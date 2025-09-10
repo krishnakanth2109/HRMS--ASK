@@ -34,13 +34,14 @@ const EmployeeDashboard = () => {
 
   const today = new Date().toISOString().split("T")[0];
 
+  // --- AI Voice Synthesis Function ---
+  // This function uses the browser's built-in capabilities to generate speech.
   const speak = (text) => {
+    // Check if the browser supports the Speech Synthesis API
     if ('speechSynthesis' in window) {
-      // Cancel any previous speech to prevent overlap
-      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1.1;
+      utterance.rate = 0.9; // Speed of the speech
+      utterance.pitch = 1.1; // Pitch of the voice
       window.speechSynthesis.speak(utterance);
     } else {
       console.log("Sorry, your browser does not support text-to-speech.");
@@ -73,29 +74,21 @@ const EmployeeDashboard = () => {
     bootstrap();
   }, [user, loadAttendance]);
 
-  // --- CORRECTED handlePunch Function ---
   const handlePunch = async (action) => {
     if (!user) return;
     try {
-      let speakText = ""; // Define a variable to hold the text to be spoken
-
       if (action === "IN") {
         await punchIn({ employeeId: user.employeeId, employeeName: user.name });
-        speakText = `${user.name}, punch in successful`;
+         // Speaks with the employee's name
+        speak('${user.name}, punch in successful'); 
       } else {
         await punchOut({ employeeId: user.employeeId });
-        speakText = `${user.name}, punch out successful`;
+        // Speaks with the employee's name
+        speak('${user.name}, punch out successful');
       }
-
-      // First, wait for the attendance data to be reloaded and state to be updated
       await loadAttendance(user.employeeId);
-
-      // NOW, with all async work done, trigger the speech
-      speak(speakText);
-
     } catch (err) {
       console.error("Punch error:", err);
-      speak("Sorry, the action failed. Please try again.");
     }
   };
 
@@ -132,7 +125,7 @@ const EmployeeDashboard = () => {
       <div className="flex flex-col md:flex-row items-center bg-gradient-to-r from-blue-100 to-blue-50 rounded-2xl shadow-lg p-6 mb-8 gap-6">
         <img
           alt="Employee"
-          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`}
+          src={'https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128'}
           className="w-28 h-28 rounded-full border-4 border-white shadow"
         />
         <div className="flex-1">
@@ -147,7 +140,7 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* Daily Attendance */}
+      {/* Daily Attendance -- UPDATED with animation class */}
       <div className="bg-gradient-to-br from-gray-50 to-blue-100 rounded-2xl shadow-lg p-6 mb-8 animate-fade-in">
         <div className="flex items-center mb-6 gap-3 border-b border-gray-200 pb-4">
           <FaRegClock className="text-blue-600 text-2xl" />
@@ -168,6 +161,7 @@ const EmployeeDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white">
+              {/* UPDATED table row with animation class */}
               <tr className="text-gray-700 border-b border-gray-200 hover:bg-gray-100 transition-colors duration-200 animate-fade-in-up">
                 <td className="px-4 py-3 font-medium">{today}</td>
                 <td className="px-4 py-3">{todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}</td>
@@ -186,11 +180,13 @@ const EmployeeDashboard = () => {
                 </td>
                 <td className="px-4 py-3 text-center">
                   {!todayLog?.punchIn ? (
+                    // UPDATED Punch In button with dynamic classes
                     <button className="bg-green-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-600 active:scale-95 transform transition-transform duration-150"
                       onClick={() => handlePunch("IN")}>
                       Punch In
                     </button>
                   ) : !todayLog?.punchOut ? (
+                    // UPDATED Punch Out button with dynamic classes
                     <button className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600 active:scale-95 transform transition-transform duration-150"
                       onClick={() => handlePunch("OUT")}>
                       Punch Out
@@ -202,7 +198,7 @@ const EmployeeDashboard = () => {
           </table>
         </div>
 
-        {/* View History Button */}
+        {/* View History Button - UPDATED with dynamic classes */}
         <div className="text-right mt-6">
           <button
             onClick={() => navigate("/employee/my-attendence")}
