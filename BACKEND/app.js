@@ -7,6 +7,8 @@ import cors from "cors";
 import mongoose from "mongoose"; // ✅ Import mongoose
 import employeeRoutes from "./routes/employeeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import holidayRoutes from "./routes/holidayRoutes.js";
+import noticeRoutes from "./routes/noticeRoutes.js";
 
 const app = express();
 
@@ -31,6 +33,8 @@ mongoose.connect(mongoUri)
 // --- API Routes ---
 app.use("/employees", employeeRoutes);
 app.use("/attendance", attendanceRoutes);
+app.use("/api/holidays", holidayRoutes);
+app.use("/api/notices", noticeRoutes);
 
 
 // --- Server Listener ---

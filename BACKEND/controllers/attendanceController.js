@@ -1,4 +1,4 @@
-import EmployeeAttendance from "../modal/EmployeeAttendance.js";
+import EmployeeAttendance from "../models/EmployeeAttendance.js";
 
 // ✅ Punch In
 export const punchIn = async (req, res) => {

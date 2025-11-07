@@ -1,334 +1,308 @@
-import React, { useContext, useState, useRef } from "react";
-import { HolidayCalendarContext } from "../context/HolidayCalendarContext";
-import { FaPlus, FaEdit, FaTrash, FaFilter, FaFileImport } from "react-icons/fa";
-import * as XLSX from "xlsx";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
 
-const AdminHolidayCalendarPage = () => {
-  const { holidays, addHoliday, editHoliday, deleteHoliday, setAllHolidays } = useContext(HolidayCalendarContext);
+const HolidayCalendar = () => {
+  const [holidayData, setHolidayData] = useState({
+    name: "",
+    description: "",
+    date: "",
+  });
+  const [holidays, setHolidays] = useState([]);
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Default filter: current month and year
-  const now = new Date();
-  const defaultMonth = String(now.getMonth() + 1).padStart(2, "0");
-  const defaultYear = String(now.getFullYear());
+  // Fetch all holidays
+  const fetchHolidays = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/holidays");
+      setHolidays(res.data);
+    } catch (err) {
+      console.error("Error fetching holidays:", err);
+    }
+  };
 
-  const [form, setForm] = useState({ name: "", date: "", description: "" });
-  const [editingId, setEditingId] = useState(null);
+  useEffect(() => {
+    fetchHolidays();
+  }, []);
 
-  // Filter state
-  const [filterMonth, setFilterMonth] = useState(defaultMonth);
-  const [filterYear, setFilterYear] = useState(defaultYear);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [importing, setImporting] = useState(false);
+  // Handle form input
+  const handleChange = (e) => {
+    setHolidayData({ ...holidayData, [e.target.name]: e.target.value });
+  };
 
-  // Modal state for import guidance
-  const [showImportModal, setShowImportModal] = useState(false);
-  const fileInputRef = useRef(null);
-
-  // Get filtered holidays, sorted by date ascending
-  const filteredHolidays = holidays
-    .filter(h => (filterMonth ? h.date.startsWith(`${filterYear}-${filterMonth}`) : h.date.startsWith(filterYear)))
-    .filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()) || h.description?.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const handleSubmit = (e) => {
+  // Add holiday
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.date) return;
-    if (editingId) {
-      editHoliday(editingId, form);
-      setEditingId(null);
-    } else {
-      addHoliday(form);
+    setIsLoading(true);
+    try {
+      await axios.post("http://localhost:5000/api/holidays", holidayData);
+      setMessage("✅ Holiday added successfully!");
+      setHolidayData({ name: "", description: "", date: "" });
+      fetchHolidays();
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ Failed to add holiday.");
+    } finally {
+      setIsLoading(false);
     }
-    setForm({ name: "", date: "", description: "" });
   };
 
-  const handleEdit = (holiday) => {
-    setForm({ name: holiday.name, date: holiday.date, description: holiday.description });
-    setEditingId(holiday.id);
+  // Delete holiday
+  const deleteHoliday = async (id) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/holidays/${id}`);
+      setMessage("🗑️ Holiday deleted successfully!");
+      fetchHolidays();
+    } catch (err) {
+      console.error(err);
+      setMessage("❌ Failed to delete holiday.");
+    }
   };
 
-  const handleCancel = () => {
-    setForm({ name: "", date: "", description: "" });
-    setEditingId(null);
-  };
-
-  // Excel import handler
-  const handleExcelImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setImporting(true);
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-      // Validate header row
-      const headerRow = rows[0] || [];
-      const expectedHeaders = ["Name", "Date", "Description"];
-      const headerValid = expectedHeaders.every((col, idx) =>
-        headerRow[idx] && headerRow[idx].toString().trim().toLowerCase() === col.toLowerCase()
+  // Highlight holidays in calendar
+  const tileClassName = ({ date, view }) => {
+    if (view === "month") {
+      const isHoliday = holidays.some(
+        (holiday) => new Date(holiday.date).toDateString() === date.toDateString()
       );
-      if (!headerValid) {
-        console.error("Excel import failed: Invalid header row. Expected columns: Name, Date, Description.");
-        setImporting(false);
-        e.target.value = "";
-        return;
-      }
-
-      // Collect valid holidays
-      const importedHolidays = [];
-      rows.slice(1).forEach((row, i) => {
-        if (row[0] && row[1]) {
-          importedHolidays.push({
-            id: Date.now() + i, // Unique id
-            name: row[0],
-            date: row[1],
-            description: row[2] || ""
-          });
-        }
-      });
-
-      setAllHolidays(importedHolidays);
-      setImporting(false);
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-  };
-
-  // Month options for dropdown
-  const monthOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-
-  // Year options for dropdown (current year +/- 2)
-  const currentYear = new Date().getFullYear();
-  const yearOptions = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(String);
-
-  // Show modal instead of file dialog
-  const handleImportClick = () => {
-    setShowImportModal(true);
-  };
-
-  const handleProceedImport = () => {
-    setShowImportModal(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+      return isHoliday 
+        ? "bg-gradient-to-br from-red-500 to-pink-600 text-white font-bold rounded-full shadow-lg transform scale-110 transition-all duration-200" 
+        : "hover:bg-gray-100 transition-colors duration-200";
     }
   };
 
-  const handleCancelImport = () => {
-    setShowImportModal(false);
-  };
+  // Custom calendar styling
+  const calendarStyles = `
+    .react-calendar {
+      border: none;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      border-radius: 1rem;
+      padding: 1rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .react-calendar__navigation button {
+      color: #3b82f6;
+      font-weight: bold;
+      font-size: 1.1rem;
+      min-width: 44px;
+      background: none;
+      border: none;
+      margin: 0 5px;
+      border-radius: 0.5rem;
+      transition: all 0.3s ease;
+    }
+    .react-calendar__navigation button:hover {
+      background: #3b82f6;
+      color: white;
+      transform: translateY(-2px);
+    }
+    .react-calendar__tile {
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      margin: 2px;
+    }
+    .react-calendar__tile:enabled:hover {
+      background: #3b82f6;
+      color: white;
+      transform: scale(1.1);
+    }
+    .react-calendar__tile--active {
+      background: #3b82f6 !important;
+      color: white;
+      transform: scale(1.1);
+    }
+  `;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-3xl font-bold text-blue-800 flex items-center gap-3">
-          <FaPlus className="text-blue-400" /> Holiday Calendar Management
-        </h2>
-        <button
-          type="button"
-          className="flex items-center gap-2 cursor-pointer bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-lg shadow font-semibold text-blue-700 transition"
-          onClick={handleImportClick}
-          disabled={importing}
-        >
-          <FaFileImport className="text-xl" />
-          <span>Import Excel</span>
-        </button>
-        {/* Hidden file input for actual import */}
-        <input
-          type="file"
-          accept=".xlsx,.xls"
-          className="hidden"
-          ref={fileInputRef}
-          onChange={handleExcelImport}
-          disabled={importing}
-        />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-10 px-4 flex flex-col items-center">
+      <style>{calendarStyles}</style>
+      
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          🎊 Holiday Management System
+        </h1>
+        <p className="text-gray-600 text-lg">Manage and view all company holidays</p>
       </div>
 
-      {/* Import Guidance Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full border border-blue-200">
-            <h3 className="text-2xl font-bold text-blue-700 mb-4 flex items-center gap-2">
-              <FaFileImport className="text-blue-400" /> Import Holidays from Excel
-            </h3>
-            <div className="mb-4 text-gray-700">
-              <p className="mb-2">
-                <span className="font-semibold text-red-600">Warning:</span> This process will <span className="font-bold">replace all existing holiday data</span> with the contents of your Excel file.
-              </p>
-              <p className="mb-2">
-                Please ensure your Excel file has the following column headers in the <span className="font-semibold">first row</span>:
-              </p>
-              <ul className="list-disc pl-6 mb-2">
-                <li><span className="font-mono text-blue-700">Name</span></li>
-                <li><span className="font-mono text-blue-700">Date</span> <span className="text-gray-500">(YYYY-MM-DD)</span></li>
-                <li><span className="font-mono text-blue-700">Description</span></li>
-              </ul>
-              <p className="mb-2">
-                <span className="font-semibold">Example:</span>
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded p-2 text-sm font-mono mb-2">
-                Name | Date | Description<br />
-                New Year's Day | 2025-01-01 | First day of the year
-              </div>
-            </div>
-            <div className="flex gap-4 justify-end mt-6">
-              <button
-                className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition font-semibold shadow"
-                onClick={handleProceedImport}
-                disabled={importing}
-              >
-                Proceed with Import
-              </button>
-              <button
-                className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-gray-500 transition font-semibold shadow"
-                onClick={handleCancelImport}
-                disabled={importing}
-              >
-                Cancel
-              </button>
-            </div>
+      {/* Form */}
+      <div className="bg-white/80 backdrop-blur-sm shadow-2xl rounded-3xl p-8 w-full max-w-lg mb-10 border border-white/20">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+            <span className="text-2xl text-white">🎉</span>
           </div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Add New Holiday
+          </h2>
         </div>
-      )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-6 mb-10 flex flex-col gap-6 border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-6">
-          <input
-            type="text"
-            placeholder="Holiday Name"
-            className="border rounded-lg px-4 py-3 flex-1 text-lg focus:ring-2 focus:ring-blue-200"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <input
-            type="date"
-            className="border rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-blue-200"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            required
-          />
-        </div>
-        <textarea
-          placeholder="Description (optional)"
-          className="border rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-blue-200"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div className="flex gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 text-lg">
+              Holiday Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={holidayData.name}
+              onChange={handleChange}
+              required
+              placeholder="Enter holiday name"
+              className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 outline-none transition-all duration-300 bg-white/50 backdrop-blur-sm"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 text-lg">
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={holidayData.description}
+              onChange={handleChange}
+              required
+              rows="3"
+              placeholder="Enter holiday details"
+              className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 outline-none transition-all duration-300 bg-white/50 backdrop-blur-sm resize-none"
+            ></textarea>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 text-lg">
+              Date
+            </label>
+            <input
+              type="date"
+              name="date"
+              value={holidayData.date}
+              onChange={handleChange}
+              required
+              className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 outline-none transition-all duration-300 bg-white/50 backdrop-blur-sm"
+            />
+          </div>
+
           <button
             type="submit"
-            className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition font-semibold shadow"
+            disabled={isLoading}
+            className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg ${
+              isLoading 
+                ? "bg-gray-400 cursor-not-allowed" 
+                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            } text-white`}
           >
-            {editingId ? "Update Holiday" : "Add Holiday"}
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
+                Adding...
+              </div>
+            ) : (
+              "Add Holiday ✨"
+            )}
           </button>
-          {editingId && (
-            <button
-              type="button"
-              className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-gray-500 transition font-semibold shadow"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-6 items-center mb-6">
-          <div className="flex items-center gap-3">
-            <FaFilter className="text-blue-500" />
-            <select
-              value={filterYear}
-              onChange={e => setFilterYear(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-gray-700 font-semibold focus:ring-2 focus:ring-blue-200"
-            >
-              {yearOptions.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <select
-              value={filterMonth}
-              onChange={e => setFilterMonth(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-gray-700 font-semibold focus:ring-2 focus:ring-blue-200"
-            >
-              <option value="">All Months</option>
-              {monthOptions.map(m => (
-                <option key={m} value={m}>
-                  {new Date(`${currentYear}-${m}-01`).toLocaleString("default", { month: "long" })}
-                </option>
-              ))}
-            </select>
+        </form>
+
+        {message && (
+          <div className={`mt-6 p-4 rounded-2xl text-center font-semibold animate-pulse ${
+            message.includes("✅") || message.includes("successfully") 
+              ? "bg-green-100 text-green-700 border border-green-200" 
+              : "bg-red-100 text-red-700 border border-red-200"
+          }`}>
+            {message}
           </div>
-          <input
-            type="text"
-            placeholder="Search by name or description"
-            className="border rounded-lg px-3 py-2 flex-1 text-lg focus:ring-2 focus:ring-blue-200"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+        )}
+      </div>
+
+      {/* List of holidays */}
+      <div className="w-full max-w-6xl mb-10">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+            <span className="text-2xl text-white">📋</span>
+          </div>
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+            All Holidays
+          </h3>
         </div>
-        <h3 className="text-xl font-semibold mb-4 text-blue-700">Holiday List</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border border-gray-200 rounded-xl shadow-sm bg-white">
-            <thead>
-              <tr className="bg-blue-50 text-blue-900">
-                <th className="py-3 px-4 font-semibold">Name</th>
-                <th className="py-3 px-4 font-semibold">Date</th>
-                <th className="py-3 px-4 font-semibold">Description</th>
-                <th className="py-3 px-4 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredHolidays.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="text-center py-6 text-gray-400 text-lg">
-                    No holidays found.
-                  </td>
-                </tr>
-              )}
-              {filteredHolidays.map((holiday) => {
-                const todayStr = new Date().toISOString().slice(0, 10);
-                const isFuture = holiday.date > todayStr;
-                return (
-                  <tr key={holiday.id} className="border-b last:border-b-0 hover:bg-blue-50 transition">
-                    <td className="py-3 px-4 font-medium text-lg">{holiday.name}</td>
-                    <td className="py-3 px-4 text-base">{holiday.date}</td>
-                    <td className="py-3 px-4 text-base">{holiday.description}</td>
-                    <td className="py-3 px-4 flex gap-2">
-                      {isFuture && (
-                        <>
-                          <button
-                            className="text-blue-600 hover:text-blue-800 bg-blue-100 rounded-full p-2 transition"
-                            onClick={() => handleEdit(holiday)}
-                            title="Edit"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            className="text-red-600 hover:text-red-800 bg-red-100 rounded-full p-2 transition"
-                            onClick={() => deleteHoliday(holiday.id)}
-                            title="Delete"
-                          >
-                            <FaTrash />
-                          </button>
-                        </>
-                      )}
-                      {!isFuture && (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Locked</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        
+        {holidays.length === 0 ? (
+          <div className="text-center py-12 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20">
+            <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📅</span>
+            </div>
+            <p className="text-gray-500 text-xl">No holidays added yet.</p>
+            <p className="text-gray-400 mt-2">Add your first holiday above!</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {holidays.map((holiday, index) => (
+              <div
+                key={holiday._id}
+                className="bg-white/80 backdrop-blur-sm shadow-xl p-6 rounded-3xl border-l-4 border-blue-500 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 group"
+                style={{
+                  animationDelay: `${index * 100}ms`,
+                  animation: `slideInUp 0.5s ease-out ${index * 100}ms both`
+                }}
+              >
+                <style>{`
+                  @keyframes slideInUp {
+                    from {
+                      opacity: 0;
+                      transform: translateY(30px);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateY(0);
+                    }
+                  }
+                `}</style>
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors duration-300">
+                    {holiday.name}
+                  </h4>
+                  <span className="text-2xl">🎊</span>
+                </div>
+                <p className="text-gray-600 mb-4 leading-relaxed">{holiday.description}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                    📅 {new Date(holiday.date).toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </p>
+                  <button
+                    onClick={() => deleteHoliday(holiday._id)}
+                    className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 py-2 rounded-xl hover:from-red-600 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg font-semibold"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Calendar */}
+      <div className="bg-white/80 backdrop-blur-sm shadow-2xl rounded-3xl p-8 w-full max-w-4xl border border-white/20">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+            <span className="text-2xl text-white">📅</span>
+          </div>
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+            Holiday Calendar
+          </h3>
         </div>
+        <Calendar 
+          tileClassName={tileClassName}
+          className="mx-auto"
+        />
+   
       </div>
     </div>
   );
 };
 
-export default AdminHolidayCalendarPage;
+export default HolidayCalendar;
