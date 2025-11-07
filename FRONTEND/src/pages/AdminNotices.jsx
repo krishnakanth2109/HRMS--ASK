@@ -1,272 +1,226 @@
-import React, { useState, useContext } from "react";
-import { PlusCircle, Edit, Trash, X, Save, RotateCcw } from "lucide-react";
-import { NoticeContext } from "../context/NoticeContext";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-const AdminNotices = () => {
-  const { notices, addNotice, updateNotice, deleteNotice } = useContext(NoticeContext);
-  const [title, setTitle] = useState("");
+const NoticeForm = () => {
+  const [noticeData, setNoticeData] = useState({
+    title: "",
+    description: "",
+    date: "",
+  });
   const [message, setMessage] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [notification, setNotification] = useState({ message: "", type: "" });
-  const [editId, setEditId] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editMessage, setEditMessage] = useState("");
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [noticeToDelete, setNoticeToDelete] = useState(null);
+  const [notices, setNotices] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Function to show a temporary notification
-  const showNotification = (msg, type) => {
-    setNotification({ message: msg, type: type });
-    setTimeout(() => {
-      setNotification({ message: "", type: "" });
-    }, 3000);
+  // Fetch all notices
+  const fetchNotices = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/notices");
+      setNotices(res.data);
+    } catch (error) {
+      console.error("Error fetching notices:", error);
+    }
   };
 
-  // Handles adding a new notice
-  const handlePostNotice = (e) => {
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  // Handle input changes
+  const handleChange = (e) => {
+    setNoticeData({ ...noticeData, [e.target.name]: e.target.value });
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !message.trim()) {
-      showNotification("Title and message are required.", "error");
-      return;
-    }
-    setPosting(true);
-    setTimeout(() => {
-      addNotice(title, message, "Admin");
-      setTitle("");
-      setMessage("");
-      setPosting(false);
-      showNotification("Notice posted successfully!", "success");
-    }, 700);
-  };
-
-  // Handles deleting a notice with confirmation modal
-  const handleDelete = () => {
-    if (noticeToDelete) {
-      deleteNotice(noticeToDelete.id);
-      setShowDeleteModal(false);
-      setNoticeToDelete(null);
-      showNotification("Notice deleted successfully.", "success");
+    setIsSubmitting(true);
+    try {
+      await axios.post("http://localhost:5000/api/notices", noticeData);
+      setMessage("✅ Notice posted successfully!");
+      setNoticeData({ title: "", description: "", date: "" });
+      fetchNotices(); // Refresh notices after posting
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ Failed to post notice.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const openDeleteModal = (notice) => {
-    setNoticeToDelete(notice);
-    setShowDeleteModal(true);
-  };
-  
-  // Handles starting the edit mode
-  const startEdit = (notice) => {
-    setEditId(notice.id);
-    setEditTitle(notice.title);
-    setEditMessage(notice.message);
+  // Dynamic color based on message type
+  const getMessageColor = () => {
+    if (message.includes("✅")) return "text-green-600 bg-green-50 border-green-200";
+    if (message.includes("❌")) return "text-red-600 bg-red-50 border-red-200";
+    return "text-blue-600 bg-blue-50 border-blue-200";
   };
 
-  // Handles canceling the edit mode
-  const cancelEdit = () => {
-    setEditId(null);
-    setEditTitle("");
-    setEditMessage("");
+  // Dynamic border colors for notice cards
+  const getNoticeBorderColor = (index) => {
+    const colors = [
+      "border-blue-500", "border-green-500", "border-purple-500", 
+      "border-orange-500", "border-pink-500", "border-indigo-500"
+    ];
+    return colors[index % colors.length];
   };
 
-  // Handles saving an edited notice
-  const handleEditSave = (id) => {
-    if (!editTitle.trim() || !editMessage.trim()) {
-      showNotification("Title and message are required.", "error");
-      return;
-    }
-    updateNotice(id, editTitle, editMessage);
-    cancelEdit();
-    showNotification("Notice updated successfully!", "success");
+  // Dynamic background for notice cards
+  const getNoticeBackground = (index) => {
+    const backgrounds = [
+      "bg-gradient-to-br from-blue-50 to-white",
+      "bg-gradient-to-br from-green-50 to-white", 
+      "bg-gradient-to-br from-purple-50 to-white",
+      "bg-gradient-to-br from-orange-50 to-white",
+      "bg-gradient-to-br from-pink-50 to-white"
+    ];
+    return backgrounds[index % backgrounds.length];
   };
 
-  // ...existing code for rendering, notification toast, and modal...
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center p-4 bg-gray-100 font-sans antialiased">
-      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 border border-gray-200">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
-          <div className="flex items-center gap-4 mb-4 sm:mb-0">
-            <div className="p-3 bg-blue-500 rounded-full text-white shadow-lg">
-              <PlusCircle className="h-6 w-6" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight leading-tight">Admin Notices</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-10 px-4 flex flex-col items-center">
+      {/* Form Section */}
+      <div className="bg-white shadow-2xl rounded-3xl p-8 w-full max-w-lg mb-12 transform hover:scale-[1.01] transition-all duration-300 border border-gray-100">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">📢</span>
           </div>
-          <p className="text-sm text-gray-500 font-medium">
-            <span className="font-semibold text-gray-700">Today:</span> {new Date().toLocaleDateString()}
-          </p>
-        </header>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Post a New Notice
+          </h2>
+          <p className="text-gray-500 mt-2">Share important updates with your community</p>
+        </div>
 
-        {/* Post Notice Form */}
-        <section className="mb-10 bg-blue-50 rounded-2xl p-6 sm:p-8 shadow-inner border border-blue-100">
-          <form onSubmit={handlePostNotice} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="title" className="block font-semibold text-gray-700 mb-2 text-sm">Title</label>
-                <input
-                  id="title"
-                  type="text"
-                  className="w-full px-4 py-2 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-base font-medium transition-colors"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Important Policy Update"
-                  disabled={posting}
-                  maxLength={60}
-                />
-              </div>
-              <div>
-                <label htmlFor="message" className="block font-semibold text-gray-700 mb-2 text-sm">Message</label>
-                <textarea
-                  id="message"
-                  className="w-full px-4 py-2 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-sm font-normal transition-colors"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Write the full notice details here..."
-                  rows={3}
-                  disabled={posting}
-                  maxLength={300}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-6 py-2 rounded-full bg-blue-600 text-white font-bold shadow-lg hover:bg-blue-700 transition transform hover:scale-105 disabled:bg-blue-400 disabled:transform-none"
-                disabled={posting}
-              >
-                {posting ? (
-                  <>
-                    <RotateCcw className="h-4 w-4 animate-spin" />
-                    Posting...
-                  </>
-                ) : (
-                  <>
-                    <PlusCircle className="h-4 w-4" />
-                    Post Notice
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </section>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Notice Title
+            </label>
+            <input
+              type="text"
+              name="title"
+              value={noticeData.title}
+              onChange={handleChange}
+              required
+              placeholder="Enter a compelling title..."
+              className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-300 bg-gray-50 hover:bg-white"
+            />
+          </div>
 
-        {/* All Notices List */}
-        <section>
-          <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">All Notices</h3>
-          <div className="grid gap-6">
-            {notices.length === 0 ? (
-              <div className="text-gray-500 text-center py-12 text-lg font-medium bg-gray-50 rounded-xl border border-gray-200">
-                No notices posted yet.
-              </div>
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 flex items-center">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={noticeData.description}
+              onChange={handleChange}
+              required
+              rows="4"
+              placeholder="Provide detailed information..."
+              className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition-all duration-300 resize-none bg-gray-50 hover:bg-white"
+            ></textarea>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-semibold text-gray-700 mb-2 flex items-center">
+              <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+              Date
+            </label>
+            <input
+              type="date"
+              name="date"
+              value={noticeData.date}
+              onChange={handleChange}
+              required
+              className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all duration-300 bg-gray-50 hover:bg-white"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`w-full py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] ${
+              isSubmitting 
+                ? "bg-gray-400 cursor-not-allowed" 
+                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+            }`}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center">
+                <div className="w-5 h-5 border-t-2 border-white border-solid rounded-full animate-spin mr-2"></div>
+                Posting...
+              </span>
             ) : (
-              notices.map((notice) => (
-                <div key={notice.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-md group relative transition-all duration-300 hover:shadow-xl">
-                  {editId === notice.id ? (
-                    // Edit mode UI
-                    <div className="space-y-4">
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold text-gray-700 text-lg transition-colors"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        placeholder="Edit title"
-                        maxLength={60}
-                      />
-                      <textarea
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-base transition-colors"
-                        value={editMessage}
-                        onChange={(e) => setEditMessage(e.target.value)}
-                        placeholder="Edit message"
-                        rows={3}
-                        maxLength={300}
-                      />
-                      <div className="flex gap-3 justify-end pt-2">
-                        <button
-                          className="flex items-center gap-1 px-4 py-2 rounded-full bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 transition transform hover:scale-105"
-                          onClick={() => handleEditSave(notice.id)}
-                          type="button"
-                        >
-                          <Save className="h-4 w-4" />
-                          Save
-                        </button>
-                        <button
-                          className="flex items-center gap-1 px-4 py-2 rounded-full bg-gray-300 text-gray-700 font-bold shadow-md hover:bg-gray-400 transition transform hover:scale-105"
-                          onClick={cancelEdit}
-                          type="button"
-                        >
-                          <X className="h-4 w-4" />
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Read-only mode UI
-                    <>
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-bold text-gray-800 text-xl tracking-tight leading-snug">{notice.title}</h4>
-                        <span className="text-xs text-gray-500 font-mono bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
-                          {notice.date}
-                        </span>
-                      </div>
-                      <p className="text-gray-700 mb-2 text-base leading-relaxed">{notice.message}</p>
-                      <p className="text-xs text-gray-500 font-semibold mt-4">Posted by {notice.author}</p>
-                      <div className="absolute right-4 top-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <button
-                          className="p-2 rounded-full bg-yellow-400 text-white shadow-md hover:bg-yellow-500 transition transform hover:scale-110"
-                          onClick={() => startEdit(notice)}
-                          title="Edit"
-                          type="button"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="p-2 rounded-full bg-red-500 text-white shadow-md hover:bg-red-600 transition transform hover:scale-110"
-                          onClick={() => openDeleteModal(notice)}
-                          title="Delete"
-                          type="button"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))
+              "📝 Post Notice"
             )}
+          </button>
+        </form>
+
+        {message && (
+          <div className={`mt-6 p-4 rounded-xl border-2 text-center font-medium transition-all duration-300 animate-pulse ${getMessageColor()}`}>
+            {message}
           </div>
-        </section>
+        )}
       </div>
 
-      {/* Notification Toast */}
-      {notification.message && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-semibold shadow-xl transition-all duration-300 ease-in-out z-50 transform ${notification.type === "success" ? "bg-green-500" : "bg-red-500"}`}>
-          {notification.message}
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full text-center">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this notice?</p>
-            <div className="flex gap-4 justify-center">
-              <button
-                className="px-6 py-2 rounded-full bg-red-500 text-white font-bold shadow-md hover:bg-red-600 transition transform hover:scale-105"
-                onClick={handleDelete}
-              >
-                Delete
-              </button>
-              <button
-                className="px-6 py-2 rounded-full bg-gray-300 text-gray-700 font-bold shadow-md hover:bg-gray-400 transition transform hover:scale-105"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
+      {/* Notice Display Section */}
+      <div className="w-full max-w-6xl">
+        <div className="text-center mb-10">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">📄</span>
           </div>
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            All Posted Notices
+          </h3>
+          <p className="text-gray-500 mt-2">Stay updated with recent announcements</p>
         </div>
-      )}
+
+        {notices.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-3xl shadow-lg border-2 border-dashed border-gray-300">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📋</span>
+            </div>
+            <p className="text-gray-500 text-lg">No notices posted yet.</p>
+            <p className="text-gray-400 mt-1">Be the first to share an update!</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {notices.map((notice, index) => (
+              <div
+                key={notice._id}
+                className={`${getNoticeBackground(index)} p-6 rounded-2xl shadow-lg border-t-4 ${getNoticeBorderColor(index)} transform hover:scale-[1.02] hover:shadow-xl transition-all duration-300 group`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <h4 className="text-xl font-bold text-gray-800 group-hover:text-gray-900 transition-colors line-clamp-2">
+                    {notice.title}
+                  </h4>
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                    <span className="text-sm">📌</span>
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 mb-4 line-clamp-3 group-hover:text-gray-700 transition-colors">
+                  {notice.description}
+                </p>
+                
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <p className="text-sm font-medium text-gray-500 flex items-center">
+                    <span className="w-2 h-2 bg-current rounded-full mr-2"></span>
+                    📅 {new Date(notice.date).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default AdminNotices;
+export default NoticeForm;
