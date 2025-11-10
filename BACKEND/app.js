@@ -8,7 +8,9 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
 import noticeRoutes from "./routes/noticeRoutes.js";
-import leaveRoutes from "./routes/leaveRoutes.js"
+import leaveRoutes from "./routes/leaveRoutes.js";
+// Make sure you have an authRoutes file for this import
+
 
 
 const app = express();
@@ -19,8 +21,8 @@ const allowedOrigins = [
   'http://localhost:5173',  // Vite default port
   'http://127.0.0.1:5173',
   'http://localhost:5000',
-  'https://hrms-420.netlify.app/',
-  ''  // Localhost alternative
+  'https://hrms-420.netlify.app',
+  'https://hrms-ask.onrender.com'
 ];
 
 const corsOptions = {
@@ -82,11 +84,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// --- API Routes ---
-app.use("/employees", employeeRoutes);
-app.use("/attendance", attendanceRoutes);
+// --- API Routes (CORRECTED FOR CONSISTENCY) ---
+ // Added for login functionality
+app.use("/api/employees", employeeRoutes); // ✅ FIXED
+app.use("/api/attendance", attendanceRoutes); // ✅ FIXED
 app.use("/api/holidays", holidayRoutes);
 app.use("/api/notices", noticeRoutes);
+app.use("/api/leaves", leaveRoutes); // Added for leave management
 
 // --- 404 Handler ---
 app.use('*', (req, res) => {

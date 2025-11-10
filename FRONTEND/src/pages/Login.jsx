@@ -6,10 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import logo from "../assets/logo.png";
-import { loginUser } from "../api.js"; // Import the centralized API function
 
 const Login = () => {
-  // The login function from context will now likely call our API
   const { user, login } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -39,20 +37,12 @@ const Login = () => {
     setError(""); // Clear previous errors
 
     try {
-      // Use the login function from AuthContext, which should internally call your API.
-      // This is a more robust pattern than calling the API directly in the component.
-      // Your AuthContext's login function would look something like:
-      // const login = async (email, password) => {
-      //   const userData = await loginUser(email, password);
-      //   setUser(userData);
-      //   return userData.role;
-      // };
+      // Use the login function from AuthContext which internally uses the API
+      const role = await login(email, password);
 
-      const result = await login(email, password); // Using the context login function
-
-      if (result === "admin") {
+      if (role === "admin") {
         navigate("/admin/dashboard");
-      } else if (result === "employee") {
+      } else if (role === "employee") {
         navigate("/employee/dashboard");
       }
     } catch (err) {
@@ -263,3 +253,4 @@ const Login = () => {
 };
 
 export default Login;
+// --- END OF FILE Login.jsx ---

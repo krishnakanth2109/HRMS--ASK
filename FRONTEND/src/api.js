@@ -2,15 +2,24 @@
 
 import axios from "axios";
 
-// Determine the base URL based on the environment
+// ✅ FIXED: Use import.meta.env.MODE instead of process.env.NODE_ENV
+// Vite sets MODE to 'production' during build and 'development' during dev
 const baseURL =
-  process.env.NODE_ENV === "production"
+  import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
     : import.meta.env.VITE_API_URL_DEVELOPMENT;
 
-// Create an Axios instance with the base URL
+// Debug logs (remove in production)
+console.log("🔧 Environment Mode:", import.meta.env.MODE);
+console.log("🌐 API Base URL:", baseURL);
+
+// Create an Axios instance that will use the correct base URL automatically.
 const api = axios.create({
   baseURL: baseURL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
 
 /**
@@ -47,13 +56,18 @@ export const deleteHolidayById = async (id) => {
 };
 
 // ------------------ Employee API Calls ------------------
+export const getEmployees = async () => {
+  const response = await api.get("/api/employees");
+  return response.data;
+};
+
 export const getEmployeeById = async (id) => {
-  const response = await api.get(`/employees/${id}`);
+  const response = await api.get(`/api/employees/${id}`);
   return response.data;
 };
 
 export const updateEmployeeById = async (id, employeeData) => {
-  const response = await api.put(`/employees/${id}`, employeeData);
+  const response = await api.put(`/api/employees/${id}`, employeeData);
   return response.data;
 };
 
@@ -68,5 +82,6 @@ export const addNotice = async (noticeData) => {
   return response.data;
 };
 
-
 export default api;
+
+// --- END OF FILE api.js ---
