@@ -9,12 +9,18 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
 import noticeRoutes from "./routes/noticeRoutes.js";
+import leaveRoutes from "./routes/leaveRoutes.js"
+
 
 const app = express();
 
 // --- Middleware ---
 app.use(cors());
 app.use(express.json());
+
+
+
+app.use("/leaves", leaveRoutes);
 
 // --- Database Connection ---
 const mongoUri = process.env.MONGO_URI;
