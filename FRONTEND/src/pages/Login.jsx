@@ -1,3 +1,5 @@
+// --- START OF FILE Login.jsx ---
+
 import { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -29,21 +31,26 @@ const Login = () => {
     }
   }, [error]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(""); // Clear previous errors
 
-    // Fake delay for loader animation
-    setTimeout(() => {
-      const result = login(email, password);
+    try {
+      // Use the login function from AuthContext which internally uses the API
+      const role = await login(email, password);
 
-      if (result === "admin") navigate("/admin/dashboard");
-      else if (result === "employee") navigate("/employee/dashboard");
-      else {
-        setError("Invalid credentials. Try again.");
-        setLoading(false);
+      if (role === "admin") {
+        navigate("/admin/dashboard");
+      } else if (role === "employee") {
+        navigate("/employee/dashboard");
       }
-    }, 2500);
+    } catch (err) {
+      // Handle login failure
+      setError(err.response?.data?.message || "Invalid credentials. Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -118,7 +125,7 @@ const Login = () => {
             animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.05, 1] }}
             transition={{ duration: 1.2, repeat: Infinity }}
           >
-            Loading your dashboard...
+            Verifying credentials...
           </motion.p>
         </motion.div>
       ) : (
@@ -231,9 +238,12 @@ const Login = () => {
               variants={fadeIn}
               custom={5}
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 shadow"
+              disabled={loading}
+              className={`w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 shadow ${
+                loading ? "cursor-not-allowed opacity-70" : ""
+              }`}
             >
-              Login
+              {loading ? "Logging in..." : "Login"}
             </motion.button>
           </form>
         </motion.div>
@@ -243,4 +253,4 @@ const Login = () => {
 };
 
 export default Login;
- 
+// --- END OF FILE Login.jsx ---
