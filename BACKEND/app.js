@@ -8,10 +8,8 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import holidayRoutes from "./routes/holidayRoutes.js";
 import noticeRoutes from "./routes/noticeRoutes.js";
+import overtimeRoutes from "./routes/overtimeRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
-// Make sure you have an authRoutes file for this import
-
-
 
 const app = express();
 
@@ -90,51 +88,9 @@ app.use("/api/employees", employeeRoutes); // ✅ FIXED
 app.use("/api/attendance", attendanceRoutes); // ✅ FIXED
 app.use("/api/holidays", holidayRoutes);
 app.use("/api/notices", noticeRoutes);
-app.use("/api/leaves", leaveRoutes); // Added for leave management
+app.use("/api/overtime", overtimeRoutes);
+app.use("/api/leave", leaveRoutes);
 
-// --- 404 Handler ---
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
-
-// --- Global Error Handler ---
-app.use((err, req, res, next) => {
-  console.error('🚨 Error:', err.stack);
-  
-  // CORS error
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({
-      success: false,
-      message: 'CORS policy: Origin not allowed'
-    });
-  }
-  
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation Error',
-      errors: Object.values(err.errors).map(e => e.message)
-    });
-  }
-  
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    return res.status(400).json({
-      success: false,
-      message: 'Duplicate field value entered'
-    });
-  }
-  
-  // Default error
-  res.status(err.status || 500).json({
-    success: false,
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong!' : err.message
-  });
-});
 
 // --- Server Listener ---
 const PORT = process.env.PORT || 5000;
