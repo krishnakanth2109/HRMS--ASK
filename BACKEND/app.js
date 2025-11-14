@@ -20,6 +20,7 @@ import AdminAttendanceRoutes from "./routes/AdminAttendanceRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import profilePicRoutes from "./routes/ProfilePicRoute.js"; // ✅ ADD THIS LINE
 
 const app = express();
 
@@ -114,6 +115,7 @@ app.use("/api/attendance", EmployeeattendanceRoutes);
 app.use("/api/admin/attendance", AdminAttendanceRoutes);
 app.use("/api/users", userRoutes);
 app.use("/notifications", notificationRoutes);
+app.use("/api/profile", profilePicRoutes); // ✅ ADD THIS LINE
 
 // 404 Handler
 app.use("*", (req, res) => {
