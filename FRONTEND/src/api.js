@@ -78,6 +78,24 @@ export const approveLeaveRequestById = async (id) => (await api.patch(`/api/leav
 export const rejectLeaveRequestById = async (id) => (await api.patch(`/api/leaves/${id}/reject`)).data;
 export const cancelLeaveRequestById = async (id) => (await api.delete(`/api/leaves/cancel/${id}`)).data;
 
+
+/* ============================================================================
+   NOTIFICATIONS
+============================================================================ */
+export const getNotifications = async () => (await api.get("/api/notifications")).data;
+
+export const addNotificationAPI = async (data) =>
+  (await api.post("/api/notifications", data)).data;
+
+export const markNotificationAsRead = async (id) =>
+  (await api.patch(`/api/notifications/${id}`, { isRead: true })).data;
+
+export const markAllNotificationsAsRead = async () =>
+  (await api.patch(`/api/notifications/mark-all`)).data;
+
+
+
+
 /* ============================================================================
    OVERTIME
 ============================================================================ */
