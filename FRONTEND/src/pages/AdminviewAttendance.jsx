@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
-// ✅ IMPORT API for both attendance and overtime
-import { getAttendanceByDateRange, getAllOvertimeRequests } from "../api"; 
-import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaHistory } from "react-icons/fa";
+import { getAttendanceByDateRange, getAllOvertimeRequests } from "../api";
+import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt } from "react-icons/fa";
 
-// --- Helper function to calculate worked status (NO CHANGE) ---
+// Helper function to determine worked status based on punch times
 const getWorkedStatus = (punchIn, punchOut) => {
   if (!punchIn || !punchOut) {
     return "Working..";
@@ -25,8 +24,32 @@ const getWorkedStatus = (punchIn, punchOut) => {
   }
 };
 
+// ✅ Location Button Component to open Google Maps
+const LocationViewButton = ({ location }) => {
+  // If no location data, display a placeholder
+  if (!location || !location.latitude || !location.longitude) {
+    return <span className="text-slate-400">--</span>;
+  }
 
-// --- Attendance Detail Modal Component (NO CHANGE) ---
+  // Construct the Google Maps URL from coordinates
+  const mapUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+
+  return (
+    <a
+      href={mapUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-md hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+      title={location.address || 'View on Google Maps'}
+    >
+      <FaMapMarkerAlt />
+      <span>View Location</span>
+    </a>
+  );
+};
+
+
+// ✅ Attendance Detail Modal with updated Location Button
 const AttendanceDetailModal = ({ isOpen, onClose, employeeData }) => {
   if (!isOpen || !employeeData) return null;
 
@@ -37,17 +60,8 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData }) => {
       className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300"
       onClick={onClose}
     >
-      <style>{`
-        @keyframes modal-scale-in {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-modal-scale-in {
-          animation: modal-scale-in 0.3s ease-out forwards;
-        }
-      `}</style>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-transform duration-300 animate-modal-scale-in"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col transform transition-transform duration-300"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
@@ -70,7 +84,9 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData }) => {
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold">Date</th>
                   <th className="px-4 py-3 text-left font-semibold">Punch In</th>
+                  <th className="px-4 py-3 text-left font-semibold">In Location</th>
                   <th className="px-4 py-3 text-left font-semibold">Punch Out</th>
+                  <th className="px-4 py-3 text-left font-semibold">Out Location</th>
                   <th className="px-4 py-3 text-left font-semibold">Duration</th>
                   <th className="px-4 py-3 text-left font-semibold">Login Status</th>
                   <th className="px-4 py-3 text-left font-semibold">Worked Status</th>
@@ -82,27 +98,33 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData }) => {
                     <tr key={record._id || idx} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-700">{new Date(record.date).toLocaleDateString()}</td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-green-600">{record.punchIn ? new Date(record.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                      <td className="px-4 py-3">
+                        <LocationViewButton location={record.punchInLocation} />
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-red-600">{record.punchOut ? new Date(record.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                      <td className="px-4 py-3">
+                        <LocationViewButton location={record.punchOutLocation} />
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-slate-600">{record.displayTime || "0h 0m"}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${record.loginStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>
                           {record.loginStatus || "--"}
                         </span>
                       </td>
-                       <td className="px-6 py-4 whitespace-nowrap font-semibold">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                              record.workedStatus === "Full Day" ? "bg-green-100 text-green-800" :
-                              record.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" :
-                              record.workedStatus === "Quarter Day" ? "bg-red-100 text-red-800" :
-                              "bg-slate-100 text-slate-800"
-                          }`}>
-                              {record.workedStatus}
-                          </span>
+                      <td className="px-4 py-3 whitespace-nowrap font-semibold">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            record.workedStatus === "Full Day" ? "bg-green-100 text-green-800" :
+                            record.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" :
+                            record.workedStatus === "Quarter Day" ? "bg-red-100 text-red-800" :
+                            "bg-slate-100 text-slate-800"
+                        }`}>
+                            {record.workedStatus}
+                        </span>
                       </td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="6" className="text-center p-10 text-slate-500">No attendance records in this period.</td></tr>
+                  <tr><td colSpan="8" className="text-center p-10 text-slate-500">No attendance records in this period.</td></tr>
                 )}
               </tbody>
             </table>
@@ -112,7 +134,6 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData }) => {
     </div>
   );
 };
-
 
 const AdminAttendance = () => {
   const todayISO = new Date().toISOString().split("T")[0];
@@ -129,9 +150,7 @@ const AdminAttendance = () => {
   const [summaryAttendanceData, setSummaryAttendanceData] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
-  // ✅ NEW: State to store overtime data
   const [overtimeData, setOvertimeData] = useState([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
@@ -143,7 +162,6 @@ const AdminAttendance = () => {
     }));
   };
   
-  // ✅ NEW: Fetch all overtime requests
   const fetchOvertimeData = useCallback(async () => {
     try {
       const data = await getAllOvertimeRequests();
@@ -153,7 +171,6 @@ const AdminAttendance = () => {
       setOvertimeData([]);
     }
   }, []);
-
 
   const fetchDailyData = useCallback(async (start, end) => {
     setLoading(true);
@@ -187,7 +204,7 @@ const AdminAttendance = () => {
 
   useEffect(() => {
     fetchSummaryData(summaryStartDate, summaryEndDate);
-    fetchOvertimeData(); // Fetch OT data along with summary
+    fetchOvertimeData();
   }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData]);
 
   const dailyStats = useMemo(() => {
@@ -196,12 +213,9 @@ const AdminAttendance = () => {
     return { workingCount, completedCount };
   }, [dailyAttendanceData]);
 
-  
-  // ✅ MODIFIED: Merged Overtime counts into the summary stats
   const employeeSummaryStats = useMemo(() => {
     if (!summaryAttendanceData.length) return [];
 
-    // First, calculate approved OT counts for each employee
     const approvedOTCounts = overtimeData.reduce((acc, ot) => {
         if (ot.status === 'APPROVED') {
             acc[ot.employeeId] = (acc[ot.employeeId] || 0) + 1;
@@ -209,7 +223,6 @@ const AdminAttendance = () => {
         return acc;
     }, {});
 
-    // Then, calculate attendance summary
     const summary = summaryAttendanceData.reduce((acc, record) => {
       if (!acc[record.employeeId]) {
         acc[record.employeeId] = {
@@ -225,13 +238,11 @@ const AdminAttendance = () => {
       }
 
       const employeeRecord = acc[record.employeeId];
-      const isPresent = record.punchIn;
-
-      if (isPresent) {
+      if (record.punchIn) {
         employeeRecord.presentDays++;
         if (record.loginStatus === 'LATE') {
           employeeRecord.lateDays++;
-        } else {
+        } else if (record.loginStatus === 'ON_TIME') {
           employeeRecord.onTimeDays++;
         }
       }
@@ -243,7 +254,6 @@ const AdminAttendance = () => {
       return acc;
     }, {});
 
-    // Finally, merge OT counts into the summary and return
     return Object.values(summary)
         .map(employee => ({
             ...employee,
@@ -251,7 +261,7 @@ const AdminAttendance = () => {
         }))
         .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
-  }, [summaryAttendanceData, overtimeData]); // Dependency array now includes overtimeData
+  }, [summaryAttendanceData, overtimeData]);
 
   const exportDailyLogToExcel = () => {
     const fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
@@ -262,7 +272,9 @@ const AdminAttendance = () => {
         "Employee ID": item.employeeId,
         "Date": new Date(item.date).toLocaleDateString(),
         "Punch In": item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--",
+        "Punch In Location": item.punchInLocation?.address || "--",
         "Punch Out": item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--",
+        "Punch Out Location": item.punchOutLocation?.address || "--",
         "Duration": item.displayTime || "0h 0m",
         "Login Status": item.loginStatus || "--",
         "Worked Status": item.workedStatus,
@@ -276,7 +288,6 @@ const AdminAttendance = () => {
     FileSaver.saveAs(data, `Daily_Log_${startDate}_to_${endDate}${fileExtension}`);
   };
 
-  // ✅ MODIFIED: Added Approved OT to the Excel export
   const exportSummaryToExcel = () => {
     if (employeeSummaryStats.length === 0) {
         alert("No summary data to export for the selected range.");
@@ -290,7 +301,7 @@ const AdminAttendance = () => {
         "Present Days": item.presentDays,
         "On-Time Days": item.onTimeDays,
         "Late Days": item.lateDays,
-        "Approved OT": item.approvedOT, // New column
+        "Approved OT": item.approvedOT,
         "Full Days": item.fullDays,
         "Half Days": item.halfDays,
         "Quarter Days": item.quarterDays,
@@ -324,7 +335,7 @@ const AdminAttendance = () => {
     <div className="p-4 md:p-8 bg-slate-100 min-h-screen font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* --- UI SECTION: DAILY ATTENDANCE LOG (NO CHANGE) --- */}
+        {/* Daily Attendance Log */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
           <div className="p-5 border-b border-slate-200 bg-slate-50/50">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -358,24 +369,39 @@ const AdminAttendance = () => {
             <table className="min-w-full text-sm">
               <thead className="bg-slate-800 text-slate-100 uppercase tracking-wider">
                 <tr>
-                  {['Employee', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Login Status', 'Worked Status', 'Status'].map(h => <th key={h} className="px-6 py-4 text-left font-semibold">{h}</th>)}
+                  <th className="px-6 py-4 text-left font-semibold">Employee</th>
+                  <th className="px-6 py-4 text-left font-semibold">Date</th>
+                  <th className="px-6 py-4 text-left font-semibold">Punch In</th>
+                  <th className="px-6 py-4 text-left font-semibold">In Location</th>
+                  <th className="px-6 py-4 text-left font-semibold">Punch Out</th>
+                  <th className="px-6 py-4 text-left font-semibold">Out Location</th>
+                  <th className="px-6 py-4 text-left font-semibold">Duration</th>
+                  <th className="px-6 py-4 text-left font-semibold">Login Status</th>
+                  <th className="px-6 py-4 text-left font-semibold">Worked Status</th>
+                  <th className="px-6 py-4 text-left font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {loading ? (
-                  <tr><td colSpan="8" className="text-center p-10 text-slate-500 font-medium">Loading daily log...</td></tr>
+                  <tr><td colSpan="10" className="text-center p-10 text-slate-500 font-medium">Loading daily log...</td></tr>
                 ) : dailyAttendanceData.length === 0 ? (
-                  <tr><td colSpan="8" className="text-center p-10 text-slate-500">No records found for this date range.</td></tr>
+                  <tr><td colSpan="10" className="text-center p-10 text-slate-500">No records found for this date range.</td></tr>
                 ) : (
                   dailyAttendanceData.map((item, idx) => (
                     <tr key={item._id || idx} className="hover:bg-blue-50/60 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap"><div className="font-semibold text-slate-800">{item.employeeName}</div><div className="text-slate-500 font-mono text-xs">{item.employeeId}</div></td>
                       <td className="px-6 py-4 whitespace-nowrap text-slate-600">{new Date(item.date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                      <td className="px-6 py-4">
+                        <LocationViewButton location={item.punchInLocation} />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-red-600">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                      <td className="px-6 py-4">
+                        <LocationViewButton location={item.punchOutLocation} />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{item.displayTime || "0h 0m"}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.loginStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>{item.loginStatus || "--"}</span></td>
-                       <td className="px-6 py-4 whitespace-nowrap font-semibold">
+                      <td className="px-6 py-4 whitespace-nowrap font-semibold">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                               item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" :
                               item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" :
@@ -394,7 +420,7 @@ const AdminAttendance = () => {
           </div>
         </div>
 
-        {/* --- UI SECTION: EMPLOYEE ATTENDANCE SUMMARY --- */}
+        {/* Employee Attendance Summary */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
             <div className="p-5 border-b border-slate-200 bg-slate-50/50">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -422,7 +448,6 @@ const AdminAttendance = () => {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                   <thead className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
-                      {/* ✅ MODIFIED: Added "Approved OT" column header */}
                       <tr>
                           <th className="px-6 py-4 text-left font-semibold">Employee</th>
                           <th className="px-6 py-4 text-center font-semibold">Present</th>
@@ -447,22 +472,17 @@ const AdminAttendance = () => {
                                     <div className="font-semibold text-slate-800">{emp.employeeName}</div>
                                     <div className="text-slate-500 font-mono text-xs">{emp.employeeId}</div>
                                   </td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-blue-600">{emp.presentDays}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-green-600">{emp.onTimeDays}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-red-600">{emp.lateDays}</td>
-                                  {/* ✅ NEW: Displaying the approved OT count */}
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-indigo-600">{emp.approvedOT}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-green-500">{emp.fullDays}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-yellow-500">{emp.halfDays}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-lg text-orange-500">{emp.quarterDays}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-blue-600">{emp.presentDays}</td>
+                                  <td className="px-6 py-4 text-center font-semibold text-green-600">{emp.onTimeDays}</td>
+                                  <td className="px-6 py-4 text-center font-semibold text-red-600">{emp.lateDays}</td>
+                                  <td className="px-6 py-4 text-center font-semibold text-indigo-600">{emp.approvedOT}</td>
+                                  <td className="px-6 py-4 text-center">{emp.fullDays}</td>
+                                  <td className="px-6 py-4 text-center">{emp.halfDays}</td>
+                                  <td className="px-6 py-4 text-center">{emp.quarterDays}</td>
                                   <td className="px-6 py-4 text-center">
-                                      <button
-                                        onClick={() => handleViewDetails(emp.employeeId, emp.employeeName)}
-                                        className="flex items-center gap-1.5 bg-blue-100 text-blue-700 font-semibold px-3 py-1.5 rounded-md hover:bg-blue-200 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                      >
-                                          <FaEye />
-                                          <span>View</span>
-                                      </button>
+                                    <button onClick={() => handleViewDetails(emp.employeeId, emp.employeeName)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <FaEye />
+                                    </button>
                                   </td>
                               </tr>
                           ))
@@ -473,7 +493,7 @@ const AdminAttendance = () => {
         </div>
 
       </div>
-      
+
       <AttendanceDetailModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

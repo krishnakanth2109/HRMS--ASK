@@ -19,6 +19,7 @@ import {
   FaCalendarAlt,
   FaChartPie,
   FaCamera,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
 import {
   getAttendanceForEmployee,
@@ -49,6 +50,7 @@ const EmployeeDashboard = () => {
     sessionStorage.getItem("profileImage") || null
   );
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const navigate = useNavigate();
 
   // State for the frontend timer
@@ -64,6 +66,47 @@ const EmployeeDashboard = () => {
       utterance.pitch = 1.1;
       window.speechSynthesis.speak(utterance);
     }
+  };
+
+  // ✅ Get user's current location
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser"));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          let errorMessage = "Unable to retrieve your location";
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "Location access denied. Please enable location permissions.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "Location information unavailable.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "Location request timed out.";
+              break;
+          }
+          
+          reject(new Error(errorMessage));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    });
   };
 
   // --- Fetch Attendance ---
@@ -85,19 +128,12 @@ const EmployeeDashboard = () => {
   // --- Fetch Profile Picture from backend ---
   const loadProfilePic = async () => {
     try {
-      console.log("📸 Fetching profile picture...");
       const res = await getProfilePic();
-      console.log("📸 Profile pic response:", res);
-
       if (res?.profilePhoto?.url) {
         setProfileImage(res.profilePhoto.url);
         sessionStorage.setItem("profileImage", res.profilePhoto.url);
-        console.log("✅ Profile picture loaded:", res.profilePhoto.url);
-      } else {
-        console.log("ℹ️ No profile picture found");
       }
     } catch (err) {
-      console.error("Profile pic fetch error:", err);
       if (err.response?.status !== 404) {
         console.error("Unexpected error fetching profile pic:", err);
       }
@@ -120,11 +156,10 @@ const EmployeeDashboard = () => {
     bootstrap();
   }, [user, loadAttendance]);
   
-  // --- ✅ ADDED: Frontend Timer Effect ---
+  // --- Frontend Timer Effect ---
   useEffect(() => {
     let interval;
 
-    // Start timer only if punched in but not punched out
     if (todayLog?.punchIn && !todayLog.punchOut) {
       const punchInTime = new Date(todayLog.punchIn);
 
@@ -134,37 +169,57 @@ const EmployeeDashboard = () => {
         setWorkedTime(diffInSeconds);
       };
 
-      updateTimer(); // Set initial time immediately
-      interval = setInterval(updateTimer, 1000); // Update every second
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
     }
 
-    // Cleanup function to clear the interval when component unmounts or status changes
     return () => {
       if (interval) {
         clearInterval(interval);
       }
     };
-  }, [todayLog]); // This effect re-runs whenever the attendance log changes
+  }, [todayLog]);
 
-
-  // --- Punch In/Out ---
+  // ✅ Punch In/Out with Location
   const handlePunch = async (action) => {
     if (!user) return;
+    
+    setLocationLoading(true);
+    
     try {
+      // Get current location
+      const location = await getCurrentLocation();
+      
       if (action === "IN") {
         await punchIn({
           employeeId: user.employeeId,
           employeeName: user.name,
+          latitude: location.latitude,
+          longitude: location.longitude,
         });
         speak(`${user.name}, punch in successful`);
       } else {
-        await punchOut({ employeeId: user.employeeId });
+        await punchOut({ 
+          employeeId: user.employeeId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
         speak(`${user.name}, punch out successful`);
       }
+      
       await loadAttendance(user.employeeId);
     } catch (err) {
       console.error("Punch error:", err);
-      speak("Punch operation failed");
+      
+      if (err.message.includes("Location")) {
+        alert(err.message);
+        speak("Location access required for attendance");
+      } else {
+        speak("Punch operation failed");
+        alert("Failed to record attendance. Please try again.");
+      }
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -238,7 +293,6 @@ const EmployeeDashboard = () => {
     }],
   };
   
-  // ✅ ADDED: Helper to format worked time from seconds
   const formatWorkedTime = (totalSeconds) => {
     if (isNaN(totalSeconds) || totalSeconds < 0) {
       return "0h 0m 0s";
@@ -298,6 +352,29 @@ const EmployeeDashboard = () => {
           <FaRegClock className="text-blue-600 text-2xl" />
           <h2 className="font-bold text-2xl text-gray-800">Daily Attendance</h2>
         </div>
+        
+        {/* ✅ Location Info Display */}
+        {todayLog?.punchInLocation && (
+          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start gap-2">
+              <FaMapMarkerAlt className="text-blue-600 mt-1" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-900">Punch In Location:</p>
+                <p className="text-xs text-gray-700">{todayLog.punchInLocation.address || "Address unavailable"}</p>
+              </div>
+            </div>
+            {todayLog?.punchOutLocation && (
+              <div className="flex items-start gap-2 mt-3 pt-3 border-t border-blue-200">
+                <FaMapMarkerAlt className="text-red-600 mt-1" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-900">Punch Out Location:</p>
+                  <p className="text-xs text-gray-700">{todayLog.punchOutLocation.address || "Address unavailable"}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm rounded-lg overflow-hidden">
             <thead>
@@ -316,7 +393,6 @@ const EmployeeDashboard = () => {
                 <td className="px-4 py-3 font-medium">{today}</td>
                 <td className="px-4 py-3">{todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}</td>
                 <td className="px-4 py-3">{todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"}</td>
-                {/* ✅ UPDATED: Show live timer or final time */}
                 <td className="px-4 py-3 font-mono">
                   {todayLog?.punchIn && !todayLog?.punchOut
                     ? formatWorkedTime(workedTime)
@@ -335,7 +411,6 @@ const EmployeeDashboard = () => {
                     </span>
                   ) : ("--")}
                 </td>
-                {/* ✅ UPDATED: Show "Working..." badge or final status */}
                 <td className="px-4 py-3 capitalize">
                    {todayLog?.punchIn && !todayLog?.punchOut ? (
                       <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
@@ -348,17 +423,33 @@ const EmployeeDashboard = () => {
                 <td className="px-4 py-3 text-center">
                   {!todayLog?.punchIn ? (
                     <button
-                      className="bg-green-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-600 active:scale-95 transform transition-transform duration-150"
+                      className="bg-green-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
                       onClick={() => handlePunch("IN")}
+                      disabled={locationLoading}
                     >
-                      Punch In
+                      {locationLoading ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                          Getting Location...
+                        </>
+                      ) : (
+                        "Punch In"
+                      )}
                     </button>
                   ) : !todayLog?.punchOut ? (
                     <button
-                      className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600 active:scale-95 transform transition-transform duration-150"
+                      className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
                       onClick={() => handlePunch("OUT")}
+                      disabled={locationLoading}
                     >
-                      Punch Out
+                      {locationLoading ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                          Getting Location...
+                        </>
+                      ) : (
+                        "Punch Out"
+                      )}
                     </button>
                   ) : (
                     <span className="text-gray-500 font-semibold">Done</span>
