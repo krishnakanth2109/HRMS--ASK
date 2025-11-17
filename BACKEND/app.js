@@ -20,24 +20,20 @@ import AdminAttendanceRoutes from "./routes/AdminAttendanceRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-import profilePicRoutes from "./routes/ProfilePicRoute.js"; // <--- IMPORT ADDED
+import profilePicRoutes from "./routes/ProfilePicRoute.js";
 
 const app = express();
 
-// For Notification
+// Create HTTP server for Socket.io
 const server = http.createServer(app);
 
-// ========================================================
-// 🔥 SOCKET.IO SETUP
-// ========================================================
+// -------------------- SOCKET.IO --------------------
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   },
 });
-
-// Attach io so routes can use req.app.get("io")
 app.set("io", io);
 
 io.on("connection", (socket) => {
@@ -48,31 +44,31 @@ io.on("connection", (socket) => {
   });
 });
 
-// ========================================================
-// CORS Setup
-// ========================================================
+// -------------------- CORS --------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // Your frontend production URL from .env
-  'http://localhost:5173',  // Vite default port
-  'https://hrms-420.netlify.app',
-  'https://hrms-ask.onrender.com',
+  "https://hrms-420.netlify.app",
+  "http://localhost:5173",
+  "https://hrms-ask.onrender.com",
 ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) callback(null, true);
-    else callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-};
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
-app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Security Headers
+// -------------------- Security Headers --------------------
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -80,23 +76,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Database Connection ---
-const mongoUri = process.env.MONGO_URI;
-mongoose.connect(mongoUri)
-    .then(() => {
-        console.log('✅ Database Connected Successfully');
-    })
-    .catch((err) => {
-        console.error('❌ Database connection error:', err);
-        process.exit(1);
-    });
+// -------------------- DATABASE --------------------
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Database Connected Successfully"))
+  .catch((err) => {
+    console.error("❌ Database connection error:", err);
+    process.exit(1);
+  });
 
-// Health Check
+// -------------------- Health Check --------------------
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
 
-// --- API Routes (Standardized with /api prefix) ---
+// -------------------- ROUTES --------------------
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
@@ -106,15 +100,10 @@ app.use("/api/overtime", overtimeRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/attendance", EmployeeattendanceRoutes);
 app.use("/api/admin/attendance", AdminAttendanceRoutes);
-app.use("/api/profile", profilePicRoutes); // <--- ROUTE REGISTRATION ADDED
-
-app.use("/api/leaves", leaveRoutes); // Corrected from '/api/leave' to match frontend api.js
-app.use("/api/attendance", EmployeeattendanceRoutes); // Primary attendance route
-app.use("/api/admin/attendance", AdminAttendanceRoutes); // Admin-specific attendance route
-app.use("/api/users", userRoutes);
+app.use("/api/profile", profilePicRoutes);
 app.use("/notifications", notificationRoutes);
 
-// 404 Handler
+// -------------------- 404 --------------------
 app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
@@ -122,7 +111,7 @@ app.use("*", (req, res) => {
   });
 });
 
-// Global Error Handler
+// -------------------- Global Error Handler --------------------
 app.use((err, req, res, next) => {
   console.error("🚨 Global Error Handler:", err.stack);
   res.status(err.status || 500).json({
@@ -134,12 +123,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ========================================================
-// 🔥 START SERVER WITH SOCKET.IO
-// ========================================================
+// -------------------- START SERVER (Socket.io + Express) --------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Allowed origins: ${allowedOrigins.join(', ')}`);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running with Socket.io on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🔗 Allowed origins: ${allowedOrigins.join(", ")}`);
 });
+
+// --- END OF FILE app.js ---

@@ -8,17 +8,11 @@ import ProfilePic from '../models/ProfilePicModel.js';
 import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
-// Cloudinary Configuration
+// Cloudinary Configuration (loads from .env)
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-console.log('🔧 Cloudinary Config:', {
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY ? '✅ Set' : '❌ Missing',
-  api_secret: process.env.CLOUDINARY_API_SECRET ? '✅ Set' : '❌ Missing',
 });
 
 // Multer Storage Configuration for Cloudinary
@@ -45,12 +39,6 @@ const storage = new CloudinaryStorage({
 
 // File filter for validation
 const fileFilter = (req, file, cb) => {
-  console.log('📁 File received:', {
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size
-  });
-
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(file.originalname.toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
@@ -77,13 +65,9 @@ const upload = multer({
  */
 router.get('/me', protect, async (req, res) => {
   try {
-    console.log('🔍 Fetching profile for employeeId:', req.user.employeeId);
-
     const employeeProfile = await ProfilePic.findOne({ 
       employeeId: req.user.employeeId 
     });
-
-    console.log('📊 Profile found:', employeeProfile ? 'Yes' : 'No');
 
     if (!employeeProfile || !employeeProfile.profilePhoto) {
       return res.status(200).json({
@@ -99,7 +83,7 @@ router.get('/me', protect, async (req, res) => {
       phone: employeeProfile.phone,
     });
   } catch (error) {
-    console.error('❌ Error fetching profile photo:', error);
+    console.error('Error fetching profile photo:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error while fetching photo.',
@@ -116,7 +100,6 @@ router.get('/me', protect, async (req, res) => {
 router.get('/:employeeId', protect, async (req, res) => {
   try {
     const { employeeId } = req.params;
-    console.log('🔍 Fetching profile for employeeId:', employeeId);
 
     const employeeProfile = await ProfilePic.findOne({ employeeId });
 
@@ -135,7 +118,7 @@ router.get('/:employeeId', protect, async (req, res) => {
       phone: employeeProfile.phone,
     });
   } catch (error) {
-    console.error('❌ Error fetching profile:', error);
+    console.error('Error fetching profile:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error while fetching profile.',
@@ -149,21 +132,12 @@ router.get('/:employeeId', protect, async (req, res) => {
  * @desc    Upload or update employee profile photo
  * @access  Private
  */
-router.put('/photo', protect, (req, res, next) => {
-  console.log('📤 Upload request received');
-  console.log('👤 User:', req.user?.employeeId);
-  console.log('📋 Body before multer:', req.body);
-  next();
-}, upload.single('image'), async (req, res) => {
+router.put('/photo', protect, upload.single('image'), async (req, res) => {
   try {
-    console.log('📋 Body after multer:', req.body);
-    console.log('📁 File:', req.file);
-
     const { employeeId, name, email, phone } = req.body;
 
     // Validate required fields
     if (!employeeId || !name || !email) {
-      console.log('❌ Validation failed: Missing required fields');
       return res.status(400).json({ 
         success: false,
         message: 'Employee ID, name, and email are required.',
@@ -172,37 +146,26 @@ router.put('/photo', protect, (req, res, next) => {
     }
 
     if (!req.file) {
-      console.log('❌ No file uploaded');
       return res.status(400).json({ 
         success: false,
         message: 'No image file uploaded.' 
       });
     }
 
-    console.log('✅ File uploaded to Cloudinary:', {
-      public_id: req.file.public_id,
-      url: req.file.path
-    });
-
     const newPhotoData = {
-      public_id: req.file.public_id || req.file.filename,
-      url: req.file.path || req.file.url,
+      public_id: req.file.filename,
+      url: req.file.path,
     };
 
-    console.log('🔍 Looking for existing profile...');
     let profile = await ProfilePic.findOne({ employeeId });
 
     if (profile) {
-      console.log('📝 Updating existing profile');
-      
       // Delete old image from Cloudinary if it exists
       if (profile.profilePhoto && profile.profilePhoto.public_id) {
         try {
-          console.log('🗑️ Deleting old image:', profile.profilePhoto.public_id);
           await cloudinary.uploader.destroy(profile.profilePhoto.public_id);
-          console.log('✅ Old image deleted');
         } catch (deleteError) {
-          console.error('⚠️ Error deleting old image:', deleteError);
+          console.error('Error deleting old image:', deleteError);
         }
       }
 
@@ -213,7 +176,6 @@ router.put('/photo', protect, (req, res, next) => {
       profile.profilePhoto = newPhotoData;
       
       const updatedProfile = await profile.save();
-      console.log('✅ Profile updated successfully');
       
       return res.status(200).json({
         success: true,
@@ -222,8 +184,6 @@ router.put('/photo', protect, (req, res, next) => {
       });
 
     } else {
-      console.log('📝 Creating new profile');
-      
       // Create new profile
       const newProfile = await ProfilePic.create({
         employeeId,
@@ -233,8 +193,6 @@ router.put('/photo', protect, (req, res, next) => {
         profilePhoto: newPhotoData,
       });
       
-      console.log('✅ Profile created successfully');
-      
       return res.status(201).json({
         success: true,
         message: 'Profile photo uploaded successfully!',
@@ -243,12 +201,10 @@ router.put('/photo', protect, (req, res, next) => {
     }
 
   } catch (error) {
-    console.error('❌ Error in profile photo upload route:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error in profile photo upload route:', error);
 
     // Handle duplicate key error
     if (error.code === 11000) {
-      console.log('⚠️ Duplicate key error detected');
       return res.status(409).json({
         success: false,
         message: 'A profile with this information already exists.',
@@ -259,7 +215,6 @@ router.put('/photo', protect, (req, res, next) => {
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
-      console.log('⚠️ Validation error:', messages);
       return res.status(400).json({
         success: false,
         message: 'Validation error',
@@ -269,7 +224,6 @@ router.put('/photo', protect, (req, res, next) => {
 
     // Handle multer errors
     if (error instanceof multer.MulterError) {
-      console.log('⚠️ Multer error:', error.message);
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -292,7 +246,6 @@ router.put('/photo', protect, (req, res, next) => {
 router.delete('/photo', protect, async (req, res) => {
   try {
     const employeeId = req.user.employeeId;
-    console.log('🗑️ Delete request for employeeId:', employeeId);
 
     const profile = await ProfilePic.findOne({ employeeId });
 
@@ -307,9 +260,8 @@ router.delete('/photo', protect, async (req, res) => {
     if (profile.profilePhoto.public_id) {
       try {
         await cloudinary.uploader.destroy(profile.profilePhoto.public_id);
-        console.log('✅ Image deleted from Cloudinary');
       } catch (deleteError) {
-        console.error('⚠️ Error deleting from Cloudinary:', deleteError);
+        console.error('Error deleting from Cloudinary:', deleteError);
       }
     }
 
@@ -323,7 +275,7 @@ router.delete('/photo', protect, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error deleting profile photo:', error);
+    console.error('Error deleting profile photo:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error while deleting photo.',
@@ -339,8 +291,6 @@ router.delete('/photo', protect, async (req, res) => {
  */
 router.get('/all/profiles', protect, async (req, res) => {
   try {
-    console.log('📋 Fetching all profiles');
-
     const profiles = await ProfilePic.find({}).select('-__v');
 
     res.status(200).json({
@@ -349,7 +299,7 @@ router.get('/all/profiles', protect, async (req, res) => {
       profiles,
     });
   } catch (error) {
-    console.error('❌ Error fetching all profiles:', error);
+    console.error('Error fetching all profiles:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error while fetching profiles.',
