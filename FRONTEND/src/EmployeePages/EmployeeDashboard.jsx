@@ -50,7 +50,8 @@ const EmployeeDashboard = () => {
     sessionStorage.getItem("profileImage") || null
   );
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(false);
+  // State to manage the detailed status of the punch action
+  const [punchStatus, setPunchStatus] = useState("IDLE"); // 'IDLE', 'FETCHING', 'PUNCHING'
   const navigate = useNavigate();
 
   // State for the frontend timer
@@ -180,15 +181,17 @@ const EmployeeDashboard = () => {
     };
   }, [todayLog]);
 
-  // ✅ Punch In/Out with Location
+  // ✅ Punch In/Out with Location and granular UI feedback
   const handlePunch = async (action) => {
     if (!user) return;
     
-    setLocationLoading(true);
+    setPunchStatus("FETCHING"); // Step 1: UI shows location fetching
     
     try {
       // Get current location
       const location = await getCurrentLocation();
+      
+      setPunchStatus("PUNCHING"); // Step 2: UI shows punching in/out
       
       if (action === "IN") {
         await punchIn({
@@ -219,7 +222,7 @@ const EmployeeDashboard = () => {
         alert("Failed to record attendance. Please try again.");
       }
     } finally {
-      setLocationLoading(false);
+      setPunchStatus("IDLE"); // Step 3: Reset UI to default state
     }
   };
 
@@ -307,6 +310,20 @@ const EmployeeDashboard = () => {
     if (!status || status === "NOT_APPLICABLE") return "--";
     return status.replace("_", " ").toLowerCase();
   };
+  
+  // --- Helper to get button content based on punch status ---
+  const getPunchButtonContent = (action) => {
+    const spinner = <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />;
+
+    if (punchStatus === 'FETCHING') {
+      return <>{spinner} Extracting Location...</>;
+    }
+    if (punchStatus === 'PUNCHING') {
+      return <>{spinner} {action === 'IN' ? 'Punching In...' : 'Punching Out...'}</>;
+    }
+    return action === 'IN' ? 'Punch In' : 'Punch Out';
+  };
+
 
   return (
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
@@ -353,28 +370,6 @@ const EmployeeDashboard = () => {
           <h2 className="font-bold text-2xl text-gray-800">Daily Attendance</h2>
         </div>
         
-        {/* ✅ Location Info Display */}
-        {todayLog?.punchInLocation && (
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-2">
-              <FaMapMarkerAlt className="text-blue-600 mt-1" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-blue-900">Punch In Location:</p>
-                <p className="text-xs text-gray-700">{todayLog.punchInLocation.address || "Address unavailable"}</p>
-              </div>
-            </div>
-            {todayLog?.punchOutLocation && (
-              <div className="flex items-start gap-2 mt-3 pt-3 border-t border-blue-200">
-                <FaMapMarkerAlt className="text-red-600 mt-1" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-red-900">Punch Out Location:</p>
-                  <p className="text-xs text-gray-700">{todayLog.punchOutLocation.address || "Address unavailable"}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm rounded-lg overflow-hidden">
             <thead>
@@ -423,33 +418,19 @@ const EmployeeDashboard = () => {
                 <td className="px-4 py-3 text-center">
                   {!todayLog?.punchIn ? (
                     <button
-                      className="bg-green-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                      className="bg-green-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto min-w-[180px]"
                       onClick={() => handlePunch("IN")}
-                      disabled={locationLoading}
+                      disabled={punchStatus !== "IDLE"}
                     >
-                      {locationLoading ? (
-                        <>
-                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                          Getting Location...
-                        </>
-                      ) : (
-                        "Punch In"
-                      )}
+                      {getPunchButtonContent("IN")}
                     </button>
                   ) : !todayLog?.punchOut ? (
                     <button
-                      className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                      className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600 active:scale-95 transform transition-transform duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto min-w-[180px]"
                       onClick={() => handlePunch("OUT")}
-                      disabled={locationLoading}
+                      disabled={punchStatus !== "IDLE"}
                     >
-                      {locationLoading ? (
-                        <>
-                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                          Getting Location...
-                        </>
-                      ) : (
-                        "Punch Out"
-                      )}
+                      {getPunchButtonContent("OUT")}
                     </button>
                   ) : (
                     <span className="text-gray-500 font-semibold">Done</span>
@@ -459,13 +440,39 @@ const EmployeeDashboard = () => {
             </tbody>
           </table>
         </div>
-        <div className="text-right mt-6">
-          <button
-            onClick={() => navigate("/employee/my-attendence")}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-blue-700 transition-all duration-200 ease-in-out transform hover:-translate-y-1"
-          >
-            View Attendance History →
-          </button>
+
+        <div className="flex justify-between items-center mt-6">
+          <div className="flex items-center gap-3">
+            {todayLog?.punchInLocation && (
+              <button
+                onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")}
+                className="flex items-center gap-1.5 bg-blue-100 text-blue-800 px-3 py-1.5 text-xs rounded-full font-semibold hover:bg-blue-200 transition-colors shadow-sm transform hover:scale-105"
+                title="View Punch-In Location"
+              >
+                <FaMapMarkerAlt />
+                View In Location
+              </button>
+            )}
+            {todayLog?.punchOutLocation && (
+              <button
+                onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")}
+                className="flex items-center gap-1.5 bg-red-100 text-red-800 px-3 py-1.5 text-xs rounded-full font-semibold hover:bg-red-200 transition-colors shadow-sm transform hover:scale-105"
+                title="View Punch-Out Location"
+              >
+                <FaMapMarkerAlt />
+                View Out Location
+              </button>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={() => navigate("/employee/my-attendence")}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-blue-700 transition-all duration-200 ease-in-out transform hover:-translate-y-1"
+            >
+              View Attendance History→
+            </button>
+          </div>
         </div>
       </div>
 
