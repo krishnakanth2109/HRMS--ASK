@@ -1,3 +1,5 @@
+// --- START OF FILE api.js ---
+
 import axios from "axios";
 
 // Automatically determine API base URL depending on environment
@@ -10,7 +12,7 @@ const baseURL =
 console.log("🔧 Environment Mode:", import.meta.env.MODE);
 console.log("🌐 API Base URL:", baseURL);
 
-// Create Axios instance
+// Create a single, consistent Axios instance
 const api = axios.create({
   baseURL,
   timeout: 500000,
@@ -63,7 +65,10 @@ export const deleteHolidayById = async (id) => (await api.delete(`/api/holidays/
    NOTICES
 ============================================================================ */
 export const getNotices = async () => (await api.get("/api/notices")).data;
+export const getAllNoticesForAdmin = async () => (await api.get("/api/notices/all")).data;
 export const addNotice = async (data) => (await api.post("/api/notices", data)).data;
+export const updateNotice = async (id, data) => (await api.put(`/api/notices/${id}`, data)).data;
+export const deleteNoticeById = async (id) => (await api.delete(`/api/notices/${id}`)).data;
 
 /* ============================================================================
    LEAVES
@@ -137,6 +142,36 @@ export const getProfilePic = async () => {
     return response.data;
   } catch (error) {
     console.error("Get Profile Pic Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteProfilePic = async () => {
+  try {
+    const response = await api.delete("/api/profile/photo");
+    return response.data;
+  } catch (error) {
+    console.error("Delete Profile Pic Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getProfilePicByEmployeeId = async (employeeId) => {
+  try {
+    const response = await api.get(`/api/profile/${employeeId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get Profile Pic by ID Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getAllProfiles = async () => {
+  try {
+    const response = await api.get("/api/profile/all/profiles");
+    return response.data;
+  } catch (error) {
+    console.error("Get All Profiles Error:", error.response?.data || error.message);
     throw error;
   }
 };
