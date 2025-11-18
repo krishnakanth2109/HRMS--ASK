@@ -1,3 +1,5 @@
+// --- START OF FILE api.js ---
+
 import axios from "axios";
 
 // Automatically determine API base URL depending on environment
@@ -62,8 +64,13 @@ export const deleteHolidayById = async (id) => (await api.delete(`/api/holidays/
 /* ============================================================================
    NOTICES
 ============================================================================ */
+// This is for employees (gets filtered notices)
 export const getNotices = async () => (await api.get("/api/notices")).data;
+// ✅ NEW: This is for admins (gets all notices)
+export const getAllNoticesForAdmin = async () => (await api.get("/api/notices/all")).data;
 export const addNotice = async (data) => (await api.post("/api/notices", data)).data;
+export const updateNotice = async (id, data) => (await api.put(`/api/notices/${id}`, data)).data;
+export const deleteNoticeById = async (id) => (await api.delete(`/api/notices/${id}`)).data;
 
 /* ============================================================================
    LEAVES
