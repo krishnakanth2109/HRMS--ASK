@@ -5,17 +5,16 @@ import {
   getNotices,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-} from "../api"; // Import centralized API functions
+} from "../api";
 import { io } from "socket.io-client";
 
-// Dynamically determine Socket.io URL from environment variables for consistency
 const SOCKET_URL =
   import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
     : import.meta.env.VITE_API_URL_DEVELOPMENT;
 
 // Load logged-in employee from storage
-const loadLoggedUser = () => {
+const loadUser = () => {
   try {
     const raw =
       localStorage.getItem("hrmsUser") || sessionStorage.getItem("hrmsUser");
@@ -25,52 +24,84 @@ const loadLoggedUser = () => {
   }
 };
 
+// LocalStorage key for READ NOTICES
+const NOTICE_READ_KEY = "employee_read_notices";
+
 const CurrentEmployeeNotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [sound] = useState(() => new Audio("/notification.mp3"));
-  const [loggedUser] = useState(loadLoggedUser);
+  const [loggedUser] = useState(loadUser);
 
-  // Always use MongoDB _id as unique identifier
-  const getUserIdentifier = useCallback(() => {
-    if (!loggedUser) return null;
-    return loggedUser._id; // 🔥 ONLY MongoDB ID
-  }, [loggedUser]);
+  /*
+  ==============================================================
+    LocalStorage helpers for notices (admin broadcast messages)
+  ==============================================================
+  */
+  const getReadNotices = () => {
+    try {
+      return JSON.parse(localStorage.getItem(NOTICE_READ_KEY)) || [];
+    } catch {
+      return [];
+    }
+  };
 
-  // --------------------------------------------------------
-  // FETCH ALL NOTIFICATIONS (personal + notices) using api.js
-  // --------------------------------------------------------
+  const markNoticeAsReadLocally = (id) => {
+    const list = getReadNotices();
+    if (!list.includes(id)) {
+      const updated = [...list, id];
+      localStorage.setItem(NOTICE_READ_KEY, JSON.stringify(updated));
+    }
+  };
+
+  const markAllNoticesAsReadLocally = () => {
+    const allNoticeIds = notifications
+      .filter((n) => n.userId === "ALL")
+      .map((n) => n._id);
+
+    localStorage.setItem(NOTICE_READ_KEY, JSON.stringify(allNoticeIds));
+  };
+
+  const getUserId = () =>
+    loggedUser ? String(loggedUser._id) : null;
+
+  /*
+  ==============================================================
+    FETCH PERSONAL + NOTICE NOTIFICATIONS
+  ==============================================================
+  */
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
+
     try {
-      const userId = getUserIdentifier();
+      const userId = getUserId();
+      const readNotices = getReadNotices();
 
-      // 1️⃣ Fetch personal notifications using centralized API
-      const allPersonal = await getNotifications();
+      // Personal notifications from DB
+      const dbNotifications = await getNotifications();
+      const personal = dbNotifications.filter(
+        (n) => String(n.userId) === userId
+      );
 
-      const personal = userId
-        ? allPersonal.filter((n) => String(n.userId) === String(userId))
-        : [];
-
-      // 2️⃣ Fetch notices from admin using centralized API
-      const noticesData = await getNotices();
-      const noticeItems = noticesData.map((n) => ({
-        _id: n._id, // use DB id
+      // Fetch admin notices
+      const notices = await getNotices();
+      const noticeItems = notices.map((n) => ({
+        _id: n._id,
         userId: "ALL",
         title: "New Notice",
         message: n.title,
         type: "notice",
-        isRead: false,
+        isRead: readNotices.includes(n._id),
         date: n.date,
       }));
 
-      // 3️⃣ Combine and sort
       const combined = [...personal, ...noticeItems];
+
       combined.sort(
         (a, b) =>
-          new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)
+          new Date(b.date || b.createdAt) -
+          new Date(a.date || a.createdAt)
       );
 
       setNotifications(combined);
@@ -79,17 +110,19 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [getUserIdentifier]);
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // --------------------------------------------------------
-  // SOCKET.IO REALTIME LISTENERS
-  // --------------------------------------------------------
+  /*
+  ==============================================================
+    SOCKET.IO LISTENERS
+  ==============================================================
+  */
   useEffect(() => {
-    const userId = getUserIdentifier();
+    const userId = getUserId();
     if (!userId) return;
 
     const socket = io(SOCKET_URL, {
@@ -98,20 +131,17 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
 
     console.log("📡 Employee Socket Connected:", socket.id);
 
-    // 1️⃣ NEW PERSONAL NOTIFICATION
+    // Real-time personal notification
     socket.on("newNotification", (n) => {
-      if (!n || !n.userId) return;
-      if (String(n.userId) !== String(userId)) return;
-
+      if (String(n.userId) !== userId) return;
       setNotifications((prev) => [n, ...prev]);
       playSound();
-      showToast(n.title ? `${n.title}: ${n.message}` : n.message);
+      showToast(n.message);
     });
 
-    // 2️⃣ NEW ADMIN NOTICE -> ALL EMPLOYEES GET IT
+    // Real-time admin notice
     socket.on("newNotice", (notice) => {
-      if (!notice) return;
-      const n = {
+      const newNotice = {
         _id: Date.now(),
         userId: "ALL",
         title: "New Notice",
@@ -120,38 +150,57 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
         isRead: false,
         date: new Date(),
       };
-      setNotifications((prev) => [n, ...prev]);
+
+      setNotifications((prev) => [newNotice, ...prev]);
       playSound();
-      showToast(`New Notice: ${notice.title}`);
+      showToast(`Notice: ${notice.title}`);
     });
 
     return () => socket.disconnect();
-  }, [getUserIdentifier, sound]); // Added sound to dependency array
+  }, []);
 
-  // --------------------------------------------------------
-  // SOUND & TOAST HELPERS
-  // --------------------------------------------------------
+  /*
+  ==============================================================
+    SOUND + TOAST
+  ==============================================================
+  */
   const playSound = () => {
     try {
       sound.currentTime = 0;
-      sound.play().catch(() => {});
+      sound.play();
     } catch {}
   };
 
   const showToast = (message) => {
     const id = Date.now();
     setToasts((prev) => [{ id, message }, ...prev]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      4000
+    );
   };
 
-  // --------------------------------------------------------
-  // MARK AS READ using api.js
-  // --------------------------------------------------------
-  const markAsRead = useCallback(async (id) => {
+  /*
+  ==============================================================
+    MARK AS READ (Single)
+  ==============================================================
+  */
+  const markAsRead = async (id) => {
     try {
-      // Use centralized API function
+      const target = notifications.find((n) => String(n._id) === String(id));
+
+      // If it's a NOTICE, store in localStorage only
+      if (target.userId === "ALL") {
+        markNoticeAsReadLocally(id);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            String(n._id) === String(id) ? { ...n, isRead: true } : n
+          )
+        );
+        return;
+      }
+
+      // Personal notification stored in DB
       await markNotificationAsRead(id);
       setNotifications((prev) =>
         prev.map((n) =>
@@ -159,24 +208,27 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
         )
       );
     } catch (err) {
-      console.error("❌ Failed to mark-as-read:", err);
+      console.error("❌ Failed to mark as read:", err);
     }
-  }, []);
+  };
 
-  // --------------------------------------------------------
-  // MARK ALL READ using api.js
-  // --------------------------------------------------------
-  const markAllAsRead = useCallback(async () => {
+  /*
+  ==============================================================
+    MARK ALL AS READ
+  ==============================================================
+  */
+  const markAllAsRead = async () => {
     try {
-      // Use centralized API function
-      await markAllNotificationsAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    } catch (err) {
-      console.error("❌ Failed to mark-all:", err);
-    }
-  }, []);
+      await markAllNotificationsAsRead(); // DB update
+      markAllNoticesAsReadLocally(); // LocalStorage update
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, isRead: true }))
+      );
+    } catch (err) {
+      console.error("❌ Failed to mark all as read:", err);
+    }
+  };
 
   return (
     <CurrentEmployeeNotificationContext.Provider
@@ -185,27 +237,27 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
         loading,
         markAsRead,
         markAllAsRead,
-        unreadCount,
+        unreadCount: notifications.filter((n) => !n.isRead).length,
       }}
     >
       {children}
 
-      {/* Toast UI */}
-      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 9999 }}>
+      {/* Toasts */}
+      <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999 }}>
         {toasts.map((t) => (
           <div
             key={t.id}
             style={{
               background: "#fff",
-              padding: "10px 14px",
-              marginBottom: 8,
-              borderRadius: 8,
-              boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-              minWidth: 260,
+              padding: "12px 16px",
+              marginBottom: 10,
+              borderRadius: 10,
+              boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
               fontWeight: 600,
+              minWidth: "260px",
             }}
           >
-            <div>{t.message}</div>
+            {t.message}
           </div>
         ))}
       </div>

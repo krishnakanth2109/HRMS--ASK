@@ -1,11 +1,9 @@
 // --- START OF FILE Login.jsx ---
-
 import { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
-import logo from "../assets/logo.png";
 
 const Login = () => {
   const { user, login } = useContext(AuthContext);
@@ -14,127 +12,122 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false); // State to handle loading UX
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect user if they are already logged in
   useEffect(() => {
     if (user?.role === "admin") navigate("/admin/dashboard");
     else if (user?.role === "employee") navigate("/employee/dashboard");
-  }, [user, navigate]);
+  }, [user]);
 
-  // Automatically clear error messages after a few seconds
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(""), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
-  // Handle form submission asynchronously
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      // Await the async login function from AuthContext
       const role = await login(email, password);
 
-      if (role === "admin") {
-        navigate("/admin/dashboard");
-      } else if (role === "employee") {
-        navigate("/employee/dashboard");
-      }
+      if (role === "admin") navigate("/admin/dashboard");
+      else if (role === "employee") navigate("/employee/dashboard");
     } catch (err) {
-      // Catch errors thrown from the API (e.g., wrong password, network error)
       setError(err.response?.data?.message || "Invalid credentials. Try again.");
     } finally {
-      setLoading(false); // Stop loading in both success and error cases
+      setLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
-    navigate("/forgot-password");
-  };
-
-  // Animation Variants
-  const fadeIn = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i = 1) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        delay: i * 0.15,
-      },
-    }),
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-200 via-blue-100 to-blue-400 px-4 relative overflow-hidden">
-      {/* Animated background circles */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-10 left-10 w-40 h-40 bg-blue-300 rounded-full opacity-30 animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-56 h-56 bg-blue-500 rounded-full opacity-20 animate-ping" />
-        <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-blue-400 rounded-full opacity-20 animate-pulse" />
-      </div>
+    <div
+      className="min-h-screen flex items-center justify-center bg-cover bg-center relative"
+      style={{
+        backgroundImage:
+          "url('https://images.unsplash.com/photo-1521790361543-f645cf042ec4?auto=format&fit=crop&w=1920&q=80')",
+      }}
+    >
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
-      {loading ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="text-2xl font-bold text-blue-700">Authenticating...</h2>
-        </motion.div>
-      ) : (
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.2 } } }}
-          className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10"
-        >
-          <motion.div variants={fadeIn} className="flex flex-col items-center mb-6">
-            <motion.img src={logo} alt="Company Logo" className="h-16 w-16 mb-2 drop-shadow-lg" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }} />
-            <h2 className="text-3xl font-extrabold text-blue-700 mb-1 drop-shadow">Welcome to Vagarious-Arah info tech</h2>
-            <p className="text-sm text-gray-500">Please login to continue</p>
-          </motion.div>
+      {/* Main Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7 }}
+        className="relative z-10 bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl w-full max-w-md px-10 py-8 rounded-3xl"
+      >
+        <h1 className="text-3xl font-bold text-white text-center mb-2 drop-shadow">
+          Welcome Back
+        </h1>
+        <p className="text-center text-gray-200 mb-6">
+          Login to continue to Vagarious – Arah Info Tech
+        </p>
 
-          {error && (
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-3 flex items-center justify-center gap-2 text-red-600 text-sm font-semibold bg-red-100 rounded-lg py-2 px-3 shadow">
-              <FaLock className="text-red-500" />
-              {error}
-            </motion.div>
-          )}
+        {error && (
+          <div className="bg-red-500/20 border border-red-400 text-red-200 text-sm text-center py-2 mb-4 rounded-lg">
+            {error}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <motion.div className="relative" variants={fadeIn} custom={1}>
-              <FaEnvelope className="absolute left-3 top-4 text-gray-400" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder=" " className="w-full pl-10 pr-4 pt-5 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none peer bg-gray-50" />
-              <label className="absolute left-10 top-2 text-sm text-gray-500 transition-all duration-200 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400">Email</label>
-            </motion.div>
-            <motion.div className="relative" variants={fadeIn} custom={2}>
-              <FaLock className="absolute left-3 top-4 text-gray-400" />
-              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required placeholder=" " className="w-full pl-10 pr-10 pt-5 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none peer bg-gray-50" />
-              <label className="absolute left-10 top-2 text-sm text-gray-500 transition-all duration-200 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400">Password</label>
-              <span className="absolute right-3 top-4 text-gray-500 cursor-pointer" onClick={() => setShowPassword((prev) => !prev)}>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email */}
+          <div>
+            <label className="text-gray-200 text-sm font-semibold">Email</label>
+            <div className="flex items-center bg-white/20 border border-white/30 rounded-lg px-3 py-2 mt-1">
+              <FaEnvelope className="text-gray-200 mr-3" />
+              <input
+                type="email"
+                className="w-full bg-transparent text-white outline-none placeholder-gray-300"
+                placeholder="Enter your email"
+                value={email}
+                required
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="text-gray-200 text-sm font-semibold">Password</label>
+            <div className="flex items-center bg-white/20 border border-white/30 rounded-lg px-3 py-2 mt-1">
+              <FaLock className="text-gray-200 mr-3" />
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full bg-transparent text-white outline-none placeholder-gray-300"
+                placeholder="Enter your password"
+                value={password}
+                required
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <span
+                className="text-gray-200 cursor-pointer"
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </span>
-            </motion.div>
-            <motion.div className="text-right text-sm" variants={fadeIn} custom={3}>
-              <button type="button" onClick={handleForgotPassword} className="text-blue-600 hover:underline font-semibold">
-                Forgot Password?
-              </button>
-            </motion.div>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              variants={fadeIn}
-              custom={5}
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 shadow disabled:opacity-60"
+            </div>
+          </div>
+
+          {/* Forgot Password */}
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="text-blue-200 hover:text-white text-sm underline"
             >
-              {loading ? "Logging In..." : "Login"}
-            </motion.button>
-          </form>
-        </motion.div>
-      )}
+              Forgot Password?
+            </button>
+          </div>
+
+          {/* Login Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600/80 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow-lg transition"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+      </motion.div>
     </div>
   );
 };

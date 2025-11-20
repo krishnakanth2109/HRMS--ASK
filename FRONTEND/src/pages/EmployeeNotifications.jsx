@@ -47,7 +47,7 @@ const EmployeeNotifications = () => {
     setLocalNotifications(notifications);
   };
 
-  // -------------------- Handle visible list --------------------
+  // -------------------- Build local display list --------------------
   useEffect(() => {
     const hidden = getHiddenIds();
     const filtered = notifications.filter(
@@ -83,7 +83,12 @@ const EmployeeNotifications = () => {
           <div className="flex flex-col gap-3">
             <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
-              onClick={markAllAsRead}
+              onClick={() => {
+                markAllAsRead(); // backend + context
+                setLocalNotifications((prev) =>
+                  prev.map((n) => ({ ...n, isRead: true }))
+                ); // instant UI update
+              }}
             >
               <FaCheckCircle /> Mark All Read
             </button>
