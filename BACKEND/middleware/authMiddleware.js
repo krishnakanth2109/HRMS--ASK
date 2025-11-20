@@ -1,41 +1,53 @@
 // --- START OF FILE middleware/authMiddleware.js ---
 
 import jwt from 'jsonwebtoken';
-import User from '../models/employeeModel.js'; // Make sure this path is correct for your User model
+import User from '../models/employeeModel.js'; // Ensures we check against the Employee DB
 
 const protect = async (req, res, next) => {
   let token;
 
-  // Check for the token in the Authorization header
+  // 1. Check if Authorization header exists and starts with 'Bearer'
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
     try {
-      // Get token from header (it's in the format "Bearer TOKEN")
+      // 2. Get token from header
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify the token
+      // 3. Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Find the user by the ID from the token and attach it to the request object
-      // This makes `req.user` available in all protected routes
+      // 4. Get user from the token (exclude password)
+      // Note: Ensures the user actually exists in the DB
       req.user = await User.findById(decoded.id).select('-password');
 
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
-      next(); // Move on to the next middleware or the route handler
+      next(); // Proceed to the next middleware
     } catch (error) {
-      console.error('Token verification failed:', error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error('Token verification failed:', error.message);
+      return res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  }
-
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+  } else {
+    // If header is missing or incorrect format
+    return res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 
-export { protect };
+// Role-based access control
+const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    // req.user is set in the 'protect' middleware above
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        message: 'You do not have permission to perform this action' 
+      });
+    }
+    next();
+  };
+};
+
+export { protect, restrictTo };

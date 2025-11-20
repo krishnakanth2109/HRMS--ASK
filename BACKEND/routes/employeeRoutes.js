@@ -1,9 +1,31 @@
+// --- START OF FILE routes/employeeRoutes.js ---
+
 import express from "express";
 import Employee from "../models/employeeModel.js";
-import Notification from "../models/notificationModel.js";   // 🆕 added
-                   // 🆕 socket
+import Notification from "../models/notificationModel.js";
+import { upload } from "../config/cloudinary.js"; // ✅ Import Cloudinary config
 
 const router = express.Router();
+
+// ============================================================================
+// 📂 1. FILE UPLOAD ROUTE (NEW - For Documents)
+// ============================================================================
+router.post("/upload-doc", upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    // Cloudinary automatically returns the secure URL in req.file.path
+    res.status(200).json({ url: req.file.path });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// 👤 2. EMPLOYEE CRUD OPERATIONS
+// ============================================================================
 
 // CREATE employee
 router.post("/", async (req, res) => {
@@ -144,8 +166,5 @@ router.post("/idle-activity", async (req, res) => {
   }
 });
 
-
-
-
-
 export default router;
+// --- END OF FILE routes/employeeRoutes.js ---

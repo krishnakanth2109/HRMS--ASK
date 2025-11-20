@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import NotificationSettings from './NotificationSettings';
 import DepartmentSettings from './DepartmentSettings';
 import SoundSettings from './SoundSettings';
-import { FaBell, FaBuilding, FaVolumeUp, FaInfoCircle } from 'react-icons/fa';
+import { FaBell, FaBuilding, FaVolumeUp } from 'react-icons/fa';
 
 const TABS = {
   NOTIFICATION: 'Notification',
   DEPARTMENT: 'Department',
   SOUND: 'Sound',
-  COMPANY_INFO: 'Company Info',
 };
 
 const SettingsPage = () => {
@@ -22,8 +21,6 @@ const SettingsPage = () => {
         return <DepartmentSettings />;
       case TABS.SOUND:
         return <SoundSettings />;
-      case TABS.COMPANY_INFO:
-        return <CompanyInfoSettings />;
       default:
         return <NotificationSettings />;
     }
@@ -51,7 +48,6 @@ const SettingsPage = () => {
         <TabButton name={TABS.NOTIFICATION} icon={<FaBell />} />
         <TabButton name={TABS.DEPARTMENT} icon={<FaBuilding />} />
         <TabButton name={TABS.SOUND} icon={<FaVolumeUp />} />
-        <TabButton name={TABS.COMPANY_INFO} icon={<FaInfoCircle />} />
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg animate-fade-in">

@@ -54,7 +54,6 @@ export const updateEmployeeById = async (id, data) => (await api.put(`/api/emplo
 export const deactivateEmployeeById = async (id, data) => (await api.patch(`/api/employees/${id}/deactivate`, data)).data;
 export const activateEmployeeById = async (id) => (await api.patch(`/api/employees/${id}/activate`)).data;
 
-
 /* ============================================================================
    Employee IDLE TIME TRACKING
 ============================================================================ */
@@ -80,9 +79,6 @@ export const getAllIdleTimeRecords = async () => {
     throw error;
   }
 };
-
-
-
 
 /* ============================================================================
    HOLIDAYS
@@ -202,6 +198,76 @@ export const getAllProfiles = async () => {
     return response.data;
   } catch (error) {
     console.error("Get All Profiles Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/* ============================================================================
+   SHIFT MANAGEMENT
+============================================================================ */
+
+/**
+ * Create or update shift for an employee
+ */
+export const createOrUpdateShift = async (shiftData) => {
+  try {
+    const response = await api.post("/api/shifts/create", shiftData);
+    return response.data;
+  } catch (error) {
+    console.error('Create/Update shift error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get all shifts (Admin only)
+ */
+export const getAllShifts = async () => {
+  try {
+    const response = await api.get("/api/shifts/all");
+    // Assuming backend returns { success: true, data: [...] }
+    return response.data.data || response.data; 
+  } catch (error) {
+    console.error('Get all shifts error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get shift for a specific employee
+ */
+export const getShiftByEmployeeId = async (employeeId) => {
+  try {
+    const response = await api.get(`/api/shifts/${employeeId}`);
+    return response.data.data || response.data;
+  } catch (error) {
+    console.error('Get shift error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Delete/Reset shift to default
+ */
+export const deleteShift = async (employeeId) => {
+  try {
+    const response = await api.delete(`/api/shifts/${employeeId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Delete shift error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Bulk create/update shifts for multiple employees
+ */
+export const bulkCreateShifts = async (employeeIds, shiftData) => {
+  try {
+    const response = await api.post("/api/shifts/bulk-create", { employeeIds, shiftData });
+    return response.data;
+  } catch (error) {
+    console.error('Bulk create shifts error:', error.response?.data || error.message);
     throw error;
   }
 };

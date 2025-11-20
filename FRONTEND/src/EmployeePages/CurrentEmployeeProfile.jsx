@@ -1,79 +1,89 @@
 // --- START OF FILE CurrentEmployeeProfile.jsx ---
 
-/**
- * Editable CurrentEmployeeProfile
- * --------------------------------
- * Features:
- * ✔ Edit all employee details (Basic, Personal, Job, Bank, Experience)
- * ✔ Saves updates to backend API:
- *      PUT http://localhost:5000/api/employees/:employeeId
- * ✔ Automatically updates sessionStorage with the new server response
- * ✔ Converts employeeId to STRING so backend always finds correct record
- * ✔ Supports adding/removing experience blocks
- * ✔ Handles nested fields safely
- *
- * IMPORTANT:
- * - employeeId & email are non-editable by default.
- * - Backend searches employeeId as STRING, so frontend must send STRING.
- */
-
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { 
+  FaUser, FaEnvelope, FaPhone, FaBuilding, FaMoneyBill, FaCalendarAlt, 
+  FaCreditCard, FaAddressCard, FaFileUpload, FaCheck, FaSpinner, FaIdCard, FaEdit, FaSave, FaTrash
+} from "react-icons/fa";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+const INDIAN_BANKS = [
+  "State Bank of India (SBI)",
+  "HDFC Bank",
+  "ICICI Bank",
+  "Punjab National Bank (PNB)",
+  "Bank of Baroda",
+  "Axis Bank",
+  "Kotak Mahindra Bank",
+  "IndusInd Bank",
+  "Union Bank of India",
+  "Canara Bank"
+];
 
 const CurrentEmployeeProfile = () => {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState({ pan: false, aadhaar: false, exp: false });
 
   // Load Employee from sessionStorage
   useEffect(() => {
     const saved = sessionStorage.getItem("hrmsUser");
     if (saved) {
       const parsed = JSON.parse(saved);
-      parsed.employeeId = String(parsed.employeeId); // 🔥 FIX: Ensure string
+      parsed.employeeId = String(parsed.employeeId);
       setEmployee(parsed);
     }
     setLoading(false);
   }, []);
 
-  if (loading) return <div className="p-6 text-center">Loading profile...</div>;
+  if (loading) return <div className="p-10 text-center text-blue-600 font-bold"><FaSpinner className="animate-spin inline mr-2"/>Loading profile...</div>;
 
   if (!employee)
     return (
-      <div className="p-6 text-red-600 text-center">
+      <div className="p-10 text-red-600 text-center font-bold border-2 border-red-200 rounded-lg m-10 bg-red-50">
         Employee not found. Please log in again.
       </div>
     );
 
-  // ---------------- UPDATE HELPERS ----------------
+  // ---------------- STATE UPDATERS ----------------
 
   const handleBasicChange = (field, value) => {
+    // Validation for Name (Letters only)
+    if (field === "name" || field === "emergency") {
+      if (!/^[A-Za-z\s]*$/.test(value)) return;
+    }
+    // Validation for Phone (Numbers only, max 10)
+    if (field === "phone" || field === "emergencyPhone") {
+      if (!/^\d{0,10}$/.test(value)) return;
+    }
+
     setEmployee((p) => ({ ...p, [field]: value }));
   };
 
   const handleNestedChange = (section, field, value) => {
+    // Validation for Account Number (Numbers only)
+    if (field === "accountNumber") {
+       if (!/^\d*$/.test(value)) return;
+    }
+
+    // Validation for Aadhaar (4-4-4 format)
+    if (field === "aadhaarNumber") {
+      let raw = value.replace(/-/g, "");
+      if (!/^\d{0,12}$/.test(raw)) return;
+      let formatted = raw;
+      if (raw.length > 4) formatted = raw.slice(0, 4) + "-" + raw.slice(4);
+      if (raw.length > 8) formatted = formatted.slice(0, 9) + "-" + formatted.slice(8);
+      value = formatted;
+    }
+
     setEmployee((p) => ({
       ...p,
       [section]: { ...(p[section] || {}), [field]: value },
     }));
-  };
-
-  // Emergency Contact handling
-  const parseEmergency = () => {
-    if (!employee.emergency) return { name: "", phone: "" };
-
-    if (employee.emergency.includes("-")) {
-      const [n, p] = employee.emergency.split("-").map((x) => x.trim());
-      return { name: n, phone: p };
-    }
-    return { name: employee.emergency, phone: "" };
-  };
-
-  const writeEmergency = (name, phone) => {
-    setEmployee((p) => ({ ...p, emergency: `${name} - ${phone}` }));
   };
 
   // Experience Helpers
@@ -90,22 +100,13 @@ const CurrentEmployeeProfile = () => {
       ...p,
       experienceDetails: [
         ...(p.experienceDetails || []),
-        {
-          company: "",
-          role: "",
-          department: "",
-          years: "",
-          joiningDate: "",
-          lastWorkingDate: "",
-          salary: "",
-          reason: "",
-          experienceLetterUrl: "",
-        },
+        { company: "", role: "", department: "", years: "", joiningDate: "", lastWorkingDate: "", salary: "", reason: "", experienceLetterUrl: "" },
       ],
     }));
   };
 
   const removeExperience = (i) => {
+    if(!window.confirm("Delete this experience record?")) return;
     setEmployee((p) => {
       const list = [...(p.experienceDetails || [])];
       list.splice(i, 1);
@@ -113,410 +114,310 @@ const CurrentEmployeeProfile = () => {
     });
   };
 
+  // ---------------- FILE UPLOAD ----------------
+
+  const handleFileUpload = async (e, type, index = null) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    setUploading(prev => ({ ...prev, [type]: true }));
+
+    try {
+      const res = await axios.post(`${API_BASE}/employees/upload-doc`, uploadData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      const url = res.data.url;
+
+      if (type === "pan") {
+        handleNestedChange("personalDetails", "panFileUrl", url);
+      } else if (type === "aadhaar") {
+        handleNestedChange("personalDetails", "aadhaarFileUrl", url);
+      } else if (type === "exp" && index !== null) {
+        updateExp(index, "experienceLetterUrl", url);
+      }
+    } catch (err) {
+      console.error("Upload Error:", err);
+      alert("File upload failed");
+    } finally {
+      setUploading(prev => ({ ...prev, [type]: false }));
+    }
+  };
+
   // ---------------- SAVE TO BACKEND ----------------
 
   const saveChanges = async () => {
-    if (!employee.employeeId) {
-      alert("Cannot update — employeeId missing");
-      return;
-    }
+    // Final Validation before save
+    if (employee.phone?.length !== 10) return alert("Phone number must be 10 digits");
+    if (employee.personalDetails?.aadhaarNumber?.replace(/-/g, "").length !== 12) return alert("Aadhaar must be 12 digits");
 
-    const empId = String(employee.employeeId); // 🔥 FIX: STRING always
-
-    const updatedEmployee = {
-      ...employee,
-      employeeId: empId, // 🔥 ensure body also has string
-    };
+    const empId = String(employee.employeeId);
+    const updatedEmployee = { ...employee, employeeId: empId };
 
     setSaving(true);
 
     try {
-      const { data } = await axios.put(
-        `${API_BASE}/api/employees/${empId}`, // 🔥 FIXED URL
-        updatedEmployee
-      );
-
-      data.employeeId = String(data.employeeId); // ensure consistent
-
+      const { data } = await axios.put(`${API_BASE}/employees/${empId}`, updatedEmployee);
+      
+      // Ensure ID stays string
+      data.employeeId = String(data.employeeId);
       sessionStorage.setItem("hrmsUser", JSON.stringify(data));
       setEmployee(data);
 
-      alert("Profile updated successfully!");
+      alert("✅ Profile updated successfully!");
       setIsEditing(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to update: " + (err.response?.data?.error || err.message));
+      alert("❌ Failed to update: " + (err.response?.data?.error || err.message));
     } finally {
       setSaving(false);
     }
   };
 
-  // Toggle Edit Mode
   const toggleEdit = () => {
-    if (isEditing) {
-      saveChanges();
-    } else {
-      setIsEditing(true);
-    }
+    if (isEditing) saveChanges();
+    else setIsEditing(true);
   };
 
-  // Extract Data
+  // Destructure for easier access
   const {
-    employeeId,
-    name,
-    email,
-    phone,
-    address,
-    personalDetails = {},
-    bankDetails = {},
-    experienceDetails = [],
-    currentDepartment,
-    currentRole,
-    joiningDate,
-    currentSalary,
+    employeeId, name, email, phone, address, emergency, emergencyPhone,
+    personalDetails = {}, bankDetails = {}, experienceDetails = [],
+    currentDepartment, currentRole, joiningDate, currentSalary,
   } = employee;
 
-  const emergency = parseEmergency();
-
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold">My Profile</h2>
-
-        <div className="flex gap-3">
-          {isEditing && (
-            <button
-              onClick={() => {
-                const saved = JSON.parse(sessionStorage.getItem("hrmsUser"));
-                saved.employeeId = String(saved.employeeId);
-                setEmployee(saved);
-                setIsEditing(false);
-              }}
-              className="px-4 py-2 border rounded"
-            >
-              Cancel
-            </button>
-          )}
-
-          <button
-            onClick={toggleEdit}
-            disabled={saving}
-            className={`px-5 py-2 rounded text-white ${
-              isEditing ? "bg-green-600" : "bg-blue-600"
-            }`}
-          >
-            {saving ? "Saving..." : isEditing ? "Save" : "Edit"}
-          </button>
-        </div>
-      </div>
-
-      {/* --------------------- SECTIONS --------------------- */}
-
-      {/* Basic Details */}
-      <Section title="Basic Details">
-        <TwoCol>
-          <StaticField label="Employee ID" value={employeeId} />
-
-          <EditableField
-            label="Name"
-            value={name}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("name", v)}
-          />
-
-          <StaticField label="Email" value={email} />
-
-          <EditableField
-            label="Phone"
-            value={phone}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("phone", v)}
-          />
-
-          <FullWidthEditable
-            label="Address"
-            value={address}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("address", v)}
-          />
-
-          <EditableField
-            label="Emergency Name"
-            value={emergency.name}
-            editable={isEditing}
-            onChange={(v) => writeEmergency(v, emergency.phone)}
-          />
-
-          <EditableField
-            label="Emergency Phone"
-            value={emergency.phone}
-            editable={isEditing}
-            onChange={(v) => writeEmergency(emergency.name, v)}
-          />
-        </TwoCol>
-      </Section>
-
-      {/* Personal Details */}
-      <Section title="Personal Details">
-        <TwoCol>
-          <EditableField
-            label="Date of Birth"
-            type="date"
-            value={personalDetails.dob?.split("T")[0] || ""}
-            editable={isEditing}
-            onChange={(v) => handleNestedChange("personalDetails", "dob", v)}
-          />
-
-          <EditableField
-            label="Gender"
-            value={personalDetails.gender}
-            editable={isEditing}
-            onChange={(v) => handleNestedChange("personalDetails", "gender", v)}
-          />
-
-          <EditableField
-            label="Marital Status"
-            value={personalDetails.maritalStatus}
-            editable={isEditing}
-            onChange={(v) =>
-              handleNestedChange("personalDetails", "maritalStatus", v)
-            }
-          />
-
-          <EditableField
-            label="Nationality"
-            value={personalDetails.nationality}
-            editable={isEditing}
-            onChange={(v) =>
-              handleNestedChange("personalDetails", "nationality", v)
-            }
-          />
-
-          <EditableField
-            label="Aadhaar Number"
-            value={personalDetails.aadharNumber}
-            editable={isEditing}
-            onChange={(v) =>
-              handleNestedChange("personalDetails", "aadharNumber", v)
-            }
-          />
-
-          <EditableField
-            label="PAN Number"
-            value={personalDetails.panNumber}
-            editable={isEditing}
-            onChange={(v) =>
-              handleNestedChange("personalDetails", "panNumber", v)
-            }
-          />
-        </TwoCol>
-      </Section>
-
-      {/* Job Details */}
-      <Section title="Job Details">
-        <TwoCol>
-          <EditableField
-            label="Department"
-            value={currentDepartment}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("currentDepartment", v)}
-          />
-
-          <EditableField
-            label="Role"
-            value={currentRole}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("currentRole", v)}
-          />
-
-          <EditableField
-            label="Joining Date"
-            type="date"
-            value={joiningDate?.split("T")[0] || ""}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("joiningDate", v)}
-          />
-
-          <EditableField
-            label="Current Salary"
-            value={currentSalary}
-            editable={isEditing}
-            onChange={(v) => handleBasicChange("currentSalary", v)}
-          />
-        </TwoCol>
-      </Section>
-
-      {/* Bank Details */}
-      <Section title="Bank Details">
-        <TwoCol>
-          <EditableField
-            label="Bank Name"
-            value={bankDetails.bankName}
-            editable={isEditing}
-            onChange={(v) => handleNestedChange("bankDetails", "bankName", v)}
-          />
-
-          <EditableField
-            label="Account Number"
-            value={bankDetails.accountNumber}
-            editable={isEditing}
-            onChange={(v) =>
-              handleNestedChange("bankDetails", "accountNumber", v)
-            }
-          />
-
-          <EditableField
-            label="IFSC Code"
-            value={bankDetails.ifsc}
-            editable={isEditing}
-            onChange={(v) => handleNestedChange("bankDetails", "ifsc", v)}
-          />
-
-          <EditableField
-            label="Branch"
-            value={bankDetails.branch}
-            editable={isEditing}
-            onChange={(v) => handleNestedChange("bankDetails", "branch", v)}
-          />
-        </TwoCol>
-      </Section>
-
-      {/* Experience */}
-      <Section title="Experience Details">
-        {isEditing && (
-          <button
-            onClick={addExperience}
-            className="px-4 py-2 bg-blue-600 text-white rounded"
-          >
-            + Add Experience
-          </button>
-        )}
-
-        {experienceDetails.length === 0 && (
-          <p className="text-gray-500 mt-3">No experience details available.</p>
-        )}
-
-        {experienceDetails.map((exp, i) => (
-          <div key={i} className="border p-4 rounded bg-white mt-4">
-            <TwoCol>
-              <EditableField
-                label="Company"
-                value={exp.company}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "company", v)}
-              />
-
-              <EditableField
-                label="Role"
-                value={exp.role}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "role", v)}
-              />
-
-              <EditableField
-                label="Department"
-                value={exp.department}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "department", v)}
-              />
-
-              <EditableField
-                label="Years"
-                value={exp.years}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "years", v)}
-              />
-
-              <EditableField
-                label="Joining Date"
-                type="date"
-                value={exp.joiningDate?.split("T")[0] || ""}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "joiningDate", v)}
-              />
-
-              <EditableField
-                label="Last Working"
-                type="date"
-                value={exp.lastWorkingDate?.split("T")[0] || ""}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "lastWorkingDate", v)}
-              />
-
-              <EditableField
-                label="Salary"
-                value={exp.salary}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "salary", v)}
-              />
-
-              <FullWidthEditable
-                label="Reason for Leaving"
-                value={exp.reason}
-                editable={isEditing}
-                onChange={(v) => updateExp(i, "reason", v)}
-              />
-            </TwoCol>
-
+    <div className="p-6 md:p-10 bg-slate-50 min-h-screen flex justify-center">
+      <div className="w-full max-w-6xl bg-white rounded-xl shadow-xl overflow-hidden">
+        
+        {/* HEADER */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-white flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold flex items-center gap-3">
+              <FaUser className="text-blue-200" /> My Profile
+            </h2>
+            <p className="text-blue-200 mt-1 ml-1">Manage your personal and work information</p>
+          </div>
+          
+          <div className="flex gap-3">
             {isEditing && (
               <button
-                onClick={() => removeExperience(i)}
-                className="mt-3 px-3 py-1 border text-red-600 rounded"
+                onClick={() => {
+                  const saved = JSON.parse(sessionStorage.getItem("hrmsUser"));
+                  saved.employeeId = String(saved.employeeId);
+                  setEmployee(saved);
+                  setIsEditing(false);
+                }}
+                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition"
               >
-                Remove
+                Cancel
               </button>
             )}
+            <button
+              onClick={toggleEdit}
+              disabled={saving}
+              className={`px-6 py-2 rounded-lg font-bold shadow-md flex items-center gap-2 transition ${
+                isEditing 
+                  ? "bg-green-500 hover:bg-green-600 text-white" 
+                  : "bg-white text-blue-800 hover:bg-blue-50"
+              }`}
+            >
+              {saving ? <FaSpinner className="animate-spin"/> : isEditing ? <FaSave/> : <FaEdit/>}
+              {saving ? "Saving..." : isEditing ? "Save Changes" : "Edit Profile"}
+            </button>
           </div>
-        ))}
-      </Section>
+        </div>
+
+        <div className="p-8 space-y-8">
+          
+          {/* 1. Basic Info */}
+          <Section title="Basic Information">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <StaticField label="Employee ID" value={employeeId} />
+                <StaticField label="Email" value={email} />
+                <Input label="Full Name" value={name} onChange={(v) => handleBasicChange("name", v)} editable={isEditing} icon={<FaUser/>} />
+                <Input label="Phone (10 Digits)" value={phone} onChange={(v) => handleBasicChange("phone", v)} editable={isEditing} icon={<FaPhone/>} />
+                <div className="md:col-span-2">
+                   <Input label="Address" value={address} onChange={(v) => handleBasicChange("address", v)} editable={isEditing} icon={<FaAddressCard/>} />
+                </div>
+             </div>
+          </Section>
+
+          {/* 2. Emergency Contact */}
+          <Section title="Emergency Contact">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input label="Contact Name" value={emergency} onChange={(v) => handleBasicChange("emergency", v)} editable={isEditing} icon={<FaUser/>} />
+              <Input label="Contact Phone" value={emergencyPhone} onChange={(v) => handleBasicChange("emergencyPhone", v)} editable={isEditing} icon={<FaPhone/>} />
+            </div>
+          </Section>
+
+          {/* 3. Personal Details */}
+          <Section title="Identity & Personal Details">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+               <div>
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Gender</label>
+                 {isEditing ? (
+                   <select 
+                     value={personalDetails.gender || "Prefer not to say"}
+                     onChange={(e) => handleNestedChange("personalDetails", "gender", e.target.value)}
+                     className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                   >
+                     <option>Male</option>
+                     <option>Female</option>
+                     <option>Prefer not to say</option>
+                   </select>
+                 ) : <p className="p-2 border-b border-slate-200 text-slate-800">{personalDetails.gender || "N/A"}</p>}
+               </div>
+
+               <Input label="Date of Birth" type="date" value={personalDetails.dob?.split("T")[0]} onChange={(v) => handleNestedChange("personalDetails", "dob", v)} editable={isEditing} />
+               <Input label="Nationality" value={personalDetails.nationality} onChange={(v) => handleNestedChange("personalDetails", "nationality", v)} editable={isEditing} />
+               
+               {/* Aadhaar */}
+               <Input label="Aadhaar (xxxx-xxxx-xxxx)" value={personalDetails.aadhaarNumber} onChange={(v) => handleNestedChange("personalDetails", "aadhaarNumber", v)} editable={isEditing} icon={<FaIdCard/>} />
+               
+               {/* PAN */}
+               <Input label="PAN Number" value={personalDetails.panNumber} onChange={(v) => handleNestedChange("personalDetails", "panNumber", v)} editable={isEditing} className="uppercase" icon={<FaCreditCard/>} />
+            </div>
+
+            {/* File Uploads */}
+            {isEditing && (
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                 <FileUpload label="Upload Aadhaar" onChange={(e)=>handleFileUpload(e, 'aadhaar')} uploading={uploading.aadhaar} fileUrl={personalDetails.aadhaarFileUrl} />
+                 <FileUpload label="Upload PAN" onChange={(e)=>handleFileUpload(e, 'pan')} uploading={uploading.pan} fileUrl={personalDetails.panFileUrl} />
+               </div>
+            )}
+            {!isEditing && (
+              <div className="flex gap-4 mt-4">
+                 {personalDetails.aadhaarFileUrl && <a href={personalDetails.aadhaarFileUrl} target="_blank" className="text-blue-600 underline text-sm">View Aadhaar</a>}
+                 {personalDetails.panFileUrl && <a href={personalDetails.panFileUrl} target="_blank" className="text-blue-600 underline text-sm">View PAN</a>}
+              </div>
+            )}
+          </Section>
+
+          {/* 4. Work Details */}
+          <Section title="Job Details">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+               <StaticField label="Department" value={currentDepartment} />
+               <StaticField label="Role" value={currentRole} />
+               <StaticField label="Joining Date" value={joiningDate?.split("T")[0]} />
+               <StaticField label="Current Salary" value={currentSalary} />
+             </div>
+          </Section>
+
+          {/* 5. Bank Details */}
+          <Section title="Bank Information">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Bank Name</label>
+                 {isEditing ? (
+                   <select 
+                     value={bankDetails.bankName || INDIAN_BANKS[0]}
+                     onChange={(e) => handleNestedChange("bankDetails", "bankName", e.target.value)}
+                     className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                   >
+                     {INDIAN_BANKS.map(bank => <option key={bank} value={bank}>{bank}</option>)}
+                   </select>
+                 ) : <p className="p-2 border-b border-slate-200 text-slate-800">{bankDetails.bankName || "N/A"}</p>}
+               </div>
+               <Input label="Account Number" value={bankDetails.accountNumber} onChange={(v) => handleNestedChange("bankDetails", "accountNumber", v)} editable={isEditing} icon={<FaCreditCard/>} />
+               <Input label="IFSC Code" value={bankDetails.ifsc} onChange={(v) => handleNestedChange("bankDetails", "ifsc", v)} editable={isEditing} className="uppercase" />
+               <Input label="Branch" value={bankDetails.branch} onChange={(v) => handleNestedChange("bankDetails", "branch", v)} editable={isEditing} />
+             </div>
+          </Section>
+
+          {/* 6. Experience */}
+          <Section title="Experience History">
+             {isEditing && <button onClick={addExperience} className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-bold">+ Add Experience</button>}
+             
+             {experienceDetails.map((exp, i) => (
+               <div key={i} className="border border-slate-200 p-4 rounded-lg mb-4 bg-slate-50/50">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Input label="Company" value={exp.company} onChange={(v)=>updateExp(i, "company", v)} editable={isEditing} />
+                    <Input label="Role" value={exp.role} onChange={(v)=>updateExp(i, "role", v)} editable={isEditing} />
+                    <Input label="From Date" type="date" value={exp.joiningDate?.split("T")[0]} onChange={(v)=>updateExp(i, "joiningDate", v)} editable={isEditing} />
+                    <Input label="To Date" type="date" value={exp.lastWorkingDate?.split("T")[0]} onChange={(v)=>updateExp(i, "lastWorkingDate", v)} editable={isEditing} />
+                 </div>
+                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Input label="Reason for Leaving" value={exp.reason} onChange={(v)=>updateExp(i, "reason", v)} editable={isEditing} />
+                    </div>
+                    {isEditing && (
+                       <div className="md:col-span-2">
+                          <FileUpload label="Upload Experience Letter" onChange={(e)=>handleFileUpload(e, 'exp', i)} uploading={uploading.exp} fileUrl={exp.experienceLetterUrl} />
+                       </div>
+                    )}
+                    {!isEditing && exp.experienceLetterUrl && (
+                       <a href={exp.experienceLetterUrl} target="_blank" className="text-blue-600 underline text-sm md:col-span-2">View Document</a>
+                    )}
+                 </div>
+                 {isEditing && <button onClick={()=>removeExperience(i)} className="mt-3 text-red-500 text-sm hover:underline flex items-center gap-1"><FaTrash/> Remove Entry</button>}
+               </div>
+             ))}
+             {experienceDetails.length === 0 && <p className="text-slate-400 italic">No past experience added.</p>}
+          </Section>
+
+        </div>
+      </div>
     </div>
   );
 };
 
 export default CurrentEmployeeProfile;
 
-/* ---------------- SMALL COMPONENTS ---------------- */
+// ---------------- REUSABLE COMPONENTS ----------------
 
 const Section = ({ title, children }) => (
-  <div className="bg-white p-6 rounded-lg shadow mb-6">
-    <h3 className="text-xl font-bold mb-4 text-blue-700 border-b pb-2">
-      {title}
+  <div className="bg-white rounded-lg">
+    <h3 className="text-lg font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4 uppercase tracking-wide flex items-center gap-2">
+      <span className="w-1 h-5 bg-blue-500 rounded-full"></span> {title}
     </h3>
     {children}
   </div>
 );
 
-const TwoCol = ({ children }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
-);
-
 const StaticField = ({ label, value }) => (
   <div>
-    <strong>{label}:</strong>
-    <p>{value || "N/A"}</p>
+    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">{label}</label>
+    <p className="text-slate-800 font-medium border-b border-slate-100 pb-1">{value || "N/A"}</p>
   </div>
 );
 
-const EditableField = ({ label, value, editable, onChange, type = "text" }) => (
+const Input = ({ label, value, editable, onChange, type = "text", icon, className = "" }) => (
   <div>
-    <strong>{label}:</strong>
+    <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">{label}</label>
     {editable ? (
-      <input
-        type={type}
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full p-2 mt-1 border rounded"
-      />
+      <div className="relative">
+        {icon && <div className="absolute left-3 top-3 text-slate-400">{icon}</div>}
+        <input
+          type={type}
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full border border-slate-300 rounded-lg py-2.5 ${icon ? "pl-10" : "pl-4"} pr-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white ${className}`}
+        />
+      </div>
     ) : (
-      <p>{value || "N/A"}</p>
+      <p className="p-2 border-b border-slate-100 text-slate-800">{value || "N/A"}</p>
     )}
   </div>
 );
 
-const FullWidthEditable = ({ label, value, editable, onChange }) => (
-  <div className="md:col-span-2">
-    <EditableField label={label} value={value} editable={editable} onChange={onChange} />
+const FileUpload = ({ label, onChange, uploading, fileUrl }) => (
+  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 bg-slate-50 hover:bg-slate-100 transition">
+    <p className="text-sm font-semibold text-slate-600 mb-2 flex justify-between items-center">
+      {label}
+      {fileUrl && <span className="text-green-600 text-xs font-bold flex items-center gap-1"><FaCheck/> Uploaded</span>}
+    </p>
+    <div className="flex items-center gap-3">
+       <label className={`cursor-pointer flex items-center gap-2 bg-white border border-slate-300 px-4 py-2 rounded-md hover:shadow-md transition ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+         {uploading ? <FaSpinner className="animate-spin text-blue-600"/> : <FaFileUpload className="text-blue-600"/>}
+         <span className="text-sm text-slate-700">{uploading ? "Uploading..." : "Choose File"}</span>
+         <input type="file" className="hidden" accept="image/*,.pdf" onChange={onChange} disabled={uploading} />
+       </label>
+       {fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">View</a>}
+    </div>
   </div>
 );
+// --- END OF FILE CurrentEmployeeProfile.jsx ---

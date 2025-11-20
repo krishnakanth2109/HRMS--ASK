@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { NoticeContext } from "../context/NoticeContext";
@@ -37,6 +38,7 @@ import {
   getProfilePic,
   deleteProfilePic,
   sendIdleActivity,
+  getShiftByEmployeeId,
 } from "../api";
 import { useNavigate } from "react-router-dom";
 import ImageCropModal from "./ImageCropModal";
@@ -66,6 +68,7 @@ const EmployeeDashboard = () => {
   );
   const [uploadingImage, setUploadingImage] = useState(false);
   const [punchStatus, setPunchStatus] = useState("IDLE");
+  const [shiftTimings, setShiftTimings] = useState(null);
   const navigate = useNavigate();
 
   // Crop modal states
@@ -136,12 +139,37 @@ const EmployeeDashboard = () => {
     });
   };
 
+  // --- Fetch Shift Timings ---
+  const loadShiftTimings = useCallback(async (empId) => {
+    try {
+      const shiftData = await getShiftByEmployeeId(empId);
+      setShiftTimings(shiftData);
+    } catch (err) {
+      console.error("Shift timings fetch error:", err);
+      // Set default shift timings if not found
+      setShiftTimings({
+        shiftStartTime: "09:00",
+        shiftEndTime: "18:00",
+        lateGracePeriod: 15,
+        fullDayHours: 8,
+        halfDayHours: 4,
+        autoExtendShift: true,
+        weeklyOffDays: [0],
+        isDefault: true
+      });
+    }
+  }, []);
+
   // --- Fetch Attendance ---
   const loadAttendance = useCallback(
     async (empId) => {
       try {
         const data = await getAttendanceForEmployee(empId);
-        const attendanceData = Array.isArray(data) ? data : [];
+        
+        // ✅ FIX: Correctly extract array from backend response object
+        // If backend returns { success: true, data: [...] }, this line handles it.
+        const attendanceData = Array.isArray(data) ? data : (data.data || []);
+        
         setAttendance(attendanceData);
         const todayEntry = attendanceData.find((d) => d.date === today);
         setTodayLog(todayEntry || null);
@@ -171,14 +199,18 @@ const EmployeeDashboard = () => {
     const bootstrap = async () => {
       if (user && user.employeeId) {
         setLoading(true);
-        await Promise.all([loadAttendance(user.employeeId), loadProfilePic()]);
+        await Promise.all([
+          loadAttendance(user.employeeId), 
+          loadProfilePic(),
+          loadShiftTimings(user.employeeId)
+        ]);
         setLoading(false);
       } else {
         setLoading(false);
       }
     };
     bootstrap();
-  }, [user, loadAttendance]);
+  }, [user, loadAttendance, loadShiftTimings]);
 
   // Extract name/email/phone/id from user and get role/department
   const { name, email, phone, employeeId } = user || {};
@@ -252,12 +284,19 @@ const EmployeeDashboard = () => {
     } catch (err) {
       console.error("Punch error:", err);
 
-      if (err.message.includes("Location")) {
-        alert(err.message);
+      const msg = err.response?.data?.message || err.message || "Unknown Error";
+
+      if (msg.includes("Location")) {
+        alert(msg);
         speak("Location access required for attendance");
+      } else if (msg.toLowerCase().includes("already punched")) {
+        // ✅ Auto-Sync: If backend says we already punched, refresh data
+        alert("System syncing: You are already punched in.");
+        speak("Updating status");
+        await loadAttendance(user.employeeId);
       } else {
         speak("Punch operation failed");
-        alert("Failed to record attendance. Please try again.");
+        alert(`Failed to record attendance: ${msg}`);
       }
     } finally {
       setPunchStatus("IDLE");
@@ -452,22 +491,8 @@ const EmployeeDashboard = () => {
     };
   }, [user, employeeId, name, department, role, todayLog, today]);
 
-  if (loading)
-    return (
-      <div className="p-8 text-center text-lg font-semibold">
-        Loading Employee Dashboard...
-      </div>
-    );
-
-  if (!user)
-    return (
-      <div className="p-8 text-center text-red-600 font-semibold">
-        Could not load employee data.
-      </div>
-    );
-
-  // ✅ UPDATED: Render chart based on new 'workedStatus' from backend
-  const leaveBarData = {
+  // ✅ Memoized Chart Data to prevent flickering on re-renders
+  const leaveBarData = useMemo(() => ({
     labels: ["Full Day", "Half Day", "Absent"],
     datasets: [
       {
@@ -484,20 +509,34 @@ const EmployeeDashboard = () => {
         borderRadius: 6,
       },
     ],
-  };
+  }), [attendance]);
 
-  const workPieData = {
+  const workPieData = useMemo(() => ({
     labels: ["Worked Hours", "Remaining"],
     datasets: [
       {
         data: [
           todayLog?.workedHours || 0,
-          Math.max(0, 8 - (todayLog?.workedHours || 0)),
+          Math.max(0, (shiftTimings?.fullDayHours || 8) - (todayLog?.workedHours || 0)),
         ],
         backgroundColor: ["#3b82f6", "#e5e7eb"],
       },
     ],
-  };
+  }), [todayLog, shiftTimings]);
+
+  if (loading)
+    return (
+      <div className="p-8 text-center text-lg font-semibold">
+        Loading Employee Dashboard...
+      </div>
+    );
+
+  if (!user)
+    return (
+      <div className="p-8 text-center text-red-600 font-semibold">
+        Could not load employee data.
+      </div>
+    );
 
   const formatWorkedTime = (totalSeconds) => {
     if (isNaN(totalSeconds) || totalSeconds < 0) {
@@ -536,20 +575,43 @@ const EmployeeDashboard = () => {
     return action === "IN" ? "Punch In" : "Punch Out";
   };
 
+  // Format time for display
+  const formatTimeDisplay = (timeString) => {
+    if (!timeString) return "--";
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    } catch (error) {
+      return timeString;
+    }
+  };
+
+  // Get day names from numbers
+  const getDayNames = (dayNumbers = []) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return dayNumbers.map(day => days[day]).join(', ') || 'None';
+  };
+
   return (
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
       {/* Profile Section */}
       <div className="flex flex-col md:flex-row items-center bg-gradient-to-r from-blue-100 to-blue-50 rounded-2xl shadow-lg p-6 mb-8 gap-6">
-        <div className="relative">
+        <div className="relative group">
           <img
-            alt="Employee"
             src={
               profileImage ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
                 name
               )}&background=0D8ABC&color=fff&size=128`
             }
-            className="w-28 h-28 rounded-full border-4 border-white shadow object-cover"
+            alt="Profile"
+            // ✅ FIXED: Prevent Tracking Prevention Errors for Cloudinary
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover"
           />
           <div className="absolute bottom-1 right-1 flex gap-1">
             <label
@@ -611,6 +673,38 @@ const EmployeeDashboard = () => {
               <b>Role:</b> {role}
             </div>
           </div>
+          
+          {/* Shift Timings Display */}
+          {shiftTimings && (
+            <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                <FaRegClock className="text-blue-600" /> Your Shift Timings
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-600">Start:</span>
+                  <div className="font-semibold">{formatTimeDisplay(shiftTimings.shiftStartTime)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">End:</span>
+                  <div className="font-semibold">{formatTimeDisplay(shiftTimings.shiftEndTime)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Grace Period:</span>
+                  <div className="font-semibold">{shiftTimings.lateGracePeriod} mins</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Weekly Off:</span>
+                  <div className="font-semibold text-xs">{getDayNames(shiftTimings.weeklyOffDays)}</div>
+                </div>
+              </div>
+              {shiftTimings.isDefault && (
+                <div className="mt-2 text-xs text-orange-600">
+                  * Default shift timings applied
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -762,6 +856,9 @@ const EmployeeDashboard = () => {
             <FaChartPie className="text-yellow-500" /> Work Hours Today
           </h2>
           <Pie data={workPieData} />
+          <div className="mt-2 text-center text-sm text-gray-600">
+            Target: {shiftTimings?.fullDayHours || 8} hours
+          </div>
         </div>
       </div>
 

@@ -1,11 +1,10 @@
 // --- START OF FILE models/employeeModel.js ---
 
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs"; // ✅ Import bcryptjs for password handling
+import bcrypt from "bcryptjs";
 
 // Sub-schemas
 const experienceSchema = new mongoose.Schema({
-  employeeId: String,
   company: String,
   role: String,
   department: String,
@@ -14,19 +13,19 @@ const experienceSchema = new mongoose.Schema({
   lastWorkingDate: String,
   salary: Number,
   reason: String,
-  experienceLetterUrl: String,
+  experienceLetterUrl: String, // Stores Cloudinary URL
   employmentType: String,
 });
 
 const personalSchema = new mongoose.Schema({
   dob: String,
-  gender: String,
+  gender: { type: String, enum: ["Male", "Female", "Prefer not to say"] },
   maritalStatus: String,
   nationality: String,
   panNumber: String,
-  aadharNumber: String,
-  aadharFileUrl: String,
-  panFileUrl: String,
+  aadhaarNumber: String,
+  aadhaarFileUrl: String, // Stores Cloudinary URL
+  panFileUrl: String,     // Stores Cloudinary URL
 });
 
 const bankSchema = new mongoose.Schema({
@@ -36,28 +35,28 @@ const bankSchema = new mongoose.Schema({
   branch: String,
 });
 
-// Main Employee Schema with role/isAdmin and password security
+// Main Employee Schema
 const EmployeeSchema = new mongoose.Schema({
-  employeeId: { type: String, required: true, unique: true }, // e.g. "EMP001"
+  employeeId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: {
     type: String,
     required: [true, "A password is required"],
     minlength: 6,
-    select: false, // Do not send password in query results by default
+    select: false,
   },
   phone: String,
   address: String,
-  emergency: String,
+  emergency: String, // Emergency Name
+  emergencyPhone: String, // Emergency Phone
   isActive: { type: Boolean, default: true },
   bankDetails: bankSchema,
   personalDetails: personalSchema,
   experienceDetails: [experienceSchema],
 
-  // ---- NEW: role + isAdmin to detect admins dynamically ----
   role: { type: String, enum: ["employee", "admin", "manager"], default: "employee" },
-  isAdmin: { type: Boolean, default: false }, // optional helper flag
+  isAdmin: { type: Boolean, default: false },
 });
 
 // Hash password before save
@@ -67,11 +66,7 @@ EmployeeSchema.pre("save", async function (next) {
   next();
 });
 
-// Instance method to compare password
-EmployeeSchema.methods.correctPassword = async function (
-  candidatePassword,
-  userPassword
-) {
+EmployeeSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
   return await bcrypt.compare(candidatePassword, userPassword);
 };
 
