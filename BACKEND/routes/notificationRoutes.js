@@ -1,76 +1,51 @@
+// routes/notificationRoutes.js
 import express from "express";
-import Notification from "../models/notificationModel.js";
 import { protect } from "../middleware/authMiddleware.js";
+
+import {
+  getMyNotifications,
+  createNotification,
+  markNotificationAsReadController,
+  markAllNotificationsAsReadController,
+} from "../controllers/notificationController.js";
 
 const router = express.Router();
 
-// Apply protect middleware to ALL notification routes that need user info
+// All routes require authentication
 router.use(protect);
 
 /*
 ===================================================================
- 🔹 MARK ALL NOTIFICATIONS READ (For Logged-in Employee Only)
+ 🔹 GET My Notifications
+     GET /api/notifications
 ===================================================================
 */
-router.patch("/mark-all", async (req, res) => {
-  try {
-    const userId = req.user?._id;
-
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized user" });
-    }
-
-    await Notification.updateMany(
-      { userId },
-      { isRead: true }
-    );
-
-    const io = req.app.get("io");
-    if (io) io.emit("notificationsAllRead", { userId });
-
-    res.json({ message: "All personal notifications marked as read" });
-  } catch (err) {
-    console.error("PATCH /mark-all error:", err);
-    res.status(500).json({ message: "Failed to mark all as read" });
-  }
-});
+router.get("/", getMyNotifications);
 
 /*
 ===================================================================
- 🔹 MARK SINGLE NOTIFICATION READ
+ 🔹 Create Notification
+     POST /api/notifications
+     (Admin can target employees or all users)
 ===================================================================
 */
-router.patch("/:id", async (req, res) => {
-  try {
-    const updated = await Notification.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-
-    const io = req.app.get("io");
-    if (io) io.emit("notificationUpdated", updated);
-
-    res.json({ message: "Updated", data: updated });
-  } catch (err) {
-    console.error("PATCH /:id error:", err);
-    res.status(500).json({ message: "Failed to update notification" });
-  }
-});
+router.post("/", createNotification);
 
 /*
 ===================================================================
- 🔹 GET ALL NOTIFICATIONS (Admin only? Optional)
+ 🔹 Mark SINGLE Notification Read
+     PATCH /api/notifications/:id
 ===================================================================
 */
-router.get("/", async (req, res) => {
-  try {
-    const notifications = await Notification.find().sort({ date: -1 });
-    res.json(notifications);
-  } catch (err) {
-    console.error("GET error:", err);
-    res.status(500).json({ message: "Failed to fetch notifications" });
-  }
-});
+router.patch("/:id", markNotificationAsReadController);
+
+/*
+===================================================================
+ 🔹 Mark ALL My Notifications Read
+     PATCH /api/notifications/mark-all
+===================================================================
+*/
+router.post("/mark-all", markAllNotificationsAsReadController);
+
 
 export default router;

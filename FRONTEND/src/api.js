@@ -113,7 +113,9 @@ export const cancelLeaveRequestById = async (id) => (await api.delete(`/api/leav
 export const getNotifications = async () => (await api.get("/api/notifications")).data;
 export const addNotificationRequest = async (data) => (await api.post("/api/notifications", data)).data;
 export const markNotificationAsRead = async (id) => (await api.patch(`/api/notifications/${id}`, { isRead: true })).data;
-export const markAllNotificationsAsRead = async () => (await api.patch("/api/notifications/mark-all")).data;
+export const markAllNotificationsAsRead = async () =>
+  (await api.post("/api/notifications/mark-all")).data;
+
 
 /* ============================================================================
    OVERTIME

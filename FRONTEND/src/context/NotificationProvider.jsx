@@ -9,7 +9,6 @@ import {
 } from "../api";
 import { io } from "socket.io-client";
 
-// Backend URL
 const SOCKET_URL =
   import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
@@ -19,13 +18,42 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Notification sound
   const [sound] = useState(() => new Audio("/notification.mp3"));
 
-  // =====================================================
-  // 1️⃣ Fetch saved notifications from DB
-  // =====================================================
+  // Load current user from sessionStorage
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("hrmsUser");
+      if (raw) {
+        setCurrentUser(JSON.parse(raw));
+      }
+    } catch (err) {
+      console.error("Failed to parse hrmsUser:", err);
+    }
+  }, []);
+
+  // Helper: does this notif belong to this user?
+  const shouldShowToUser = (notif, user) => {
+    if (!user || !notif) return false;
+    const userId = user._id;
+    const role = user.role;
+
+    // direct notification
+    if (notif.userId) {
+      return (
+        notif.userId === userId ||
+        notif.userId?.toString?.() === userId?.toString()
+      );
+    }
+
+    // role/global broadcast
+    if (!notif.role || notif.role === "all") return true;
+    return notif.role === role;
+  };
+
+  // Fetch notifications from backend
   const fetchNotifications = useCallback(async () => {
     try {
       const data = await getNotifications();
@@ -41,18 +69,15 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // =====================================================
-  // 2️⃣ SOCKET.IO — ONLY NOTICE + NOTIFICATION EVENTS
-  // (🔥 Idle-time listeners removed)
-  // =====================================================
+  // SOCKET CONNECTION
   useEffect(() => {
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
     });
 
-    console.log("📡 SOCKET CONNECTED:", SOCKET_URL);
+    console.log("📡 SOCKET CONNECTED (notifications):", SOCKET_URL);
 
-    // 🔔 When admin posts a notice
+    // When admin posts a notice (you already had this)
     socket.on("newNotice", (data) => {
       const newNotification = {
         _id: Date.now(),
@@ -66,22 +91,25 @@ export const NotificationProvider = ({ children }) => {
       setNotifications((prev) => [newNotification, ...prev]);
     });
 
-    // 🔔 General notification from backend
+    // General notification from backend
     socket.on("newNotification", (data) => {
       console.log("🔥 New Notification Received:", data);
+
+      // ✅ Only add if this notification is actually for this user
+      if (!shouldShowToUser(data, currentUser)) return;
 
       setNotifications((prev) => {
         if (prev.some((n) => n._id === data._id)) return prev;
         return [data, ...prev];
       });
 
-      // play notification sound
+      // play sound
       try {
         sound.currentTime = 0;
         sound.play().catch(() => {});
       } catch {}
 
-      // show toast popup
+      // toast popup
       const toastId = Date.now();
       setToasts((prev) => [
         { id: toastId, message: data.message, time: new Date() },
@@ -96,14 +124,12 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       socket.disconnect();
     };
-  }, [sound]);
+  }, [sound, currentUser]);
 
-  // =====================================================
-  // 3️⃣ Add notification manually
-  // =====================================================
-  const addNotification = async (message, type = "info") => {
+  // Add notification manually
+  const addNotification = async (message, type = "info", extra = {}) => {
     try {
-      const saved = await addNotificationRequest({ message, type });
+      const saved = await addNotificationRequest({ message, type, ...extra });
       setNotifications((prev) => [saved, ...prev]);
       return saved;
     } catch (err) {
@@ -111,9 +137,6 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // =====================================================
-  // 4️⃣ Mark single notification as read
-  // =====================================================
   const markAsRead = async (id) => {
     try {
       await markNotificationAsRead(id);
@@ -125,9 +148,6 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // =====================================================
-  // 5️⃣ Mark ALL notifications as read
-  // =====================================================
   const markAllAsRead = async () => {
     try {
       await markAllNotificationsAsRead();
@@ -152,7 +172,7 @@ export const NotificationProvider = ({ children }) => {
     >
       {children}
 
-      {/* Toast Messages */}
+      {/* Toasts */}
       <div
         style={{
           position: "fixed",

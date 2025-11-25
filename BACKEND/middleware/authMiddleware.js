@@ -1,53 +1,70 @@
-// --- START OF FILE middleware/authMiddleware.js ---
+// middleware/authMiddleware.js
+import { promisify } from "util";
+import jwt from "jsonwebtoken";
+import Admin from "../models/adminModel.js";
+import Employee from "../models/employeeModel.js";
 
-import jwt from 'jsonwebtoken';
-import User from '../models/employeeModel.js'; // Ensures we check against the Employee DB
-
-const protect = async (req, res, next) => {
+/*
+  PROTECT MIDDLEWARE
+  - validates JWT
+  - loads Admin OR Employee into req.user
+  - attaches user.role = "admin" or "employee"
+*/
+export const protect = async (req, res, next) => {
   let token;
 
-  // 1. Check if Authorization header exists and starts with 'Bearer'
   if (
     req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
+    req.headers.authorization.startsWith("Bearer")
   ) {
-    try {
-      // 2. Get token from header
-      token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(" ")[1];
+  }
 
-      // 3. Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Not authorized, no token provided" });
+  }
 
-      // 4. Get user from the token (exclude password)
-      // Note: Ensures the user actually exists in the DB
-      req.user = await User.findById(decoded.id).select('-password');
+  try {
+    const decoded = await promisify(jwt.verify)(
+      token,
+      process.env.JWT_SECRET
+    );
 
-      if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized, user not found' });
+    let currentUser = await Admin.findById(decoded.id).select("-password");
+    if (currentUser) {
+      currentUser.role = "admin";
+    } else {
+      currentUser = await Employee.findById(decoded.id).select("-password");
+      if (currentUser) {
+        currentUser.role = "employee";
       }
-
-      next(); // Proceed to the next middleware
-    } catch (error) {
-      console.error('Token verification failed:', error.message);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  } else {
-    // If header is missing or incorrect format
-    return res.status(401).json({ message: 'Not authorized, no token' });
+
+    if (!currentUser) {
+      return res.status(401).json({ message: "Not authorized, user not found" });
+    }
+
+    req.user = currentUser;
+    next();
+  } catch (error) {
+    console.error("Token verification error:", error.message);
+    return res.status(401).json({ message: "Not authorized, token invalid" });
   }
 };
 
-// Role-based access control
-const restrictTo = (...roles) => {
+/*
+  Optional: Restrict route to roles:
+  router.get('/admin-only', protect, restrictTo('admin'), controller)
+*/
+export const restrictTo = (...roles) => {
   return (req, res, next) => {
-    // req.user is set in the 'protect' middleware above
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        message: 'You do not have permission to perform this action' 
-      });
+      return res
+        .status(403)
+        .json({ message: "You do not have permission for this action" });
     }
     next();
   };
 };
-
-export { protect, restrictTo };

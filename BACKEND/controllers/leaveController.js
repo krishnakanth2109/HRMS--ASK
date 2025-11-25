@@ -156,26 +156,34 @@ export const updateLeaveStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
+    // Update the leave request
     const doc = await LeaveRequest.findByIdAndUpdate(
       req.params.id,
-      { status, approvedBy, actionDate: new Date().toISOString().slice(0, 10) },
+      {
+        status,
+        approvedBy,
+        actionDate: new Date().toISOString().slice(0, 10),
+      },
       { new: true }
     );
 
-    if (!doc) return res.status(404).json({ message: "Not found" });
+    if (!doc) return res.status(404).json({ message: "Leave request not found" });
 
-    // 🔥 NOTIFY EMPLOYEE
+    // 🔥 Find the employee
     const employee = await Employee.findOne({ employeeId: doc.employeeId });
 
     if (employee) {
+      // 🔥 Create notification for employee
       const notif = await Notification.create({
-        userId: employee._id.toString(),
-        title: "Leave Status Updated",
-        message: `Your leave request has been ${status} by ${approvedBy}`,
+        userId: employee._id,
+        userType: "Employee",     // REQUIRED!!
+        title: "Leave Status Update",
+        message: `Your leave request (${doc.from} → ${doc.to}) has been ${status} by ${approvedBy}.`,
         type: "leave-status",
         isRead: false,
       });
 
+      // 🔥 Emit socket event
       const io = req.app.get("io");
       if (io) io.emit("newNotification", notif);
     }
@@ -185,25 +193,8 @@ export const updateLeaveStatus = async (req, res) => {
     console.error("updateLeaveStatus error:", err);
     res.status(500).json({ message: "Failed to update leave status." });
   }
-  // ===================================================================================
-  // 🔥 SEND NOTIFICATION TO EMPLOYEE WHEN ADMIN UPDATES STATUS
-  // ===================================================================================
-  const employee = await Employee.findOne({ employeeId: doc.employeeId });
-
-  if (employee) {
-    const notif = await Notification.create({
-      userId: employee._id.toString(),
-      title: "Leave Status Update",
-      message: `Your leave request from ${doc.from} to ${doc.to} has been ${status} by ${approvedBy}.`,
-      type: "leave-status",
-      isRead: false,
-    });
-
-    const io = req.app.get("io");
-    if (io) io.emit("newNotification", notif);
-  }
-
 };
+
 
 // ===================================================================================
 // EMPLOYEE CANCEL LEAVE
