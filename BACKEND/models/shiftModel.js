@@ -1,51 +1,39 @@
+// --- START OF FILE models/Shift.js ---
+
 import mongoose from "mongoose";
 
-const ShiftSchema = new mongoose.Schema({
-  employeeId: {
-    type: String,
-    required: true,
-    unique: true,
-    ref: 'Employee'
+const ShiftSchema = new mongoose.Schema(
+  {
+    employeeId: { type: String, required: true, unique: true },
+    employeeName: { type: String, required: true },
+    email: { type: String, required: true },
+    department: { type: String, default: "N/A" },
+    role: { type: String, default: "N/A" },
+
+    // Manual shift (NO DEFAULTS)
+    shiftStartTime: { type: String, default: "" },
+    shiftEndTime: { type: String, default: "" },
+
+    lateGracePeriod: { type: Number, default: null },
+    fullDayHours: { type: Number, default: null },
+    halfDayHours: { type: Number, default: null },
+
+    autoExtendShift: { type: Boolean, default: false },
+
+    weeklyOffDays: { type: [Number], default: [] },
+
+    category: { type: String, default: null }, // night-shift-xxxx
+
+    timezone: { type: String, default: "Asia/Kolkata" },
+
+    isActive: { type: Boolean, default: true },
+
+    createdBy: { type: String, default: "Admin" },
+    updatedBy: { type: String, default: "Admin" },
   },
-  employeeName: { type: String, required: true },
-  email: { type: String, required: true },
-  department: { type: String, default: 'N/A' },
-  role: { type: String, default: 'N/A' },
-  
-  // Shift Timings (Stored as String HH:MM)
-  // These represent Indian Standard Time (IST)
-  shiftStartTime: {
-    type: String,
-    required: true,
-    default: "09:00"
-  },
-  shiftEndTime: {
-    type: String,
-    required: true,
-    default: "18:00"
-  },
-  
-  // Explicitly store that these timings are for India
-  // This helps the backend convert UTC server time to this timezone before comparing
-  timezone: {
-    type: String,
-    default: "Asia/Kolkata" 
-  },
-  
-  lateGracePeriod: { type: Number, default: 15 }, // in minutes
-  
-  fullDayHours: { type: Number, default: 8 },
-  halfDayHours: { type: Number, default: 4 },
-  
-  autoExtendShift: { type: Boolean, default: true },
-  weeklyOffDays: { type: [Number], default: [0] }, // 0 = Sunday
-  
-  isActive: { type: Boolean, default: true },
-  
-  createdBy: { type: String, default: 'SYSTEM' },
-  updatedBy: { type: String, default: 'SYSTEM' },
-}, { 
-  timestamps: true 
-});
+  { timestamps: true }
+);
 
 export default mongoose.model("Shift", ShiftSchema);
+
+// --- END OF FILE models/Shift.js ---

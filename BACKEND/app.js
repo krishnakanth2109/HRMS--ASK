@@ -23,6 +23,7 @@ import userRoutes from "./routes/userRoutes.js";
 import profilePicRoutes from "./routes/ProfilePicRoute.js";
 import idleTimeRoutes from "./routes/idleTimeRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
 const app = express();
 const server = http.createServer(app);
 
@@ -122,6 +123,7 @@ app.use("/api/profile", profilePicRoutes);
 app.use("/api/notifications", notificationRoutes); // ✅ Corrected route prefix
 app.use("/idletime", idleTimeRoutes);
 app.use("/api/shifts", shiftRoutes);
+app.use("/api/categories", categoryRoutes);
 // -------------------- 404 Handler --------------------
 app.use("*", (req, res) => {
   res.status(404).json({ success: false, message: "API route not found" });

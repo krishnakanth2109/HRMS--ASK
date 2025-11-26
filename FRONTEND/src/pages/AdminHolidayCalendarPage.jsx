@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import { getHolidays, addHoliday, deleteHolidayById } from "../api";
+import { getHolidays, addHoliday, deleteHolidayById, getEmployees } from "../api";
 import { FaCalendarDay, FaStar } from "react-icons/fa";
 
 const AdminHolidayCalendarPage = () => {
@@ -14,6 +14,7 @@ const AdminHolidayCalendarPage = () => {
   });
 
   const [holidays, setHolidays] = useState([]);
+  const [birthdays, setBirthdays] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeDate, setActiveDate] = useState(new Date());
@@ -25,7 +26,9 @@ const AdminHolidayCalendarPage = () => {
     return d;
   };
 
-  // Fetch Holidays
+  /* =========================================================
+      FETCH HOLIDAYS
+  ==========================================================*/
   const fetchHolidays = useCallback(async () => {
     try {
       const response = await getHolidays();
@@ -36,9 +39,33 @@ const AdminHolidayCalendarPage = () => {
     }
   }, []);
 
+  /* =========================================================
+      FETCH EMPLOYEE BIRTHDAYS (personalDetails.dob)
+  ==========================================================*/
+  const fetchBirthdays = useCallback(async () => {
+    try {
+      const allEmployees = await getEmployees();
+
+      const result = allEmployees
+        .filter((emp) => emp.personalDetails?.dob)
+        .map((emp) => ({
+          name: emp.name,
+          dob: new Date(emp.personalDetails.dob), // Convert to Date()
+        }));
+
+      setBirthdays(result);
+    } catch (err) {
+      console.error("Error loading birthdays:", err);
+    }
+  }, []);
+
+  /* =========================================================
+      LOAD EVERYTHING
+  ==========================================================*/
   useEffect(() => {
     fetchHolidays();
-  }, [fetchHolidays]);
+    fetchBirthdays();
+  }, [fetchHolidays, fetchBirthdays]);
 
   const handleChange = (e) => {
     setHolidayData({
@@ -54,7 +81,6 @@ const AdminHolidayCalendarPage = () => {
     setMessage("");
 
     try {
-      // Auto-fill endDate for single-day holiday
       const finalData = {
         ...holidayData,
         endDate: holidayData.endDate || holidayData.startDate,
@@ -85,7 +111,9 @@ const AdminHolidayCalendarPage = () => {
     }
   };
 
-  // Count holiday DAYS this month
+  /* =========================================================
+      COUNT HOLIDAY DAYS THIS MONTH
+  ==========================================================*/
   const holidaysThisMonth = holidays.reduce((total, holiday) => {
     const start = normalizeDate(holiday.startDate);
     const end = normalizeDate(holiday.endDate);
@@ -108,42 +136,70 @@ const AdminHolidayCalendarPage = () => {
     return total;
   }, 0);
 
-  // Tooltip for holiday ranges
+  /* =========================================================
+      CALENDAR TILE CONTENT (TOOLTIP)
+  ==========================================================*/
   const tileContent = ({ date, view }) => {
-    if (view === "month") {
-      const current = normalizeDate(date);
+    if (view !== "month") return null;
 
-      const holiday = holidays.find((h) => {
-        const start = normalizeDate(h.startDate);
-        const end = normalizeDate(h.endDate);
-        return current >= start && current <= end;
-      });
+    const current = normalizeDate(date);
 
-      if (holiday) {
-        return (
-          <div className="holiday-tooltip">
-            {holiday.name}
-            <br />
-            {holiday.startDate} → {holiday.endDate}
-          </div>
-        );
-      }
+    // Holiday tooltip
+    const holiday = holidays.find((h) => {
+      const start = normalizeDate(h.startDate);
+      const end = normalizeDate(h.endDate);
+      return current >= start && current <= end;
+    });
+
+    if (holiday) {
+      return (
+        <div className="holiday-tooltip">
+          {holiday.name}
+          <br />
+          {holiday.startDate} → {holiday.endDate}
+        </div>
+      );
+    }
+
+    // Birthday tooltip
+    const birthday = birthdays.find((b) => {
+      return (
+        b.dob.getDate() === date.getDate() &&
+        b.dob.getMonth() === date.getMonth()
+      );
+    });
+
+    if (birthday) {
+      return <div className="birthday-tooltip">🎂 {birthday.name}</div>;
     }
   };
 
-  // Highlight holiday ranges on calendar
+  /* =========================================================
+      CALENDAR TILE COLORS
+  ==========================================================*/
   const tileClassName = ({ date, view }) => {
-    if (view === "month") {
-      const current = normalizeDate(date);
+    if (view !== "month") return "";
 
-      const range = holidays.some((holiday) => {
-        const start = normalizeDate(holiday.startDate);
-        const end = normalizeDate(holiday.endDate);
-        return current >= start && current <= end;
-      });
+    const current = normalizeDate(date);
 
-      if (range) return "holiday-tile";
-    }
+    // Highlight holidays
+    const isHoliday = holidays.some((holiday) => {
+      const start = normalizeDate(holiday.startDate);
+      const end = normalizeDate(holiday.endDate);
+      return current >= start && current <= end;
+    });
+
+    if (isHoliday) return "holiday-tile";
+
+    // Highlight birthdays
+    const isBirthday = birthdays.some((b) => {
+      return (
+        b.dob.getDate() === date.getDate() &&
+        b.dob.getMonth() === date.getMonth()
+      );
+    });
+
+    if (isBirthday) return "birthday-tile";
   };
 
   return (
@@ -156,11 +212,11 @@ const AdminHolidayCalendarPage = () => {
             Holiday Management
           </h1>
           <p className="text-gray-600 mt-2 text-lg">
-            Add, manage, and view all company holidays
+            Add, manage, and view all company holidays and birthdays
           </p>
         </header>
 
-        {/* FORM + LIST */}
+        {/* FORM + LIST SECTION */}
         <div className="grid lg:grid-cols-2 gap-10 mb-16">
 
           {/* ADD HOLIDAY FORM */}
@@ -170,7 +226,6 @@ const AdminHolidayCalendarPage = () => {
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-
               <div>
                 <label className="font-semibold text-gray-700 mb-2 block">
                   Holiday Name
@@ -181,7 +236,6 @@ const AdminHolidayCalendarPage = () => {
                   value={holidayData.name}
                   onChange={handleChange}
                   className="w-full p-4 rounded-xl border border-gray-300 focus:ring-4 focus:ring-blue-200 outline-none"
-                  placeholder="Enter holiday name"
                   required
                 />
               </div>
@@ -197,7 +251,6 @@ const AdminHolidayCalendarPage = () => {
                   className="w-full p-4 rounded-xl border border-gray-300 focus:ring-4 focus:ring-blue-200 outline-none resize-none"
                   rows="3"
                   required
-                  placeholder="Enter holiday description"
                 />
               </div>
 
@@ -210,7 +263,7 @@ const AdminHolidayCalendarPage = () => {
                   name="startDate"
                   value={holidayData.startDate}
                   onChange={handleChange}
-                  className="w-full p-4 rounded-xl border border-gray-300 focus:ring-4 focus:ring-blue-200 outline-none"
+                  className="w-full p-4 rounded-xl border border-gray-300"
                   required
                 />
               </div>
@@ -225,38 +278,35 @@ const AdminHolidayCalendarPage = () => {
                   value={holidayData.endDate}
                   min={holidayData.startDate}
                   onChange={handleChange}
-                  className="w-full p-4 rounded-xl border border-gray-300 focus:ring-4 focus:ring-blue-200 outline-none"
+                  className="w-full p-4 rounded-xl border border-gray-300"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-4 rounded-xl font-semibold text-lg shadow-lg transition-all ${
-                  loading
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:scale-105"
-                }`}
+                className={`w-full py-4 rounded-xl font-semibold text-lg shadow-lg transition-all ${loading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:scale-105"
+                  }`}
               >
                 {loading ? "Adding..." : "Add Holiday ✨"}
               </button>
-
             </form>
 
             {message && (
               <div
-                className={`mt-5 p-3 rounded-xl text-center font-semibold ${
-                  message.includes("❌")
-                    ? "bg-red-100 text-red-700"
-                    : "bg-green-100 text-green-700"
-                }`}
+                className={`mt-5 p-3 rounded-xl text-center font-semibold ${message.includes("❌")
+                  ? "bg-red-100 text-red-700"
+                  : "bg-green-100 text-green-700"
+                  }`}
               >
                 {message}
               </div>
             )}
           </div>
 
-          {/* HOLIDAY LIST */}
+          {/* HOLIDAY LIST + BIRTHDAYS LIST */}
           <div className="w-full">
             <h3 className="text-3xl font-bold text-gray-800 mb-8 text-center">
               All Holidays 📋
@@ -270,66 +320,97 @@ const AdminHolidayCalendarPage = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div
+                className="space-y-6 overflow-y-auto"
+                style={{
+                  maxHeight: "420px",  // shows approx 2 cards
+                  paddingRight: "10px"
+                }}
+              >
                 {holidays.map((holiday) => (
                   <div
                     key={holiday._id}
-                    className="group relative bg-white shadow-lg p-6 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 overflow-hidden"
+                    className="group bg-white shadow-lg p-6 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all"
                   >
                     <div className="flex items-center gap-5">
-                      <div className="flex-shrink-0 text-3xl font-bold text-indigo-600 bg-indigo-50 p-4 rounded-xl text-center">
-                        <div className="leading-none">
-                          {new Date(holiday.startDate).getDate()}
-                        </div>
-                        <div className="text-sm font-medium tracking-wide">
-                          {new Date(holiday.startDate).toLocaleString(
-                            "default",
-                            { month: "short" }
-                          )}
+                      <div className="text-3xl font-bold text-indigo-600 bg-indigo-50 p-4 rounded-xl text-center">
+                        <div>{new Date(holiday.startDate).getDate()}</div>
+                        <div className="text-sm">
+                          {new Date(holiday.startDate).toLocaleString("default", {
+                            month: "short",
+                          })}
                         </div>
                       </div>
 
                       <div className="flex-grow">
-                        <h4 className="text-xl font-bold text-gray-900 mb-1">
-                          {holiday.name}
-                        </h4>
-                        <p className="text-gray-500 text-sm mb-1">
-                          {holiday.description}
-                        </p>
-                        <p className="text-gray-500 font-semibold text-sm">
-                          {new Date(holiday.startDate).toLocaleDateString(
-                            "en-US"
-                          )}{" "}
-                          →{" "}
-                          {new Date(holiday.endDate).toLocaleDateString(
-                            "en-US"
-                          )}
+                        <h4 className="text-xl font-bold text-gray-900">{holiday.name}</h4>
+                        <p className="text-gray-500">{holiday.description}</p>
+                        <p className="text-gray-600 font-semibold">
+                          {new Date(holiday.startDate).toLocaleDateString()} →{" "}
+                          {new Date(holiday.endDate).toLocaleDateString()}
                         </p>
                       </div>
 
-                      <div className="flex flex-col items-center gap-3">
-                        <FaStar className="text-yellow-400 text-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <button
-                          onClick={() => handleDelete(holiday._id)}
-                          className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-xl shadow"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDelete(holiday._id)}
+                        className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-xl shadow"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
 
+            )}
+
+            {/* BIRTHDAY LIST */}
+            <div className="mt-16">
+              <h3 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+                Employee Birthdays 🎂
+              </h3>
+
+              {birthdays.length === 0 ? (
+                <div className="text-center bg-white p-12 rounded-2xl shadow-lg">
+                  <p className="text-2xl text-gray-400 mb-4">📭</p>
+                  <p className="text-gray-600 font-semibold text-lg">
+                    No birthdays found.
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className="space-y-5 overflow-y-auto"
+                  style={{
+                    maxHeight: "300px",     // Shows around 3 cards
+                    paddingRight: "10px",   // Prevent scrollbar overlap
+                  }}
+                >
+                  {birthdays.map((b, i) => (
+                    <div
+                      key={i}
+                      className="bg-white p-6 rounded-2xl shadow hover:shadow-xl transition"
+                    >
+                      <h4 className="text-xl font-bold text-orange-600">
+                        {b.name}
+                      </h4>
+                      <p className="text-gray-600">
+                        🎂 {b.dob.toLocaleDateString("en-US")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+
+          </div>
         </div>
 
-        {/* CALENDAR + STATS SECTION */}
+        {/* CALENDAR SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 items-start">
           <div className="lg:col-span-2 bg-white shadow-2xl rounded-3xl p-6 sm:p-8 border border-slate-100">
             <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center flex items-center justify-center gap-3">
-              <FaCalendarDay className="text-indigo-500" /> Holiday Calendar
+              <FaCalendarDay className="text-indigo-500" /> Holiday & Birthday Calendar
             </h3>
 
             <Calendar
@@ -342,6 +423,7 @@ const AdminHolidayCalendarPage = () => {
             />
           </div>
 
+          {/* STATS CARD */}
           <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-2xl rounded-3xl p-8 text-center flex flex-col justify-center h-full">
             <h3 className="text-2xl font-bold mb-4">Holiday Days This Month</h3>
             <div className="text-7xl font-extrabold my-4 animate-bounce-slow">
@@ -374,17 +456,20 @@ const AdminHolidayCalendarPage = () => {
           font-weight: bold;
           border-radius: 0.5rem !important;
         }
-        .holiday-tile:hover .holiday-tooltip {
-          opacity: 1;
-          transform: translateY(0);
+
+        .birthday-tile {
+          background: linear-gradient(135deg, #F97316, #FB923C) !important;
+          color: white !important;
+          font-weight: bold;
+          border-radius: 0.5rem !important;
         }
 
-        .holiday-tooltip {
+        .holiday-tooltip,
+        .birthday-tooltip {
           position: absolute;
           bottom: 105%;
           left: 50%;
           transform: translateX(-50%) translateY(10px);
-          background-color: #333;
           color: white;
           padding: 4px 8px;
           border-radius: 4px;
@@ -393,7 +478,17 @@ const AdminHolidayCalendarPage = () => {
           transition: 0.3s;
           white-space: nowrap;
         }
-        .holiday-tooltip::after {
+
+        .holiday-tooltip {
+          background-color: #333;
+        }
+
+        .birthday-tooltip {
+          background-color: #ff8800;
+        }
+
+        .holiday-tooltip::after,
+        .birthday-tooltip::after {
           content: '';
           position: absolute;
           top: 100%;
@@ -401,7 +496,14 @@ const AdminHolidayCalendarPage = () => {
           transform: translateX(-50%);
           border-width: 5px;
           border-style: solid;
+        }
+
+        .holiday-tooltip::after {
           border-color: #333 transparent transparent transparent;
+        }
+
+        .birthday-tooltip::after {
+          border-color: #ff8800 transparent transparent transparent;
         }
 
         .animate-bounce-slow { animation: bounce 2s infinite; }

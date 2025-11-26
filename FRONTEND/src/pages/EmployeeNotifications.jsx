@@ -39,10 +39,23 @@ const EmployeeNotifications = () => {
   // -------------------- Build Local Visible List --------------------
   useEffect(() => {
     const hidden = getHiddenIds();
-    const filtered = notifications.filter(
+
+    // ❌ Remove all notice-related notifications
+    const removedNotices = notifications.filter((n) => {
+      const msg = n.message?.toLowerCase() || "";
+
+      return (
+        n.type !== "notice" &&
+        n.category !== "notice" &&
+        !msg.includes("notice")
+      );
+    });
+
+    const finalList = removedNotices.filter(
       (n) => !hidden.includes(String(n._id))
     );
-    setLocalNotifications(filtered);
+
+    setLocalNotifications(finalList);
   }, [notifications]);
 
   // -------------------- Loading UI --------------------
@@ -61,7 +74,6 @@ const EmployeeNotifications = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-6xl mx-auto flex gap-6 h-screen overflow-hidden">
-
         {/* ----------------- SIDE PANEL ----------------- */}
         <div className="w-60 bg-white shadow-md rounded-xl p-5 border">
           <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
@@ -70,13 +82,10 @@ const EmployeeNotifications = () => {
           </h3>
 
           <div className="flex flex-col gap-3">
-
             {/* MARK ALL READ */}
             <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
-              onClick={() => {
-                markAllAsRead(); // ✔ UPDATES CONTEXT + NAVBAR
-              }}
+              onClick={() => markAllAsRead()}
             >
               <FaCheckCircle /> Mark All Read
             </button>
@@ -96,13 +105,11 @@ const EmployeeNotifications = () => {
             >
               <FaUndo /> Restore Hidden
             </button>
-
           </div>
         </div>
 
         {/* ----------------- MAIN CONTENT ----------------- */}
         <div className="flex-1 bg-white rounded-xl shadow-md p-6 border overflow-y-auto">
-
           <div className="flex justify-between items-center mb-5">
             <div>
               <h2 className="text-2xl font-semibold text-gray-700">
@@ -136,9 +143,7 @@ const EmployeeNotifications = () => {
                       ? "bg-blue-50 border-blue-300"
                       : "bg-white border-gray-200"
                   }`}
-                  onClick={() => {
-                    markAsRead(n._id); // ✔ CONTEXT UPDATE = NAVBAR UPDATE
-                  }}
+                  onClick={() => markAsRead(n._id)}
                 >
                   <div
                     className={`p-3 rounded-full ${
@@ -166,7 +171,6 @@ const EmployeeNotifications = () => {
               ))}
             </div>
           )}
-
         </div>
       </div>
     </div>

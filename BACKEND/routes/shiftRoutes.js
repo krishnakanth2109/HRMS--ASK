@@ -1,172 +1,122 @@
-import express from 'express';
-import Shift from '../models/shiftModel.js';
-import Employee from '../models/employeeModel.js';
+// --- START OF FILE routes/shiftRoutes.js ---
+
+import express from "express";
+import Shift from "../models/shiftModel.js";
+import Employee from "../models/employeeModel.js";
 
 const router = express.Router();
 
-// @route   POST /api/shifts/create
-router.post('/create', async (req, res) => {
+/* ======================= GET ALL SHIFTS ======================= */
+router.get("/all", async (req, res) => {
   try {
-    const {
-      employeeId,
-      shiftStartTime,
-      shiftEndTime,
-      lateGracePeriod,
-      fullDayHours,
-      halfDayHours,
-      autoExtendShift,
-      weeklyOffDays
-    } = req.body;
-
-    if (!employeeId) {
-      return res.status(400).json({ success: false, message: 'Employee ID is required' });
-    }
-
-    const cleanEmployeeId = employeeId.trim();
-    const employee = await Employee.findOne({ employeeId: cleanEmployeeId });
-    
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Employee not found' });
-    }
-
-    const latestExp = employee.experienceDetails?.length
-      ? employee.experienceDetails[employee.experienceDetails.length - 1]
-      : null;
-
-    const department = latestExp?.department || employee.department || 'N/A';
-    const role = latestExp?.role || employee.role || 'N/A';
-    const currentUserEmail = req.user?.email || 'Admin';
-
-    let shift = await Shift.findOne({ employeeId: cleanEmployeeId });
-
-    const shiftData = {
-      shiftStartTime: shiftStartTime || "09:00",
-      shiftEndTime: shiftEndTime || "18:00",
-      lateGracePeriod: Number(lateGracePeriod) || 15,
-      fullDayHours: Number(fullDayHours) || 8,
-      halfDayHours: Number(halfDayHours) || 4,
-      autoExtendShift: autoExtendShift !== undefined ? autoExtendShift : true,
-      weeklyOffDays: weeklyOffDays || [0],
-      department,
-      role,
-      timezone: "Asia/Kolkata", // FORCE IST Timezone
-      employeeName: employee.name,
-      updatedBy: currentUserEmail,
-      isActive: true
-    };
-
-    if (shift) {
-      Object.assign(shift, shiftData);
-      await shift.save();
-    } else {
-      shift = await Shift.create({
-        employeeId: cleanEmployeeId,
-        email: employee.email,
-        createdBy: currentUserEmail,
-        ...shiftData
-      });
-    }
-
-    return res.status(200).json({ success: true, message: 'Shift updated successfully', data: shift });
-
-  } catch (error) {
-    console.error('Shift save error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    const shifts = await Shift.find();
+    res.json({ success: true, data: shifts });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// @route   GET /api/shifts/all
-router.get('/all', async (req, res) => {
+/* ======================= GET SHIFT BY EMPLOYEE ======================= */
+router.get("/:employeeId", async (req, res) => {
   try {
-    const shifts = await Shift.find({ isActive: true }).sort({ employeeName: 1 });
-    return res.status(200).json({ success: true, count: shifts.length, data: shifts });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    const shift = await Shift.findOne({ employeeId: req.params.employeeId });
+    res.json({ success: true, data: shift });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// @route   GET /api/shifts/:employeeId
-router.get('/:employeeId', async (req, res) => {
+/* ======================= CREATE OR UPDATE SHIFT ======================= */
+router.post("/create", async (req, res) => {
   try {
-    const shift = await Shift.findOne({ employeeId: req.params.employeeId, isActive: true });
-    
-    // If no specific shift found, return default logic structure
-    if (!shift) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          employeeId: req.params.employeeId,
-          shiftStartTime: "09:00",
-          shiftEndTime: "18:00",
-          lateGracePeriod: 15,
-          fullDayHours: 8,
-          halfDayHours: 4,
-          autoExtendShift: true,
-          weeklyOffDays: [0],
-          timezone: "Asia/Kolkata",
-          isDefault: true
-        }
-      });
-    }
-    return res.status(200).json({ success: true, data: shift });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    const data = req.body;
+
+    const emp = await Employee.findOne({ employeeId: data.employeeId });
+    if (!emp)
+      return res.status(404).json({ success: false, message: "Employee not found" });
+
+    const shift = await Shift.findOneAndUpdate(
+      { employeeId: data.employeeId },
+      {
+        ...data,
+        employeeName: emp.name,
+        email: emp.email,
+        department: emp.department || "N/A",
+        role: emp.role || "N/A",
+        updatedBy: "Admin",
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, data: shift });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// @route   DELETE /api/shifts/:employeeId
-router.delete('/:employeeId', async (req, res) => {
+/* ======================= UPDATE CATEGORY ONLY ======================= */
+router.post("/update-category", async (req, res) => {
+  try {
+    const { employeeId, category } = req.body;
+
+    if (!employeeId)
+      return res.status(400).json({ message: "employeeId required" });
+
+    const updated = await Shift.findOneAndUpdate(
+      { employeeId },
+      { category },
+      { new: true }
+    );
+
+    res.json({ message: "Category updated", data: updated });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update category" });
+  }
+});
+
+/* ======================= BULK CREATE SHIFTS ======================= */
+router.post("/bulk-create", async (req, res) => {
+  try {
+    const { employeeIds, shiftData, category } = req.body;
+
+    await Promise.all(
+      employeeIds.map(async (id) => {
+        const emp = await Employee.findOne({ employeeId: id });
+        if (!emp) return;
+
+        await Shift.findOneAndUpdate(
+          { employeeId: id },
+          {
+            ...shiftData,
+            category: category || null,
+            employeeId: id,
+            employeeName: emp.name,
+            email: emp.email,
+            department: emp.department || "N/A",
+            role: emp.role || "N/A",
+            updatedBy: "Admin",
+          },
+          { upsert: true }
+        );
+      })
+    );
+
+    res.json({ success: true, message: "Bulk shift update completed" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ======================= DELETE SHIFT ======================= */
+router.delete("/:employeeId", async (req, res) => {
   try {
     await Shift.findOneAndDelete({ employeeId: req.params.employeeId });
-    return res.status(200).json({ success: true, message: 'Shift reset to default' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// @route   POST /api/shifts/bulk-create
-router.post('/bulk-create', async (req, res) => {
-  try {
-    const { employeeIds, shiftData } = req.body;
-    const currentUserEmail = req.user?.email || 'Admin';
-
-    if (!employeeIds || !Array.isArray(employeeIds)) {
-      return res.status(400).json({ success: false, message: 'Invalid Employee IDs' });
-    }
-
-    const cleanShiftData = {
-      ...shiftData,
-      lateGracePeriod: Number(shiftData.lateGracePeriod),
-      fullDayHours: Number(shiftData.fullDayHours),
-      halfDayHours: Number(shiftData.halfDayHours),
-      timezone: "Asia/Kolkata" // FORCE IST Timezone
-    };
-
-    const promises = employeeIds.map(async (empId) => {
-      const cleanId = empId.trim();
-      const employee = await Employee.findOne({ employeeId: cleanId });
-      if (!employee) return;
-
-      const shiftUpdate = {
-        ...cleanShiftData,
-        employeeName: employee.name,
-        email: employee.email,
-        updatedBy: currentUserEmail,
-        isActive: true
-      };
-
-      await Shift.findOneAndUpdate(
-        { employeeId: cleanId },
-        { $set: shiftUpdate, $setOnInsert: { createdBy: currentUserEmail } },
-        { upsert: true, new: true }
-      );
-    });
-
-    await Promise.all(promises);
-    return res.status(200).json({ success: true, message: 'Bulk update successful' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
 export default router;
+
+// --- END OF FILE routes/shiftRoutes.js ---

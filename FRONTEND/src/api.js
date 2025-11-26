@@ -225,58 +225,121 @@ export const getAllProfiles = async () => {
 };
 
 /* ============================================================================
-   SHIFT MANAGEMENT
+   SHIFT MANAGEMENT (FINAL & FIXED)
 ============================================================================ */
-export const createOrUpdateShift = async (shiftData) => {
-  try {
-    const response = await api.post("/api/shifts/create", shiftData);
-    return response.data;
-  } catch (error) {
-    console.error('Create/Update shift error:', error.response?.data || error.message);
-    throw error;
-  }
-};
-
-export const getAllShifts = async () => {
-  try {
-    const response = await api.get("/api/shifts/all");
-    // Return .data.data if wrapped, else .data
-    return response.data.data || response.data; 
-  } catch (error) {
-    console.error('Get all shifts error:', error.response?.data || error.message);
-    throw error;
-  }
-};
+export const getAllShifts = async () =>
+  (await api.get("/api/shifts/all")).data;
 
 export const getShiftByEmployeeId = async (employeeId) => {
   try {
     const response = await api.get(`/api/shifts/${employeeId}`);
     return response.data.data || response.data;
   } catch (error) {
-    console.error('Get shift error:', error.response?.data || error.message);
+    console.error("Get shift error:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const deleteShift = async (employeeId) => {
+export const createOrUpdateShift = async (shiftData) =>
+  (await api.post("/api/shifts/create", shiftData)).data;
+
+export const deleteShift = async (employeeId) =>
+  (await api.delete(`/api/shifts/${employeeId}`)).data;
+
+/*  
+  ✔ FIXED: Proper structure for backend bulk-create
+  ✔ Backend expects employeeIds[], shiftData{}, category
+*/
+export const bulkCreateShifts = async (employeeIds, shiftData, category) =>
+  (await api.post("/api/shifts/bulk-create", {
+    employeeIds,
+    shiftData,
+    category: category || null,
+  })).data;
+
+
+/* ============================================================================
+   SHIFT CATEGORY ASSIGNMENT
+============================================================================ */
+export const updateEmployeeCategory = async (employeeId, category) => {
   try {
-    const response = await api.delete(`/api/shifts/${employeeId}`);
+    const response = await api.post("/api/shifts/update-category", {
+      employeeId,
+      category,
+    });
     return response.data;
   } catch (error) {
-    console.error('Delete shift error:', error.response?.data || error.message);
+    console.error("Update employee category error:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const bulkCreateShifts = async (employeeIds, shiftData) => {
+
+
+
+
+
+/* ============================================================================
+   CATEGORY MANAGEMENT (Backend Driven)
+============================================================================ */
+export const getCategories = async () => {
   try {
-    const response = await api.post("/api/shifts/bulk-create", { employeeIds, shiftData });
+    const response = await api.get("/api/categories");
     return response.data;
   } catch (error) {
-    console.error('Bulk create shifts error:', error.response?.data || error.message);
+    console.error("Get categories error:", error.response?.data || error.message);
     throw error;
   }
 };
+
+export const addCategory = async (id, name) => {
+  try {
+    const response = await api.post("/api/categories", { id, name });
+    return response.data;
+  } catch (error) {
+    console.error("Add category error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteCategoryApi = async (id) => {
+  try {
+    const response = await api.delete(`/api/categories/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Delete category error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+
+
+export const addMemberToShift = async (category, employee) => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/shifts/add-member`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        category,
+        employee
+      }),
+    });
+
+    return await res.json();
+  } catch (err) {
+    console.error("addMemberToShift error:", err);
+    throw err;
+  }
+};
+
+
+
+
+
 
 // Export default for backward compatibility with components using `api.get()` directly
 export default api;
