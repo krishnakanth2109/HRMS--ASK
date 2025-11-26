@@ -7,78 +7,45 @@ const ShiftSchema = new mongoose.Schema({
     unique: true,
     ref: 'Employee'
   },
-  employeeName: {
-    type: String,
-    required: true
-  },
-  email: {
-    type: String,
-    required: true
-  },
-  department: {
-    type: String,
-    default: 'N/A'
-  },
-  role: {
-    type: String,
-    default: 'N/A'
-  },
+  employeeName: { type: String, required: true },
+  email: { type: String, required: true },
+  department: { type: String, default: 'N/A' },
+  role: { type: String, default: 'N/A' },
   
-  // Shift Timings
+  // Shift Timings (Stored as String HH:MM)
+  // These represent Indian Standard Time (IST)
   shiftStartTime: {
     type: String,
     required: true,
-    default: "09:00" // HH:MM format
+    default: "09:00"
   },
   shiftEndTime: {
     type: String,
     required: true,
-    default: "18:00" // HH:MM format
+    default: "18:00"
   },
   
-  // Grace period for late login (in minutes)
-  lateGracePeriod: {
-    type: Number,
-    default: 15 
+  // Explicitly store that these timings are for India
+  // This helps the backend convert UTC server time to this timezone before comparing
+  timezone: {
+    type: String,
+    default: "Asia/Kolkata" 
   },
   
-  // Working hours configuration
-  fullDayHours: {
-    type: Number,
-    default: 8 
-  },
-  halfDayHours: {
-    type: Number,
-    default: 4 
-  },
-  // Removed Quarter Day and Break Time as requested
+  lateGracePeriod: { type: Number, default: 15 }, // in minutes
   
-  // Auto-extend shift when late
-  autoExtendShift: {
-    type: Boolean,
-    default: true
-  },
+  fullDayHours: { type: Number, default: 8 },
+  halfDayHours: { type: Number, default: 4 },
   
-  // Weekly off days (0 = Sunday, 6 = Saturday)
-  weeklyOffDays: {
-    type: [Number],
-    default: [0] 
-  },
+  autoExtendShift: { type: Boolean, default: true },
+  weeklyOffDays: { type: [Number], default: [0] }, // 0 = Sunday
   
-  isActive: {
-    type: Boolean,
-    default: true
-  },
+  isActive: { type: Boolean, default: true },
   
   createdBy: { type: String, default: 'SYSTEM' },
   updatedBy: { type: String, default: 'SYSTEM' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-ShiftSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
+}, { 
+  timestamps: true 
 });
 
 export default mongoose.model("Shift", ShiftSchema);

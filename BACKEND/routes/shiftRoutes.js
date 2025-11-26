@@ -35,9 +35,9 @@ router.post('/create', async (req, res) => {
 
     const department = latestExp?.department || employee.department || 'N/A';
     const role = latestExp?.role || employee.role || 'N/A';
+    const currentUserEmail = req.user?.email || 'Admin';
 
     let shift = await Shift.findOne({ employeeId: cleanEmployeeId });
-    const currentUserEmail = req.user?.email || 'Admin';
 
     const shiftData = {
       shiftStartTime: shiftStartTime || "09:00",
@@ -49,6 +49,7 @@ router.post('/create', async (req, res) => {
       weeklyOffDays: weeklyOffDays || [0],
       department,
       role,
+      timezone: "Asia/Kolkata", // FORCE IST Timezone
       employeeName: employee.name,
       updatedBy: currentUserEmail,
       isActive: true
@@ -66,7 +67,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    return res.status(200).json({ success: true, message: 'Shift saved successfully', data: shift });
+    return res.status(200).json({ success: true, message: 'Shift updated successfully', data: shift });
 
   } catch (error) {
     console.error('Shift save error:', error);
@@ -88,8 +89,9 @@ router.get('/all', async (req, res) => {
 router.get('/:employeeId', async (req, res) => {
   try {
     const shift = await Shift.findOne({ employeeId: req.params.employeeId, isActive: true });
+    
+    // If no specific shift found, return default logic structure
     if (!shift) {
-      // Default if not found
       return res.status(200).json({
         success: true,
         data: {
@@ -101,6 +103,7 @@ router.get('/:employeeId', async (req, res) => {
           halfDayHours: 4,
           autoExtendShift: true,
           weeklyOffDays: [0],
+          timezone: "Asia/Kolkata",
           isDefault: true
         }
       });
@@ -136,28 +139,30 @@ router.post('/bulk-create', async (req, res) => {
       lateGracePeriod: Number(shiftData.lateGracePeriod),
       fullDayHours: Number(shiftData.fullDayHours),
       halfDayHours: Number(shiftData.halfDayHours),
+      timezone: "Asia/Kolkata" // FORCE IST Timezone
     };
 
-    for (const empId of employeeIds) {
+    const promises = employeeIds.map(async (empId) => {
       const cleanId = empId.trim();
       const employee = await Employee.findOne({ employeeId: cleanId });
-      if (!employee) continue;
+      if (!employee) return;
 
-      let shift = await Shift.findOne({ employeeId: cleanId });
-      if (shift) {
-        Object.assign(shift, { ...cleanShiftData, updatedBy: currentUserEmail, isActive: true });
-        await shift.save();
-      } else {
-        await Shift.create({
-          employeeId: cleanId,
-          employeeName: employee.name,
-          email: employee.email,
-          createdBy: currentUserEmail,
-          updatedBy: currentUserEmail,
-          ...cleanShiftData
-        });
-      }
-    }
+      const shiftUpdate = {
+        ...cleanShiftData,
+        employeeName: employee.name,
+        email: employee.email,
+        updatedBy: currentUserEmail,
+        isActive: true
+      };
+
+      await Shift.findOneAndUpdate(
+        { employeeId: cleanId },
+        { $set: shiftUpdate, $setOnInsert: { createdBy: currentUserEmail } },
+        { upsert: true, new: true }
+      );
+    });
+
+    await Promise.all(promises);
     return res.status(200).json({ success: true, message: 'Bulk update successful' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
