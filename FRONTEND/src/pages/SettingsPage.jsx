@@ -1,28 +1,23 @@
 import React, { useState } from 'react';
-import NotificationSettings from './NotificationSettings';
+// import NotificationSettings from './NotificationSettings'; // Removed as unused
 import DepartmentSettings from './DepartmentSettings';
-import SoundSettings from './SoundSettings';
-import { FaBell, FaBuilding, FaVolumeUp } from 'react-icons/fa';
+// import SoundSettings from './SoundSettings'; // Removed as unused
+import { FaBuilding } from 'react-icons/fa';
 
 const TABS = {
-  NOTIFICATION: 'Notification',
-  DEPARTMENT: 'Department',
-  SOUND: 'Sound',
+  DEPARTMENT: 'Manage Shift Timings',
 };
 
 const SettingsPage = () => {
-  const [activeTab, setActiveTab] = useState(TABS.NOTIFICATION);
+  // FIXED: Set initial state to TABS.DEPARTMENT so it appears immediately
+  const [activeTab, setActiveTab] = useState(TABS.DEPARTMENT);
 
   const renderContent = () => {
     switch (activeTab) {
-      case TABS.NOTIFICATION:
-        return <NotificationSettings />;
       case TABS.DEPARTMENT:
         return <DepartmentSettings />;
-      case TABS.SOUND:
-        return <SoundSettings />;
       default:
-        return <NotificationSettings />;
+        return <DepartmentSettings />;
     }
   };
 
@@ -42,12 +37,8 @@ const SettingsPage = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Application Settings</h1>
-      
       <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-xl shadow-sm mb-6">
-        <TabButton name={TABS.NOTIFICATION} icon={<FaBell />} />
         <TabButton name={TABS.DEPARTMENT} icon={<FaBuilding />} />
-        <TabButton name={TABS.SOUND} icon={<FaVolumeUp />} />
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg animate-fade-in">

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { getHolidays, getEmployees } from "../api";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import { FaCalendarDay, FaGift, FaStar } from "react-icons/fa";
+import { FaCalendarDay, FaGift, FaStar, FaRegSadTear } from "react-icons/fa";
 
 const EmployeeHolidays = () => {
   const [holidays, setHolidays] = useState([]);
@@ -114,6 +114,9 @@ const EmployeeHolidays = () => {
     }
   };
 
+  // Helper for Month Name
+  const currentMonthName = activeDate.toLocaleString("default", { month: "long" });
+
   // Loading UI
   if (isLoading) {
     return (
@@ -124,11 +127,9 @@ const EmployeeHolidays = () => {
             <div className="md:col-span-2 bg-gray-200 rounded-2xl h-96"></div>
             <div className="bg-gray-200 rounded-2xl h-48"></div>
           </div>
-          <div className="h-8 bg-gray-200 rounded-lg w-1/4 mx-auto"></div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-gray-200 h-40 rounded-2xl"></div>
-            ))}
+          <div className="grid lg:grid-cols-2 gap-8">
+             <div className="bg-gray-200 h-64 rounded-2xl"></div>
+             <div className="bg-gray-200 h-64 rounded-2xl"></div>
           </div>
         </div>
       </div>
@@ -142,16 +143,16 @@ const EmployeeHolidays = () => {
         {/* HEADER */}
         <div className="text-center mb-12">
           <h2 className="text-4xl pb-2 sm:text-5xl font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent mb-3 animate-gradient-x">
-            Company Holidays
+            Company Calendar
           </h2>
           <p className="text-lg text-gray-600">
-            Plan your year with our official holiday schedule.
+            Keep track of holidays and celebrate your colleagues.
           </p>
         </div>
 
-        {/* CALENDAR */}
+        {/* CALENDAR & STATS SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 items-start">
-          <div className="lg:col-span-2 bg-white shadow-2xl rounded-3xl p-6 sm:p-8 border border-slate-100">
+          <div className="lg:col-span-2 bg-white shadow-xl rounded-3xl p-6 sm:p-8 border border-slate-100">
             <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center flex items-center justify-center gap-3">
               <FaCalendarDay className="text-indigo-500" /> Holiday Calendar
             </h3>
@@ -167,94 +168,104 @@ const EmployeeHolidays = () => {
           </div>
 
           {/* STATS */}
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-2xl rounded-3xl p-8 text-center flex flex-col justify-center h-full">
-            <h3 className="text-2xl font-bold mb-4">Holidays This Month</h3>
+          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-xl rounded-3xl p-8 text-center flex flex-col justify-center h-full">
+            <h3 className="text-2xl font-bold mb-4">Holidays in {currentMonthName}</h3>
             <div className="text-7xl font-extrabold my-4 animate-bounce-slow">
               {holidaysThisMonth}
             </div>
             <p className="opacity-80">
               {activeDate.toLocaleString("default", {
-                month: "long",
                 year: "numeric",
               })}
             </p>
           </div>
         </div>
 
-        {/* UPCOMING HOLIDAYS + BIRTHDAYS */}
-        <div className="w-full max-w-6xl mx-auto">
-          <h3 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-            Upcoming Holidays ({activeDate.toLocaleString("default", { month: "long" })})
-          </h3>
-
-          {filteredHolidays.length === 0 && filteredBirthdays.length === 0 ? (
-            <div className="text-center bg-white p-12 rounded-2xl shadow-lg">
-              <p className="text-2xl text-gray-400 mb-4">📭</p>
-              <p className="text-gray-600 font-semibold text-lg">
-                No holidays or birthdays found for this month.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-
-              {/* 🎉 HOLIDAYS */}
-              {filteredHolidays.map((h) => (
-                <div
-                  key={h._id}
-                  className="group relative bg-white shadow-lg p-6 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
-
-                  <div className="flex items-center gap-5">
-                    <div className="flex-shrink-0 text-3xl font-bold text-indigo-600 bg-indigo-50 p-4 rounded-xl text-center">
-                      <div className="leading-none">{h.start.getDate()}</div>
-                      <div className="text-sm font-medium tracking-wide">
-                        {h.start.toLocaleString("default", { month: "short" })}
+        {/* SPLIT VIEW: HOLIDAYS & BIRTHDAYS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* ----- LEFT COLUMN: HOLIDAYS ----- */}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <span className="text-purple-600">🎉</span> Holidays ({currentMonthName})
+            </h3>
+            
+            {filteredHolidays.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-dashed border-gray-300 text-center">
+                 <p className="text-gray-400 text-5xl mb-3">🏖️</p>
+                 <p className="text-gray-500 font-medium">No holidays this month.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredHolidays.map((h) => (
+                  <div
+                    key={h._id}
+                    className="group relative bg-white shadow-md p-5 rounded-xl hover:shadow-xl hover:scale-[1.01] transition-all duration-300 overflow-hidden border-l-4 border-purple-500"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0 text-2xl font-bold text-purple-600 bg-purple-50 p-3 rounded-lg text-center w-16">
+                        <div className="leading-none">{h.start.getDate()}</div>
+                        <div className="text-xs uppercase font-bold mt-1">
+                          {h.start.toLocaleString("default", { month: "short" })}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex-grow">
-                      <h4 className="text-xl font-bold text-gray-900 mb-1">{h.name}</h4>
-                      <p className="text-gray-500 font-semibold text-sm">
-                        {h.start.toLocaleDateString()} → {h.end.toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <FaStar className="text-yellow-400 text-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  </div>
-                </div>
-              ))}
-
-              {/* 🎂 BIRTHDAYS */}
-              {filteredBirthdays.map((b, i) => (
-                <div
-                  key={i}
-                  className="group relative bg-white shadow-lg p-6 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
-
-                  <div className="flex items-center gap-5">
-                    <div className="flex-shrink-0 text-3xl font-bold text-orange-600 bg-orange-50 p-4 rounded-xl text-center">
-                      <div className="leading-none">{b.dob.getDate()}</div>
-                      <div className="text-sm font-medium tracking-wide">
-                        {b.dob.toLocaleString("default", { month: "short" })}
+                      <div className="flex-grow">
+                        <h4 className="text-lg font-bold text-gray-900">{h.name}</h4>
+                        <p className="text-gray-500 text-sm">
+                           {h.start.toDateString()}
+                        </p>
                       </div>
+                      
+                      <FaStar className="text-yellow-400 text-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-
-                    <div className="flex-grow">
-                      <h4 className="text-xl font-bold text-gray-900 mb-1">{b.name}</h4>
-                      <p className="text-gray-500 font-semibold text-sm">
-                        Birthday: {b.dob.toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <FaGift className="text-pink-500 text-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
 
-            </div>
-          )}
+          {/* ----- RIGHT COLUMN: BIRTHDAYS ----- */}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <span className="text-orange-500">🎂</span> Colleagues Birthdays ({currentMonthName})
+            </h3>
+
+            {filteredBirthdays.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-dashed border-gray-300 text-center">
+                 <p className="text-gray-400 text-5xl mb-3">🎈</p>
+                 <p className="text-gray-500 font-medium">No birthdays this month.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredBirthdays.map((b, i) => (
+                  <div
+                    key={i}
+                    className="group relative bg-white shadow-md p-5 rounded-xl hover:shadow-xl hover:scale-[1.01] transition-all duration-300 overflow-hidden border-l-4 border-orange-400"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0 text-2xl font-bold text-orange-600 bg-orange-50 p-3 rounded-lg text-center w-16">
+                        <div className="leading-none">{b.dob.getDate()}</div>
+                        <div className="text-xs uppercase font-bold mt-1">
+                          {b.dob.toLocaleString("default", { month: "short" })}
+                        </div>
+                      </div>
+
+                      <div className="flex-grow">
+                        <h4 className="text-lg font-bold text-gray-900">{b.name}</h4>
+                        <p className="text-gray-500 text-sm">
+                          Turning a year older! 🎁
+                        </p>
+                      </div>
+
+                      <FaGift className="text-pink-500 text-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 
@@ -277,6 +288,8 @@ const EmployeeHolidays = () => {
           font-size: 12px;
           opacity: 0;
           transition: 0.3s;
+          z-index: 10;
+          white-space: nowrap;
         }
         .holiday-tile:hover .holiday-tooltip { opacity: 1; }
         .animate-bounce-slow { animation: bounce 2s infinite; }

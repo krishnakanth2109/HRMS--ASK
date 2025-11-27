@@ -30,6 +30,9 @@ import {
   FaTrash,
   FaChevronDown,
 } from "react-icons/fa";
+// ✅ SweetAlert2 Import
+import Swal from "sweetalert2"; 
+
 // ✅ Imported 'api' default export for custom requests
 import api, {
   getAttendanceForEmployee,
@@ -90,6 +93,9 @@ const EmployeeDashboard = () => {
   // State for the frontend timer
   const [workedTime, setWorkedTime] = useState(0);
 
+  // 🔔 Alarm State Refs
+  const alarmPlayedRef = useRef(false);
+
   const today = new Date().toISOString().split("T")[0];
 
   // 🔴 IDLE TRACKING REFS
@@ -101,10 +107,33 @@ const EmployeeDashboard = () => {
   // --- Voice Feedback ---
   const speak = (text) => {
     if ("speechSynthesis" in window) {
+      // Cancel any ongoing speech to avoid overlapping
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1.1;
+      utterance.volume = 1.0; // Ensure max volume
       window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // ✅ Function to play Shift Completion Sound (Beep + Voice 2 times)
+  const playShiftCompletedSound = () => {
+    // 1. Play Beep Sound (Reliable fallback)
+    const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    audio.play().catch(e => console.warn("Audio autoplay blocked:", e));
+
+    // 2. Play Voice Message (Concatenated string ensures it plays twice continuously)
+    const message = "Please punch out, your shift is completed. Please punch out, your shift is completed.";
+    
+    if ("speechSynthesis" in window) {
+        // Wait a split second for beep to start, then speak
+        setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.rate = 0.9; // Slightly slower for clarity
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }, 500);
     }
   };
 
@@ -233,7 +262,23 @@ const EmployeeDashboard = () => {
   const role = latestExp?.role || user?.role || "N/A";
   const department = latestExp?.department || user?.department || "N/A";
 
-  // --- Frontend Timer Effect ---
+  // ✅ New Helper: Calculate difference between shift times in Seconds
+  const getShiftDurationInSeconds = useCallback((startTime, endTime) => {
+    if(!startTime || !endTime) return 8 * 3600; // Default 8 hrs
+    
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+
+    let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+    // Handle overnight shifts (e.g. 10 PM to 6 AM)
+    if (diffMinutes < 0) {
+        diffMinutes += 24 * 60;
+    }
+    
+    return diffMinutes * 60;
+  }, []);
+
+  // --- Frontend Timer & Work Completion Alarm Effect ---
   useEffect(() => {
     let interval;
     if (todayLog?.punchIn && !todayLog.punchOut) {
@@ -242,6 +287,30 @@ const EmployeeDashboard = () => {
         const now = new Date();
         const diffInSeconds = Math.floor((now - punchInTime) / 1000);
         setWorkedTime(diffInSeconds);
+
+        // 🔔 WORK COMPLETION ALARM LOGIC
+        if (shiftTimings) {
+            const totalShiftSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime);
+            
+            // Check if work is completed AND alarm hasn't played yet
+            if (diffInSeconds >= totalShiftSeconds && !alarmPlayedRef.current) {
+                alarmPlayedRef.current = true; // Mark as played
+                
+                // Play Sound & Voice
+                playShiftCompletedSound();
+                
+                // Show SweetAlert
+                Swal.fire({
+                    title: "Shift Completed!",
+                    text: "Your day is completed, please punch out.",
+                    icon: "success",
+                    confirmButtonText: "OK",
+                    confirmButtonColor: "#3b82f6",
+                    timer: 10000, // Close automatically after 10s if ignored
+                    timerProgressBar: true
+                });
+            }
+        }
       };
       updateTimer();
       interval = setInterval(updateTimer, 1000);
@@ -250,7 +319,7 @@ const EmployeeDashboard = () => {
         setWorkedTime(todayLog.workedHours * 3600);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [todayLog]);
+  }, [todayLog, shiftTimings, getShiftDurationInSeconds]);
 
   // 🔴 Helper to calculate Idle Time String
   const getTodayIdleTimeStr = () => {
@@ -277,10 +346,8 @@ const EmployeeDashboard = () => {
     return `${h}h ${m}m ${s}s`;
   };
 
-  // ✅ Punch In/Out
-  const handlePunch = async (action) => {
-    if (!user) return;
-
+  // ✅ Core Punch Logic (Separated for reuse)
+  const performPunchAction = async (action) => {
     // 🔴 If Punching Out while Idle, force stop idle first
     if (action === "OUT" && isIdleRef.current) {
         try {
@@ -303,6 +370,8 @@ const EmployeeDashboard = () => {
       if (action === "IN") {
         // Reset local storage on punch in
         localStorage.setItem(LOCAL_STORAGE_KEY, Date.now());
+        alarmPlayedRef.current = false; // Reset alarm for new day
+        
         await punchIn({
           employeeId: user.employeeId,
           employeeName: user.name,
@@ -323,17 +392,75 @@ const EmployeeDashboard = () => {
     } catch (err) {
       console.error("Punch error:", err);
       const msg = err.response?.data?.message || err.message || "Unknown Error";
+      
       if (msg.includes("Location")) {
-        alert(msg);
+        Swal.fire({
+            icon: 'error',
+            title: 'Location Error',
+            text: msg
+        });
       } else if (msg.toLowerCase().includes("already punched")) {
-        alert("System syncing: You are already punched in.");
+        Swal.fire({
+            icon: 'info',
+            title: 'Syncing',
+            text: "System syncing: You are already punched in."
+        });
         await loadAttendance(user.employeeId);
       } else {
         speak("Punch operation failed");
-        alert(`Failed to record attendance: ${msg}`);
+        Swal.fire({
+            icon: 'error',
+            title: 'Action Failed',
+            text: `Failed to record attendance: ${msg}`
+        });
       }
     } finally {
       setPunchStatus("IDLE");
+    }
+  };
+
+  // ✅ Main Handle Punch Handler (With Checks)
+  const handlePunch = async (action) => {
+    if (!user) return;
+
+    // Check Logic for Punch Out
+    if (action === "OUT") {
+        const totalShiftSeconds = shiftTimings ? getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime) : 8 * 3600;
+        const fiveHoursSeconds = 5 * 3600;
+        
+        // 1. If Shift Completed -> Direct Punch Out (No Alert)
+        if (workedTime >= totalShiftSeconds) {
+            await performPunchAction("OUT");
+            return;
+        }
+
+        // 2. If Shift NOT Completed -> Show Warning Popup
+        let confirmMessage = "";
+        let confirmTitle = "Early Punch Out?";
+        
+        if (workedTime < fiveHoursSeconds) {
+            confirmMessage = "Your worked hours are less than 5 hours. It's going to record as Absent (<5 hrs). Are you sure?";
+        } else {
+            confirmMessage = "Your worked hours are less than your assigned shift hours. It's going to record as Half Day. Are you sure?";
+        }
+
+        Swal.fire({
+            title: confirmTitle,
+            text: confirmMessage,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, punch out!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                performPunchAction("OUT");
+            }
+        });
+
+    } else {
+        // Punch In (Direct)
+        performPunchAction("IN");
     }
   };
 
@@ -342,7 +469,7 @@ const EmployeeDashboard = () => {
     const file = e.target.files[0];
     if (!file || !user) return;
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB");
+      Swal.fire("Error", "File size must be less than 5MB", "error");
       return;
     }
     const reader = new FileReader();
@@ -371,27 +498,39 @@ const EmployeeDashboard = () => {
         setProfileImage(res.profilePhoto.url);
         sessionStorage.setItem("profileImage", res.profilePhoto.url);
         speak("Profile updated");
-        alert("Profile picture updated successfully!");
+        Swal.fire("Success", "Profile picture updated successfully!", "success");
         setShowCropModal(false);
         setImageToCrop(null);
       }
     } catch (err) {
-      alert("Failed to upload image.");
+      Swal.fire("Error", "Failed to upload image.", "error");
     } finally {
       setUploadingImage(false);
     }
   };
 
   const handleDeleteProfilePic = async () => {
-    if (!window.confirm("Are you sure you want to delete your profile picture?")) return;
-    try {
-      await deleteProfilePic();
-      setProfileImage(null);
-      sessionStorage.removeItem("profileImage");
-      speak("Profile deleted");
-    } catch (err) {
-      alert("Failed to delete profile picture.");
-    }
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "Do you want to delete your profile picture?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await deleteProfilePic();
+                setProfileImage(null);
+                sessionStorage.removeItem("profileImage");
+                speak("Profile deleted");
+                Swal.fire("Deleted!", "Profile picture has been deleted.", "success");
+            } catch (err) {
+                Swal.fire("Error", "Failed to delete profile picture.", "error");
+            }
+        }
+    });
   };
 
   // ============================================================
@@ -517,22 +656,6 @@ const EmployeeDashboard = () => {
     return dayNumbers.map(day => days[day]).join(', ') || 'None';
   };
 
-  // ✅ New Helper: Calculate difference between shift times in Seconds
-  const getShiftDurationInSeconds = (startTime, endTime) => {
-    if(!startTime || !endTime) return 8 * 3600; // Default 8 hrs
-    
-    const [startH, startM] = startTime.split(':').map(Number);
-    const [endH, endM] = endTime.split(':').map(Number);
-
-    let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    // Handle overnight shifts (e.g. 10 PM to 6 AM)
-    if (diffMinutes < 0) {
-        diffMinutes += 24 * 60;
-    }
-    
-    return diffMinutes * 60;
-  };
-
   // ✅ New Helper: Worked Status Badge Logic
   const getWorkedStatusBadge = () => {
     if (!todayLog?.punchIn) return { label: "--", color: "text-gray-500" };
@@ -543,10 +666,8 @@ const EmployeeDashboard = () => {
     }
 
     // 2. If punched out, calculate final status
-    // Use total shift seconds from shift details
     const totalShiftSeconds = shiftTimings ? getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime) : 8 * 3600;
     
-    // workedTime state holds the seconds, ensure it's accurate
     const currentWorkedSeconds = workedTime; 
     const fiveHoursSeconds = 5 * 3600;
 
@@ -555,7 +676,6 @@ const EmployeeDashboard = () => {
     } else if (currentWorkedSeconds > fiveHoursSeconds) {
         return { label: "Half Day", color: "bg-yellow-100 text-yellow-800" };
     } else {
-        // Less than or equal to 5 hours
         return { label: "Absent", color: "bg-red-100 text-red-800" };
     }
   };
@@ -563,19 +683,14 @@ const EmployeeDashboard = () => {
   // ✅ New Helper Function to calculate visual Login status
   const getDisplayLoginStatus = () => {
     if (!todayLog?.punchIn || !shiftTimings) return todayLog?.loginStatus || "--";
-    
-    // If backend says LATE, believe it
     if (todayLog.loginStatus === "LATE") return "LATE";
 
-    // Double check on frontend in case backend time was off
     try {
       const punchTime = new Date(todayLog.punchIn);
       const [sHour, sMin] = shiftTimings.shiftStartTime.split(':').map(Number);
       
       const shiftTime = new Date(punchTime);
       shiftTime.setHours(sHour, sMin, 0, 0);
-      
-      // Add Grace
       shiftTime.setMinutes(shiftTime.getMinutes() + (shiftTimings.lateGracePeriod || 15));
 
       if (punchTime > shiftTime) {
@@ -589,20 +704,14 @@ const EmployeeDashboard = () => {
 
   // --- Dynamic Meter Chart Calculation ---
   const workMeterData = useMemo(() => {
-    // 1. Determine Total Shift Seconds (Based on Start & End Time)
-    let totalShiftSeconds = 8 * 3600; // default
+    let totalShiftSeconds = 8 * 3600; 
     if (shiftTimings?.shiftStartTime && shiftTimings?.shiftEndTime) {
         totalShiftSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime);
     } else if (shiftTimings?.fullDayHours) {
         totalShiftSeconds = shiftTimings.fullDayHours * 3600;
     }
 
-    // 2. Determine Current Worked Seconds (Live or Static)
-    // workedTime is updated every second by useEffect if punched in
-    // Ensure we don't go below 0
     const currentWorked = Math.max(0, workedTime);
-    
-    // 3. Determine Remaining
     const remaining = Math.max(0, totalShiftSeconds - currentWorked);
 
     return {
@@ -610,19 +719,18 @@ const EmployeeDashboard = () => {
       datasets: [
         {
           data: [currentWorked, remaining],
-          backgroundColor: ["#3b82f6", "#e5e7eb"], // Blue for work, Gray for pending
+          backgroundColor: ["#3b82f6", "#e5e7eb"],
           borderWidth: 0,
-          cutout: "75%", // Thin line for meter look
-          circumference: 180, // Half circle
-          rotation: -90, // Rotate to start from left
+          cutout: "75%",
+          circumference: 180,
+          rotation: -90,
         },
       ],
-      // Store raw values for external use if needed
       rawValues: { currentWorked, remaining, totalShiftSeconds }
     };
-  }, [workedTime, shiftTimings]);
+  }, [workedTime, shiftTimings, getShiftDurationInSeconds]);
 
-  // Chart Options for UI consistency
+  // Chart Options
   const commonChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -635,7 +743,7 @@ const EmployeeDashboard = () => {
   const meterChartOptions = {
     ...commonChartOptions,
     plugins: {
-        legend: { display: false }, // Hide legend for meter, use custom text below
+        legend: { display: false },
         tooltip: { 
             callbacks: {
                 label: function(context) {
@@ -666,11 +774,10 @@ const EmployeeDashboard = () => {
   if (loading) return <div className="p-8 text-center text-lg font-semibold">Loading Dashboard...</div>;
   if (!user) return <div className="p-8 text-center text-red-600 font-semibold">Could not load employee data.</div>;
 
-  // Calculate status for display
   const displayStatus = getDisplayLoginStatus();
   const workedStatusBadge = getWorkedStatusBadge();
   
-  // ✅ UPDATED: Format calculated Shift Hours to "Xh Ym" instead of decimal
+  // ✅ UPDATED: Format calculated Shift Hours to "Xh Ym"
   const getFormattedShiftDuration = () => {
       if(!shiftTimings) return "8h 0m";
       const totalSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime);
