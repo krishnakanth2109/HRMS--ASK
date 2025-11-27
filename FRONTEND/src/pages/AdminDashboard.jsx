@@ -65,11 +65,11 @@ const AdminDashboard = () => {
           <h3 className="text-gray-600 font-semibold">Total Employees</h3>
           <p className="text-3xl font-extrabold text-gray-800">{statCards.totalEmployees}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition flex flex-col items-center">
+        {/* <div className="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition flex flex-col items-center" onClick={() => navigate("/admin/admin-Leavemanage")}>
           <FaCalendarAlt className="text-3xl text-yellow-500 mb-2" />
           <h3 className="text-gray-600 font-semibold">On Leave Today</h3>
           <p className="text-3xl font-extrabold text-gray-800">{statCards.onLeaveToday}</p>
-        </div>
+        </div> */}
         <div className="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition flex flex-col items-center" onClick={() => navigate("/admin/admin-Leavemanage", { state: { defaultStatus: "Pending" } })}>
           <FaClipboardList className="text-3xl text-purple-600 mb-2" />
           <h3 className="text-gray-600 font-semibold">Pending Leaves</h3>

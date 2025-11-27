@@ -50,14 +50,31 @@ const AdminHolidayCalendarPage = () => {
         .filter((emp) => emp.personalDetails?.dob)
         .map((emp) => ({
           name: emp.name,
-          dob: new Date(emp.personalDetails.dob), // Convert to Date()
+          dob: new Date(emp.personalDetails.dob),
         }));
+
+      // Today's date (ignore time)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Sort birthdays: upcoming first, past last
+      result.sort((a, b) => {
+        const aNext = new Date(today.getFullYear(), a.dob.getMonth(), a.dob.getDate());
+        const bNext = new Date(today.getFullYear(), b.dob.getMonth(), b.dob.getDate());
+
+        // If birthday already passed this year → shift to next year
+        if (aNext < today) aNext.setFullYear(today.getFullYear() + 1);
+        if (bNext < today) bNext.setFullYear(today.getFullYear() + 1);
+
+        return aNext - bNext;
+      });
 
       setBirthdays(result);
     } catch (err) {
       console.error("Error loading birthdays:", err);
     }
   }, []);
+
 
   /* =========================================================
       LOAD EVERYTHING
@@ -419,7 +436,7 @@ const AdminHolidayCalendarPage = () => {
               onActiveStartDateChange={({ activeStartDate }) =>
                 setActiveDate(activeStartDate)
               }
-              className="w-full border-none"
+              className="w-full border-none mx-auto"
             />
           </div>
 

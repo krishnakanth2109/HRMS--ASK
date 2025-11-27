@@ -23,6 +23,21 @@ const OvertimeWithModal = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // ============================
+  // BLOCK SUNDAY VALIDATION
+  // ============================
+  const validateDate = (selectedDate) => {
+    const chosen = new Date(selectedDate);
+    chosen.setHours(0, 0, 0, 0);
+
+    // Block Sunday (0)
+    if (chosen.getDay() === 0) {
+      return "You cannot apply overtime on Sundays.";
+    }
+
+    return null;
+  };
+
   const fetchOvertimeData = useCallback(async () => {
     if (!user?.employeeId) {
       setLoading(false);
@@ -55,8 +70,18 @@ const OvertimeWithModal = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSuccess("");
+
     if (!form.date || !form.type) {
       setError("Please fill all fields.");
+      return;
+    }
+
+    // === Validate Sunday ===
+    const validationMessage = validateDate(form.date);
+    if (validationMessage) {
+      setError(validationMessage);
       return;
     }
 
@@ -134,7 +159,6 @@ const OvertimeWithModal = () => {
 
                   <td className="px-4 py-2 border text-center">
                     <div className="flex justify-center items-center gap-3">
-                      {/* STATUS BADGE */}
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-bold ${
                           ot.status === "APPROVED"
@@ -149,7 +173,6 @@ const OvertimeWithModal = () => {
                         {ot.status}
                       </span>
 
-                      {/* CANCEL ONLY FOR PENDING */}
                       {ot.status === "PENDING" && (
                         <button
                           onClick={() => {
@@ -167,10 +190,7 @@ const OvertimeWithModal = () => {
               ))
             ) : (
               <tr>
-                <td
-                  colSpan="3"
-                  className="text-center p-4 text-gray-500"
-                >
+                <td colSpan="3" className="text-center p-4 text-gray-500">
                   No Overtime Requests Found
                 </td>
               </tr>
@@ -216,7 +236,21 @@ const OvertimeWithModal = () => {
                     type="date"
                     name="date"
                     value={form.date}
-                    onChange={handleChange}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      const d = new Date(selected);
+
+                      // Block Sunday Immediately
+                      if (d.getDay() === 0) {
+                        setError("Sundays are not allowed for overtime.");
+                        setForm({ ...form, date: "" });
+                        return;
+                      }
+
+                      setError("");
+                      handleChange(e);
+                    }}
                     className="w-full border rounded px-3 py-2"
                   />
                 </div>

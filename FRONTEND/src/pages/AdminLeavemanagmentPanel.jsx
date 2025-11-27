@@ -11,46 +11,40 @@ import {
   approveLeaveRequestById,
   rejectLeaveRequestById,
 } from "../api";
-import { 
-  FaCheck, 
-  FaTimes, 
-  FaSearch, 
-  FaCalendarAlt, 
-  FaClipboardList, 
-  FaHourglassHalf, 
-  FaCheckCircle, 
-  FaTimesCircle 
-} from "react-icons/fa";
+import { FaCheck, FaTimes, FaFilter, FaCalendarAlt } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 
 const AdminLeavePanel = () => {
+  const location = useLocation();
+
   const [leaveList, setLeaveList] = useState([]);
   const [employeesMap, setEmployeesMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [statusUpdating, setStatusUpdating] = useState(null);
 
   // --- UI States ---
-  // Initialize month to current YYYY-MM
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7)
+  const [filterDept, setFilterDept] = useState("All");
+  const [filterStatus, setFilterStatus] = useState(
+    location.state?.defaultStatus || "All"
   );
-  const [filterStatus, setFilterStatus] = useState("All");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showMoreId, setShowMoreId] = useState(null);
   const [snackbar, setSnackbar] = useState("");
 
-  // NEW STATES FOR POPUP
+  // --- Confirm Popup States ---
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null); // "Approved" or "Rejected"
+  const [confirmAction, setConfirmAction] = useState(null);
   const [selectedLeaveId, setSelectedLeaveId] = useState(null);
 
-  // --- Helper Snackbar Function ---
+  // Snackbar
   const showSnackbar = (msg) => {
     setSnackbar(msg);
     setTimeout(() => setSnackbar(""), 1800);
   };
 
-  // ✅ Fetch leaves & employees
+  // Fetch leaves & employees
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,10 +55,10 @@ const AdminLeavePanel = () => {
 
       setLeaveList(leavesData);
 
-      const newEmployeesMap = new Map(
+      const map = new Map(
         employeesData.map((emp) => [emp.employeeId, emp])
       );
-      setEmployeesMap(newEmployeesMap);
+      setEmployeesMap(map);
     } catch (err) {
       console.error("Admin Panel Data Fetch Error:", err);
     } finally {
@@ -76,384 +70,347 @@ const AdminLeavePanel = () => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // ✅ Enriched leave list (Removed Department Logic)
+  // Enriched leave list
   const enrichedLeaveList = useMemo(() => {
     return leaveList.map((leave) => {
       const emp = employeesMap.get(leave.employeeId);
       return {
         ...leave,
         employeeName: emp?.name || "Unknown",
-        // department field removed from UI logic
+        department: emp?.department || "Unassigned",
       };
     });
   }, [leaveList, employeesMap]);
 
-  // ✅ Filtering: Month -> Status -> Search
+  const allDepartments = useMemo(() => {
+    return Array.from(
+      new Set(Array.from(employeesMap.values()).map((emp) => emp.department))
+    ).filter(Boolean);
+  }, [employeesMap]);
+
+  // 🔥 TABLE FILTER LOGIC (INCLUDING TODAY FILTER)
   const filteredRequests = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+
     return enrichedLeaveList.filter((req) => {
-      // 1. Month Filter (Compare YYYY-MM of 'from' date)
-      const leaveMonth = req.from ? req.from.substring(0, 7) : "";
-      const matchesMonth = leaveMonth === selectedMonth;
+      const matchDept =
+        filterDept === "All" || req.department === filterDept;
 
-      // 2. Status Filter
-      const matchesStatus =
-        filterStatus === "All" || req.status === filterStatus;
+      const matchStatus =
+        filterStatus === "All" ||
+        req.status === filterStatus ||
+        (filterStatus === "Today" &&
+          req.status === "Approved" &&
+          today >= req.from &&
+          today <= req.to);
 
-      // 3. Search Filter
-      const matchesSearch =
+      const matchSearch =
         req.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         req.employeeName.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesMonth && matchesStatus && matchesSearch;
+      return matchDept && matchStatus && matchSearch;
     });
-  }, [enrichedLeaveList, selectedMonth, filterStatus, searchQuery]);
+  }, [enrichedLeaveList, filterDept, filterStatus, searchQuery]);
 
-  // ✅ Calculate Stats for the CURRENTLY SELECTED MONTH (Filtered List)
-  const stats = useMemo(() => {
-    return {
-      total: filteredRequests.length,
-      pending: filteredRequests.filter((r) => r.status === "Pending").length,
-      approved: filteredRequests.filter((r) => r.status === "Approved").length,
-      rejected: filteredRequests.filter((r) => r.status === "Rejected").length,
-    };
-  }, [filteredRequests]);
+  // 🔥 COUNT TODAY'S ON-LEAVE EMPLOYEES
+  const todayOnLeave = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
 
-  // OPEN CONFIRM POPUP
+    return enrichedLeaveList.filter(
+      (req) =>
+        req.status === "Approved" &&
+        today >= req.from &&
+        today <= req.to
+    ).length;
+  }, [enrichedLeaveList]);
+
+  // Approve/Reject
   const openConfirm = (id, actionType) => {
     setSelectedLeaveId(id);
     setConfirmAction(actionType);
     setConfirmOpen(true);
   };
 
-  // CONFIRMATION HANDLER
   const handleConfirmAction = async () => {
-    const id = selectedLeaveId;
-    const status = confirmAction;
-
-    setConfirmOpen(false);
-    setStatusUpdating(id);
-
     try {
-      if (status === "Approved") {
-        await approveLeaveRequestById(id);
-      } else if (status === "Rejected") {
-        await rejectLeaveRequestById(id);
+      setStatusUpdating(selectedLeaveId);
+      setConfirmOpen(false);
+
+      if (confirmAction === "Approved") {
+        await approveLeaveRequestById(selectedLeaveId);
+      } else {
+        await rejectLeaveRequestById(selectedLeaveId);
       }
 
       await fetchAllData();
-
-      showSnackbar(
-        status === "Approved"
-          ? "Leave approved successfully."
-          : "Leave rejected successfully."
-      );
-    } catch (err) {
-      console.error("Status Update Error:", err);
-      showSnackbar("Failed to update leave status.");
+      showSnackbar(`Leave ${confirmAction.toLowerCase()} successfully.`);
+    } catch {
+      showSnackbar("Failed to update leave.");
     } finally {
       setStatusUpdating(null);
     }
   };
 
-  const toggleShowMore = (id) => {
-    setShowMoreId((prev) => (prev === id ? null : id));
-  };
-
   const statusBadge = (status) => {
-    let color = "bg-gray-100 text-gray-600 border-gray-200";
-    if (status === "Pending") color = "bg-amber-50 text-amber-700 border-amber-200 border";
-    if (status === "Approved") color = "bg-emerald-50 text-emerald-700 border-emerald-200 border";
-    if (status === "Rejected") color = "bg-red-50 text-red-700 border-red-200 border";
+    let color = "bg-gray-200 text-gray-700";
+    if (status === "Pending") color = "bg-yellow-100 text-yellow-700";
+    if (status === "Approved") color = "bg-green-100 text-green-700";
+    if (status === "Rejected") color = "bg-red-100 text-red-700";
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${color}`}>
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${color}`}>
         {status}
       </span>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg font-semibold text-gray-500 animate-pulse">
-          Loading leave requests...
-        </div>
-      </div>
-    );
-  }
+  if (loading)
+    return <div className="p-6 text-center text-lg">Loading...</div>;
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen font-sans">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="p-6">
+      <h2 className="text-3xl font-bold mb-6 text-emerald-900">
+        Leave Management (Admin Panel)
+      </h2>
+
+      {/* --- STAT CARDS --- */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* TODAY */}
+        <div className="bg-white shadow-lg rounded-xl p-6 flex items-center gap-4 border-l-8 border-red-600">
+          <div className="bg-red-100 text-red-600 p-3 rounded-full text-2xl">
+            <FaCalendarAlt />
+          </div>
           <div>
-            <h2 className="text-3xl font-bold text-gray-800">Admin Leave Panel</h2>
-            <p className="text-gray-500 text-sm mt-1">Manage and review employee leave requests</p>
-          </div>
-          
-          {/* Month Filter */}
-          <div className="flex items-center gap-3 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-            <div className="bg-indigo-100 p-2 rounded text-indigo-600">
-              <FaCalendarAlt />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-bold text-gray-400 uppercase">Filter by Month</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="text-sm font-semibold text-gray-700 focus:outline-none bg-transparent cursor-pointer"
-              />
-            </div>
+            <h3 className="text-gray-600 font-semibold text-sm">
+              On Leave Today
+            </h3>
+            <p className="text-3xl font-extrabold text-gray-800">
+              {todayOnLeave}
+            </p>
           </div>
         </div>
 
-        {/* Stats Containers (Cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Total */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500 flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">Total Requests</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-full text-blue-500">
-              <FaClipboardList size={20} />
-            </div>
+        {/* APPROVED */}
+        <div className="bg-white shadow-lg rounded-xl p-6 flex items-center gap-4 border-l-8 border-green-600">
+          <div className="bg-green-100 text-green-600 p-3 rounded-full text-2xl">
+            ✔
           </div>
-
-          {/* Pending */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">Pending</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
-            </div>
-            <div className="bg-amber-50 p-3 rounded-full text-amber-500">
-              <FaHourglassHalf size={20} />
-            </div>
-          </div>
-
-          {/* Approved */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500 flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">Approved</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.approved}</p>
-            </div>
-            <div className="bg-emerald-50 p-3 rounded-full text-emerald-500">
-              <FaCheckCircle size={20} />
-            </div>
-          </div>
-
-          {/* Rejected */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500 flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase">Rejected</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.rejected}</p>
-            </div>
-            <div className="bg-red-50 p-3 rounded-full text-red-500">
-              <FaTimesCircle size={20} />
-            </div>
+          <div>
+            <h3 className="text-gray-600 font-semibold text-sm">
+              Approved
+            </h3>
+            <p className="text-3xl font-extrabold text-gray-800">
+              {filteredRequests.filter((r) => r.status === "Approved").length}
+            </p>
           </div>
         </div>
 
-        {/* Controls: Search & Status Tabs */}
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
-          {/* Status Tabs */}
-          <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-200 flex overflow-x-auto max-w-full">
-            {["All", "Pending", "Approved", "Rejected"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`px-5 py-2 rounded-md text-sm font-semibold transition-all whitespace-nowrap ${
-                  filterStatus === s
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+        {/* PENDING */}
+        <div className="bg-white shadow-lg rounded-xl p-6 flex items-center gap-4 border-l-8 border-yellow-600">
+          <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full text-2xl">
+            ⏳
           </div>
-
-          {/* Search Bar */}
-          <div className="relative w-full lg:w-80">
-            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search Name or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition bg-white shadow-sm"
-            />
-          </div>
-        </div>
-
-        {/* Table Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
-                <tr>
-                  <th className="p-4 border-b">Emp ID</th>
-                  <th className="p-4 border-b">Name</th>
-                  <th className="p-4 border-b">From</th>
-                  <th className="p-4 border-b">To</th>
-                  <th className="p-4 border-b">Type</th>
-                  <th className="p-4 border-b">Reason</th>
-                  <th className="p-4 border-b">Status</th>
-                  <th className="p-4 border-b text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredRequests.length > 0 ? (
-                  filteredRequests.map((lv) => (
-                    <React.Fragment key={lv._id}>
-                      <tr className={`hover:bg-gray-50 transition duration-150 ${showMoreId === lv._id ? 'bg-gray-50' : ''}`}>
-                        <td className="p-4 font-medium text-gray-700">{lv.employeeId}</td>
-                        <td className="p-4 font-semibold text-gray-800">{lv.employeeName}</td>
-                        <td className="p-4 text-gray-600 whitespace-nowrap">{lv.from}</td>
-                        <td className="p-4 text-gray-600 whitespace-nowrap">{lv.to}</td>
-                        <td className="p-4">
-                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">
-                            {lv.leaveType}
-                          </span>
-                        </td>
-                        <td className="p-4 text-gray-600 max-w-xs truncate" title={lv.reason}>
-                          {lv.reason}
-                        </td>
-                        <td className="p-4">{statusBadge(lv.status)}</td>
-
-                        <td className="p-4 flex justify-end gap-2">
-                          <button
-                            onClick={() => toggleShowMore(lv._id)}
-                            className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition"
-                          >
-                            {showMoreId === lv._id ? "Hide" : "Details"}
-                          </button>
-
-                          {/* APPROVE */}
-                          <button
-                            onClick={() => openConfirm(lv._id, "Approved")}
-                            title="Approve"
-                            className="bg-emerald-100 text-emerald-600 p-2 rounded hover:bg-emerald-200 transition flex items-center justify-center"
-                          >
-                            <FaCheck size={12} />
-                          </button>
-
-                          {/* REJECT */}
-                          <button
-                            onClick={() => openConfirm(lv._id, "Rejected")}
-                            title="Reject"
-                            className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-200 transition flex items-center justify-center"
-                          >
-                            <FaTimes size={12} />
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Dropdown Details */}
-                      <AnimatePresence>
-                        {showMoreId === lv._id && (
-                          <motion.tr
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="bg-gray-50/50"
-                          >
-                            <td colSpan="8" className="p-4 border-b border-gray-200">
-                              <div className="bg-white p-4 rounded-lg shadow-inner border border-gray-200 ml-4 border-l-4 border-l-indigo-500">
-                                <h4 className="font-bold text-gray-700 mb-3 text-xs uppercase tracking-wide">
-                                  Daily Breakdown
-                                </h4>
-                                {lv.details?.length ? (
-                                  <div className="overflow-hidden rounded-md border border-gray-200">
-                                    <table className="min-w-full text-left text-xs">
-                                      <thead className="bg-gray-100 text-gray-600">
-                                        <tr>
-                                          <th className="px-4 py-2 font-semibold">Date</th>
-                                          <th className="px-4 py-2 font-semibold">Category</th>
-                                          <th className="px-4 py-2 font-semibold">Type</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-100">
-                                        {lv.details.map((d, i) => (
-                                          <tr key={i} className="bg-white">
-                                            <td className="px-4 py-2 text-gray-700">{d.date}</td>
-                                            <td className="px-4 py-2 text-gray-600">{d.leavecategory}</td>
-                                            <td className="px-4 py-2 text-gray-600">{d.leaveDayType}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                ) : (
-                                  <p className="text-gray-500 text-sm italic">
-                                    No daily breakdown details provided.
-                                  </p>
-                                )}
-                              </div>
-                            </td>
-                          </motion.tr>
-                        )}
-                      </AnimatePresence>
-                    </React.Fragment>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="text-center py-12 text-gray-400">
-                      <div className="flex flex-col items-center justify-center">
-                        <FaClipboardList className="text-4xl mb-3 opacity-20" />
-                        <p>No leave requests found for this month.</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div>
+            <h3 className="text-gray-600 font-semibold text-sm">
+              Pending
+            </h3>
+            <p className="text-3xl font-extrabold text-gray-800">
+              {filteredRequests.filter((r) => r.status === "Pending").length}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* CONFIRM POPUP */}
+      {/* --- FILTERS --- */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <FaFilter className="text-blue-600" />
+
+        <select
+          value={filterDept}
+          onChange={(e) => setFilterDept(e.target.value)}
+          className="border px-3 py-2 rounded shadow"
+        >
+          <option value="All">All Departments</option>
+          {allDepartments.map((dept) => (
+            <option key={dept}>{dept}</option>
+          ))}
+        </select>
+
+        {/* FILTER BUTTONS */}
+        {["All", "Pending", "Approved", "Rejected", "Today"].map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilterStatus(s)}
+            className={`px-4 py-2 rounded font-semibold transition ${
+              filterStatus === s
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 hover:bg-blue-100"
+            }`}
+          >
+            {s === "Today" ? "On Leave Today" : s}
+          </button>
+        ))}
+      </div>
+
+      {/* SEARCH */}
+      <input
+        type="text"
+        placeholder="Search by Name or Employee ID"
+        className="border px-4 py-2 rounded mb-4 w-full max-w-sm"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+
+      {/* --- SUMMARY BAR --- */}
+      <div className="mb-4 bg-gray-50 p-3 rounded-xl shadow flex gap-6 text-sm font-semibold">
+        <span>Total: {filteredRequests.length}</span>
+        <span>Approved: {filteredRequests.filter((r) => r.status === "Approved").length}</span>
+        <span>Pending: {filteredRequests.filter((r) => r.status === "Pending").length}</span>
+        <span>Rejected: {filteredRequests.filter((r) => r.status === "Rejected").length}</span>
+        <span>On Leave Today: {todayOnLeave}</span>
+      </div>
+
+      {/* --- TABLE --- */}
+      <div className="overflow-x-auto bg-white rounded-xl shadow">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-gray-100 text-left">
+              <th className="p-4">ID</th>
+              <th className="p-4">Name</th>
+              <th className="p-4">Dept</th>
+              <th className="p-4">From</th>
+              <th className="p-4">To</th>
+              <th className="p-4">Type</th>
+              <th className="p-4">Reason</th>
+              <th className="p-4">Status</th>
+              <th className="p-4">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredRequests.length ? (
+              filteredRequests.map((lv) => (
+                <React.Fragment key={lv._id}>
+                  <tr className="border-t hover:bg-blue-50 transition">
+                    <td className="p-4">{lv.employeeId}</td>
+                    <td className="p-4">{lv.employeeName}</td>
+                    <td className="p-4">{lv.department}</td>
+                    <td className="p-4">{lv.from}</td>
+                    <td className="p-4">{lv.to}</td>
+                    <td className="p-4">{lv.leaveType}</td>
+                    <td className="p-4">{lv.reason}</td>
+                    <td className="p-4">{statusBadge(lv.status)}</td>
+
+                    <td className="p-4 flex gap-2">
+                      <button
+                        onClick={() =>
+                          setShowMoreId(showMoreId === lv._id ? null : lv._id)
+                        }
+                        className="bg-blue-100 text-blue-700 px-2 py-1 rounded"
+                      >
+                        {showMoreId === lv._id ? "Hide" : "Details"}
+                      </button>
+
+                      <button
+                        onClick={() => openConfirm(lv._id, "Approved")}
+                        className="bg-green-100 text-green-700 px-2 py-1 rounded"
+                      >
+                        <FaCheck />
+                      </button>
+
+                      <button
+                        onClick={() => openConfirm(lv._id, "Rejected")}
+                        className="bg-red-100 text-red-700 px-2 py-1 rounded"
+                      >
+                        <FaTimes />
+                      </button>
+                    </td>
+                  </tr>
+
+                  {showMoreId === lv._id && (
+                    <tr className="bg-gray-50">
+                      <td colSpan="9" className="p-4">
+                        <div className="bg-white p-4 rounded shadow">
+                          <h4 className="font-semibold mb-2">
+                            Leave Day Details
+                          </h4>
+
+                          {lv.details?.length ? (
+                            <table className="min-w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="px-3 py-2">Date</th>
+                                  <th className="px-3 py-2">Category</th>
+                                  <th className="px-3 py-2">Type</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lv.details.map((d, i) => (
+                                  <tr key={i}>
+                                    <td className="px-3 py-2">{d.date}</td>
+                                    <td className="px-3 py-2">{d.leavecategory}</td>
+                                    <td className="px-3 py-2">{d.leaveDayType}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p>No details available.</p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="9" className="text-center p-4 text-gray-500">
+                  No leave requests found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* --- CONFIRM POPUP --- */}
       <AnimatePresence>
         {confirmOpen && (
           <motion.div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white w-96 p-6 rounded-2xl shadow-2xl"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-80 p-6 rounded-xl shadow-xl"
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
             >
-              <h3 className={`text-xl font-bold mb-2 ${confirmAction === 'Approved' ? 'text-emerald-600' : 'text-red-600'}`}>
+              <h3 className="text-xl font-bold mb-4 text-indigo-700">
                 Confirm {confirmAction}
               </h3>
 
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                Are you sure you want to <span className="font-bold">{confirmAction.toLowerCase()}</span> this leave request?
-                <br /><span className="text-xs text-gray-400">This action cannot be undone easily.</span>
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to{" "}
+                <b className="text-indigo-700">{confirmAction}</b> this leave
+                request?
               </p>
 
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setConfirmOpen(false)}
-                  className="px-5 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition"
-                >
-                  Cancel
-                </button>
+              <div className="flex justify-between">
                 <button
                   onClick={handleConfirmAction}
-                  className={`px-5 py-2 rounded-lg text-white font-medium shadow-md transition transform active:scale-95 ${
-                    confirmAction === "Approved" 
-                      ? "bg-emerald-600 hover:bg-emerald-700" 
-                      : "bg-red-600 hover:bg-red-700"
-                  }`}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-800"
                 >
-                  Yes, {confirmAction}
+                  Yes, Confirm
+                </button>
+
+                <button
+                  onClick={() => setConfirmOpen(false)}
+                  className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancel
                 </button>
               </div>
             </motion.div>
@@ -461,26 +418,15 @@ const AdminLeavePanel = () => {
         )}
       </AnimatePresence>
 
-      {/* Snackbar */}
-      <AnimatePresence>
-        {snackbar && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg shadow-xl z-50 text-white font-medium flex items-center gap-2 ${
-              snackbar.toLowerCase().includes("rejected") || snackbar.toLowerCase().includes("failed")
-                ? "bg-red-600"
-                : "bg-emerald-600"
-            }`}
-          >
-            {snackbar.toLowerCase().includes("rejected") ? <FaTimesCircle /> : <FaCheckCircle />}
-            {snackbar}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {snackbar && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded shadow-lg">
+          {snackbar}
+        </div>
+      )}
     </div>
   );
 };
 
 export default AdminLeavePanel;
+
+// --- END OF FILE AdminLeaveManagementPanel.jsx ---
