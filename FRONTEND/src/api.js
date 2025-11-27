@@ -15,7 +15,7 @@ console.log("🌐 API Base URL:", baseURL);
 // Create a single, consistent Axios instance
 const api = axios.create({
   baseURL,
-  timeout: 500000, // Extended timeout for large requests
+  timeout: 500000, 
   headers: { "Content-Type": "application/json" },
 });
 
