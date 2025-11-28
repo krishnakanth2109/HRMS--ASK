@@ -5,7 +5,8 @@ import { useNavigate } from "react-router-dom";
 import {
   FaUser, FaEnvelope, FaBuilding, FaIdBadge, FaPhone, FaMapMarkerAlt,
   FaCalendarAlt, FaBriefcase, FaMoneyBill, FaBirthdayCake, FaFlag,
-  FaHeartbeat, FaUniversity, FaCreditCard, FaCodeBranch
+  FaHeartbeat, FaUniversity, FaCreditCard, FaCodeBranch,
+  FaEye, FaEyeSlash // Icons for password toggle
 } from "react-icons/fa";
 // ✅ IMPORT THE CENTRALIZED API FUNCTIONS
 import { getEmployees, addEmployee } from "../api";
@@ -24,6 +25,9 @@ const AddEmployee = () => {
   const navigate = useNavigate();
   const snackbar = useSnackbar();
   const [employees, setEmployees] = useState([]);
+  
+  // State for Password Visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch employees (for duplicate ID/email check) using the API service
   useEffect(() => {
@@ -53,8 +57,41 @@ const AddEmployee = () => {
   // Handle form input change
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // ✅ VALIDATION: Name (Only Characters and Spaces)
+    if (name === "name") {
+      if (!/^[a-zA-Z\s]*$/.test(value)) return;
+    }
+
+    // ✅ VALIDATION: Phone (Only Digits, Max 10)
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) return; // Only allow numbers
+      if (value.length > 10) return;    // Limit to 10 digits
+    }
+
+    // ✅ VALIDATION: Password (Max 12 characters)
+    if (name === "password") {
+      if (value.length > 12) return;
+    }
+
     if (name.startsWith("bankDetails.")) {
       const field = name.split(".")[1];
+
+      // ✅ VALIDATION: Account Number (Digits only)
+      if (field === "accountNumber") {
+        if (!/^\d*$/.test(value)) return;
+      }
+
+      // ✅ VALIDATION: Branch (No numbers allowed)
+      if (field === "branch") {
+        if (!/^[a-zA-Z\s]*$/.test(value)) return;
+      }
+
+      // ✅ VALIDATION: IFSC (Max 11 characters)
+      if (field === "ifsc") {
+        if (value.length > 11) return;
+      }
+
       setFormData((prev) => ({
         ...prev,
         bankDetails: { ...prev.bankDetails, [field]: value },
@@ -74,12 +111,40 @@ const AddEmployee = () => {
   const validate = () => {
     if (!formData.name.trim()) return "Full Name is required.";
     if (!formData.email.trim()) return "Email is required.";
+    
+    // Password Validations
     if (!formData.password.trim()) return "Password is required.";
     if (formData.password.length < 8) return "Password must be at least 8 characters.";
+
+    // ✅ VALIDATION: Phone Number Length
+    if (formData.phone && formData.phone.length !== 10) {
+      return "Phone number must be exactly 10 digits.";
+    }
+    
     if (!formData.currentDepartment.trim()) return "Department is required.";
     if (!formData.currentRole.trim()) return "Role is required.";
     if (!formData.joiningDate) return "Joining Date is required.";
     if (!formData.currentSalary || isNaN(formData.currentSalary)) return "Salary is required.";
+
+    // ✅ VALIDATION: Address length check
+    if (formData.address && formData.address.length < 10) {
+      return "Address must be at least 10 characters long.";
+    }
+
+    // ✅ VALIDATION: Account Number requirements
+    if (formData.bankDetails.accountNumber) {
+      if (!/^\d+$/.test(formData.bankDetails.accountNumber)) {
+        return "Bank Account Number must contain only digits.";
+      }
+      if (formData.bankDetails.accountNumber.length < 9 || formData.bankDetails.accountNumber.length > 18) {
+        return "Bank Account Number should be between 9 and 18 digits.";
+      }
+    }
+
+    // ✅ VALIDATION: IFSC Code Length
+    if (formData.bankDetails.ifsc && formData.bankDetails.ifsc.length !== 11) {
+      return "IFSC Code must be exactly 11 characters.";
+    }
 
     if (formData.employeeId.trim()) {
       const exists = employees.some(emp => emp.employeeId === formData.employeeId.trim());
@@ -147,9 +212,25 @@ const AddEmployee = () => {
             <h3 className="md:col-span-2 text-xl font-bold text-blue-700 border-b pb-3 mb-3">Basic Information</h3>
             <InputField icon={<FaIdBadge />} name="employeeId" label="Employee ID (optional)" value={formData.employeeId} onChange={handleChange} placeholder="Enter Employee ID" />
             <InputField icon={<FaUser />} name="name" label="Full Name" value={formData.name} onChange={handleChange} placeholder="e.g., John Doe" required />
-            <InputField icon={<FaIdBadge />} name="password" label="Password" type="password" value={formData.password} onChange={handleChange} placeholder="Enter password" required />
+            
+            {/* Password Field with Toggle Icon */}
+            <InputField 
+              icon={<FaIdBadge />} 
+              name="password" 
+              label="Password" 
+              type={showPassword ? "text" : "password"} 
+              value={formData.password} 
+              onChange={handleChange} 
+              placeholder="Enter password" 
+              required 
+              maxLength={12} 
+              endIcon={showPassword ? <FaEyeSlash /> : <FaEye />} 
+              onEndIconClick={() => setShowPassword(!showPassword)} 
+            />
+
             <InputField icon={<FaEnvelope />} name="email" label="Email Address" type="email" value={formData.email} onChange={handleChange} placeholder="e.g., john@example.com" required />
-            <InputField icon={<FaPhone />} name="phone" label="Phone Number" type="tel" value={formData.phone} onChange={handleChange} placeholder="e.g., 9876543210" />
+            {/* ✅ Updated Phone Input with maxLength */}
+            <InputField icon={<FaPhone />} name="phone" label="Phone Number" type="tel" value={formData.phone} onChange={handleChange} placeholder="e.g., 9876543210" maxLength={10} />
             <InputField icon={<FaMapMarkerAlt />} name="address" label="Address" value={formData.address} onChange={handleChange} placeholder="e.g., Hyderabad" />
             <InputField icon={<FaHeartbeat />} name="emergency" label="Emergency Contact" value={formData.emergency} onChange={handleChange} placeholder="e.g., Jane Doe - 9999999999" />
           </div>
@@ -176,9 +257,9 @@ const AddEmployee = () => {
             <h3 className="md:col-span-2 text-xl font-bold text-purple-700 border-b pb-3 mb-3">Personal & Bank Details</h3>
             <InputField icon={<FaBirthdayCake />} name="personalDetails.dob" label="Date of Birth" type="date" value={formData.personalDetails.dob} onChange={handleChange} />
             <InputField icon={<FaFlag />} name="personalDetails.nationality" label="Nationality" value={formData.personalDetails.nationality} onChange={handleChange} placeholder="e.g., Indian" />
-            <InputField icon={<FaCreditCard />} name="bankDetails.accountNumber" label="Account Number" value={formData.bankDetails.accountNumber} onChange={handleChange} placeholder="e.g., 1234567890" />
+            <InputField icon={<FaCreditCard />} name="bankDetails.accountNumber" label="Account Number" value={formData.bankDetails.accountNumber} onChange={handleChange} placeholder="e.g., 1234567890" maxLength={18} />
             <InputField icon={<FaUniversity />} name="bankDetails.bankName" label="Bank Name" value={formData.bankDetails.bankName} onChange={handleChange} placeholder="e.g., SBI" />
-            <InputField icon={<FaCodeBranch />} name="bankDetails.ifsc" label="IFSC Code" value={formData.bankDetails.ifsc} onChange={handleChange} placeholder="e.g., SBIN0001234" />
+            <InputField icon={<FaCodeBranch />} name="bankDetails.ifsc" label="IFSC Code" value={formData.bankDetails.ifsc} onChange={handleChange} placeholder="e.g., SBIN0001234" maxLength={11} />
             <InputField icon={<FaMapMarkerAlt />} name="bankDetails.branch" label="Branch" value={formData.bankDetails.branch} onChange={handleChange} placeholder="e.g., Hyderabad Main" />
           </div>
 
@@ -197,12 +278,23 @@ const AddEmployee = () => {
   );
 };
 
-// Input Component
-const InputField = ({ icon, label, ...props }) => (
+// Input Component with optional End Icon support
+const InputField = ({ icon, label, endIcon, onEndIconClick, ...props }) => (
   <div className="relative">
     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{icon}</div>
     <label className="absolute left-10 text-xs text-gray-500 font-medium top-1.5">{label}</label>
-    <input {...props} className="w-full pl-10 pr-4 pt-5 pb-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-gray-50 border-gray-300" />
+    <input 
+      {...props} 
+      className={`w-full pl-10 pt-5 pb-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-gray-50 border-gray-300 ${endIcon ? 'pr-10' : 'pr-4'}`} 
+    />
+    {endIcon && (
+      <div 
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600"
+        onClick={onEndIconClick}
+      >
+        {endIcon}
+      </div>
+    )}
   </div>
 );
 
