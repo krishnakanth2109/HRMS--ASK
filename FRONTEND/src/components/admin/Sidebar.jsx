@@ -179,9 +179,10 @@ const Sidebar = () => {
         }`}
       >
         <div
-          className={`flex items-center gap-3 transition-all ${
+          className={`flex items-center gap-3 transition-all hover:bg-slate-800 ${
             collapsed ? "w-0 opacity-0" : "w-full opacity-100"
           }`}
+          onClick={() => setCollapsed((p) => !p)}
         >
           <span className="text-3xl text-indigo-400">
             <FaConnectdevelop />

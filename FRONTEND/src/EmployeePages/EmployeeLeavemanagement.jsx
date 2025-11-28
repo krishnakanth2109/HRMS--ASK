@@ -118,6 +118,9 @@ const getNextMonth = (monthStr) => {
 const EmployeeLeavemanagement = () => {
   const [user, setUser] = useState(null);
   
+  // Block past dates
+  const today = new Date().toISOString().split("T")[0];
+  
   // Holiday state
   const [holidays, setHolidays] = useState([]);
   const [sandwichLeaves, setSandwichLeaves] = useState([]);
@@ -633,24 +636,52 @@ const EmployeeLeavemanagement = () => {
 
   }, [allApprovedLeaves, user]);
 
-  // Handle input changes
+  // Handle input changes with auto-reset & min date logic
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setForm((prev) => {
-      const updated = {
+      let updated = {
         ...prev,
         [name]: name === "reason" ? value.slice(0, REASON_LIMIT) : value,
       };
-      
-      if (name === "from" || name === "to") {
-        const fromDate = name === "from" ? value : prev.from;
-        const toDate = name === "to" ? value : prev.to;
+
+      // Prevent selecting past dates at state level too (extra safety)
+      if (name === "from" && value < today) {
+        updated.from = today;
+      }
+      if (name === "to" && value < today) {
+        updated.to = today;
+      }
+
+      // Auto-reset To when From changes
+      if (name === "from") {
+        if (updated.to && updated.to < value) {
+          updated.to = value;
+        }
+      }
+
+      // Auto-correct To if user manually picks older than From
+      if (name === "to") {
+        if (updated.from && value < updated.from) {
+          updated.to = updated.from;
+        }
+      }
+
+      const fromDate = updated.from;
+      const toDate = updated.to;
+
+      if (fromDate && toDate) {
         checkForSandwichLeave(fromDate, toDate);
         checkColleagueOverlaps(fromDate, toDate);
+      } else {
+        setSandwichWarning(null);
+        setOverlappingColleagues([]);
       }
-      
+
       return updated;
     });
+
     setSubmitError("");
     setSubmitSuccess("");
   };
@@ -781,15 +812,15 @@ const EmployeeLeavemanagement = () => {
 
   // Filter Upcoming Leaves for Modal
   const upcomingTeamLeaves = useMemo(() => {
-    const today = new Date();
-    today.setHours(0,0,0,0);
+    const todayDate = new Date();
+    todayDate.setHours(0,0,0,0);
     
     // Filter leaves where 'to' date is today or later
     return allApprovedLeaves
       .filter(l => {
         const endDate = new Date(l.to);
         endDate.setHours(0,0,0,0);
-        return endDate >= today && l.employeeId !== user?.employeeId;
+        return endDate >= todayDate && l.employeeId !== user?.employeeId;
       })
       .sort((a, b) => new Date(a.from) - new Date(b.from));
   }, [allApprovedLeaves, user]);
@@ -1243,6 +1274,7 @@ const EmployeeLeavemanagement = () => {
                       name="from" 
                       value={form.from} 
                       onChange={handleChange}
+                      min={today}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>
@@ -1253,6 +1285,7 @@ const EmployeeLeavemanagement = () => {
                       name="to" 
                       value={form.to} 
                       onChange={handleChange}
+                      min={form.from || today}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>

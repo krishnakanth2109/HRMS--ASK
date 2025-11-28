@@ -1,3 +1,5 @@
+// --- START OF FILE Navbar.jsx ---
+
 import { useContext, useState, useRef, useEffect } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +28,7 @@ const Navbar = () => {
 
   const [showMenu, setShowMenu] = useState(false);
   const [showThemeColors, setShowThemeColors] = useState(false);
+
   const menuRef = useRef(null);
 
   const { unreadCount, setUnreadCount, addNotification } =
@@ -33,58 +36,52 @@ const Navbar = () => {
 
   const { themeColor, setThemeColor } = useTheme();
 
-  // ⭐ Popup for Idle Alerts
   const [idlePopup, setIdlePopup] = useState(null);
 
   const colors = ["#3B82F6", "#FACC15", "#34D399", "#F472B6"];
 
-  // 🧹 Close dropdown if clicked outside
+  // 🧹 Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e) => {
+    const handleOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setShowMenu(false);
         setShowThemeColors(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
   // ================================
-  // 🔥 SOCKET.IO – LISTEN TO ADMIN EVENTS
+  // 🔥 SOCKET.IO LISTENERS
   // ================================
   useEffect(() => {
-  if (!user) return;
+    if (!user) return;
 
-  socket.on("connect", () => {
-    console.log("🟢 Admin Socket Connected:", socket.id);
+    socket.on("connect", () => {
+      console.log("🟢 Socket connected:", socket.id);
+      socket.emit("register", "admin");
+    });
 
-    // Register admin
-    socket.emit("register", "admin");
-    console.log("📡 Admin registered on socket");
-  });
+    socket.on("admin-notification", (data) => {
+      console.log("🔥 Notification:", data);
 
-  socket.on("admin-notification", (data) => {
-    console.log("🔥 Admin Notification Received:", data);
+      if (data.title === "Employee Idle Alert") {
+        setIdlePopup(data);
+        setTimeout(() => setIdlePopup(null), 6000);
+      }
 
-    if (data.title === "Employee Idle Alert") {
-      setIdlePopup(data);
+      addNotification(data);
+      setUnreadCount((prev) => prev + 1);
+    });
 
-      setTimeout(() => setIdlePopup(null), 6000);
-    }
+    return () => {
+      socket.off("connect");
+      socket.off("admin-notification");
+    };
+  }, [user]);
 
-    addNotification(data);
-    setUnreadCount((prev) => prev + 1);
-  });
-
-  return () => {
-    socket.off("connect");
-    socket.off("admin-notification");
-  };
-}, [user]);
-
-
-  // Logout function
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -92,7 +89,7 @@ const Navbar = () => {
 
   return (
     <>
-      {/* ⭐ IDLE ALERT POPUP */}
+      {/* ⭐ IDLE POPUP */}
       {idlePopup && (
         <div className="fixed top-20 right-4 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg w-80 animate-slide-in">
           <strong className="font-bold flex items-center gap-2">
@@ -120,7 +117,6 @@ const Navbar = () => {
         </h1>
 
         <div className="flex items-center gap-6">
-
           {/* 🔔 Notification Icon */}
           <div
             className="relative cursor-pointer group"
@@ -139,6 +135,7 @@ const Navbar = () => {
           <div
             ref={menuRef}
             className="relative flex items-center gap-2 cursor-pointer select-none"
+            onClick={() => setShowMenu((prev) => !prev)}
           >
             <FaUserCircle className="text-3xl text-white shadow" />
             <span className="text-white font-semibold hidden md:inline">
@@ -146,14 +143,15 @@ const Navbar = () => {
             </span>
 
             <FaChevronDown
-              className={`text-white ml-1 transition-transform duration-200 ${
-                showMenu ? "rotate-180" : ""
-              }`}
-              onClick={() => setShowMenu((prev) => !prev)}
+              className={`text-white ml-1 transition-transform duration-200 ${showMenu ? "rotate-180" : ""
+                }`}
             />
 
             {showMenu && (
-              <div className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-56 z-50 text-base animate-fade-in">
+              <div
+                className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-56 z-50 text-base animate-fade-in"
+                onClick={(e) => e.stopPropagation()} // 🔥 prevents reopen
+              >
                 <div
                   onClick={() => {
                     navigate("/admin/profile");
@@ -187,21 +185,26 @@ const Navbar = () => {
                 {/* THEME COLORS */}
                 <div className="border-t">
                   <div
-                    onClick={() => setShowThemeColors((prev) => !prev)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // keep main menu open
+                      setShowThemeColors((p) => !p);
+                    }}
                     className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition"
                   >
                     <span className="flex items-center gap-3">
                       <FaPaintBrush className="text-blue-600" /> Theme Change
                     </span>
                     <FaChevronDown
-                      className={`ml-1 text-gray-600 transition-transform duration-200 ${
-                        showThemeColors ? "rotate-180" : ""
-                      }`}
+                      className={`ml-1 text-gray-600 transition-transform duration-200 ${showThemeColors ? "rotate-180" : ""
+                        }`}
                     />
                   </div>
 
                   {showThemeColors && (
-                    <div className="px-4 py-3 grid grid-cols-4 gap-3">
+                    <div
+                      className="px-4 py-3 grid grid-cols-4 gap-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {colors.map((color) => (
                         <button
                           key={color}
@@ -216,13 +219,18 @@ const Navbar = () => {
 
                 {/* LOGOUT */}
                 <div
-                  onClick={handleLogout}
+                  onClick={() => {
+                    handleLogout();
+                    setShowMenu(false);
+                  }}
                   className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-blue-50 cursor-pointer transition border-t"
                 >
                   <FaSignOutAlt /> Logout
                 </div>
               </div>
             )}
+
+
           </div>
         </div>
       </nav>
@@ -231,3 +239,5 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
+// --- END OF FILE Navbar.jsx ---

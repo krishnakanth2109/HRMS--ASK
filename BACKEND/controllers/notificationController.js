@@ -67,8 +67,9 @@ export const createNotification = async (req, res) => {
       role: role || null,
     });
 
-    const io = req.app.get("io");
-    if (io) io.emit("newNotification", notification);
+    // ❌ Remove socket broadcast
+    // const io = req.app.get("io");
+    // if (io) io.emit("newNotification", notification);
 
     res.status(201).json(notification);
   } catch (err) {
@@ -93,7 +94,6 @@ export const markNotificationAsReadController = async (req, res) => {
 
     const user = req.user;
 
-    // User-specific notifications must only be updated by the owner or admin
     if (
       notification.userId &&
       notification.userId.toString() !== user._id.toString() &&
@@ -107,8 +107,9 @@ export const markNotificationAsReadController = async (req, res) => {
     notification.isRead = true;
     await notification.save();
 
-    const io = req.app.get("io");
-    if (io) io.emit("notificationUpdated", notification);
+    // ❌ Remove socket broadcast
+    // const io = req.app.get("io");
+    // if (io) io.emit("notificationUpdated", notification);
 
     res.json({ message: "Updated", data: notification });
   } catch (err) {
@@ -130,8 +131,9 @@ export const markAllNotificationsAsReadController = async (req, res) => {
 
     await Notification.updateMany(filter, { isRead: true });
 
-    const io = req.app.get("io");
-    if (io) io.emit("notificationsAllRead", { userId: user._id });
+    // ❌ Remove socket broadcast
+    // const io = req.app.get("io");
+    // if (io) io.emit("notificationsAllRead", { userId: user._id });
 
     res.json({ message: "All notifications marked as read" });
   } catch (err) {

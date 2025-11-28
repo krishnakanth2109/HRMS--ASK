@@ -26,21 +26,18 @@ const loadUser = () => {
   }
 };
 
-const READ_NOTICE_KEY = "employee_read_notices"; // localStorage only
+const READ_NOTICE_KEY = "employee_read_notices";
 
 const CurrentEmployeeNotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState([]); // ONLY Employee notifications
-  const [notices, setNotices] = useState([]); // Notice board items
-  const [unreadNotices, setUnreadNotices] = useState(0); // Badge count
+  const [notifications, setNotifications] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [unreadNotices, setUnreadNotices] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [sound] = useState(() => new Audio("/notification.mp3"));
   const [loggedUser] = useState(loadUser);
 
   const getUserId = () => (loggedUser ? String(loggedUser._id) : null);
 
-  // -------------------------------------------------------------
-  // Load read notice IDs from localStorage
-  // -------------------------------------------------------------
+  // Read notices from localStorage
   const loadReadNoticeIds = () => {
     try {
       return JSON.parse(localStorage.getItem(READ_NOTICE_KEY)) || [];
@@ -53,9 +50,7 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
     localStorage.setItem(READ_NOTICE_KEY, JSON.stringify(ids));
   };
 
-  // -------------------------------------------------------------
-  // FETCH EMPLOYEE NOTIFICATIONS
-  // -------------------------------------------------------------
+  // Load employee notifications
   const loadNotifications = useCallback(async () => {
     try {
       const all = await getNotifications();
@@ -75,13 +70,10 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
     }
   }, []);
 
-  // -------------------------------------------------------------
-  // FETCH NOTICES (SEPARATE)
-  // -------------------------------------------------------------
+  // Load notices
   const loadNotices = useCallback(async () => {
     try {
       const list = await getNotices();
-
       const readIds = loadReadNoticeIds();
 
       const mapped = list.map((n) => ({
@@ -95,58 +87,37 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
       mapped.sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setNotices(mapped);
-
       setUnreadNotices(mapped.filter((n) => !n.isRead).length);
     } catch (err) {
       console.error("❌ Error fetching notices:", err);
     }
   }, []);
 
-  // -------------------------------------------------------------
-  // MARK ALL NOTICES READ
-  // -------------------------------------------------------------
+  // Mark all notices read
   const markAllNoticesRead = () => {
     const allIds = notices.map((n) => n._id);
     saveReadNoticeIds(allIds);
 
     const updated = notices.map((n) => ({ ...n, isRead: true }));
-
     setNotices(updated);
     setUnreadNotices(0);
   };
 
-  // -------------------------------------------------------------
-  // SOCKET: Only notifications (NOT notices)
-  // -------------------------------------------------------------
+  // 🚫 DISABLE ALL SOCKET NOTIFICATIONS
   useEffect(() => {
-    const userId = getUserId();
-    if (!userId) return;
-
     const socket = io(SOCKET_URL, { transports: ["websocket", "polling"] });
 
-    socket.on("newNotification", (n) => {
-      if (String(n.userId) !== userId) return;
+    console.log("📡 Socket connected (employee notifications disabled)");
 
-      setNotifications((prev) => [n, ...prev]);
-      playSound();
-    });
+    socket.off("newNotification");
+    socket.off("newNotice");
+    socket.off("notificationUpdated");
+    socket.off("notificationsAllRead");
 
     return () => socket.disconnect();
   }, []);
 
-  // -------------------------------------------------------------
-  // SOUND
-  // -------------------------------------------------------------
-  const playSound = () => {
-    try {
-      sound.currentTime = 0;
-      sound.play();
-    } catch {}
-  };
-
-  // -------------------------------------------------------------
-  // MARK SINGLE EMPLOYEE NOTIFICATION READ
-  // -------------------------------------------------------------
+  // Mark single notification read
   const markAsRead = async (id) => {
     try {
       await markNotificationAsRead(id);
@@ -161,22 +132,17 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
     }
   };
 
-  // -------------------------------------------------------------
-  // MARK ALL EMPLOYEE NOTIFICATIONS READ
-  // -------------------------------------------------------------
+  // Mark all notifications read
   const markAllAsRead = async () => {
     try {
       await markAllNotificationsAsRead();
-
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (err) {
       console.error("❌ Mark all read failed:", err);
     }
   };
 
-  // -------------------------------------------------------------
-  // INITIAL LOAD
-  // -------------------------------------------------------------
+  // Initial load
   useEffect(() => {
     (async () => {
       await loadNotifications();
@@ -188,15 +154,13 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
   return (
     <CurrentEmployeeNotificationContext.Provider
       value={{
-        notifications, // only employee notifications
-        notices,       // separate notices for sidebar + notice page
-        unreadNotices, // badge count for sidebar
+        notifications,
+        notices,
+        unreadNotices,
         loading,
-
         markAsRead,
         markAllAsRead,
-
-        markAllNoticesRead, // notice board only
+        markAllNoticesRead,
         loadNotifications,
         loadNotices,
       }}
