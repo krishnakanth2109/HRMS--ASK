@@ -7,10 +7,9 @@ const LocationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: null }
 }, { _id: false });
 
-// ✅ New Schema for tracking idle segments (From File 1)
 const IdleActivitySchema = new mongoose.Schema({
   idleStart: { type: Date, required: true },
-  idleEnd: { type: Date, default: null }, // Null means currently idle
+  idleEnd: { type: Date, default: null },
 }, { _id: false });
 
 const DailySchema = new mongoose.Schema({
@@ -40,32 +39,34 @@ const DailySchema = new mongoose.Schema({
     default: "NOT_APPLICABLE",
   },
 
-  // ✅ FIXED: Added "ABSENT" to the enum list to prevent crash
   workedStatus: {
     type: String,
     enum: ["FULL_DAY", "HALF_DAY", "QUARTER_DAY", "ABSENT", "NOT_APPLICABLE"],
     default: "NOT_APPLICABLE",
   },
 
-  // ✅ ADDED: Because your route tries to save this field
   attendanceCategory: {
     type: String,
     enum: ["FULL_DAY", "HALF_DAY", "ABSENT", "NOT_APPLICABLE"],
     default: "NOT_APPLICABLE"
   },
 
-  // ✅ Added this field to store idle start/end times (From File 1)
+  // Idle activity tracking
   idleActivity: {
     type: [IdleActivitySchema],
     default: []
-  }
+  },
+
+  // ✅ ADMIN PUNCH OUT FIELDS
+  adminPunchOut: { type: Boolean, default: false },
+  adminPunchOutBy: { type: String, default: null },
+  adminPunchOutTimestamp: { type: Date, default: null }
 });
 
 const AttendanceSchema = new mongoose.Schema({
-  // ✅ FIXED: unique: true is sufficient. Do not add index:true here to avoid duplicate warning.
   employeeId: { type: String, required: true, unique: true },
   employeeName: { type: String, required: true },
   attendance: [DailySchema],
-});
+});a
 
 export default mongoose.model("Attendance", AttendanceSchema);
