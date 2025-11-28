@@ -48,8 +48,13 @@ export const login = async (req, res, next) => {
 
     // 4️⃣ BLOCK DEACTIVATED EMPLOYEES
     if (role === "employee" && user.isActive === false) {
+<<<<<<< HEAD
       return res.status(403).json({
         message: "Your account is deactivated. Please contact support team.",
+=======
+      return res.status(403).json({ 
+        message: "Your account is Deactivated please contact support team" 
+>>>>>>> 0441e4089714e2ec2e3d9f19df347aa6f4ebe1c2
       });
     }
 
