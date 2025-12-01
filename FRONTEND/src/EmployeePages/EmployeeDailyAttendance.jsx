@@ -126,21 +126,29 @@ const EmployeeDailyAttendance = () => {
   // --- Fetch Data ---
   const loadData = useCallback(async (empId) => {
     setLoading(true);
+    
+    // 1. Fetch Attendance (Critical Data)
     try {
-      // 1. Fetch Attendance
       const attendanceRes = await getAttendanceForEmployee(empId);
       const attendanceData = Array.isArray(attendanceRes) ? attendanceRes : (attendanceRes.data || []);
       setAttendance(attendanceData);
+    } catch (err) {
+      console.error("Error fetching attendance:", err);
+      setAttendance([]);
+    }
 
-      // 2. Fetch Shifts and find user's shift
+    // 2. Fetch Shifts (Optional/Enhanced Data)
+    // We separate this so a 403 error here doesn't block the attendance data from showing
+    try {
       const shiftsRes = await getAllShifts();
       const allShifts = Array.isArray(shiftsRes) ? shiftsRes : (shiftsRes.data || []);
       const myShift = allShifts.find(s => s.employeeId === empId);
       setShiftDetails(myShift || null);
-
     } catch (err) {
-      console.error("Error fetching data:", err);
-      setAttendance([]);
+      // 403 Forbidden is expected for employees if backend restricts 'getAllShifts'
+      // We log a warning but do NOT clear the attendance data
+      console.warn("Could not fetch shift details (using default 9-hour shift):", err.message);
+      setShiftDetails(null); 
     } finally {
       setLoading(false);
     }
