@@ -19,21 +19,41 @@ const officeSettingsSchema = new mongoose.Schema({
     enum: ["WFO", "WFH"], 
     default: "WFO" 
   },
-  // Store individual employee work mode overrides
+  // Store individual employee work mode overrides and schedules
   employeeWorkModes: [{
     employeeId: { type: String, required: true },
     employeeName: { type: String, required: true },
-    workMode: { 
+    
+    // Type of rule applied: 
+    // "Global" (Default), "Permanent" (Manual Override), "Temporary" (Date Range), "Recurring" (Days of Week)
+    ruleType: { 
       type: String, 
-      enum: ["WFO", "WFH", "Global"], 
-      required: true 
+      enum: ["Global", "Permanent", "Temporary", "Recurring"], 
+      default: "Global" 
     },
+
+    // 1. Permanent Override (Old 'workMode')
+    permanentMode: { type: String, enum: ["WFO", "WFH"] },
+
+    // 2. Temporary Schedule (Date Range)
+    temporary: {
+      mode: { type: String, enum: ["WFO", "WFH"] },
+      fromDate: { type: Date },
+      toDate: { type: Date }
+    },
+
+    // 3. Recurring Schedule (Specific Days)
+    recurring: {
+      mode: { type: String, enum: ["WFO", "WFH"] },
+      days: [{ type: Number }] // 0=Sunday, 1=Monday, ... 6=Saturday
+    },
+
     updatedAt: { type: Date, default: Date.now }
   }],
-  // ✅ NEW: Store Custom Categories (Groups)
+  
   categories: [{
     name: { type: String, required: true },
-    employeeIds: [{ type: String }] // List of employee IDs in this category
+    employeeIds: [{ type: String }] 
   }]
 }, { timestamps: true });
 

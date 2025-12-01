@@ -1,3 +1,5 @@
+// --- START OF FILE EmployeeLeavemanagement.jsx ---
+
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,7 +14,7 @@ import {
 const REASON_LIMIT = 50;
 
 // --- LEAVE YEAR CONFIGURATION ---
-const LEAVE_YEAR_START_MONTH = 1; // Nov
+const LEAVE_YEAR_START_MONTH = 1; // Jan
 
 // --- HELPER FUNCTIONS ---
 
@@ -78,8 +80,13 @@ const addDays = (date, days) => {
   return result;
 };
 
+// Timezone safe formatter
 const formatDate = (date) => {
-  return date.toISOString().split('T')[0];
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const normalize = (d) => {
@@ -168,11 +175,12 @@ const EmployeeLeavemanagement = () => {
   // Stats states
   const [stats, setStats] = useState({
     monthlyAvailable: 1,    
-    totalLeaveDays: 0,      
+    totalLeaveDays: 0,
+    normalLeaveDays: 0, // Added to track normal leaves separately
     extraLeaves: 0,         
     sandwichLeavesCount: 0, 
     sandwichDaysCount: 0,   
-    pendingLeaves: 0,       
+    pendingLeaves: 1,       
   });
 
   // Filtered leave list
@@ -188,56 +196,38 @@ const EmployeeLeavemanagement = () => {
     });
   }, [leaveList, selectedMonth, selectedStatus]);
 
-  // Calculate MONTHLY stats
+  // --- UPDATED STATS CALCULATION ---
   useEffect(() => {
-    if (!leaveList.length) return;
-
-    const { startDate, endDate } = getCurrentLeaveYear();
-    const currentMonthYear = selectedMonth;
-
-    const { year: currentYear, month: currentMonth } = getMonthFromString(currentMonthYear);
-    const { year: startYear, month: startMonth } = getMonthFromString(`${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`);
-    
-    const totalMonths = (currentYear - startYear) * 12 + (currentMonth - startMonth) + 1;
-    const totalEarnedLeaves = Math.max(1, totalMonths); 
-
-    const usedLeaves = leaveList.filter(leave => {
-      if (leave.status !== 'Approved') return false;
-      const leaveDate = new Date(leave.from);
-      const leaveMonthYear = `${leaveDate.getFullYear()}-${String(leaveDate.getMonth() + 1).padStart(2, '0')}`;
-      const leaveCompare = parseInt(leaveMonthYear.replace('-', ''));
-      const currentCompare = parseInt(currentMonthYear.replace('-', ''));
-      return leaveCompare <= currentCompare && leaveDate >= startDate && leaveDate <= endDate;
-    }).length;
-
-    const availableLeaves = Math.max(0, totalEarnedLeaves - usedLeaves);
-
-    setStats(prev => ({
-      ...prev,
-      monthlyAvailable: availableLeaves,
-      pendingLeaves: availableLeaves
-    }));
-
-  }, [leaveList, selectedMonth]);
-
-  useEffect(() => {
+    // 1. Calculate Approved Days (only from leaves)
     const approvedLeavesInMonth = filteredLeaveList.filter(leave => leave.status === 'Approved');
-    const totalApprovedDays = approvedLeavesInMonth.reduce((total, leave) => {
+    const approvedDaysCount = approvedLeavesInMonth.reduce((total, leave) => {
       return total + calculateLeaveDays(leave.from, leave.to);
     }, 0);
 
-    const extraLeavesInMonth = Math.max(0, totalApprovedDays - 1);
-    const sandwichCount = sandwichLeaves.length;
-    const sandwichDays = sandwichLeaves.reduce((total, sandwich) => {
-      return total + 2;
+    // 2. Calculate Sandwich Days (The gap days: Sundays/Holidays)
+    const sandwichGapDays = sandwichLeaves.reduce((total, sandwich) => {
+      return total + (sandwich.daysCount || 0);
     }, 0);
+
+    // 3. Total Consumed = Approved Days + Sandwich Gap Days
+    const totalConsumed = approvedDaysCount + sandwichGapDays;
+
+    // 4. Pending Calculation
+    // Logic: 1 leave per month credit. Pending = Credit - Used.
+    const monthlyCredit = 1;
+    const pending = Math.max(0, monthlyCredit - totalConsumed);
+
+    // 5. Extra Leaves
+    const extra = Math.max(0, totalConsumed - monthlyCredit);
 
     setStats(prev => ({
       ...prev,
-      totalLeaveDays: totalApprovedDays,
-      extraLeaves: extraLeavesInMonth,
-      sandwichLeavesCount: sandwichCount,
-      sandwichDaysCount: sandwichDays,
+      pendingLeaves: pending,
+      totalLeaveDays: totalConsumed, 
+      normalLeaveDays: approvedDaysCount, // Tracking normal separately
+      extraLeaves: extra,
+      sandwichLeavesCount: sandwichLeaves.length,
+      sandwichDaysCount: sandwichGapDays,
     }));
   }, [filteredLeaveList, sandwichLeaves]);
   
@@ -344,7 +334,7 @@ const EmployeeLeavemanagement = () => {
     }
   }, [user, fetchLeaves, fetchHolidays, fetchAllEmployeesLeaves]);
 
-  // --- SANDWICH LOGIC ---
+  // --- UPDATED SANDWICH LOGIC (DASHBOARD DISPLAY) ---
   const calculateSandwichLeaves = useCallback(() => {
     const approvedLeaves = filteredLeaveList.filter(leave => leave.status === 'Approved');
     if (approvedLeaves.length === 0 && holidays.length === 0) {
@@ -352,148 +342,89 @@ const EmployeeLeavemanagement = () => {
       return;
     }
 
-    const approvedLeaveDates = new Set();
+    // MAP: DateString -> isFullDay (Boolean)
+    const approvedLeaveMap = new Map();
+
     approvedLeaves.forEach(leave => {
+      // Determine if this leave is "Full Day"
+      const isFullDay = !leave.halfDaySession; 
       let currentDate = new Date(leave.from);
       const endDate = new Date(leave.to);
       while (currentDate <= endDate) {
-        approvedLeaveDates.add(formatDate(currentDate));
+        approvedLeaveMap.set(formatDate(currentDate), isFullDay);
         currentDate = addDays(currentDate, 1);
       }
     });
 
     const newSandwichLeaves = [];
-    const nextMonth = getNextMonth(selectedMonth);
-
+    
+    // 1. Holiday Sandwiches
     holidays.forEach(holiday => {
-      let currentHoliDate = new Date(holiday.start);
-      const endHoliDate = new Date(holiday.end);
+      const holidayStart = new Date(holiday.start);
+      const holidayEnd = new Date(holiday.end);
+      
+      const dayBefore = addDays(holidayStart, -1);
+      const dayAfter = addDays(holidayEnd, 1);
+      const dayBeforeStr = formatDate(dayBefore);
+      const dayAfterStr = formatDate(dayAfter);
 
-      while (currentHoliDate <= endHoliDate) {
-        const holidayStr = formatDate(currentHoliDate);
-        const isInSelectedMonth = isDateInMonth(holidayStr, selectedMonth);
-        const isInNextMonth = isDateInMonth(holidayStr, nextMonth);
+      // Check if both surrounding days exist in map AND are Full Day
+      const isBeforeFullDay = approvedLeaveMap.get(dayBeforeStr) === true;
+      const isAfterFullDay = approvedLeaveMap.get(dayAfterStr) === true;
+
+      if (isBeforeFullDay && isAfterFullDay) {
+        const isBeforeInMonth = isDateInMonth(dayBeforeStr, selectedMonth);
+        const isAfterInMonth = isDateInMonth(dayAfterStr, selectedMonth);
         
-        if (!isInSelectedMonth && !isInNextMonth) {
-          currentHoliDate = addDays(currentHoliDate, 1);
-          continue;
-        }
-
-        const dayBefore = addDays(currentHoliDate, -1);
-        const dayAfter = addDays(currentHoliDate, 1);
-        const dayBeforeStr = formatDate(dayBefore);
-        const dayAfterStr = formatDate(dayAfter);
-
-        const hasLeaveBefore = approvedLeaveDates.has(dayBeforeStr);
-        const hasLeaveAfter = approvedLeaveDates.has(dayAfterStr);
-
-        if (hasLeaveBefore && hasLeaveAfter) {
-          const existingPattern = newSandwichLeaves.find(pattern => 
-            pattern.dates.includes(holidayStr)
-          );
-
+        if (isBeforeInMonth || isAfterInMonth) {
+          const patternKey = `${dayBeforeStr}|${dayAfterStr}`;
+          const existingPattern = newSandwichLeaves.find(p => p.key === patternKey);
+          
           if (!existingPattern) {
-            const monthContext = isInSelectedMonth ? selectedMonth : nextMonth;
-            newSandwichLeaves.push({
-              dates: `${dayBeforeStr}, ${holiday.name} (${holidayStr}), ${dayAfterStr}`,
-              reason: `Leave approved on the day before and after the '${holiday.name}' holiday.`,
-              month: monthContext,
-              type: 'holiday'
+             const duration = calculateLeaveDays(holidayStart, holidayEnd);
+             newSandwichLeaves.push({
+              key: patternKey,
+              dates: `${dayBeforeStr} & ${dayAfterStr}`,
+              reason: `Sandwich around holiday: ${holiday.name}. Holiday period counted as leave.`,
+              month: selectedMonth,
+              type: 'holiday',
+              daysCount: duration // Add duration of the holiday as leave taken
             });
           }
         }
-        currentHoliDate = addDays(currentHoliDate, 1);
       }
     });
 
-    approvedLeaveDates.forEach(dateStr => {
+    // 2. Weekend Sandwiches (Sat/Mon)
+    for (const [dateStr, isFullDay] of approvedLeaveMap.entries()) {
+      if (!isFullDay) continue; 
+
       const date = new Date(dateStr);
-      const isInSelectedMonth = isDateInMonth(dateStr, selectedMonth);
-      if (!isInSelectedMonth) return;
+      const dayOfWeek = date.getDay();
 
-      if (date.getDay() === 6) { // Saturday
-        const followingMonday = addDays(date, 2);
-        const mondayStr = formatDate(followingMonday);
-        const isMondayInSelectedMonth = isDateInMonth(mondayStr, selectedMonth);
-        const isMondayInNextMonth = isDateInMonth(mondayStr, nextMonth);
-        
-        if (isMondayInSelectedMonth || isMondayInNextMonth) {
-          if (approvedLeaveDates.has(mondayStr)) {
-            const existingPattern = newSandwichLeaves.find(pattern => 
-              pattern.dates.includes(dateStr) && pattern.dates.includes(mondayStr)
-            );
+      // Case: Saturday(6) checking Monday(1)
+      if (dayOfWeek === 6) {
+        const mondayDate = addDays(date, 2);
+        const mondayStr = formatDate(mondayDate);
 
-            if (!existingPattern) {
-              newSandwichLeaves.push({
-                dates: `${dateStr} (Saturday) → ${mondayStr} (Monday)`,
-                reason: 'Leave approved on a Saturday and the following Monday, sandwiching Sunday.',
-                month: selectedMonth,
-                type: 'weekend'
-              });
-            }
+        // Check if Monday is booked AND is Full Day
+        if (approvedLeaveMap.get(mondayStr) === true) {
+          const patternKey = `${dateStr}|${mondayStr}`;
+          const existingPattern = newSandwichLeaves.find(p => p.key === patternKey);
+
+          if (!existingPattern && (isDateInMonth(dateStr, selectedMonth) || isDateInMonth(mondayStr, selectedMonth))) {
+            newSandwichLeaves.push({
+              key: patternKey,
+              dates: `${dateStr} (Sat) & ${mondayStr} (Mon)`,
+              reason: 'Full Day leaves on Sat & Mon sandwiching Sunday. Sunday counted as leave.',
+              month: selectedMonth,
+              type: 'weekend',
+              daysCount: 1 // Sunday is 1 day
+            });
           }
         }
       }
-
-      if (date.getDay() === 5) { // Friday
-        const followingSunday = addDays(date, 2);
-        const sundayStr = formatDate(followingSunday);
-        if (isDateInMonth(sundayStr, selectedMonth)) {
-          if (approvedLeaveDates.has(sundayStr)) {
-            const existingPattern = newSandwichLeaves.find(pattern => 
-              pattern.dates.includes(dateStr) && pattern.dates.includes(sundayStr)
-            );
-
-            if (!existingPattern) {
-              newSandwichLeaves.push({
-                dates: `${dateStr} (Friday) → ${sundayStr} (Sunday)`,
-                reason: 'Leave approved on a Friday and the following Sunday.',
-                month: selectedMonth,
-                type: 'weekend'
-              });
-            }
-          }
-        }
-      }
-      
-      // Friday to Tuesday Check
-      if (date.getDay() === 5) {
-        const followingTuesday = addDays(date, 4);
-        const tuesdayStr = formatDate(followingTuesday);
-        
-        const isTuesdayInSelectedMonth = isDateInMonth(tuesdayStr, selectedMonth);
-        const isTuesdayInNextMonth = isDateInMonth(tuesdayStr, nextMonth);
-        
-        if ((isTuesdayInSelectedMonth || isTuesdayInNextMonth) && approvedLeaveDates.has(tuesdayStr)) {
-          const monday = addDays(date, 3);
-          const mondayStr = formatDate(monday);
-          const hasHolidayOnMonday = holidays.some(holiday => {
-            let currentHoliDate = new Date(holiday.start);
-            const endHoliDate = new Date(holiday.end);
-            while (currentHoliDate <= endHoliDate) {
-              if (formatDate(currentHoliDate) === mondayStr) return true;
-              currentHoliDate = addDays(currentHoliDate, 1);
-            }
-            return false;
-          });
-
-          if (hasHolidayOnMonday) {
-            const existingPattern = newSandwichLeaves.find(pattern => 
-              pattern.dates.includes(dateStr) && pattern.dates.includes(tuesdayStr)
-            );
-
-            if (!existingPattern) {
-              newSandwichLeaves.push({
-                dates: `${dateStr} (Friday) → Holiday (Monday) → ${tuesdayStr} (Tuesday)`,
-                reason: 'Leave approved on Friday and Tuesday, sandwiching a holiday weekend.',
-                month: selectedMonth,
-                type: 'extended-weekend'
-              });
-            }
-          }
-        }
-      }
-    });
+    }
 
     setSandwichLeaves(newSandwichLeaves);
   }, [filteredLeaveList, holidays, selectedMonth]);
@@ -502,108 +433,86 @@ const EmployeeLeavemanagement = () => {
     calculateSandwichLeaves();
   }, [filteredLeaveList, holidays, selectedMonth, calculateSandwichLeaves]);
 
-  // Check for sandwich leave
+
+  // --- UPDATED SANDWICH CHECK (FORM VALIDATION) ---
   const checkForSandwichLeave = useCallback((fromDate, toDate) => {
     if (!fromDate || !toDate) {
       setSandwichWarning(null);
       return;
     }
 
+    // 1. Gather all "Booked" dates with Full Day status
     const approvedLeaves = filteredLeaveList.filter(leave => leave.status === 'Approved');
-    const approvedLeaveDates = new Set();
+    const bookedMap = new Map();
+    const currentSelectedDates = new Set();
+
     approvedLeaves.forEach(leave => {
-      let currentDate = new Date(leave.from);
-      const endDate = new Date(leave.to);
-      while (currentDate <= endDate) {
-        approvedLeaveDates.add(formatDate(currentDate));
-        currentDate = addDays(currentDate, 1);
+      const isFullDay = !leave.halfDaySession;
+      let curr = new Date(leave.from);
+      const end = new Date(leave.to);
+      while (curr <= end) {
+        bookedMap.set(formatDate(curr), isFullDay);
+        curr = addDays(curr, 1);
       }
     });
 
-    const selectedDates = new Set();
-    let currentDate = new Date(fromDate);
-    const endDate = new Date(toDate);
-    while (currentDate <= endDate) {
-      selectedDates.add(formatDate(currentDate));
-      currentDate = addDays(currentDate, 1);
+    // Current selection status
+    const isCurrentSelectionFullDay = !(form.from === form.to && form.halfDaySession);
+
+    let selStart = new Date(fromDate);
+    const selEnd = new Date(toDate);
+    while (selStart <= selEnd) {
+      const fDate = formatDate(selStart);
+      currentSelectedDates.add(fDate);
+      bookedMap.set(fDate, isCurrentSelectionFullDay); 
+      selStart = addDays(selStart, 1);
     }
 
     const warnings = [];
-    const nextMonth = getNextMonth(selectedMonth);
 
+    // 2. Check Holiday Sandwiches
     holidays.forEach(holiday => {
-      let currentHoliDate = new Date(holiday.start);
-      const endHoliDate = new Date(holiday.end);
+      const hStart = new Date(holiday.start);
+      const hEnd = new Date(holiday.end);
+      const dayBefore = formatDate(addDays(hStart, -1));
+      const dayAfter = formatDate(addDays(hEnd, 1));
 
-      while (currentHoliDate <= endHoliDate) {
-        const holidayStr = formatDate(currentHoliDate);
-        const dayBefore = formatDate(addDays(currentHoliDate, -1));
-        const dayAfter = formatDate(addDays(currentHoliDate, 1));
+      const beforeIsFull = bookedMap.get(dayBefore) === true;
+      const afterIsFull = bookedMap.get(dayAfter) === true;
 
-        const isHolidayInScope = isDateInMonth(holidayStr, selectedMonth) || 
-                                isDateInMonth(holidayStr, nextMonth);
-
-        if (isHolidayInScope) {
-          const hasBeforeLeave = approvedLeaveDates.has(dayBefore) || selectedDates.has(dayBefore);
-          const hasAfterLeave = approvedLeaveDates.has(dayAfter) || selectedDates.has(dayAfter);
-
-          if (hasBeforeLeave && hasAfterLeave) {
-            const newlyCreated = selectedDates.has(dayBefore) || selectedDates.has(dayAfter);
-            if (newlyCreated) {
-              const monthContext = isDateInMonth(holidayStr, selectedMonth) ? 'this month' : 'next month';
-              const msg = `Your selected dates create a sandwich leave around '${holiday.name}' (${holidayStr}) in ${monthContext}. Leaves on ${dayBefore} and ${dayAfter} surround this holiday.`;
-              if(!warnings.some(w => w.message === msg)) {
-                warnings.push({
-                  type: 'holiday',
-                  message: msg
-                });
-              }
-            }
-          }
-        }
-        currentHoliDate = addDays(currentHoliDate, 1);
-      }
-    });
-
-    selectedDates.forEach(dateStr => {
-      const date = new Date(dateStr);
-      if (date.getDay() === 6) { 
-        const followingMonday = formatDate(addDays(date, 2));
-        const isMondayInScope = isDateInMonth(followingMonday, selectedMonth) || 
-                               isDateInMonth(followingMonday, nextMonth);
-        
-        if (isMondayInScope) {
-          const hasMonday = approvedLeaveDates.has(followingMonday) || selectedDates.has(followingMonday);
-          if (hasMonday) {
-            const monthContext = isDateInMonth(followingMonday, selectedMonth) ? 'this month' : 'next month';
-            const message = `Your selected dates create a sandwich leave around Sunday. Leaves on ${dateStr} (Saturday) and ${followingMonday} (Monday) in ${monthContext} will surround Sunday.`;
-            if (!warnings.some(w => w.message === message)) {
-              warnings.push({ type: 'weekend', message });
-            }
-          }
-        }
-      }
-
-      if (date.getDay() === 5) { 
-        const followingSunday = formatDate(addDays(date, 2));
-        if (isDateInMonth(followingSunday, selectedMonth)) {
-          const hasSunday = approvedLeaveDates.has(followingSunday) || selectedDates.has(followingSunday);
-          if (hasSunday) {
-            const message = `Your selected dates create a sandwich leave. Leaves on ${dateStr} (Friday) and ${followingSunday} (Sunday) will surround Saturday.`;
-            if (!warnings.some(w => w.message === message)) {
-              warnings.push({ type: 'weekend', message });
-            }
-          }
+      if (beforeIsFull && afterIsFull) {
+        if (currentSelectedDates.has(dayBefore) || currentSelectedDates.has(dayAfter)) {
+           const msg = `Sandwich Detected: Full Day leaves surround '${holiday.name}'. The holiday period will be counted as leave(s).`;
+           if (!warnings.some(w => w.message === msg)) {
+             warnings.push({ type: 'holiday', message: msg });
+           }
         }
       }
     });
+
+    // 3. Check Weekend Sandwiches
+    for (const [dateStr, isFullDay] of bookedMap.entries()) {
+      if (!isFullDay) continue; 
+      const d = new Date(dateStr);
+      if (d.getDay() === 6) { // Saturday
+        const mondayStr = formatDate(addDays(d, 2));
+        if (bookedMap.get(mondayStr) === true) {
+          if (currentSelectedDates.has(dateStr) || currentSelectedDates.has(mondayStr)) {
+            const msg = `Sandwich Detected: Full Day leaves on Sat & Mon. Sunday will be counted as a leave.`;
+             if (!warnings.some(w => w.message === msg)) {
+               warnings.push({ type: 'weekend', message: msg });
+             }
+          }
+        }
+      }
+    }
 
     if (warnings.length > 0) {
       setSandwichWarning(warnings);
     } else {
       setSandwichWarning(null);
     }
-  }, [filteredLeaveList, holidays, selectedMonth]);
+  }, [filteredLeaveList, holidays, selectedMonth, form.halfDaySession, form.from, form.to]);
 
   // Check Overlaps with Colleagues
   const checkColleagueOverlaps = useCallback((fromDate, toDate) => {
@@ -668,12 +577,16 @@ const EmployeeLeavemanagement = () => {
         }
       }
 
+      // Reset halfDaySession if date range is > 1 day
+      if (updated.from && updated.to && updated.from !== updated.to) {
+        updated.halfDaySession = ""; 
+      }
+
       const fromDate = updated.from;
       const toDate = updated.to;
 
       if (fromDate && toDate) {
-        checkForSandwichLeave(fromDate, toDate);
-        checkColleagueOverlaps(fromDate, toDate);
+         // Logic checks handled in useEffect below
       } else {
         setSandwichWarning(null);
         setOverlappingColleagues([]);
@@ -685,6 +598,14 @@ const EmployeeLeavemanagement = () => {
     setSubmitError("");
     setSubmitSuccess("");
   };
+  
+  // Re-run checks when form dates/type change
+  useEffect(() => {
+    if (form.from && form.to) {
+      checkForSandwichLeave(form.from, form.to);
+      checkColleagueOverlaps(form.from, form.to);
+    }
+  }, [form.from, form.to, form.halfDaySession, checkForSandwichLeave, checkColleagueOverlaps]);
 
   // Submit leave
   const handleSubmit = async (e) => {
@@ -888,79 +809,67 @@ const EmployeeLeavemanagement = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Updated Grid to fill screen (grid-cols-4) with Pending Card */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 w-full"
         >
-          {/* Pending Leaves Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
+          {/* Pending Leaves Card (Added) */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 h-full">
+            <div className="flex items-center justify-between h-full">
               <div>
                 <p className="text-gray-600 text-sm font-semibold">Pending Leaves</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.pendingLeaves}</p>
-                <p className="text-xs text-gray-500 mt-1">Your Available Leaves</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.pendingLeaves}</p>
+                <p className="text-xs text-gray-500 mt-1">Available this month</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📥</span>
+              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">📥</span>
               </div>
             </div>
           </div>
 
-          {/* Total Leave Days Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-cyan-500">
-            <div className="flex items-center justify-between">
+          {/* Total Leave Days Card - UPDATED WITH BREAKDOWN */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-cyan-500 h-full">
+            <div className="flex items-center justify-between h-full">
               <div>
                 <p className="text-gray-600 text-sm font-semibold">Total Leave Days</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalLeaveDays}</p>
-                <p className="text-xs text-gray-500 mt-1">Days used this month</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalLeaveDays}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.normalLeaveDays} Normal + {stats.sandwichDaysCount} Sandwich
+                </p>
               </div>
-              <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center">
-                 <span className="text-2xl">📅</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Approved Leaves Card (Counts requests) */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-semibold">Approved Leaves</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{filteredLeaveList.filter(l => l.status === 'Approved').length}</p>
-                <p className="text-xs text-gray-500 mt-1">Requests this month</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">✅</span>
+              <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center">
+                 <span className="text-3xl">📅</span>
               </div>
             </div>
           </div>
 
           {/* Extra Leaves Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500 h-full">
+            <div className="flex items-center justify-between h-full">
               <div>
                 <p className="text-gray-600 text-sm font-semibold">Extra Leaves Taken</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.extraLeaves}</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.extraLeaves}</p>
                 <p className="text-xs text-gray-500 mt-1">Beyond 1 day this month</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">⚠️</span>
+              <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
               </div>
             </div>
           </div>
 
           {/* Sandwich Leaves Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500 h-full">
+            <div className="flex items-center justify-between h-full">
               <div>
                 <p className="text-gray-600 text-sm font-semibold">Sandwich Leaves</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.sandwichLeavesCount}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.sandwichDaysCount} days counted</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.sandwichLeavesCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Patterns found</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">🥪</span>
+              <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">🥪</span>
               </div>
             </div>
           </div>

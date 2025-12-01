@@ -3,12 +3,13 @@ import Swal from "sweetalert2";
 import { 
   FaMapMarkerAlt, FaSave, FaSatelliteDish, FaUsers, 
   FaLaptopHouse, FaBuilding, FaSearch, FaLayerGroup, 
-  FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes, FaUserMinus, FaListAlt, FaUserPlus, FaCheck 
+  FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes, 
+  FaUserMinus, FaListAlt, FaUserPlus, FaCheck, FaCalendarAlt, FaClock, FaEdit
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import api, { updateEmployeeWorkMode } from "../api"; 
+import api from "../api"; 
 
 // --- LEAFLET ICON FIX ---
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -40,9 +41,199 @@ const RecenterMap = ({ center }) => {
   return null;
 };
 
-// --- Helper Components ---
+// --- MODALS ---
 
-// 1. Bulk Update Modal
+// 1. Schedule Modal (NEW FEATURE)
+const ScheduleModal = ({ isOpen, onClose, employee, onSave }) => {
+  const [activeTab, setActiveTab] = useState("Temporary");
+  
+  // Form States
+  const [tempMode, setTempMode] = useState("WFH");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const [recurMode, setRecurMode] = useState("WFH");
+  const [recurDays, setRecurDays] = useState([]);
+
+  const [permMode, setPermMode] = useState("WFO");
+
+  useEffect(() => {
+    if (isOpen && employee && employee.config) {
+      // Pre-fill data based on existing config
+      const { ruleType, temporary, recurring, permanentMode } = employee.config;
+      
+      if (ruleType === "Temporary" && temporary) {
+        setActiveTab("Temporary");
+        setTempMode(temporary.mode);
+        setFromDate(temporary.fromDate ? temporary.fromDate.split('T')[0] : "");
+        setToDate(temporary.toDate ? temporary.toDate.split('T')[0] : "");
+      } else if (ruleType === "Recurring" && recurring) {
+        setActiveTab("Recurring");
+        setRecurMode(recurring.mode);
+        setRecurDays(recurring.days || []);
+      } else if (ruleType === "Permanent") {
+        setActiveTab("Permanent");
+        setPermMode(permanentMode);
+      } else {
+        setActiveTab("Temporary"); // Default view
+      }
+    }
+  }, [isOpen, employee]);
+
+  if (!isOpen || !employee) return null;
+
+  const daysOfWeek = [
+    { id: 1, label: "Mon" }, { id: 2, label: "Tue" }, { id: 3, label: "Wed" },
+    { id: 4, label: "Thu" }, { id: 5, label: "Fri" }, { id: 6, label: "Sat" }, { id: 0, label: "Sun" }
+  ];
+
+  const toggleDay = (dayId) => {
+    setRecurDays(prev => prev.includes(dayId) ? prev.filter(d => d !== dayId) : [...prev, dayId]);
+  };
+
+  const handleSave = () => {
+    let payload = { employeeId: employee.employeeId, ruleType: activeTab };
+
+    if (activeTab === "Temporary") {
+      if (!fromDate || !toDate) return Swal.fire("Error", "Please select From and To dates.", "error");
+      if (new Date(fromDate) > new Date(toDate)) return Swal.fire("Error", "To Date cannot be before From Date", "error");
+      payload = { ...payload, mode: tempMode, fromDate, toDate };
+    } 
+    else if (activeTab === "Recurring") {
+      if (recurDays.length === 0) return Swal.fire("Error", "Select at least one day.", "error");
+      payload = { ...payload, mode: recurMode, days: recurDays };
+    } 
+    else if (activeTab === "Permanent") {
+      payload = { ...payload, mode: permMode };
+    }
+
+    onSave(payload);
+  };
+
+  const handleResetToGlobal = () => {
+    onSave({ employeeId: employee.employeeId, ruleType: "Global" });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100 flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+             <h3 className="text-xl font-bold text-gray-800">Manage Schedule</h3>
+             <p className="text-sm text-gray-500">for {employee.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500"><FaTimes size={20}/></button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
+           {["Temporary", "Recurring", "Permanent"].map(tab => (
+             <button 
+               key={tab} 
+               onClick={() => setActiveTab(tab)}
+               className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+             >
+               {tab}
+             </button>
+           ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 mb-6">
+          
+          {/* 1. TEMPORARY TAB */}
+          {activeTab === "Temporary" && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 mb-2">
+                Set a temporary mode. Automatically reverts to Global settings after the "To Date".
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Work Mode</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="tempMode" value="WFO" checked={tempMode === "WFO"} onChange={e => setTempMode(e.target.value)} className="text-blue-600"/> <span className="text-sm font-medium">Work From Office</span></label>
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="tempMode" value="WFH" checked={tempMode === "WFH"} onChange={e => setTempMode(e.target.value)} className="text-green-600"/> <span className="text-sm font-medium">Work From Home</span></label>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 mb-1">From Date</label>
+                   <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 mb-1">To Date</label>
+                   <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 2. RECURRING TAB */}
+          {activeTab === "Recurring" && (
+             <div className="space-y-4 animate-fade-in">
+               <div className="bg-purple-50 p-3 rounded-lg text-xs text-purple-700 mb-2">
+                 Set specific days to have a fixed mode. Other days follow Global settings.
+               </div>
+               <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">On Selected Days:</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="recurMode" value="WFO" checked={recurMode === "WFO"} onChange={e => setRecurMode(e.target.value)} className="text-blue-600"/> <span className="text-sm font-medium">Work From Office</span></label>
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="recurMode" value="WFH" checked={recurMode === "WFH"} onChange={e => setRecurMode(e.target.value)} className="text-green-600"/> <span className="text-sm font-medium">Work From Home</span></label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Select Days</label>
+                <div className="flex flex-wrap gap-2">
+                  {daysOfWeek.map(day => (
+                    <button 
+                      key={day.id} 
+                      onClick={() => toggleDay(day.id)}
+                      className={`w-10 h-10 rounded-full text-xs font-bold transition-all ${recurDays.includes(day.id) ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+             </div>
+          )}
+
+          {/* 3. PERMANENT TAB */}
+          {activeTab === "Permanent" && (
+            <div className="space-y-4 animate-fade-in">
+               <div className="bg-orange-50 p-3 rounded-lg text-xs text-orange-700 mb-2">
+                 Permanently override Global settings for this employee until changed manually.
+               </div>
+               <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Select Permanent Mode</label>
+                <div className="flex flex-col gap-2">
+                   {['WFO', 'WFH'].map(m => (
+                     <label key={m} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${permMode === m ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-gray-50 border-gray-200'}`}>
+                       <input type="radio" name="permMode" value={m} checked={permMode === m} onChange={(e) => setPermMode(e.target.value)} className="w-4 h-4 text-blue-600" />
+                       <span className="font-semibold text-gray-700">{m === 'WFO' ? 'Work From Office' : 'Work From Home'}</span>
+                     </label>
+                   ))}
+                </div>
+               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between pt-4 border-t">
+          <button onClick={handleResetToGlobal} className="text-red-500 text-sm font-bold hover:underline flex items-center gap-1">
+             <FaUndo size={12}/> Reset to Global
+          </button>
+          <div className="flex gap-3">
+             <button onClick={onClose} className="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
+             <button onClick={handleSave} className="px-6 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-black transition">Save Rule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// 2. Bulk Update Modal
 const BulkModeModal = ({ isOpen, onClose, onSave, selectedCount }) => {
   const [mode, setMode] = useState("Global");
   if (!isOpen) return null;
@@ -51,7 +242,7 @@ const BulkModeModal = ({ isOpen, onClose, onSave, selectedCount }) => {
     <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-white rounded-2xl p-6 w-96 shadow-2xl border border-gray-100">
         <h3 className="text-xl font-bold mb-2 text-gray-800">Bulk Update</h3>
-        <p className="text-gray-500 mb-6 text-sm">Set work mode for <span className="font-bold text-blue-600">{selectedCount}</span> selected employees.</p>
+        <p className="text-gray-500 mb-6 text-sm">Set permanent mode for <span className="font-bold text-blue-600">{selectedCount}</span> selected employees.</p>
         
         <div className="space-y-3 mb-8">
           {['Global', 'WFO', 'WFH'].map((m) => (
@@ -73,7 +264,7 @@ const BulkModeModal = ({ isOpen, onClose, onSave, selectedCount }) => {
   );
 };
 
-// 2. Add Member Modal
+// 3. Add Member Modal
 const AddMemberModal = ({ isOpen, onClose, onAdd, allEmployees, activeCategory }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState("");
@@ -152,7 +343,7 @@ const AddMemberModal = ({ isOpen, onClose, onAdd, allEmployees, activeCategory }
   );
 };
 
-// 3. Category Modal
+// 4. Category Modal
 const CategoryModal = ({ isOpen, onClose, onSave, allEmployees }) => {
   const [catName, setCatName] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
@@ -237,19 +428,19 @@ const CategoryModal = ({ isOpen, onClose, onSave, allEmployees }) => {
   );
 };
 
-// 4. Exceptions List Modal
+// 5. Exceptions List Modal
 const ExceptionsModal = ({ isOpen, onClose, employees }) => {
   if (!isOpen) return null;
 
-  const exceptions = employees.filter(e => e.personalWorkMode && e.personalWorkMode !== 'Global');
+  const exceptions = employees.filter(e => e.ruleType && e.ruleType !== 'Global');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl border border-gray-100 h-[70vh] flex flex-col">
         <div className="flex justify-between items-center mb-4 border-b pb-4">
             <div>
-              <h3 className="text-xl font-bold text-gray-800">Work Mode Overrides</h3>
-              <p className="text-sm text-gray-500">Employees NOT following Global settings.</p>
+              <h3 className="text-xl font-bold text-gray-800">Work Mode Rules</h3>
+              <p className="text-sm text-gray-500">Employees with specific schedules or overrides.</p>
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-red-500"><FaTimes size={20}/></button>
         </div>
@@ -258,15 +449,15 @@ const ExceptionsModal = ({ isOpen, onClose, employees }) => {
            {exceptions.length === 0 ? (
              <div className="h-full flex flex-col items-center justify-center text-gray-400">
                <FaCheckSquare size={40} className="mb-2 opacity-20"/>
-               <p>No exceptions found. Everyone follows Global.</p>
+               <p>No special rules found. Everyone follows Global.</p>
              </div>
            ) : (
              <table className="w-full text-sm text-left">
                <thead className="bg-gray-50 text-gray-600 uppercase font-bold text-xs">
                  <tr>
                    <th className="px-4 py-3 rounded-l-lg">Employee</th>
-                   <th className="px-4 py-3">Category</th>
-                   <th className="px-4 py-3 rounded-r-lg text-right">Current Mode</th>
+                   <th className="px-4 py-3">Rule Type</th>
+                   <th className="px-4 py-3 rounded-r-lg text-right">Details</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
@@ -276,15 +467,19 @@ const ExceptionsModal = ({ isOpen, onClose, employees }) => {
                        <div className="font-bold text-gray-800">{emp.name}</div>
                        <div className="text-xs text-gray-500">{emp.employeeId}</div>
                      </td>
-                     <td className="px-4 py-3 text-gray-600">{emp.category}</td>
-                     <td className="px-4 py-3 text-right">
-                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                         emp.personalWorkMode === 'WFO' 
-                           ? 'bg-blue-100 text-blue-700' 
-                           : 'bg-green-100 text-green-700'
-                       }`}>
-                         {emp.personalWorkMode}
-                       </span>
+                     <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            emp.ruleType === 'Temporary' ? 'bg-blue-100 text-blue-700' :
+                            emp.ruleType === 'Recurring' ? 'bg-purple-100 text-purple-700' :
+                            'bg-orange-100 text-orange-700'
+                        }`}>
+                            {emp.ruleType}
+                        </span>
+                     </td>
+                     <td className="px-4 py-3 text-right text-xs text-gray-600">
+                       {emp.ruleType === 'Permanent' && <span>{emp.config.permanentMode}</span>}
+                       {emp.ruleType === 'Temporary' && <span>{emp.config.temporary.mode} until {emp.config.temporary.toDate?.split('T')[0]}</span>}
+                       {emp.ruleType === 'Recurring' && <span>{emp.config.recurring.mode} on {emp.config.recurring.days.length} days</span>}
                      </td>
                    </tr>
                  ))}
@@ -315,8 +510,7 @@ const AdminLocationSettings = () => {
   const [employees, setEmployees] = useState([]); 
   const [categories, setCategories] = useState([]); 
   const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [savingEmployeeId, setSavingEmployeeId] = useState(null);
-
+  
   // UI State
   const [activeCategory, setActiveCategory] = useState("All"); 
   const [searchTerm, setSearchTerm] = useState("");
@@ -328,9 +522,13 @@ const AdminLocationSettings = () => {
   const [showExceptionsModal, setShowExceptionsModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
 
+  // New Schedule Modal State
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+
   // --- MAP STATE ---
   const [showMap, setShowMap] = useState(false);
-  const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); // Default India
+  const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); 
   const [selectedCoords, setSelectedCoords] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchingMap, setSearchingMap] = useState(false);
@@ -437,7 +635,6 @@ const AdminLocationSettings = () => {
     if (settings.globalWorkMode === "WFO" && (!settings.latitude || !settings.longitude)) {
       return Swal.fire("Warning", "Please set Latitude and Longitude for WFO.", "warning");
     }
-    
     try {
       setLoading(true);
       await api.put("/api/admin/settings/office", {
@@ -453,22 +650,24 @@ const AdminLocationSettings = () => {
     }
   };
 
-  const handleEmployeeModeChange = (employeeId, newMode) => {
-    setEmployees(prev => prev.map(emp => emp.employeeId === employeeId ? { ...emp, personalWorkMode: newMode } : emp));
+  // --- Schedule Handling ---
+  const handleOpenScheduleModal = (employee) => {
+    setEditingEmployee(employee);
+    setScheduleModalOpen(true);
   };
 
-  const handleSaveEmployeeMode = async (employee) => {
+  const handleSaveSchedule = async (payload) => {
     try {
-      setSavingEmployeeId(employee.employeeId);
-      await updateEmployeeWorkMode(employee.employeeId, employee.personalWorkMode);
-      Swal.fire({ icon: "success", title: "Updated!", timer: 1000, showConfirmButton: false });
+      setScheduleModalOpen(false);
+      await api.put("/api/admin/settings/employee-mode", payload);
+      Swal.fire("Success", "Schedule updated!", "success");
+      fetchEmployees();
     } catch (error) {
-      Swal.fire("Error", `Failed to update ${employee.name}`, "error");
-    } finally {
-      setSavingEmployeeId(null);
+      Swal.fire("Error", "Failed to update schedule", "error");
     }
   };
 
+  // --- Bulk & Selection ---
   const toggleSelectAll = (filteredEmps) => {
     const ids = filteredEmps.map(e => e.employeeId);
     if (ids.every(id => selectedEmployees.includes(id))) {
@@ -497,7 +696,7 @@ const AdminLocationSettings = () => {
   const handleResetAll = () => {
     Swal.fire({
       title: "Reset All Employees?",
-      text: "Everyone will revert to 'Follow Global Settings'.",
+      text: "Everyone will revert to Global Settings. All temporary and recurring schedules will be deleted.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -581,6 +780,39 @@ const AdminLocationSettings = () => {
     return employees.filter(e => e.category === catName).length;
   };
 
+  // Helper to render current status badge
+  const renderStatusBadge = (emp) => {
+    // Current Effective Mode
+    const isActiveWFO = emp.currentEffectiveMode === "WFO";
+    const bgClass = isActiveWFO ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800";
+    
+    // Rule Type Description
+    let details = "Following Global";
+    let icon = null;
+
+    if (emp.ruleType === "Permanent") {
+      details = "Permanent Override";
+      icon = <FaSave className="mr-1"/>;
+    } else if (emp.ruleType === "Temporary") {
+      details = `Until ${emp.config.temporary?.toDate?.split("T")[0]}`;
+      icon = <FaCalendarAlt className="mr-1"/>;
+    } else if (emp.ruleType === "Recurring") {
+      details = "Weekly Schedule";
+      icon = <FaClock className="mr-1"/>;
+    }
+
+    return (
+       <div className="flex flex-col items-end">
+          <span className={`px-2 py-0.5 rounded text-xs font-bold ${bgClass} mb-1`}>
+             {emp.currentEffectiveMode}
+          </span>
+          <span className="text-[10px] text-gray-500 flex items-center">
+             {icon} {details}
+          </span>
+       </div>
+    );
+  };
+
   return (
     <div className="p-6 bg-gradient-to-br from-gray-50 to-indigo-50 min-h-screen font-sans relative">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -629,7 +861,6 @@ const AdminLocationSettings = () => {
                  <div>
                     <div className="flex justify-between items-center mb-2">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Office Coordinates</label>
-                        {/* ✅ CHANGED: Buttons side by side */}
                         <div className="flex gap-2">
                             <button onClick={handleGetCurrentLocation} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1 transition">
                                 <FaMapMarkerAlt /> Auto-Detect
@@ -764,18 +995,17 @@ const AdminLocationSettings = () => {
                                      </button>
                                  )}
 
-                                 <div className="flex bg-gray-100/50 p-1 rounded-lg">
-                                     {['Global', 'WFO', 'WFH'].map(m => (
-                                         <label key={m} className={`cursor-pointer px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${employee.personalWorkMode === m ? (m === 'Global' ? 'bg-white text-gray-700 shadow-sm' : m === 'WFO' ? 'bg-blue-600 text-white shadow-blue-200 shadow-sm' : 'bg-green-600 text-white shadow-green-200 shadow-sm') : 'text-gray-500 hover:text-gray-800'}`}>
-                                             <input type="radio" name={`mode-${employee.employeeId}`} value={m} checked={employee.personalWorkMode === m} onChange={(e) => handleEmployeeModeChange(employee.employeeId, e.target.value)} className="hidden" />
-                                             {m === 'Global' ? 'Auto' : m}
-                                         </label>
-                                     ))}
+                                 {/* Updated Status Display and Edit Button */}
+                                 <div className="flex items-center gap-3 pl-3 border-l border-gray-100">
+                                     {renderStatusBadge(employee)}
+                                     <button 
+                                        onClick={() => handleOpenScheduleModal(employee)} 
+                                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition"
+                                        title="Manage Schedule"
+                                     >
+                                         <FaEdit size={16} />
+                                     </button>
                                  </div>
-
-                                 <button onClick={() => handleSaveEmployeeMode(employee)} disabled={savingEmployeeId === employee.employeeId} className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-green-50 text-gray-400 hover:text-green-600 transition">
-                                     {savingEmployeeId === employee.employeeId ? <div className="animate-spin w-3 h-3 border-2 border-green-600 border-t-transparent rounded-full" /> : <FaSave size={16} />}
-                                 </button>
                              </div>
                          </div>
                      ))}
@@ -785,7 +1015,7 @@ const AdminLocationSettings = () => {
         </div>
       </div>
 
-      {/* --- MAP MODAL (INSERTED AT THE END) --- */}
+      {/* --- MAP MODAL --- */}
       {showMap && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 animate-fade-in">
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
@@ -829,11 +1059,12 @@ const AdminLocationSettings = () => {
         </div>
       )}
 
-      {/* Other Modals */}
+      {/* Modals */}
       <BulkModeModal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} onSave={handleBulkUpdate} selectedCount={selectedEmployees.length} />
       <CategoryModal isOpen={showCategoryModal} onClose={() => setShowCategoryModal(false)} onSave={handleSaveCategory} allEmployees={employees} />
       <ExceptionsModal isOpen={showExceptionsModal} onClose={() => setShowExceptionsModal(false)} employees={employees} />
       <AddMemberModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} onAdd={handleAddMembersToCategory} allEmployees={employees} activeCategory={activeCategory} />
+      <ScheduleModal isOpen={scheduleModalOpen} onClose={() => setScheduleModalOpen(false)} employee={editingEmployee} onSave={handleSaveSchedule} />
     </div>
   );
 };

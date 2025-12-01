@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useMemo, useCallback } from "react";
 import { AuthContext } from "../context/AuthContext";
-import { getAttendanceForEmployee } from "../api";
+import { getAttendanceForEmployee, getAllShifts } from "../api";
 
 // --- Import Chart.js and React wrapper ---
 import { Bar } from 'react-chartjs-2';
@@ -28,7 +28,7 @@ import {
   FaStarHalfAlt,
   FaTimesCircle,
   FaFilter,
-  FaUserCheck // Added for Punch In count
+  FaClipboardList // For Leave
 } from "react-icons/fa";
 
 // --- Register Chart.js components ---
@@ -40,6 +40,66 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+// ==========================================
+// HELPER FUNCTIONS (MATCHING ADMIN LOGIC)
+// ==========================================
+
+const getShiftDurationInHours = (startTime, endTime) => {
+  if (!startTime || !endTime) return 9; // Default to 9 hours if no shift assigned
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+  if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight shifts
+  return Math.round((diffMinutes / 60) * 10) / 10;
+};
+
+const getWorkedStatus = (punchIn, punchOut, apiStatus, targetWorkHours) => {
+  const statusUpper = (apiStatus || "").toUpperCase();
+  
+  // 1. Check API Status for Leaves/Holidays first
+  if (statusUpper === "LEAVE") return "Leave";
+  if (statusUpper === "HOLIDAY") return "Holiday";
+  if (statusUpper === "ABSENT" && !punchIn) return "Absent";
+
+  // 2. Check for currently working
+  if (punchIn && !punchOut) return "Working..";
+
+  // 3. If no punches and not leave/holiday
+  if (!punchIn || !punchOut) return "Absent";
+
+  // 4. Calculate Worked Hours
+  const workedMilliseconds = new Date(punchOut) - new Date(punchIn);
+  const workedHours = workedMilliseconds / (1000 * 60 * 60);
+
+  // 5. Determine Status based on Target Shift Hours
+  // Full Day: Worked at least (Target - 15mins buffer)
+  if (workedHours >= (targetWorkHours - 0.25)) return "Full Day";
+  
+  // Half Day: Worked at least 50% of the shift
+  if (workedHours >= (targetWorkHours / 2)) return "Half Day";
+  
+  return "Absent(<Half)";
+};
+
+const calculateLoginStatus = (punchInTime, shiftData, apiStatus) => {
+  if (!punchInTime) return "--";
+  if (apiStatus === "LATE") return "LATE";
+  if (shiftData && shiftData.shiftStartTime) {
+    try {
+      const punchDate = new Date(punchInTime);
+      const [sHour, sMin] = shiftData.shiftStartTime.split(':').map(Number);
+      const shiftDate = new Date(punchDate);
+      shiftDate.setHours(sHour, sMin, 0, 0);
+      const grace = shiftData.lateGracePeriod || 15;
+      shiftDate.setMinutes(shiftDate.getMinutes() + grace);
+      if (punchDate > shiftDate) return "LATE";
+    } catch (e) {
+      console.error("Date calc error", e);
+    }
+  }
+  return "ON_TIME";
+};
 
 // A skeleton component for a better loading state UI
 const TableRowSkeleton = () => (
@@ -57,21 +117,29 @@ const TableRowSkeleton = () => (
 const EmployeeDailyAttendance = () => {
   const { user } = useContext(AuthContext);
   const [attendance, setAttendance] = useState([]);
+  const [shiftDetails, setShiftDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'descending' });
 
-  // --- Fetch Attendance ---
-  const loadAttendance = useCallback(async (empId) => {
+  // --- Fetch Data ---
+  const loadData = useCallback(async (empId) => {
     setLoading(true);
     try {
-      const data = await getAttendanceForEmployee(empId);
-      // Handle response format (array or object with data property)
-      const attendanceData = Array.isArray(data) ? data : (data.data || []);
+      // 1. Fetch Attendance
+      const attendanceRes = await getAttendanceForEmployee(empId);
+      const attendanceData = Array.isArray(attendanceRes) ? attendanceRes : (attendanceRes.data || []);
       setAttendance(attendanceData);
+
+      // 2. Fetch Shifts and find user's shift
+      const shiftsRes = await getAllShifts();
+      const allShifts = Array.isArray(shiftsRes) ? shiftsRes : (shiftsRes.data || []);
+      const myShift = allShifts.find(s => s.employeeId === empId);
+      setShiftDetails(myShift || null);
+
     } catch (err) {
-      console.error("Error fetching attendance:", err);
+      console.error("Error fetching data:", err);
       setAttendance([]);
     } finally {
       setLoading(false);
@@ -80,11 +148,11 @@ const EmployeeDailyAttendance = () => {
 
   useEffect(() => {
     if (user?.employeeId) {
-      loadAttendance(user.employeeId);
+      loadData(user.employeeId);
     } else {
       setLoading(false);
     }
-  }, [user, loadAttendance]);
+  }, [user, loadData]);
 
   // --- Extract Available Years ---
   const availableYears = useMemo(() => {
@@ -93,15 +161,29 @@ const EmployeeDailyAttendance = () => {
     return Array.from(years).sort((a, b) => b - a);
   }, [attendance]);
 
-  // --- Helpers matching Dashboard Logic ---
-  const formatWorkedStatus = (status) => {
-    if (!status || status === "NOT_APPLICABLE") return "--";
-    return status.replace(/_/g, " ").toLowerCase();
-  };
+  // --- Process Attendance Data (Apply Admin Logic) ---
+  const processedAttendance = useMemo(() => {
+    // Determine target hours from shift or default to 9
+    const targetHours = shiftDetails 
+      ? getShiftDurationInHours(shiftDetails.shiftStartTime, shiftDetails.shiftEndTime) 
+      : 9;
+
+    return attendance.map(record => {
+      // Calculate Statuses dynamically
+      const dynamicWorkedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, targetHours);
+      const dynamicLoginStatus = calculateLoginStatus(record.punchIn, shiftDetails, record.loginStatus);
+
+      return {
+        ...record,
+        workedStatus: dynamicWorkedStatus, // Override API status with calculated one
+        loginStatus: dynamicLoginStatus,   // Override API status with calculated one
+      };
+    });
+  }, [attendance, shiftDetails]);
 
   // --- Filter & Sort Data ---
   const monthlyFilteredAttendance = useMemo(() => {
-    let data = attendance.filter(item => {
+    let data = processedAttendance.filter(item => {
       const recordDate = new Date(item.date);
       return recordDate.getFullYear() === selectedDate.getFullYear() &&
         recordDate.getMonth() === selectedDate.getMonth();
@@ -126,40 +208,47 @@ const EmployeeDailyAttendance = () => {
     }
 
     return data;
-  }, [attendance, selectedDate, searchTerm, sortConfig]);
+  }, [processedAttendance, selectedDate, searchTerm, sortConfig]);
 
-  // --- Calculate Stats (Synced with Dashboard Logic) ---
+  // --- Calculate Stats (Based on Processed Data) ---
   const summaryStats = useMemo(() => {
     const data = monthlyFilteredAttendance;
 
-    // 1. Calculate basic statuses
-    const fullDays = data.filter(a => a.workedStatus === 'FULL_DAY').length;
-    const halfDays = data.filter(a => a.workedStatus === 'HALF_DAY').length;
-    const absentDays = data.filter(a => a.status === 'ABSENT' || a.workedStatus === 'ABSENT').length;
+    // Use Admin logic for counts
+    // Present: Any day with a punchIn
+    const presentDays = data.filter(r => r.punchIn).length;
+    
+    // Full/Half Days based on calculated Worked Status
+    const fullDays = data.filter(r => r.workedStatus === 'Full Day').length;
+    const halfDays = data.filter(r => r.workedStatus === 'Half Day').length;
+    
+    // Leave: Explicitly 'Leave' or 'Holiday'
+    const leaveDays = data.filter(r => r.workedStatus === 'Leave' || r.workedStatus === 'Holiday').length;
+    
+    // Absent: 'Absent' string or specific condition
+    const absentDays = data.filter(r => r.workedStatus.includes("Absent") || (r.status === 'ABSENT' && !r.punchIn)).length;
 
-    // 2. Calculate Punched In Count (If they have a punchIn time, they are present)
-    const punchedInCount = data.filter(a => a.punchIn).length;
-
+    // Time metrics
     const lateCount = data.filter(a => a.loginStatus === 'LATE').length;
-    const onTimeCount = data.filter(a => a.loginStatus === 'ON_TIME' || (a.punchIn && a.loginStatus !== 'LATE')).length;
+    const onTimeCount = data.filter(a => a.loginStatus === 'ON_TIME').length;
 
     return {
-      totalPresent: punchedInCount, // Updated to use punch-in count
-      punchedInCount,
-      onTimeCount,
-      lateCount,
+      presentDays,
       fullDays,
       halfDays,
-      absentDays
+      leaveDays,
+      absentDays,
+      onTimeCount,
+      lateCount
     };
   }, [monthlyFilteredAttendance]);
 
   // --- Chart Data ---
   const graphData = useMemo(() => {
     const monthlyCounts = Array(12).fill(0);
-    attendance.forEach(a => {
+    processedAttendance.forEach(a => {
       const recordDate = new Date(a.date);
-      // Count as present if Punch In exists (matching the new logic)
+      // Count as present if punchIn exists
       if (recordDate.getFullYear() === selectedDate.getFullYear() && a.punchIn) {
         monthlyCounts[recordDate.getMonth()] += 1;
       }
@@ -192,7 +281,7 @@ const EmployeeDailyAttendance = () => {
         barThickness: 15,
       }]
     };
-  }, [attendance, selectedDate]);
+  }, [processedAttendance, selectedDate]);
 
   const graphOptions = {
     responsive: true,
@@ -290,7 +379,6 @@ const EmployeeDailyAttendance = () => {
           <div className="lg:col-span-2 p-6 bg-white rounded-xl shadow-md flex flex-col justify-center">
             <h3 className="font-semibold text-lg mb-6 text-gray-800">Monthly Summary</h3>
             <div className="space-y-4">
-              {/* ✅ Added: Days Punched In Count */}
               <WorkedStatusItem
                 icon={<FaBusinessTime />}
                 title="Full Days"
@@ -303,7 +391,7 @@ const EmployeeDailyAttendance = () => {
                 value={summaryStats.halfDays}
                 iconColorClass="text-yellow-500"
               />
-              <WorkedStatusItem
+               <WorkedStatusItem
                 icon={<FaTimesCircle />}
                 title="Absent"
                 value={summaryStats.absentDays}
@@ -323,8 +411,7 @@ const EmployeeDailyAttendance = () => {
 
         {/* Quick Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* ✅ Updated: Uses Punched In count for Total Present */}
-          <StatCard icon={<FaCalendarCheck className="text-white" />} title={`Days Punched In (${graphData.labels[selectedDate.getMonth()]})`} value={summaryStats.totalPresent} colorClass="bg-blue-500" />
+          <StatCard icon={<FaCalendarCheck className="text-white" />} title={`Present Days (${graphData.labels[selectedDate.getMonth()]})`} value={summaryStats.presentDays} colorClass="bg-blue-500" />
           <StatCard icon={<FaUserClock className="text-white" />} title="On Time Arrivals" value={summaryStats.onTimeCount} colorClass="bg-green-500" />
           <StatCard icon={<FaExclamationTriangle className="text-white" />} title="Late Arrivals" value={summaryStats.lateCount} colorClass="bg-red-500" />
         </div>
@@ -357,9 +444,14 @@ const EmployeeDailyAttendance = () => {
                   Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)
                 ) : monthlyFilteredAttendance.length > 0 ? (
                   monthlyFilteredAttendance.map((a) => {
-                    const isAbsent = a.status === 'ABSENT' || a.workedStatus === 'ABSENT';
+                    // Styling logic based on calculated status
+                    const isAbsent = a.workedStatus.includes('Absent') || (a.status === 'ABSENT' && !a.punchIn);
+                    const isLeave = a.workedStatus === 'Leave' || a.workedStatus === 'Holiday';
+                    const isHalfDay = a.workedStatus === 'Half Day';
+
                     return (
-                      <tr key={a.date} className={`text-gray-800 hover:bg-blue-50/50 transition-colors duration-200 border-b border-gray-100 last:border-b-0 ${isAbsent ? "bg-red-50/30" : ""}`}>
+                      <tr key={a.date} className={`text-gray-800 hover:bg-blue-50/50 transition-colors duration-200 border-b border-gray-100 last:border-b-0 
+                        ${isAbsent ? "bg-red-50/30" : isLeave ? "bg-orange-50/30" : isHalfDay ? "bg-yellow-50/30" : ""}`}>
                         <td className="px-4 py-3 font-medium text-left whitespace-nowrap">
                           {(() => {
                             const d = new Date(a.date);
@@ -369,9 +461,9 @@ const EmployeeDailyAttendance = () => {
                             return `${day}-${month}-${year}`;
                           })()}
                         </td>
-                        <td className="px-4 py-3 text-left whitespace-nowrap">{a.punchIn ? new Date(a.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-gray-400">--</span>}</td>
-                        <td className="px-4 py-3 text-left whitespace-nowrap">{a.punchOut ? new Date(a.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-gray-400">--</span>}</td>
-                        <td className="px-4 py-3 font-mono text-left whitespace-nowrap">{a.displayTime || <span className="text-gray-400">00:00</span>}</td>
+                        <td className="px-4 py-3 text-left whitespace-nowrap text-green-600 font-medium">{a.punchIn ? new Date(a.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-gray-400">--</span>}</td>
+                        <td className="px-4 py-3 text-left whitespace-nowrap text-red-600 font-medium">{a.punchOut ? new Date(a.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-gray-400">--</span>}</td>
+                        <td className="px-4 py-3 font-mono text-left whitespace-nowrap text-gray-700">{a.displayTime || <span className="text-gray-400">00:00</span>}</td>
                         <td className="px-4 py-3 text-left whitespace-nowrap">{a.status}</td>
                         <td className="px-4 py-3 text-left whitespace-nowrap">
                           {a.punchIn ? (
@@ -384,10 +476,11 @@ const EmployeeDailyAttendance = () => {
                         <td className="px-4 py-3 capitalize text-left whitespace-nowrap font-medium">
                           <span className={
                             isAbsent ? "text-red-600" :
-                              a.workedStatus === "HALF_DAY" ? "text-yellow-600" :
-                                a.workedStatus === "FULL_DAY" ? "text-green-600" : "text-gray-600"
+                            isLeave ? "text-orange-600" :
+                            a.workedStatus === "Half Day" ? "text-yellow-600" :
+                            a.workedStatus === "Full Day" ? "text-green-600" : "text-gray-600"
                           }>
-                            {formatWorkedStatus(a.workedStatus)}
+                            {a.workedStatus}
                           </span>
                         </td>
                       </tr>

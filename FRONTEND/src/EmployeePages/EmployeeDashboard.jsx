@@ -1,3 +1,5 @@
+// --- START OF FILE EmployeeDashboard.jsx ---
+
 import React, {
   useContext,
   useState,
@@ -31,6 +33,7 @@ import {
   FaChevronDown,
   FaLaptopHouse,
   FaBuilding,
+  FaInfoCircle
 } from "react-icons/fa";
 import Swal from "sweetalert2"; 
 
@@ -302,25 +305,76 @@ const EmployeeDashboard = () => {
     return `${h}h ${m}m ${s}s`;
   };
 
-  // ✅ DETERMINE EFFECTIVE WORK MODE (From OfficeSettings)
-  const getEffectiveWorkMode = () => {
-    if (!officeConfig) {
-      return 'WFO'; 
+  // ✅ CALCULATE WORK MODE STATUS & DESCRIPTION (UPDATED)
+  const calculateWorkModeStatus = useCallback(() => {
+    const defaults = { 
+      mode: officeConfig?.globalWorkMode || 'WFO', 
+      description: "Adhering to standard company-wide policy." 
+    };
+
+    if (!officeConfig || !user) return defaults;
+
+    const empConfig = officeConfig.employeeWorkModes?.find(e => e.employeeId === user.employeeId);
+    
+    // If no config found or rule is Global
+    if (!empConfig || empConfig.ruleType === "Global") {
+      return defaults;
     }
 
-    const employeeWorkModes = officeConfig.employeeWorkModes || [];
-    const employeeMode = employeeWorkModes.find(
-      emp => emp.employeeId === user?.employeeId
-    );
-    
-    // If employee has specific mode set and it's not "Global", use it
-    if (employeeMode && employeeMode.workMode !== 'Global') {
-      return employeeMode.workMode;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // 1. Check Temporary
+    if (empConfig.ruleType === "Temporary" && empConfig.temporary) {
+      const from = new Date(empConfig.temporary.fromDate);
+      const to = new Date(empConfig.temporary.toDate);
+      from.setHours(0,0,0,0);
+      to.setHours(23,59,59,999);
+      
+      if (today >= from && today <= to) {
+        return {
+          mode: empConfig.temporary.mode,
+          description: `Temporary schedule active from ${from.toLocaleDateString()} to ${to.toLocaleDateString()}.`
+        };
+      }
     }
-    
-    // Otherwise, fall back to global admin settings
-    return officeConfig.globalWorkMode || 'WFO';
-  };
+
+    // 2. Check Recurring (Updated for Specific Mode Text & All Days)
+    if (empConfig.ruleType === "Recurring" && empConfig.recurring) {
+      const currentDay = new Date().getDay(); // 0=Sun, 1=Mon
+      const daysMap = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+      
+      // Get readable mode text
+      const modeText = empConfig.recurring.mode === "WFH" ? "Remote" : "Work From Office";
+      
+      // Get all assigned days sorted
+      const sortedDays = [...(empConfig.recurring.days || [])].sort((a,b) => a - b);
+      const allDaysStr = sortedDays.map(d => daysMap[d]).join(", ");
+      
+      if (empConfig.recurring.days.includes(currentDay)) {
+        return {
+          mode: empConfig.recurring.mode,
+          description: `Recurring schedule active. Assigned to work ${modeText} on ${allDaysStr}.`
+        };
+      } else {
+        // Even if not active today, show the recurring schedule details
+        return {
+            ...defaults,
+            description: `Recurring schedule exists (${modeText} on ${allDaysStr}), but today follows Global settings.`
+        };
+      }
+    }
+
+    // 3. Check Permanent
+    if (empConfig.ruleType === "Permanent") {
+      return {
+        mode: empConfig.permanentMode,
+        description: "Permanently assigned override by administration."
+      };
+    }
+
+    return defaults;
+  }, [officeConfig, user]);
 
   const performPunchAction = async (action) => {
     if (action === "OUT" && isIdleRef.current) {
@@ -344,8 +398,8 @@ const EmployeeDashboard = () => {
       setPunchStatus("PUNCHING");
 
       if (action === "IN") {
-        // ✅ GET EFFECTIVE WORK MODE FOR THIS EMPLOYEE
-        const effectiveMode = getEffectiveWorkMode();
+        // ✅ GET CALCULATED WORK MODE (WFO/WFH)
+        const { mode: effectiveMode } = calculateWorkModeStatus();
         
         // ✅ IF WFO MODE → VALIDATE LOCATION
         if (effectiveMode === "WFO") {
@@ -645,7 +699,6 @@ const EmployeeDashboard = () => {
   const displayStatus = getDisplayLoginStatus();
   const workedStatusBadge = getWorkedStatusBadge();
   
-  // ✅ FIXED SYNTAX AND COMPLETION
   const getFormattedShiftDuration = () => { 
     if (!shiftTimings) return "8h 0m"; 
     const totalSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime); 
@@ -655,8 +708,9 @@ const EmployeeDashboard = () => {
   };
   
   const calculatedShiftHours = getFormattedShiftDuration();
+  
   // ✅ GET CURRENT WORK MODE FOR DISPLAY
-  const currentWorkMode = getEffectiveWorkMode();
+  const { mode: currentWorkMode, description: workModeDesc } = calculateWorkModeStatus();
   
   return (
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
@@ -687,17 +741,24 @@ const EmployeeDashboard = () => {
              <div>
                 <h3 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><FaUserCircle /> {name}</h3>
                 
-                {/* ✅ WORK MODE DISPLAY BADGE */}
-                <div className="mt-2 mb-2">
-                    {currentWorkMode === 'WFH' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-700 border-2 border-green-300 shadow-sm">
-                            <FaLaptopHouse size={16} /> Work From Home
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-700 border-2 border-blue-300 shadow-sm">
-                            <FaBuilding size={16} /> Work From Office
-                        </span>
-                    )}
+                {/* ✅ WORK MODE DISPLAY BADGE & DESCRIPTION */}
+                <div className="mt-3 mb-3">
+                    <div className="flex items-center gap-2 mb-1">
+                        {currentWorkMode === 'WFH' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-700 border border-green-200 shadow-sm">
+                                <FaLaptopHouse size={16} /> Work From Home
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
+                                <FaBuilding size={16} /> Work From Office
+                            </span>
+                        )}
+                    </div>
+                    {/* Mode Description */}
+                    <div className="text-xs text-gray-500 font-medium italic flex items-center gap-1 ml-1">
+                        <FaInfoCircle size={10} className="text-gray-400" /> 
+                        {workModeDesc}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-gray-700 mt-2 text-sm">
