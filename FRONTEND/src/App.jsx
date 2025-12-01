@@ -40,6 +40,7 @@ import { PermissionHoursProvider } from "./context/PermissionHoursProvider";
 import { NoticeProvider } from "./context/NoticeProvider";
 import HolidayCalendarProvider from "./context/HolidayCalendarProvider";
 import CurrentEmployeeNotificationProvider from "./EmployeeContext/CurrentEmployeeNotificationProvider";
+import { EmployeeProvider } from "./context/EmployeeProvider";
 
 // Employee pages
 import EmployeeDashboard from "./EmployeePages/EmployeeDashboard";
@@ -69,11 +70,13 @@ function App() {
       <Route path="/" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
-      {/* Admin protected routes */}
+      {/* ------------------ ADMIN ROUTES ------------------ */}
       <Route
         element={
           <ProtectedRoute role="admin">
-            <LayoutAdmin />
+            <EmployeeProvider> {/* ⭐ FIX — Employee data loads ONLY for admins */}
+              <LayoutAdmin />
+            </EmployeeProvider>
           </ProtectedRoute>
         }
       >
@@ -129,11 +132,11 @@ function App() {
         <Route path="/admin/admin-Leavemanage" element={<AdminLeavePanel />} />
       </Route>
 
-      {/* Employee protected routes */}
+      {/* ------------------ EMPLOYEE ROUTES ------------------ */}
       <Route
         element={
           <ProtectedRoute role="employee">
-            <CurrentEmployeeNotificationProvider>   {/* 🔥 FIX ADDED HERE */}
+            <CurrentEmployeeNotificationProvider>
               <NoticeProvider>
                 <LayoutEmployee />
               </NoticeProvider>
@@ -148,7 +151,6 @@ function App() {
         <Route path="/employee/leave-management" element={<LeaveWithModal />} />
         <Route path="/employee/empovertime" element={<OvertimeForm />} />
         <Route path="/employee/my-attendence" element={<EmployeeDailyAttendance />} />
-        <Route path="/employee/leave-request" element={<LeaveWithModal />} />
         <Route path="/employee/new-attendence" element={<NewEmployeeAttendance />} />
 
         <Route
@@ -169,3 +171,5 @@ function App() {
 }
 
 export default App;
+
+// --- END OF FILE App.jsx ---
