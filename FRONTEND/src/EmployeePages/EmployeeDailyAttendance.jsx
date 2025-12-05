@@ -1,6 +1,9 @@
+// --- START OF FILE EmployeeDailyAttendance.jsx ---
+
 import React, { useContext, useEffect, useState, useMemo, useCallback } from "react";
 import { AuthContext } from "../context/AuthContext";
-import { getAttendanceForEmployee, getAllShifts } from "../api";
+// UPDATED: Import getShiftByEmployeeId to fetch specific user settings instead of getAllShifts
+import { getAttendanceForEmployee, getShiftByEmployeeId } from "../api";
 
 // --- Import Chart.js and React wrapper ---
 import { Bar } from 'react-chartjs-2';
@@ -27,8 +30,7 @@ import {
   FaBusinessTime,
   FaStarHalfAlt,
   FaTimesCircle,
-  FaFilter,
-  FaClipboardList // For Leave
+  FaFilter
 } from "react-icons/fa";
 
 // --- Register Chart.js components ---
@@ -42,57 +44,53 @@ ChartJS.register(
 );
 
 // ==========================================
-// HELPER FUNCTIONS (MATCHING ADMIN LOGIC)
+// HELPER FUNCTIONS (MATCHING DASHBOARD LOGIC)
 // ==========================================
 
-const getShiftDurationInHours = (startTime, endTime) => {
-  if (!startTime || !endTime) return 9; // Default to 9 hours if no shift assigned
-  const [startH, startM] = startTime.split(':').map(Number);
-  const [endH, endM] = endTime.split(':').map(Number);
-  let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-  if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight shifts
-  return Math.round((diffMinutes / 60) * 10) / 10;
-};
-
-const getWorkedStatus = (punchIn, punchOut, apiStatus, targetWorkHours) => {
+const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDayThreshold) => {
   const statusUpper = (apiStatus || "").toUpperCase();
   
   // 1. Check API Status for Leaves/Holidays first
   if (statusUpper === "LEAVE") return "Leave";
   if (statusUpper === "HOLIDAY") return "Holiday";
+  // If explicitly marked ABSENT by system/admin and no punch in exists
   if (statusUpper === "ABSENT" && !punchIn) return "Absent";
 
   // 2. Check for currently working
   if (punchIn && !punchOut) return "Working..";
 
   // 3. If no punches and not leave/holiday
-  if (!punchIn || !punchOut) return "Absent";
+  if (!punchIn) return "Absent";
 
   // 4. Calculate Worked Hours
-  const workedMilliseconds = new Date(punchOut) - new Date(punchIn);
+  // Handle case where punchOut is missing (should be covered by "Working.." but safety check)
+  const end = punchOut ? new Date(punchOut) : new Date();
+  const start = new Date(punchIn);
+  const workedMilliseconds = end - start;
   const workedHours = workedMilliseconds / (1000 * 60 * 60);
 
-  // 5. Determine Status based on Target Shift Hours
-  // Full Day: Worked at least (Target - 15mins buffer)
-  if (workedHours >= (targetWorkHours - 0.25)) return "Full Day";
+  // 5. Determine Status based on Admin Assigned Hours
+  // Using >= to match Dashboard logic exactly
+  if (workedHours >= fullDayThreshold) return "Full Day";
+  if (workedHours >= halfDayThreshold) return "Half Day";
   
-  // Half Day: Worked at least 50% of the shift
-  if (workedHours >= (targetWorkHours / 2)) return "Half Day";
-  
-  return "Absent(<Half)";
+  return "Absent"; // Worked less than half day threshold
 };
 
 const calculateLoginStatus = (punchInTime, shiftData, apiStatus) => {
   if (!punchInTime) return "--";
   if (apiStatus === "LATE") return "LATE";
+  
   if (shiftData && shiftData.shiftStartTime) {
     try {
       const punchDate = new Date(punchInTime);
       const [sHour, sMin] = shiftData.shiftStartTime.split(':').map(Number);
       const shiftDate = new Date(punchDate);
       shiftDate.setHours(sHour, sMin, 0, 0);
+      
       const grace = shiftData.lateGracePeriod || 15;
       shiftDate.setMinutes(shiftDate.getMinutes() + grace);
+      
       if (punchDate > shiftDate) return "LATE";
     } catch (e) {
       console.error("Date calc error", e);
@@ -127,28 +125,24 @@ const EmployeeDailyAttendance = () => {
   const loadData = useCallback(async (empId) => {
     setLoading(true);
     
-    // 1. Fetch Attendance (Critical Data)
     try {
-      const attendanceRes = await getAttendanceForEmployee(empId);
+      // UPDATED: Fetch specific shift details using the correct API endpoint
+      // This prevents 403 errors and ensures we get the actual assigned hours
+      const [attendanceRes, shiftRes] = await Promise.all([
+        getAttendanceForEmployee(empId),
+        getShiftByEmployeeId(empId).catch(err => {
+            console.warn("Failed to fetch specific shift, using defaults", err);
+            return null;
+        })
+      ]);
+
       const attendanceData = Array.isArray(attendanceRes) ? attendanceRes : (attendanceRes.data || []);
       setAttendance(attendanceData);
-    } catch (err) {
-      console.error("Error fetching attendance:", err);
-      setAttendance([]);
-    }
+      setShiftDetails(shiftRes);
 
-    // 2. Fetch Shifts (Optional/Enhanced Data)
-    // We separate this so a 403 error here doesn't block the attendance data from showing
-    try {
-      const shiftsRes = await getAllShifts();
-      const allShifts = Array.isArray(shiftsRes) ? shiftsRes : (shiftsRes.data || []);
-      const myShift = allShifts.find(s => s.employeeId === empId);
-      setShiftDetails(myShift || null);
     } catch (err) {
-      // 403 Forbidden is expected for employees if backend restricts 'getAllShifts'
-      // We log a warning but do NOT clear the attendance data
-      console.warn("Could not fetch shift details (using default 9-hour shift):", err.message);
-      setShiftDetails(null); 
+      console.error("Error loading data:", err);
+      setAttendance([]);
     } finally {
       setLoading(false);
     }
@@ -169,22 +163,29 @@ const EmployeeDailyAttendance = () => {
     return Array.from(years).sort((a, b) => b - a);
   }, [attendance]);
 
-  // --- Process Attendance Data (Apply Admin Logic) ---
+  // --- Process Attendance Data (Apply Admin Assigned Hours Logic) ---
   const processedAttendance = useMemo(() => {
-    // Determine target hours from shift or default to 9
-    const targetHours = shiftDetails 
-      ? getShiftDurationInHours(shiftDetails.shiftStartTime, shiftDetails.shiftEndTime) 
-      : 9;
+    // UPDATED: Get Admin Assigned Hours (Defaults: Full=9, Half=4.5)
+    // This matches the logic in EmployeeDashboard.jsx exactly
+    const adminFullDayHours = shiftDetails?.fullDayHours || 9;
+    const adminHalfDayHours = shiftDetails?.halfDayHours || 4.5;
 
     return attendance.map(record => {
-      // Calculate Statuses dynamically
-      const dynamicWorkedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, targetHours);
+      // Calculate Statuses dynamically based on Admin Settings
+      const dynamicWorkedStatus = getWorkedStatus(
+        record.punchIn, 
+        record.punchOut, 
+        record.status, 
+        adminFullDayHours, 
+        adminHalfDayHours
+      );
+      
       const dynamicLoginStatus = calculateLoginStatus(record.punchIn, shiftDetails, record.loginStatus);
 
       return {
         ...record,
-        workedStatus: dynamicWorkedStatus, // Override API status with calculated one
-        loginStatus: dynamicLoginStatus,   // Override API status with calculated one
+        workedStatus: dynamicWorkedStatus, // Calculated based on configured hours
+        loginStatus: dynamicLoginStatus,
       };
     });
   }, [attendance, shiftDetails]);
@@ -222,21 +223,17 @@ const EmployeeDailyAttendance = () => {
   const summaryStats = useMemo(() => {
     const data = monthlyFilteredAttendance;
 
-    // Use Admin logic for counts
-    // Present: Any day with a punchIn
     const presentDays = data.filter(r => r.punchIn).length;
     
-    // Full/Half Days based on calculated Worked Status
+    // Statuses derived from processedAttendance logic
     const fullDays = data.filter(r => r.workedStatus === 'Full Day').length;
     const halfDays = data.filter(r => r.workedStatus === 'Half Day').length;
     
-    // Leave: Explicitly 'Leave' or 'Holiday'
     const leaveDays = data.filter(r => r.workedStatus === 'Leave' || r.workedStatus === 'Holiday').length;
     
-    // Absent: 'Absent' string or specific condition
-    const absentDays = data.filter(r => r.workedStatus.includes("Absent") || (r.status === 'ABSENT' && !r.punchIn)).length;
+    // Absent includes explicit "Absent" string or logic fallbacks
+    const absentDays = data.filter(r => r.workedStatus === "Absent" || (r.status === 'ABSENT' && !r.punchIn)).length;
 
-    // Time metrics
     const lateCount = data.filter(a => a.loginStatus === 'LATE').length;
     const onTimeCount = data.filter(a => a.loginStatus === 'ON_TIME').length;
 
@@ -453,7 +450,7 @@ const EmployeeDailyAttendance = () => {
                 ) : monthlyFilteredAttendance.length > 0 ? (
                   monthlyFilteredAttendance.map((a) => {
                     // Styling logic based on calculated status
-                    const isAbsent = a.workedStatus.includes('Absent') || (a.status === 'ABSENT' && !a.punchIn);
+                    const isAbsent = a.workedStatus === 'Absent' || (a.status === 'ABSENT' && !a.punchIn);
                     const isLeave = a.workedStatus === 'Leave' || a.workedStatus === 'Holiday';
                     const isHalfDay = a.workedStatus === 'Half Day';
 

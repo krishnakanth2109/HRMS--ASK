@@ -40,16 +40,6 @@ const getCurrentDepartment = (employee) => {
   return "";
 };
 
-// --- Attendance Helpers ---
-const getShiftDurationInHours = (startTime, endTime) => {
-  if (!startTime || !endTime) return 9; // Default to 9 hours if no shift
-  const [startH, startM] = startTime.split(':').map(Number);
-  const [endH, endM] = endTime.split(':').map(Number);
-  let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-  if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight shifts
-  return Math.round((diffMinutes / 60) * 10) / 10;
-};
-
 const formatDecimalHours = (decimalHours) => {
   if (decimalHours === undefined || decimalHours === null || isNaN(decimalHours)) return "--";
   const hours = Math.floor(decimalHours);
@@ -58,18 +48,19 @@ const formatDecimalHours = (decimalHours) => {
   return `${hours}h ${minutes}m`;
 };
 
-const getWorkedStatus = (punchIn, punchOut, apiStatus, targetWorkHours) => {
+// UPDATED: Worked status based on Admin Assigned Hours (Full Day / Half Day thresholds)
+const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDayThreshold) => {
   if (apiStatus === "ABSENT") return "Absent";
   if (punchIn && !punchOut) return "Working..";
-  if (!punchIn || !punchOut) return "Absent";
+  if (!punchIn) return "Absent";
   
   const workedMilliseconds = new Date(punchOut) - new Date(punchIn);
   const workedHours = workedMilliseconds / (1000 * 60 * 60);
   
-  // Logic matches AdminViewAttendance
-  if (workedHours >= targetWorkHours) return "Full Day";
-  if (workedHours > 5) return "Half Day"; // Hardcoded threshold as per admin view
-  return "Absent(<5)";
+  // Logic matches AdminViewAttendance & EmployeeDashboard
+  if (workedHours >= fullDayThreshold) return "Full Day";
+  if (workedHours >= halfDayThreshold) return "Half Day"; 
+  return "Absent"; // Worked less than half day threshold
 };
 
 // --- Leave Helpers ---
@@ -348,22 +339,23 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
         getAttendanceByDateRange(attStartDate, attEndDate)
       ]);
       
-      // ✅ Handle robust data extraction (Array vs Object wrapped)
       const allShifts = Array.isArray(allShiftsRes) ? allShiftsRes : (allShiftsRes.data || []);
       const attData = Array.isArray(attDataRes) ? attDataRes : (attDataRes.data || []);
 
       const empShift = allShifts.find(s => s.employeeId === employee.employeeId);
       const filteredAtt = attData.filter(a => a.employeeId === employee.employeeId);
       
-      // ✅ Calculate Shift Duration correctly
-      const shiftDuration = empShift ? getShiftDurationInHours(empShift.shiftStartTime, empShift.shiftEndTime) : 9;
+      // ✅ UPDATED: Extract Admin Assigned Hours to Calculate Status Correctly
+      const adminFullDayHours = empShift?.fullDayHours || 9;
+      const adminHalfDayHours = empShift?.halfDayHours || 4.5;
 
       // Process Attendance
       const processedAtt = filteredAtt.map(item => {
         return {
           ...item,
-          shiftDuration: shiftDuration, // Assigned Hrs
-          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, shiftDuration),
+          shiftDuration: adminFullDayHours, // Display assigned hours
+          // ✅ Pass thresholds to getWorkedStatus
+          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
           isLate: item.loginStatus === "LATE"
         };
       }).sort((a, b) => new Date(b.date) - new Date(a.date));

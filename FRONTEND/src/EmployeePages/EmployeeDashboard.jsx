@@ -33,7 +33,10 @@ import {
   FaChevronDown,
   FaLaptopHouse,
   FaBuilding,
-  FaInfoCircle
+  FaInfoCircle,
+  FaHistory,
+  FaHourglassHalf,
+  FaCoffee // Added icon for Break
 } from "react-icons/fa";
 import Swal from "sweetalert2"; 
 
@@ -100,7 +103,12 @@ const EmployeeDashboard = () => {
   const [officeConfig, setOfficeConfig] = useState(null);
 
   const [isShiftDropdownOpen, setIsShiftDropdownOpen] = useState(false);
+  
+  // ✅ Break Dropdown State
+  const [isBreakDropdownOpen, setIsBreakDropdownOpen] = useState(false);
+  
   const dropdownRef = useRef(null);
+  const breakDropdownRef = useRef(null); 
 
   const navigate = useNavigate();
 
@@ -145,7 +153,7 @@ const EmployeeDashboard = () => {
     }
   };
 
-// ✅ Get user's current location (Better Error Handling)
+  // ✅ Get user's current location (Better Error Handling)
   const getCurrentLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -187,7 +195,17 @@ const EmployeeDashboard = () => {
       const shiftData = await getShiftByEmployeeId(empId);
       setShiftTimings(shiftData);
     } catch (err) {
-      setShiftTimings({ shiftStartTime: "09:00", shiftEndTime: "18:00", lateGracePeriod: 15, fullDayHours: 8, halfDayHours: 4, autoExtendShift: true, weeklyOffDays: [0], isDefault: true });
+      // Default fallback if API fails
+      setShiftTimings({ 
+          shiftStartTime: "09:00", 
+          shiftEndTime: "18:00", 
+          lateGracePeriod: 15, 
+          fullDayHours: 9, 
+          halfDayHours: 4.5, 
+          autoExtendShift: true, 
+          weeklyOffDays: [0], 
+          isDefault: true 
+      });
     }
   }, []);
 
@@ -240,6 +258,9 @@ const EmployeeDashboard = () => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsShiftDropdownOpen(false);
       }
+      if (breakDropdownRef.current && !breakDropdownRef.current.contains(event.target)) {
+        setIsBreakDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => { document.removeEventListener("mousedown", handleClickOutside); };
@@ -251,7 +272,7 @@ const EmployeeDashboard = () => {
   const department = latestExp?.department || user?.department || "N/A";
 
   const getShiftDurationInSeconds = useCallback((startTime, endTime) => {
-    if(!startTime || !endTime) return 8 * 3600; 
+    if(!startTime || !endTime) return 9 * 3600; 
     const [startH, startM] = startTime.split(':').map(Number);
     const [endH, endM] = endTime.split(':').map(Number);
     let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
@@ -259,30 +280,50 @@ const EmployeeDashboard = () => {
     return diffMinutes * 60;
   }, []);
 
+  // ✅ UPDATED TIMER LOGIC: Uses fullDayHours from admin settings
   useEffect(() => {
     let interval;
-    if (todayLog?.punchIn && !todayLog.punchOut) {
-      const punchInTime = new Date(todayLog.punchIn);
+    const isWorking = todayLog?.status === "WORKING";
+
+    if (isWorking) {
       const updateTimer = () => {
         const now = new Date();
-        const diffInSeconds = Math.floor((now - punchInTime) / 1000);
-        setWorkedTime(diffInSeconds);
+        let totalSeconds = 0;
+        
+        if (todayLog.sessions && todayLog.sessions.length > 0) {
+            todayLog.sessions.forEach(sess => {
+                const start = new Date(sess.punchIn);
+                const end = sess.punchOut ? new Date(sess.punchOut) : now; 
+                totalSeconds += (end - start) / 1000;
+            });
+        } else if (todayLog.punchIn) {
+            const start = new Date(todayLog.punchIn);
+            totalSeconds = (now - start) / 1000;
+        }
+
+        setWorkedTime(Math.floor(totalSeconds));
+
+        // UPDATED: Check against Admin Assigned Full Day Hours
         if (shiftTimings) {
-            const totalShiftSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime);
-            if (diffInSeconds >= totalShiftSeconds && !alarmPlayedRef.current) {
+            const assignedFullDaySeconds = (shiftTimings.fullDayHours || 9) * 3600;
+            
+            if (totalSeconds >= assignedFullDaySeconds && !alarmPlayedRef.current) {
                 alarmPlayedRef.current = true; 
                 playShiftCompletedSound();
-                Swal.fire({ title: "Shift Completed!", text: "Your day is completed, please punch out.", icon: "success", confirmButtonText: "OK", confirmButtonColor: "#3b82f6", timer: 10000, timerProgressBar: true });
+                Swal.fire({ title: "Shift Completed!", text: "Your required work hours are done. Please punch out.", icon: "success", confirmButtonText: "OK", confirmButtonColor: "#3b82f6", timer: 10000, timerProgressBar: true });
             }
         }
       };
       updateTimer();
       interval = setInterval(updateTimer, 1000);
-    } else if (todayLog?.workedHours) {
-        setWorkedTime(todayLog.workedHours * 3600);
+    } else {
+        if (todayLog?.workedHours !== undefined) {
+             const storedSec = (todayLog.workedHours * 3600) + (todayLog.workedMinutes * 60) + (todayLog.workedSeconds || 0);
+             setWorkedTime(storedSec);
+        }
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [todayLog, shiftTimings, getShiftDurationInSeconds]);
+  }, [todayLog, shiftTimings]);
 
   const getTodayIdleTimeStr = () => {
     const activities = todayLog?.idleActivity || [];
@@ -305,7 +346,6 @@ const EmployeeDashboard = () => {
     return `${h}h ${m}m ${s}s`;
   };
 
-  // ✅ CALCULATE WORK MODE STATUS & DESCRIPTION (UPDATED)
   const calculateWorkModeStatus = useCallback(() => {
     const defaults = { 
       mode: officeConfig?.globalWorkMode || 'WFO', 
@@ -313,66 +353,34 @@ const EmployeeDashboard = () => {
     };
 
     if (!officeConfig || !user) return defaults;
-
     const empConfig = officeConfig.employeeWorkModes?.find(e => e.employeeId === user.employeeId);
-    
-    // If no config found or rule is Global
-    if (!empConfig || empConfig.ruleType === "Global") {
-      return defaults;
-    }
+    if (!empConfig || empConfig.ruleType === "Global") return defaults;
 
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    // 1. Check Temporary
     if (empConfig.ruleType === "Temporary" && empConfig.temporary) {
       const from = new Date(empConfig.temporary.fromDate);
       const to = new Date(empConfig.temporary.toDate);
       from.setHours(0,0,0,0);
       to.setHours(23,59,59,999);
-      
-      if (today >= from && today <= to) {
-        return {
-          mode: empConfig.temporary.mode,
-          description: `Temporary schedule active from ${from.toLocaleDateString()} to ${to.toLocaleDateString()}.`
-        };
-      }
+      if (today >= from && today <= to) return { mode: empConfig.temporary.mode, description: `Temporary schedule active.` };
     }
 
-    // 2. Check Recurring (Updated for Specific Mode Text & All Days)
     if (empConfig.ruleType === "Recurring" && empConfig.recurring) {
-      const currentDay = new Date().getDay(); // 0=Sun, 1=Mon
+      const currentDay = new Date().getDay();
       const daysMap = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
-      
-      // Get readable mode text
       const modeText = empConfig.recurring.mode === "WFH" ? "Remote" : "Work From Office";
-      
-      // Get all assigned days sorted
       const sortedDays = [...(empConfig.recurring.days || [])].sort((a,b) => a - b);
       const allDaysStr = sortedDays.map(d => daysMap[d]).join(", ");
       
       if (empConfig.recurring.days.includes(currentDay)) {
-        return {
-          mode: empConfig.recurring.mode,
-          description: `Recurring schedule active. Assigned to work ${modeText} on ${allDaysStr}.`
-        };
+        return { mode: empConfig.recurring.mode, description: `Recurring schedule active.` };
       } else {
-        // Even if not active today, show the recurring schedule details
-        return {
-            ...defaults,
-            description: `Recurring schedule exists (${modeText} on ${allDaysStr}), but today follows Global settings.`
-        };
+        return { ...defaults, description: `Recurring schedule exists (${modeText} on ${allDaysStr}), but today follows Global settings.` };
       }
     }
-
-    // 3. Check Permanent
-    if (empConfig.ruleType === "Permanent") {
-      return {
-        mode: empConfig.permanentMode,
-        description: "Permanently assigned override by administration."
-      };
-    }
-
+    if (empConfig.ruleType === "Permanent") return { mode: empConfig.permanentMode, description: "Permanently assigned override by administration." };
     return defaults;
   }, [officeConfig, user]);
 
@@ -386,9 +394,7 @@ const EmployeeDashboard = () => {
             idleStart: idleStartTimeRef.current 
           }); 
           isIdleRef.current = false; 
-        } catch(e) { 
-          console.error(e); 
-        }
+        } catch(e) { console.error(e); }
     }
     
     setPunchStatus("FETCHING");
@@ -398,21 +404,13 @@ const EmployeeDashboard = () => {
       setPunchStatus("PUNCHING");
 
       if (action === "IN") {
-        // ✅ GET CALCULATED WORK MODE (WFO/WFH)
         const { mode: effectiveMode } = calculateWorkModeStatus();
-        
-        // ✅ IF WFO MODE → VALIDATE LOCATION
         if (effectiveMode === "WFO") {
             if (officeConfig && officeConfig.officeLocation) {
-                const distance = getDistanceFromLatLonInMeters(
-                  location.latitude, 
-                  location.longitude, 
-                  officeConfig.officeLocation.latitude, 
-                  officeConfig.officeLocation.longitude
-                );
-                
+                const distance = getDistanceFromLatLonInMeters(location.latitude, location.longitude, officeConfig.officeLocation.latitude, officeConfig.officeLocation.longitude);
                 const allowedRadius = officeConfig.allowedRadius || 200;
                 
+                // ✅ SWEET ALERT HTML CONTENT (Restored)
                 if (distance > allowedRadius) {
                     setPunchStatus("IDLE");
                     speak("Punch failed. You are not in the office location.");
@@ -426,49 +424,24 @@ const EmployeeDashboard = () => {
                       confirmButtonColor: '#d33' 
                     });
                 }
-            } else {
-              console.warn("⚠️ Office settings not loaded, skipping distance check.");
             }
         }
-
         localStorage.setItem(LOCAL_STORAGE_KEY, Date.now());
         alarmPlayedRef.current = false; 
-        
-        await punchIn({ 
-          employeeId: user.employeeId, 
-          employeeName: user.name, 
-          latitude: location.latitude, 
-          longitude: location.longitude 
-        });
-        
+        await punchIn({ employeeId: user.employeeId, employeeName: user.name, latitude: location.latitude, longitude: location.longitude });
         speak(`${user.name}, punch in successful`);
-        Swal.fire({ 
-          icon: 'success', 
-          title: 'Welcome!', 
-          text: 'Punch in recorded successfully.' 
-        });
+        Swal.fire({ icon: 'success', title: 'Welcome!', text: 'Punch in recorded successfully.' });
       } else {
-        // PUNCH OUT
-        await punchOut({ 
-          employeeId: user.employeeId, 
-          latitude: location.latitude, 
-          longitude: location.longitude 
-        });
-        
+        await punchOut({ employeeId: user.employeeId, latitude: location.latitude, longitude: location.longitude });
         speak(`${user.name}, punch out successful`);
-        Swal.fire({ 
-          icon: 'success', 
-          title: 'Goodbye!', 
-          text: 'Punch out recorded successfully.' 
-        });
+        Swal.fire({ icon: 'success', title: 'Goodbye!', text: 'Punch out recorded successfully.' });
       }
-      
       await loadAttendance(user.employeeId);
-      
     } catch (err) {
       console.error("Punch error:", err);
       const msg = err.response?.data?.message || err.message || "Unknown Error";
       
+      // ✅ DETAILED ERROR HANDLING (Restored)
       if (msg.includes("Location")) { 
         Swal.fire({ 
           icon: 'error', 
@@ -490,59 +463,46 @@ const EmployeeDashboard = () => {
           text: `Failed to record attendance: ${msg}` 
         }); 
       }
-    } finally { 
-      setPunchStatus("IDLE"); 
-    }
+    } finally { setPunchStatus("IDLE"); }
   };
 
   const handlePunch = async (action) => {
     if (!user) return;
-    
     if (action === "IN") {
-        const yesterdayDate = new Date();
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-        const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
-        const yesterdayLog = attendance.find(d => d.date === yesterdayStr);
-        
-        if (yesterdayLog && yesterdayLog.punchIn && !yesterdayLog.punchOut) {
-            Swal.fire({ 
-              icon: 'error', 
-              title: 'Punch In Disabled', 
-              text: 'You did not punch out yesterday. Please contact the admin team.', 
-              confirmButtonColor: '#d33' 
-            });
-            return; 
+        if (!todayLog) {
+            const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
+            const yesterdayLog = attendance.find(d => d.date === yesterdayStr);
+            if (yesterdayLog && yesterdayLog.punchIn && !yesterdayLog.punchOut) {
+                Swal.fire({ icon: 'error', title: 'Punch In Disabled', text: 'You did not punch out yesterday. Please contact the admin team.' });
+                return; 
+            }
         }
+        performPunchAction("IN");
     }
     
     if (action === "OUT") {
-        const totalShiftSeconds = shiftTimings ? getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime) : 8 * 3600;
-        const fiveHoursSeconds = 5 * 3600;
+        // ✅ UPDATED: Validate against Admin Assigned Work Hours
+        const fullDaySeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
+        const halfDaySeconds = shiftTimings ? (shiftTimings.halfDayHours * 3600) : (4.5 * 3600);
         
-        if (workedTime >= totalShiftSeconds) { 
-          await performPunchAction("OUT"); 
-          return; 
-        }
+        if (workedTime >= fullDaySeconds) { await performPunchAction("OUT"); return; }
         
-        let confirmMessage = workedTime < fiveHoursSeconds 
-          ? "Your worked hours are less than 5 hours. It's going to record as Absent (<5 hrs). Are you sure?" 
-          : "Your worked hours are less than your assigned shift hours. It's going to record as Half Day. Are you sure?";
+        let confirmMessage = workedTime < halfDaySeconds 
+          ? "“Your worked hours are below the minimum Half-Day limit. If you don’t punch in again, today will be marked as ABSENT. Do you want to continue?”" 
+          : "Your worked hours are below the Full-Day requirement. If you don’t punch in again, today will be marked as HALF-DAY. Do you want to continue?”";
         
         Swal.fire({ 
-          title: "Early Punch Out?", 
-          text: confirmMessage, 
-          icon: 'warning', 
-          showCancelButton: true, 
-          confirmButtonColor: '#d33', 
-          cancelButtonColor: '#3085d6', 
-          confirmButtonText: 'Yes, punch out!' 
+            title: "Early Punch Out?", 
+            text: confirmMessage, 
+            icon: 'warning', 
+            showCancelButton: true, 
+            confirmButtonColor: '#d33', 
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, punch out!' 
         }).then((result) => { 
-          if (result.isConfirmed) { 
-            performPunchAction("OUT"); 
-          } 
+          if (result.isConfirmed) { performPunchAction("OUT"); } 
         });
-    } else { 
-      performPunchAction("IN"); 
     }
   };
 
@@ -567,100 +527,79 @@ const EmployeeDashboard = () => {
     setUploadingImage(true);
     try {
       const res = await uploadProfilePic(formData);
-      if (res?.profilePhoto?.url) { 
-        setProfileImage(res.profilePhoto.url); 
-        sessionStorage.setItem("profileImage", res.profilePhoto.url); 
-        speak("Profile updated"); 
-        Swal.fire("Success", "Profile picture updated successfully!", "success"); 
-        setShowCropModal(false); 
-        setImageToCrop(null); 
-      }
-    } catch (err) { 
-      Swal.fire("Error", "Failed to upload image.", "error"); 
-    } finally { 
-      setUploadingImage(false); 
-    }
+      if (res?.profilePhoto?.url) { setProfileImage(res.profilePhoto.url); sessionStorage.setItem("profileImage", res.profilePhoto.url); setShowCropModal(false); }
+    } catch (err) { Swal.fire("Error", "Failed to upload image.", "error"); } finally { setUploadingImage(false); }
   };
 
   const handleDeleteProfilePic = async () => {
-    Swal.fire({ 
-      title: 'Are you sure?', 
-      text: "Do you want to delete your profile picture?", 
-      icon: 'warning', 
-      showCancelButton: true, 
-      confirmButtonColor: '#d33', 
-      cancelButtonColor: '#3085d6', 
-      confirmButtonText: 'Yes, delete it!' 
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            try { 
-              await deleteProfilePic(); 
-              setProfileImage(null); 
-              sessionStorage.removeItem("profileImage"); 
-              speak("Profile deleted"); 
-              Swal.fire("Deleted!", "Profile picture has been deleted.", "success"); 
-            } catch (err) { 
-              Swal.fire("Error", "Failed to delete profile picture.", "error"); 
-            }
-        }
+    Swal.fire({ title: 'Are you sure?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete it!' }).then(async (result) => {
+        if (result.isConfirmed) { await deleteProfilePic(); setProfileImage(null); sessionStorage.removeItem("profileImage"); }
     });
   };
 
-  // Idle Tracking
   useEffect(() => {
     if (!user || !user.employeeId || !todayLog?.punchIn || todayLog?.punchOut) return;
-    if (todayLog.idleActivity && todayLog.idleActivity.length > 0) {
-      const lastEntry = todayLog.idleActivity[todayLog.idleActivity.length - 1];
-      if (lastEntry && !lastEntry.idleEnd && !isIdleRef.current) { isIdleRef.current = true; idleStartTimeRef.current = lastEntry.idleStart; }
-    }
     const handleActivity = () => {
       const now = Date.now();
       const lastSaved = parseInt(localStorage.getItem(LOCAL_STORAGE_KEY) || 0);
       if (now - lastSaved > 1000) { localStorage.setItem(LOCAL_STORAGE_KEY, now); }
       if (isIdleRef.current && idleStartTimeRef.current) {
-        const startT = idleStartTimeRef.current;
-        isIdleRef.current = false;
-        idleStartTimeRef.current = null;
-        idleNotifiedRef.current = false;
+        const startT = idleStartTimeRef.current; isIdleRef.current = false; idleStartTimeRef.current = null; idleNotifiedRef.current = false;
         recordIdleActivityLocally({ employeeId: user.employeeId, idleEnd: new Date().toISOString(), isIdle: false, idleStart: startT }).then(() => { loadAttendance(user.employeeId); }).catch(err => console.error(err));
       }
     };
-    window.addEventListener("mousemove", handleActivity); window.addEventListener("keydown", handleActivity); window.addEventListener("click", handleActivity); window.addEventListener("scroll", handleActivity);
+    window.addEventListener("mousemove", handleActivity); window.addEventListener("keydown", handleActivity); window.addEventListener("click", handleActivity);
     const intervalId = setInterval(async () => {
       const now = Date.now();
       const hour = new Date().getHours();
       if (hour < WORK_START_HOUR || hour >= WORK_END_HOUR) return;
       const lastActive = parseInt(localStorage.getItem(LOCAL_STORAGE_KEY) || Date.now());
-      const diff = now - lastActive;
-      if (diff >= INACTIVITY_LIMIT_MS && !isIdleRef.current) {
-        isIdleRef.current = true;
-        idleStartTimeRef.current = new Date().toISOString();
-        try { await recordIdleActivityLocally({ employeeId: user.employeeId, idleStart: idleStartTimeRef.current, isIdle: true, }); if (!idleNotifiedRef.current) { idleNotifiedRef.current = true; await sendIdleActivity({ employeeId: user.employeeId, name: user.name, department, role, lastActiveAt: new Date(lastActive).toISOString(), }); } } catch (error) { console.error("Failed to record idle start:", error); }
+      if (now - lastActive >= INACTIVITY_LIMIT_MS && !isIdleRef.current) {
+        isIdleRef.current = true; idleStartTimeRef.current = new Date().toISOString();
+        try { await recordIdleActivityLocally({ employeeId: user.employeeId, idleStart: idleStartTimeRef.current, isIdle: true }); if (!idleNotifiedRef.current) { idleNotifiedRef.current = true; await sendIdleActivity({ employeeId: user.employeeId, name: user.name, department, role, lastActiveAt: new Date(lastActive).toISOString() }); } } catch (e) {}
       }
-      if (isIdleRef.current) setWorkedTime(prev => prev); 
     }, 1000);
-    return () => { window.removeEventListener("mousemove", handleActivity); window.removeEventListener("keydown", handleActivity); window.removeEventListener("click", handleActivity); window.removeEventListener("scroll", handleActivity); clearInterval(intervalId); };
+    return () => { window.removeEventListener("mousemove", handleActivity); window.removeEventListener("keydown", handleActivity); window.removeEventListener("click", handleActivity); clearInterval(intervalId); };
   }, [user, department, role, todayLog, loadAttendance, LOCAL_STORAGE_KEY]);
-
 
   const formatWorkedTime = (totalSeconds) => {
     if (isNaN(totalSeconds) || totalSeconds < 0) return "0h 0m 0s";
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const seconds = Math.floor(totalSeconds % 60);
     return `${hours}h ${minutes}m ${seconds}s`;
   };
 
   const getPunchButtonContent = (action) => {
     const spinner = <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />;
-    if (punchStatus === "FETCHING") return <>{spinner} Extracting Location...</>;
+    if (punchStatus === "FETCHING") return <>{spinner} Extracting...</>;
     if (punchStatus === "PUNCHING") return <>{spinner} {action === "IN" ? "Punching In..." : "Punching Out..."}</>;
-    return action === "IN" ? "Punch In" : "Punch Out";
+    // ✅ REQ: Change button text to "Resume Work" if resuming
+    if (action === "IN") return todayLog?.punchIn ? "Resume Work" : "Punch In";
+    return "Punch Out";
   };
 
   const formatTimeDisplay = (timeString) => {
     if (!timeString) return "--";
-    try { const [hours, minutes] = timeString.split(':'); const hour = parseInt(hours); const ampm = hour >= 12 ? 'PM' : 'AM'; const displayHour = hour % 12 || 12; return `${displayHour}:${minutes} ${ampm}`; } catch (error) { return timeString; }
+    try { const [h, m] = timeString.split(':'); const hr = parseInt(h); const ampm = hr >= 12 ? 'PM' : 'AM'; return `${hr % 12 || 12}:${m} ${ampm}`; } catch (error) { return timeString; }
+  };
+
+  // ✅ NEW HELPER: Display Formatted Assigned Work Hours
+  const getTargetWorkHours = () => {
+    if (!shiftTimings) return "9h 0m";
+    const hrs = shiftTimings.fullDayHours || 9;
+    const h = Math.floor(hrs);
+    const m = Math.round((hrs - h) * 60);
+    return `${h}h ${m}m`;
+  };
+
+  // ✅ NEW HELPER: Display Formatted Half Day Hours
+  const getTargetHalfDayHours = () => {
+    if (!shiftTimings) return "4h 30m";
+    const hrs = shiftTimings.halfDayHours || 4.5;
+    const h = Math.floor(hrs);
+    const m = Math.round((hrs - h) * 60);
+    return `${h}h ${m}m`;
   };
 
   const getDayNames = (dayNumbers = []) => { const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; return dayNumbers.map(day => days[day]).join(', ') || 'None'; };
@@ -668,10 +607,13 @@ const EmployeeDashboard = () => {
   const getWorkedStatusBadge = () => {
     if (!todayLog?.punchIn) return { label: "--", color: "text-gray-500" };
     if (!todayLog.punchOut) { return { label: "Working...", color: "bg-blue-100 text-blue-800 animate-pulse" }; }
-    const totalShiftSeconds = shiftTimings ? getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime) : 8 * 3600;
+    
+    // ✅ UPDATED: Use Admin Assigned Work Hours for Status
+    const fullDaySeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
+    const halfDaySeconds = shiftTimings ? (shiftTimings.halfDayHours * 3600) : (4.5 * 3600);
     const currentWorkedSeconds = workedTime; 
-    const fiveHoursSeconds = 5 * 3600;
-    if (currentWorkedSeconds >= totalShiftSeconds) { return { label: "Full Day", color: "bg-green-100 text-green-800" }; } else if (currentWorkedSeconds > fiveHoursSeconds) { return { label: "Half Day", color: "bg-yellow-100 text-yellow-800" }; } else { return { label: "Absent", color: "bg-red-100 text-red-800" }; }
+
+    if (currentWorkedSeconds >= fullDaySeconds) { return { label: "Full Day", color: "bg-green-100 text-green-800" }; } else if (currentWorkedSeconds >= halfDaySeconds) { return { label: "Half Day", color: "bg-yellow-100 text-yellow-800" }; } else { return { label: "Absent", color: "bg-red-100 text-red-800" }; }
   };
 
   const getDisplayLoginStatus = () => {
@@ -680,13 +622,17 @@ const EmployeeDashboard = () => {
     try { const punchTime = new Date(todayLog.punchIn); const [sHour, sMin] = shiftTimings.shiftStartTime.split(':').map(Number); const shiftTime = new Date(punchTime); shiftTime.setHours(sHour, sMin, 0, 0); shiftTime.setMinutes(shiftTime.getMinutes() + (shiftTimings.lateGracePeriod || 15)); if (punchTime > shiftTime) { return "LATE"; } return "On Time"; } catch (e) { return todayLog.loginStatus || "On Time"; }
   };
 
+  // ✅ UPDATED: Progress Bar uses Assigned Hours
   const workMeterData = useMemo(() => {
-    let totalShiftSeconds = 8 * 3600; 
-    if (shiftTimings?.shiftStartTime && shiftTimings?.shiftEndTime) { totalShiftSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime); } else if (shiftTimings?.fullDayHours) { totalShiftSeconds = shiftTimings.fullDayHours * 3600; }
+    let targetSeconds = 9 * 3600; 
+    if (shiftTimings?.fullDayHours) { 
+        targetSeconds = shiftTimings.fullDayHours * 3600; 
+    }
+    
     const currentWorked = Math.max(0, workedTime);
-    const remaining = Math.max(0, totalShiftSeconds - currentWorked);
-    return { labels: ["Worked", "Pending"], datasets: [ { data: [currentWorked, remaining], backgroundColor: ["#3b82f6", "#e5e7eb"], borderWidth: 0, cutout: "75%", circumference: 180, rotation: -90, }, ], rawValues: { currentWorked, remaining, totalShiftSeconds } };
-  }, [workedTime, shiftTimings, getShiftDurationInSeconds]);
+    const remaining = Math.max(0, targetSeconds - currentWorked);
+    return { labels: ["Worked", "Pending"], datasets: [ { data: [currentWorked, remaining], backgroundColor: ["#3b82f6", "#e5e7eb"], borderWidth: 0, cutout: "75%", circumference: 180, rotation: -90, }, ], rawValues: { currentWorked, remaining, targetSeconds } };
+  }, [workedTime, shiftTimings]);
 
   const commonChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true } } };
   const meterChartOptions = { ...commonChartOptions, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { const val = context.raw; const h = Math.floor(val / 3600); const m = Math.floor((val % 3600) / 60); return `${context.label}: ${h}h ${m}m`; } } } } };
@@ -698,39 +644,27 @@ const EmployeeDashboard = () => {
 
   const displayStatus = getDisplayLoginStatus();
   const workedStatusBadge = getWorkedStatusBadge();
-  
-  const getFormattedShiftDuration = () => { 
-    if (!shiftTimings) return "8h 0m"; 
-    const totalSeconds = getShiftDurationInSeconds(shiftTimings.shiftStartTime, shiftTimings.shiftEndTime); 
-    const h = Math.floor(totalSeconds / 3600); 
-    const m = Math.floor((totalSeconds % 3600) / 60); 
-    return `${h}h ${m}m`; 
-  };
-  
-  const calculatedShiftHours = getFormattedShiftDuration();
-  
-  // ✅ GET CURRENT WORK MODE FOR DISPLAY
+  const calculatedTargetHours = getTargetWorkHours();
   const { mode: currentWorkMode, description: workModeDesc } = calculateWorkModeStatus();
   
+  // ✅ UPDATED: Shift Completion Logic
+  // Check if user is punched out AND (has marked FULL_DAY status OR has calculated worked time >= target)
+  const targetSeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
+  const isShiftCompleted = todayLog?.punchOut && (todayLog?.workedStatus === "FULL_DAY" || workedTime >= targetSeconds);
+  
+  // ✅ CHECK IF SHIFT REQUIREMENT IS MET (For dynamic button switching)
+  const isShiftReqCompleted = workedTime >= targetSeconds;
+
+  const showPunchInButton = !todayLog || todayLog.status !== "WORKING";
+
   return (
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
       {/* Profile Section */}
       <div className="flex flex-col md:flex-row items-center bg-gradient-to-r from-blue-100 to-blue-50 rounded-2xl shadow-lg p-6 mb-8 gap-6 relative">
         <div className="relative group">
-          <img 
-            src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} 
-            alt="Profile Img" 
-            crossOrigin="anonymous" 
-            referrerPolicy="no-referrer" 
-            className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover" 
-          />
+          <img src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} alt="Profile" className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover" />
           <div className="absolute bottom-1 right-1 flex gap-1">
-            <label 
-              htmlFor="profile-upload" 
-              className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 ${uploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {uploadingImage ? <div className="animate-spin">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />}
-            </label>
+            <label htmlFor="profile-upload" className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 ${uploadingImage ? "opacity-50" : ""}`}> {uploadingImage ? <div className="animate-spin">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />} </label>
             {profileImage && ( <button onClick={handleDeleteProfilePic} className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"> <FaTrash size={14} /> </button> )}
           </div>
           <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
@@ -740,52 +674,69 @@ const EmployeeDashboard = () => {
           <div className="flex justify-between items-start w-full">
              <div>
                 <h3 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><FaUserCircle /> {name}</h3>
-                
-                {/* ✅ WORK MODE DISPLAY BADGE & DESCRIPTION */}
                 <div className="mt-3 mb-3">
                     <div className="flex items-center gap-2 mb-1">
-                        {currentWorkMode === 'WFH' ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-700 border border-green-200 shadow-sm">
-                                <FaLaptopHouse size={16} /> Work From Home
-                            </span>
-                        ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
-                                <FaBuilding size={16} /> Work From Office
-                            </span>
-                        )}
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold shadow-sm ${currentWorkMode === 'WFH' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                            {currentWorkMode === 'WFH' ? <FaLaptopHouse size={16} /> : <FaBuilding size={16} />} {currentWorkMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
+                        </span>
                     </div>
-                    {/* Mode Description */}
-                    <div className="text-xs text-gray-500 font-medium italic flex items-center gap-1 ml-1">
-                        <FaInfoCircle size={10} className="text-gray-400" /> 
-                        {workModeDesc}
-                    </div>
+                    <div className="text-xs text-gray-500 font-medium italic flex items-center gap-1 ml-1"><FaInfoCircle size={10} /> {workModeDesc}</div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-gray-700 mt-2 text-sm">
-                    <div><b>ID:</b> {employeeId}</div>
-                    <div><b>Email:</b> {email}</div>
-                    <div><b>Department:</b> {department}</div>
-                    <div><b>Role:</b> {role}</div>
+                    <div><b>ID:</b> {employeeId}</div> <div><b>Email:</b> {email}</div> <div><b>Department:</b> {department}</div> <div><b>Role:</b> {role}</div>
                 </div>
              </div>
 
-             {shiftTimings && (
-                <div className="relative" ref={dropdownRef}>
-                    <button onClick={() => setIsShiftDropdownOpen(!isShiftDropdownOpen)} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition-all text-sm font-semibold"> <FaRegClock /> Shift Details <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12}/> </button>
-                    {isShiftDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-4 animate-fade-in-down">
-                            <h4 className="font-bold text-blue-800 border-b pb-2 mb-3">Assigned Shift</h4>
-                            <div className="space-y-3 text-sm text-gray-700">
-                                <div className="flex justify-between"><span>Start Time:</span> <span className="font-semibold text-gray-900">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
-                                <div className="flex justify-between"><span>End Time:</span> <span className="font-semibold text-gray-900">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>
-                                <div className="flex justify-between"><span>Late Grace:</span> <span className="font-semibold text-gray-900">{shiftTimings.lateGracePeriod} mins</span></div>
-                                <div className="flex justify-between"><span>Calc Work Hrs:</span> <span className="font-semibold text-gray-900">{calculatedShiftHours}</span></div>
-                                <div className="pt-2 border-t mt-2"> <span className="block text-xs text-gray-500 mb-1">Weekly Offs:</span> <div className="font-medium text-blue-600">{getDayNames(shiftTimings.weeklyOffDays)}</div> </div>
+             <div className="flex gap-2">
+                {/* Break Taken Dropdown */}
+                {todayLog?.sessions?.length > 0 && (
+                    <div className="relative" ref={breakDropdownRef}>
+                        <button onClick={() => setIsBreakDropdownOpen(!isBreakDropdownOpen)} className="flex items-center gap-2 bg-white text-orange-700 border border-orange-200 px-4 py-2 rounded-lg shadow-sm hover:bg-orange-50 transition-all text-sm font-semibold"> <FaHistory /> Breaks & Sessions <FaChevronDown className={`transform transition-transform ${isBreakDropdownOpen ? 'rotate-180' : ''}`} size={12}/> </button>
+                        {isBreakDropdownOpen && (
+                            <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-4 animate-fade-in-down">
+                                <h4 className="font-bold text-orange-800 border-b pb-2 mb-3">Today's Sessions</h4>
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {todayLog.sessions.map((sess, idx) => (
+                                        <div key={idx} className="text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                                            <div className="flex justify-between font-semibold text-gray-700 mb-1">
+                                                <span>Session {idx + 1}</span>
+                                                <span className={sess.punchOut ? "text-green-600" : "text-blue-600 animate-pulse"}>{sess.punchOut ? "Completed" : "Active"}</span>
+                                            </div>
+                                            <div className="flex justify-between text-gray-500">
+                                                <span>In: {new Date(sess.punchIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                                <span>Out: {sess.punchOut ? new Date(sess.punchOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "--"}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-             )}
+                        )}
+                    </div>
+                )}
+
+                {/* ✅ UPDATED: Shift Details Dropdown with Admin Assigned Settings */}
+                {shiftTimings && (
+                    <div className="relative" ref={dropdownRef}>
+                        <button onClick={() => setIsShiftDropdownOpen(!isShiftDropdownOpen)} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition-all text-sm font-semibold"> <FaRegClock /> Shift Details <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12}/> </button>
+                        {isShiftDropdownOpen && (
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-4 animate-fade-in-down">
+                                <h4 className="font-bold text-blue-800 border-b pb-2 mb-3">Admin Assigned Shift</h4>
+                                <div className="space-y-3 text-sm text-gray-700">
+                                    <div className="flex justify-between"><span>Start Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
+                                    <div className="flex justify-between"><span>End Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>
+                                    
+                                    {/* Added Admin Assigned Work Hours */}
+                                    <div className="flex justify-between bg-blue-50 p-1 rounded"><span>Required Work:</span> <span className="font-bold text-blue-700">{calculatedTargetHours}</span></div>
+                                    <div className="flex justify-between text-xs text-gray-500"><span>Min Half Day:</span> <span>{getTargetHalfDayHours()}</span></div>
+                                    <div className="flex justify-between text-xs text-gray-500"><span>Late Grace:</span> <span>{shiftTimings.lateGracePeriod} mins</span></div>
+
+                                    <div className="pt-2 border-t mt-2"> <span className="block text-xs text-gray-500 mb-1">Weekly Offs:</span> <div className="font-medium text-blue-600">{getDayNames(shiftTimings.weeklyOffDays)}</div> </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+             </div>
           </div>
         </div>
       </div>
@@ -801,11 +752,12 @@ const EmployeeDashboard = () => {
             <thead>
               <tr className="bg-blue-600 text-white uppercase tracking-wider">
                 <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Punch In</th>
-                <th className="px-4 py-3 text-left">Punch Out</th>
+                <th className="px-4 py-3 text-left">First In</th>
+                <th className="px-4 py-3 text-left">Last Out</th>
                 <th className="px-4 py-3 text-left">Worked</th>
                 <th className="px-4 py-3 text-left">Login Status</th>
                 <th className="px-4 py-3 text-left">Worked Status</th>
+                <th className="px-4 py-3 text-left">Break Time</th>
                 <th className="px-4 py-3 text-left">Idle Time</th>
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
@@ -814,17 +766,42 @@ const EmployeeDashboard = () => {
               <tr className="text-gray-700 border-b border-gray-200 hover:bg-gray-100 transition-colors duration-200">
                 <td className="px-4 py-3 font-medium">{today}</td>
                 <td className="px-4 py-3">{todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}</td>
-                <td className="px-4 py-3">{todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"}</td>
-                <td className="px-4 py-3 font-mono">{todayLog?.punchIn && !todayLog?.punchOut ? formatWorkedTime(workedTime) : todayLog?.displayTime || "0h 0m 0s"}</td>
                 <td className="px-4 py-3">
-                  {todayLog?.punchIn ? ( <span className={`px-3 py-1 rounded-full text-xs font-semibold ${displayStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}> {displayStatus === "LATE" ? "Late" : "On Time"} </span> ) : "--"}
+                    {todayLog?.status === "WORKING" ? (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold animate-pulse">Active</span>
+                    ) : (
+                        todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"
+                    )}
+                </td>
+                <td className="px-4 py-3 font-mono font-bold text-blue-600">{todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}</td>
+                <td className="px-4 py-3">
+                  {todayLog?.punchIn ? ( <span className={`px-3 py-1 rounded-full text-xs font-semibold ${displayStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}> {displayStatus} </span> ) : "--"}
                 </td>
                 <td className="px-4 py-3 capitalize"> {todayLog?.punchIn ? ( <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span> ) : ( <span className="text-gray-500">--</span> )} </td>
+                <td className="px-4 py-3 font-mono text-purple-600"> {todayLog?.totalBreakSeconds ? formatWorkedTime(todayLog.totalBreakSeconds) : "0h 0m 0s"} </td>
                 <td className="px-4 py-3 font-mono font-bold text-orange-600"> {todayLog?.punchIn ? getTodayIdleTimeStr() : "--"} </td>
+                
+                {/* ✅ DYNAMIC ACTION BUTTON LOGIC */}
                 <td className="px-4 py-3 text-center">
-                  {!todayLog?.punchIn ? ( <button className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:opacity-50 mx-auto flex gap-2" onClick={() => handlePunch("IN")} disabled={punchStatus !== "IDLE"}>{getPunchButtonContent("IN")}</button>
-                  ) : !todayLog?.punchOut ? ( <button className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 mx-auto flex gap-2" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>{getPunchButtonContent("OUT")}</button>
-                  ) : ( <span className="text-gray-500 font-semibold">Done</span> )}
+                  {isShiftCompleted ? (
+                      <span className="text-gray-500 font-bold text-xs bg-gray-200 px-3 py-1 rounded-full">Completed</span>
+                  ) : showPunchInButton ? ( 
+                      <button className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("IN")} disabled={punchStatus !== "IDLE"}>{getPunchButtonContent("IN")}</button>
+                  ) : ( 
+                      // ✅ If Shift NOT completed: Show BREAK button
+                      // ✅ If Shift IS completed: Show PUNCH OUT button
+                      isShiftReqCompleted ? (
+                        <button className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>
+                            {punchStatus === "PUNCHING" ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : null}
+                            {punchStatus === "PUNCHING" ? "Punching Out..." : "Punch Out"}
+                        </button>
+                      ) : (
+                        <button className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>
+                            {punchStatus === "PUNCHING" ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <FaCoffee />}
+                            {punchStatus === "PUNCHING" ? "Starting Break..." : "Break"}
+                        </button>
+                      )
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -849,11 +826,12 @@ const EmployeeDashboard = () => {
           <div className="flex-1 relative flex flex-col items-center justify-center">
             <div className="w-full h-full max-h-40 relative">
                  <Doughnut data={workMeterData} options={meterChartOptions} />
-                 <div className="absolute inset-0 flex items-end justify-center pb-2 pointer-events-none"> <span className="text-2xl font-bold text-gray-700"> {Math.floor((workMeterData.rawValues.currentWorked / workMeterData.rawValues.totalShiftSeconds) * 100)}% </span> </div>
+                 <div className="absolute inset-0 flex items-end justify-center pb-2 pointer-events-none"> <span className="text-2xl font-bold text-gray-700"> {Math.floor((workMeterData.rawValues.currentWorked / workMeterData.rawValues.targetSeconds) * 100)}% </span> </div>
             </div>
             <div className="flex justify-between w-full px-8 mt-4 border-t pt-3">
                 <div className="text-center"> <p className="text-xs text-gray-500 uppercase font-semibold">Worked Hrs</p> <p className="text-lg font-bold text-blue-600">{formatWorkedTime(workMeterData.rawValues.currentWorked)}</p> </div>
-                <div className="text-center"> <p className="text-xs text-gray-500 uppercase font-semibold">Total Shift</p> <p className="text-lg font-bold text-gray-400">{formatWorkedTime(workMeterData.rawValues.totalShiftSeconds)}</p> </div>
+                {/* Updated Label to reflect Target */}
+                <div className="text-center"> <p className="text-xs text-gray-500 uppercase font-semibold">Target Work</p> <p className="text-lg font-bold text-gray-400">{formatWorkedTime(workMeterData.rawValues.targetSeconds)}</p> </div>
             </div>
           </div>
         </div>

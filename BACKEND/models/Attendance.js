@@ -1,3 +1,5 @@
+// --- START OF FILE Attendance.js ---
+
 import mongoose from "mongoose";
 
 const LocationSchema = new mongoose.Schema({
@@ -12,18 +14,29 @@ const IdleActivitySchema = new mongoose.Schema({
   idleEnd: { type: Date, default: null },
 }, { _id: false });
 
+const SessionSchema = new mongoose.Schema({
+  punchIn: { type: Date, required: true },
+  punchOut: { type: Date, default: null },
+  durationSeconds: { type: Number, default: 0 } 
+}, { _id: false });
+
 const DailySchema = new mongoose.Schema({
   date: { type: String, required: true },
+  
   punchIn: { type: Date, default: null },
   punchOut: { type: Date, default: null },
 
-  // Location tracking
   punchInLocation: { type: LocationSchema, default: null },
   punchOutLocation: { type: LocationSchema, default: null },
+
+  sessions: { type: [SessionSchema], default: [] },
 
   workedHours: { type: Number, default: 0 },
   workedMinutes: { type: Number, default: 0 },
   workedSeconds: { type: Number, default: 0 },
+
+  // ✅ NEW: Store total calculated break time (gap between sessions)
+  totalBreakSeconds: { type: Number, default: 0 },
 
   displayTime: { type: String, default: "0h 0m 0s" },
 
@@ -51,13 +64,11 @@ const DailySchema = new mongoose.Schema({
     default: "NOT_APPLICABLE"
   },
 
-  // Idle activity tracking
   idleActivity: {
     type: [IdleActivitySchema],
     default: []
   },
 
-  // ✅ ADMIN PUNCH OUT FIELDS
   adminPunchOut: { type: Boolean, default: false },
   adminPunchOutBy: { type: String, default: null },
   adminPunchOutTimestamp: { type: Date, default: null }

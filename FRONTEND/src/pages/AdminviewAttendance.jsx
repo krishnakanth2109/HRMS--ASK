@@ -29,16 +29,30 @@ const formatDecimalHours = (decimalHours) => {
   return `${hours}h ${minutes}m`;
 };
 
-// Basic worked status based on punch data only
-const getWorkedStatus = (punchIn, punchOut, apiStatus, targetWorkHours) => {
-  if (apiStatus === "ABSENT") return "Absent";
+// UPDATED: Worked status based on Admin Assigned Hours (Full Day / Half Day thresholds)
+const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDayThreshold) => {
+  const statusUpper = (apiStatus || "").toUpperCase();
+
+  // 1. Check API Status for Leaves/Holidays first
+  if (statusUpper === "LEAVE") return "Leave";
+  if (statusUpper === "HOLIDAY") return "Holiday";
+  if (statusUpper === "ABSENT" && !punchIn) return "Absent";
+
+  // 2. Check for currently working
   if (punchIn && !punchOut) return "Working..";
-  if (!punchIn || !punchOut) return "Absent";
+
+  // 3. If no punches
+  if (!punchIn) return "Absent";
+
+  // 4. Calculate Worked Hours
   const workedMilliseconds = new Date(punchOut) - new Date(punchIn);
   const workedHours = workedMilliseconds / (1000 * 60 * 60);
-  if (workedHours >= targetWorkHours) return "Full Day";
-  if (workedHours > 5) return "Half Day";
-  return "Absent(<5)";
+
+  // 5. Determine Status based on Admin Settings
+  if (workedHours >= fullDayThreshold) return "Full Day";
+  if (workedHours >= halfDayThreshold) return "Half Day";
+  
+  return "Absent"; // Worked less than half day threshold
 };
 
 const LocationViewButton = ({ location }) => {
@@ -197,9 +211,14 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
     const history = [];
     const start = new Date(dateRange.startDate);
     const end = new Date(dateRange.endDate);
+    
+    // UPDATED: Get Admin Assigned Shift Hours
     const shift = shiftsMap[employeeData.employeeId];
     const weeklyOffs = shift?.weeklyOffDays || [0]; // Default Sunday off
-    const shiftHours = shift ? getShiftDurationInHours(shift.shiftStartTime, shift.shiftEndTime) : 9;
+    
+    // Defaults matching Employee Dashboard
+    const adminFullDayHours = shift?.fullDayHours || 9;
+    const adminHalfDayHours = shift?.halfDayHours || 4.5;
 
     // Iterate through every day in range
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -221,7 +240,7 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
         let punchIn = null;
         let punchOut = null;
         let rowClass = "";
-        let shiftDuration = shiftHours;
+        let shiftDuration = adminFullDayHours;
 
         if (record) {
             // Employee Logged In
@@ -229,10 +248,12 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
             punchOut = record.punchOut;
             displayTime = record.displayTime;
             loginStatus = calculateLoginStatus(record.punchIn, shift, record.loginStatus);
-            workedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, shiftHours);
             
-            // Logic: < 5 hours is Absent
-            if (workedStatus === "Absent(<5)") {
+            // UPDATED: Use Admin Assigned Hours for calculation
+            workedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, adminFullDayHours, adminHalfDayHours);
+            
+            // Logic for Row Coloring
+            if (workedStatus === "Absent") {
                 rowClass = "bg-red-50"; 
             } else if (workedStatus === "Half Day") {
                 rowClass = "bg-yellow-50";
@@ -594,16 +615,21 @@ const AdminAttendance = () => {
     return allEmployees.reduce((acc, emp) => { acc[emp.employeeId] = emp.name; return acc; }, {});
   }, [allEmployees]);
 
+  // UPDATED: Process Daily Data with Admin Assigned Hours
   const processedDailyData = useMemo(() => {
     const mapped = rawDailyData.map(item => {
         const shift = shiftsMap[item.employeeId];
-        const targetHours = shift ? getShiftDurationInHours(shift.shiftStartTime, shift.shiftEndTime) : 9;
+        // Use fullDayHours if available, else fallback to 9
+        const adminFullDayHours = shift?.fullDayHours || 9;
+        const adminHalfDayHours = shift?.halfDayHours || 4.5;
+        
         const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
+        
         return {
             ...item,
             employeeName: realName,
-            assignedHours: targetHours,
-            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, targetHours),
+            assignedHours: adminFullDayHours, // Display assigned hours
+            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
             displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus)
         };
     });
@@ -617,16 +643,20 @@ const AdminAttendance = () => {
     return mapped.filter(item => (item.employeeName && item.employeeName.toLowerCase().includes(lowerTerm)) || (item.employeeId && item.employeeId.toLowerCase().includes(lowerTerm)));
   }, [rawDailyData, shiftsMap, dailySearchTerm, empNameMap]);
 
+  // UPDATED: Process Summary Data with Admin Assigned Hours
   const processedSummaryData = useMemo(() => {
     return rawSummaryData.map(item => {
         const shift = shiftsMap[item.employeeId];
-        const targetHours = shift ? getShiftDurationInHours(shift.shiftStartTime, shift.shiftEndTime) : 9;
+        
+        const adminFullDayHours = shift?.fullDayHours || 9;
+        const adminHalfDayHours = shift?.halfDayHours || 4.5;
+        
         const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
         return { 
           ...item, 
           employeeName: realName, 
-          assignedHours: targetHours, 
-          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, targetHours), 
+          assignedHours: adminFullDayHours, 
+          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours), 
           displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus) 
         };
     });
@@ -666,15 +696,18 @@ const AdminAttendance = () => {
     return activeOnly.filter(emp => !presentIds.has(emp.employeeId));
   }, [allEmployees, rawDailyData, loading, startDate, endDate]);
 
+  // UPDATED: Daily Stats logic consistent with new workedStatus
   const dailyStats = useMemo(() => {
       const fullList = rawDailyData.map(item => {
         const shift = shiftsMap[item.employeeId];
-        const targetHours = shift ? getShiftDurationInHours(shift.shiftStartTime, shift.shiftEndTime) : 9;
+        const adminFullDayHours = shift?.fullDayHours || 9;
+        const adminHalfDayHours = shift?.halfDayHours || 4.5;
+        
         const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
         return {
             ...item,
             employeeName: realName,
-            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, targetHours),
+            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
             displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus)
         };
       });
@@ -800,7 +833,7 @@ const AdminAttendance = () => {
           <Pagination totalItems={processedDailyData.length} itemsPerPage={dailyItemsPerPage} currentPage={dailyCurrentPage} onPageChange={setDailyCurrentPage} setItemsPerPage={setDailyItemsPerPage} />
         </div>
 
-        {/* ✅ Employee Attendance Summary Section with New UI & Filters */}
+        {/* Employee Attendance Summary Section with New UI & Filters */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden mt-8">
           <div className="p-6 border-b border-slate-200 bg-slate-50/50">
             <div className="flex flex-col gap-6">
@@ -825,7 +858,7 @@ const AdminAttendance = () => {
                         />
                     </div>
 
-                    {/* ✅ New Month Filter */}
+                    {/* Month Filter */}
                     <div className="w-full">
                         <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Select Month</label>
                         <div className="relative">

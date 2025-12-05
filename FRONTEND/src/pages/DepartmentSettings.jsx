@@ -35,7 +35,6 @@ const DepartmentSettings = () => {
 
   // --- Category System (Session Storage) ---
   const [categories, setCategories] = useState(() => {
-    // UPDATED: Using sessionStorage instead of localStorage
     const saved = sessionStorage.getItem("shiftCategories");
     return saved ? JSON.parse(saved) : [
       { id: "day", name: "Day Shift", isDefault: true },
@@ -46,7 +45,6 @@ const DepartmentSettings = () => {
   
   const [selectedCategoryId, setSelectedCategoryId] = useState("all"); 
   const [employeeCategories, setEmployeeCategories] = useState(() => {
-    // UPDATED: Using sessionStorage instead of localStorage
     const saved = sessionStorage.getItem("employeeCategories");
     return saved ? JSON.parse(saved) : {};
   });
@@ -57,13 +55,14 @@ const DepartmentSettings = () => {
     sessionStorage.setItem("employeeCategories", JSON.stringify(employeeCategories));
   }, [categories, employeeCategories]);
 
-  // Default Form State (Defaulting to Indian standard office hours)
+  // Default Form State 
+  // UPDATED: Default Full Day Hours set to 9 manually
   const defaultShift = {
     shiftStartTime: "09:00",
     shiftEndTime: "18:00",
     lateGracePeriod: 15,
-    fullDayHours: 8,
-    halfDayHours: 4,
+    fullDayHours: 9, // Changed from 8 to 9
+    halfDayHours: 4.5, // Changed from 4 to 4.5 (half of 9)
     autoExtendShift: true,
     weeklyOffDays: [0], // Sunday
   };
@@ -104,29 +103,6 @@ const DepartmentSettings = () => {
     setTimeout(() => setMessage({ type: "", text: "" }), 5000);
   };
 
-  // NEW HELPER: Calculate Duration
-  const calculateShiftDuration = (start, end) => {
-    if (!start || !end) return "0 hrs 0 mins";
-    
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-
-    // Convert to minutes
-    let startTotal = startH * 60 + startM;
-    let endTotal = endH * 60 + endM;
-
-    // Handle overnight shifts (e.g., 22:00 to 06:00)
-    if (endTotal < startTotal) {
-      endTotal += 24 * 60; 
-    }
-
-    const diff = endTotal - startTotal;
-    const hours = Math.floor(diff / 60);
-    const minutes = diff % 60;
-
-    return `${hours} hrs ${minutes} mins`;
-  };
-
   const handleEmployeeSelect = (employee) => {
     setSelectedEmployee(employee);
 
@@ -139,8 +115,9 @@ const DepartmentSettings = () => {
         shiftStartTime: existingShift.shiftStartTime || "09:00",
         shiftEndTime: existingShift.shiftEndTime || "18:00",
         lateGracePeriod: existingShift.lateGracePeriod ?? 15,
-        fullDayHours: existingShift.fullDayHours || 8,
-        halfDayHours: existingShift.halfDayHours || 4,
+        // Ensure we load existing hours or fallback to new default of 9
+        fullDayHours: existingShift.fullDayHours || 9,
+        halfDayHours: existingShift.halfDayHours || 4.5,
         autoExtendShift: existingShift.autoExtendShift ?? true,
         weeklyOffDays: existingShift.weeklyOffDays || [0],
       });
@@ -239,8 +216,8 @@ const DepartmentSettings = () => {
         shiftStartTime: shiftForm.shiftStartTime,
         shiftEndTime: shiftForm.shiftEndTime,
         lateGracePeriod: Number(shiftForm.lateGracePeriod),
-        fullDayHours: Number(shiftForm.fullDayHours),
-        halfDayHours: Number(shiftForm.halfDayHours),
+        fullDayHours: Number(shiftForm.fullDayHours), // Send manual input
+        halfDayHours: Number(shiftForm.halfDayHours), // Send manual input
         autoExtendShift: shiftForm.autoExtendShift,
         weeklyOffDays: shiftForm.weeklyOffDays,
       };
@@ -267,8 +244,8 @@ const DepartmentSettings = () => {
         shiftStartTime: bulkShiftForm.shiftStartTime,
         shiftEndTime: bulkShiftForm.shiftEndTime,
         lateGracePeriod: Number(bulkShiftForm.lateGracePeriod),
-        fullDayHours: Number(bulkShiftForm.fullDayHours),
-        halfDayHours: Number(bulkShiftForm.halfDayHours),
+        fullDayHours: Number(bulkShiftForm.fullDayHours), // Send manual input
+        halfDayHours: Number(bulkShiftForm.halfDayHours), // Send manual input
         autoExtendShift: bulkShiftForm.autoExtendShift,
         weeklyOffDays: bulkShiftForm.weeklyOffDays,
       };
@@ -415,7 +392,6 @@ const DepartmentSettings = () => {
                       <p className="text-xs text-gray-500">{emp.employeeId} • {emp.department || "N/A"}</p>
                     </div>
                   </div>
-                  {/* Category Dropdown (Uses session storage) */}
                   <select 
                     value={employeeCategories[emp.employeeId] || ""} 
                     onClick={(e) => e.stopPropagation()} 
@@ -452,14 +428,16 @@ const DepartmentSettings = () => {
                     <input type="time" name="shiftEndTime" value={shiftForm.shiftEndTime} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
                   
-                  {/* --- NEW SECTION: Display Calculated Work Hours --- */}
-                  <div className="col-span-2 bg-blue-50 border border-blue-100 rounded p-2 flex justify-between items-center -mt-1 mb-1">
-                    <span className="text-xs font-bold text-blue-700">WORK HOURS:</span>
-                    <span className="text-sm font-bold text-blue-800">
-                      {calculateShiftDuration(shiftForm.shiftStartTime, shiftForm.shiftEndTime)}
-                    </span>
+                  {/* --- UPDATED SECTION: Manual Work Hours --- */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
+                    <input type="number" step="0.5" name="fullDayHours" value={shiftForm.fullDayHours} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
-                  {/* -------------------------------------------------- */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
+                    <input type="number" step="0.5" name="halfDayHours" value={shiftForm.halfDayHours} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                  </div>
+                  {/* ------------------------------------------ */}
 
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
@@ -475,7 +453,7 @@ const DepartmentSettings = () => {
                 
                 <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded flex items-center gap-2">
                    <FaInfoCircle className="text-blue-500" />
-                   Timings entered here are treated as Indian Standard Time by the server.
+                   Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
                 </div>
 
                 <div className="mt-4">
@@ -519,14 +497,16 @@ const DepartmentSettings = () => {
                     <input type="time" name="shiftEndTime" value={bulkShiftForm.shiftEndTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
 
-                  {/* --- NEW SECTION: Display Calculated Work Hours (Also for Bulk) --- */}
-                  <div className="col-span-2 bg-blue-50 border border-blue-100 rounded p-2 flex justify-between items-center -mt-1 mb-1">
-                    <span className="text-xs font-bold text-blue-700">CALCULATED WORK HOURS:</span>
-                    <span className="text-sm font-bold text-blue-800">
-                      {calculateShiftDuration(bulkShiftForm.shiftStartTime, bulkShiftForm.shiftEndTime)}
-                    </span>
+                  {/* --- UPDATED SECTION: Manual Work Hours (Bulk) --- */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
+                    <input type="number" step="0.5" name="fullDayHours" value={bulkShiftForm.fullDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
-                  {/* -------------------------------------------------- */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
+                    <input type="number" step="0.5" name="halfDayHours" value={bulkShiftForm.halfDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                  </div>
+                  {/* ----------------------------------------------- */}
 
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
@@ -536,7 +516,7 @@ const DepartmentSettings = () => {
               
               <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded flex items-center gap-2">
                    <FaInfoCircle className="text-blue-500" />
-                   Timings entered here are treated as Indian Standard Time by the server.
+                   Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
               </div>
 
               <div className="mt-4">

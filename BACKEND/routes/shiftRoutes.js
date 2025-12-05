@@ -1,5 +1,3 @@
-// --- UPDATED FILE: routes/shiftRoutes.js ---
-
 import express from 'express';
 import Shift from '../models/shiftModel.js';
 import Employee from '../models/employeeModel.js';
@@ -50,12 +48,13 @@ router.post('/create', onlyAdmin, async (req, res) => {
 
     let shift = await Shift.findOne({ employeeId: cleanEmployeeId });
 
+    // UPDATED: Default fullDayHours to 9
     const shiftData = {
       shiftStartTime: shiftStartTime || "09:00",
       shiftEndTime: shiftEndTime || "18:00",
       lateGracePeriod: Number(lateGracePeriod) || 15,
-      fullDayHours: Number(fullDayHours) || 8,
-      halfDayHours: Number(halfDayHours) || 4,
+      fullDayHours: Number(fullDayHours) || 9,
+      halfDayHours: Number(halfDayHours) || 4.5,
       autoExtendShift: autoExtendShift !== undefined ? autoExtendShift : true,
       weeklyOffDays: weeklyOffDays || [0],
       department,
@@ -121,8 +120,8 @@ router.get('/:employeeId', async (req, res) => {
           shiftStartTime: "09:00",
           shiftEndTime: "18:00",
           lateGracePeriod: 15,
-          fullDayHours: 8,
-          halfDayHours: 4,
+          fullDayHours: 9, // UPDATED: Default to 9
+          halfDayHours: 4.5,
           autoExtendShift: true,
           weeklyOffDays: [0],
           timezone: "Asia/Kolkata",
@@ -164,8 +163,8 @@ router.post('/bulk-create', onlyAdmin, async (req, res) => {
     const cleanShiftData = {
       ...shiftData,
       lateGracePeriod: Number(shiftData.lateGracePeriod),
-      fullDayHours: Number(shiftData.fullDayHours),
-      halfDayHours: Number(shiftData.halfDayHours),
+      fullDayHours: Number(shiftData.fullDayHours) || 9, // UPDATED: Default to 9
+      halfDayHours: Number(shiftData.halfDayHours) || 4.5,
       timezone: "Asia/Kolkata"
     };
 
@@ -201,5 +200,3 @@ router.post('/bulk-create', onlyAdmin, async (req, res) => {
 });
 
 export default router;
-
-// --- END ---

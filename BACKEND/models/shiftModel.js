@@ -34,8 +34,9 @@ const ShiftSchema = new mongoose.Schema({
   
   lateGracePeriod: { type: Number, default: 15 }, // in minutes
   
-  fullDayHours: { type: Number, default: 8 },
-  halfDayHours: { type: Number, default: 4 },
+  // UPDATED: Default is now 9 hours
+  fullDayHours: { type: Number, default: 9 },
+  halfDayHours: { type: Number, default: 5},
   
   autoExtendShift: { type: Boolean, default: true },
   weeklyOffDays: { type: [Number], default: [0] }, // 0 = Sunday
