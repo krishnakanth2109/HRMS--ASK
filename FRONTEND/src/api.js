@@ -6,7 +6,7 @@ import axios from "axios";
 const baseURL =
   import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
-    : import.meta.env.VITE_API_URL_DEVELOPMENT;
+    : import.meta.env.VITE_API_URL_DEVELOPMENT || "http://localhost:5000";
 
 // Debug logs
 console.log("🔧 Environment Mode:", import.meta.env.MODE);
@@ -24,10 +24,28 @@ const api = axios.create({
 ============================================================================= */
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem("hrms-token");
+    // 1. Try finding standalone token
+    let token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
+
+    // 2. If not found, try finding it inside the user object
+    if (!token) {
+      const savedUser = sessionStorage.getItem("hrmsUser");
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          // Check common locations: { token: ... } or { data: { token: ... } }
+          token = parsed.token || (parsed.data && parsed.data.token);
+        } catch (error) {
+          console.error("Error parsing hrmsUser for token:", error);
+        }
+      }
+    }
+
+    // 3. Attach token if found
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -69,9 +87,9 @@ api.interceptors.response.use(
 ============================================================================= */
 export const loginUser = async (email, password) => {
   try {
-    // MUST return the full axios response, NOT response.data
+    // Return full response so AuthProvider can handle status/headers
     const response = await api.post("/api/auth/login", { email, password });
-    return response;  // ⭐ FIX: return whole axios response
+    return response; 
   } catch (error) {
     console.error("Login failed:", error.response?.data || error.message);
     throw error;
@@ -220,6 +238,10 @@ export const punchIn = async (data) =>
   (await api.post("/api/attendance/punch-in", data)).data;
 export const punchOut = async (data) =>
   (await api.post("/api/attendance/punch-out", data)).data;
+
+// ✅ NEW: Added Admin Punch Out function
+export const adminPunchOut = async (data) =>
+  (await api.post("/api/attendance/admin-punch-out", data)).data;
 
 export const getAllAttendanceRecords = async () => {
   try {
@@ -393,7 +415,8 @@ export const deleteCategoryApi = async (id) => {
 
 export const addMemberToShift = async (category, employee) => {
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/shifts/add-member`, {
+    // ✅ FIXED: Added '/api' to the URL
+    const res = await fetch(`${baseURL}/api/shifts/add-member`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -436,5 +459,4 @@ export const updateEmployeeWorkMode = async (employeeId, mode) => {
   }
 };
 
-// Export default for backward compatibility
 export default api;

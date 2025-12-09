@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
-import { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api"; 
+import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api"; 
 import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay } from "react-icons/fa";
-import axios from 'axios';
 import { toBlob } from 'html-to-image'; 
 
 // ==========================================
@@ -161,8 +160,7 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
       await onPunchOut(employee.employeeId, selectedTime.toISOString(), currentLocation, employee.date);
       onClose();
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message;
-      alert('Failed to punch out: ' + errorMsg);
+      // Error is logged in handleAdminPunchOut
     } finally {
       setLoading(false);
     }
@@ -568,14 +566,17 @@ const AdminAttendance = () => {
     try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data : []); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); } 
   }, []);
 
+  // ✅ FIX: Use 'api' instance from ../api.js to include token AND include /api prefix
   const handleAdminPunchOut = async (employeeId, punchOutTime, location, dateOfRecord) => {
     try {
-      const LIVE_BACKEND = 'https://hrms-ask.onrender.com/api';
-      let baseUrl = import.meta.env?.VITE_API_URL || (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) || LIVE_BACKEND;
-      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-      
-      const response = await axios.post(`${baseUrl}/attendance/admin-punch-out`, {
-        employeeId, punchOutTime, latitude: location.latitude, longitude: location.longitude, adminId: 'Admin', date: dateOfRecord
+      // ✅ Added /api prefix to URL to fix 404
+      const response = await api.post(`/api/attendance/admin-punch-out`, {
+        employeeId, 
+        punchOutTime, 
+        latitude: location.latitude, 
+        longitude: location.longitude, 
+        adminId: 'Admin', 
+        date: dateOfRecord
       });
 
       if (response.data.success) {
@@ -586,6 +587,7 @@ const AdminAttendance = () => {
     } catch (error) {
       const errMsg = error.response?.data?.message || error.message;
       alert(`Failed to punch out: ${errMsg}`);
+      throw error; // Propagate error to modal to stop loading state
     }
   };
 

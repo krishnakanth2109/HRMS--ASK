@@ -17,35 +17,35 @@ const seedAdminAndManager = async () => {
     // ---------------------------
     // 1️⃣ CREATE ADMIN ACCOUNT
     // ---------------------------
-    const adminEmail = "ajay.arahinfotech@gmail.com";
+    // const adminEmail = "ajay.arahinfotech@gmail.com";
 
-    let admin = await Admin.findOne({ email: adminEmail });
-    if (!admin) {
-      await Admin.create({
-        name: "Ajay Arah",
-        email: adminEmail,
-        password: "Arah@142", // hashed automatically
-        phone: "1234567890",
-        role: "admin",
-        department: "Administration",
-      });
+    // let admin = await Admin.findOne({ email: adminEmail });
+    // if (!admin) {
+    //   await Admin.create({
+    //     name: "Ajay",
+    //     email: adminEmail,
+    //     password: "Arah@142", // hashed automatically
+    //     phone: "1234567890",
+    //     role: "admin",
+    //     department: "Administration",
+    //   });
 
-      console.log("✅ Admin account created.");
-    } else {
-      console.log("ℹ️ Admin already exists. Skipping...");
-    }
+    //   console.log("✅ Admin account created.");
+    // } else {
+    //   console.log("ℹ️ Admin already exists. Skipping...");
+    // }
 
     // ---------------------------
     // 2️⃣ CREATE MANAGER ACCOUNT
     // ---------------------------
-    const managerEmail = "manager@arahinfotech.com";
+    const managerEmail = "arahinfotech9@gmail.com";
 
     let manager = await Admin.findOne({ email: managerEmail });
     if (!manager) {
       await Admin.create({
-        name: "Manager User",
+        name: "AJAY",
         email: managerEmail,
-        password: "Manager@123", // hashed automatically
+        password: "123456789", // hashed automatically
         phone: "9876543210",
         role: "manager",
         department: "Management",

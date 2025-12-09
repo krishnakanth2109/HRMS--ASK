@@ -23,10 +23,33 @@ const AdminProfile = () => {
   }, [user]);
 
   const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+
+    // VALIDATION: Name should not accept numbers (only letters and spaces)
+    if (name === "name") {
+      const nameRegex = /^[A-Za-z\s]*$/;
+      if (!nameRegex.test(value)) return;
+    }
+
+    // VALIDATION: Phone number should not accept characters (only digits)
+    if (name === "phone") {
+      const phoneRegex = /^\d*$/;
+      if (!phoneRegex.test(value)) return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
+    // VALIDATION: Check for valid Email format (Gmail or generic valid email)
+    // If you strictly want ONLY @gmail.com, change regex to: /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    
+    if (formData.email && !emailRegex.test(formData.email)) {
+      alert("Please enter a valid email address (e.g., example@gmail.com).");
+      return;
+    }
+
     try {
       const { data } = await updateUserProfile(formData);
       // Update the global context and sessionStorage with the fresh data from the server
@@ -109,7 +132,7 @@ const AdminProfile = () => {
                 </label>
                 <label className="flex flex-col font-semibold">
                   Phone:
-                  <input name="phone" value={formData.phone || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" />
+                  <input name="phone" value={formData.phone || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" maxLength={10} />
                 </label>
               </>
             )}
