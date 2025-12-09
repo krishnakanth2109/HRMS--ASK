@@ -22,7 +22,6 @@ const INDIAN_BANKS = [
   "Canara Bank"
 ];
 
-// Helper to ensure URLs are always HTTPS to prevent "Failed to load PDF" errors
 const getSecureUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("http:")) {
@@ -42,26 +41,46 @@ const CurrentEmployeeProfile = () => {
   useEffect(() => {
     const saved = sessionStorage.getItem("hrmsUser");
     if (saved) {
-      const parsed = JSON.parse(saved);
-      parsed.employeeId = String(parsed.employeeId);
-      
-      // Ensure arrays exist
-      if (!parsed.experienceDetails) parsed.experienceDetails = [];
-      // Ensure at least one experience object exists for "Current Job" binding
-      if (parsed.experienceDetails.length === 0) {
-          parsed.experienceDetails.push({
-              company: "Current Company", // Default
-              role: "",
-              department: "",
-              joiningDate: "",
-              salary: 0
-          });
+      try {
+        const parsed = JSON.parse(saved);
+        const empData = parsed.data || parsed; 
+        
+        empData.employeeId = String(empData.employeeId);
+        
+        if (!empData.experienceDetails) empData.experienceDetails = [];
+        if (empData.experienceDetails.length === 0) {
+            empData.experienceDetails.push({
+                company: "Current Company",
+                role: "",
+                department: "",
+                joiningDate: "",
+                salary: 0
+            });
+        }
+        setEmployee(empData);
+      } catch (e) {
+        console.error("Error parsing user data:", e);
       }
-
-      setEmployee(parsed);
     }
     setLoading(false);
   }, []);
+
+  // --- HELPER: ROBUST TOKEN RETRIEVAL ---
+  const getToken = () => {
+    let token = sessionStorage.getItem("token");
+    if (!token) {
+        const saved = sessionStorage.getItem("hrmsUser");
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                token = parsed.token || (parsed.data && parsed.data.token);
+            } catch (e) {
+                console.error("JSON Parse Error checking token:", e);
+            }
+        }
+    }
+    return token;
+  };
 
   if (loading) return <div className="p-10 text-center text-blue-600 font-bold"><FaSpinner className="animate-spin inline mr-2"/>Loading profile...</div>;
 
@@ -84,17 +103,44 @@ const CurrentEmployeeProfile = () => {
     setEmployee((p) => ({ ...p, [field]: value }));
   };
 
+  // ✅ IMPROVED VALIDATION LOGIC (Fixed Aadhaar & PAN typing)
   const handleNestedChange = (section, field, value) => {
+    
+    // 1. Account Number (Digits Only)
     if (field === "accountNumber") {
        if (!/^\d*$/.test(value)) return;
     }
+
+    // 2. Aadhaar Validation (12 Digits + Formatting)
     if (field === "aadhaarNumber") {
-      let raw = value.replace(/-/g, "");
-      if (!/^\d{0,12}$/.test(raw)) return;
-      let formatted = raw;
-      if (raw.length > 4) formatted = raw.slice(0, 4) + "-" + raw.slice(4);
-      if (raw.length > 8) formatted = formatted.slice(0, 9) + "-" + formatted.slice(8);
+      // Remove any non-digit character
+      const raw = value.replace(/\D/g, "");
+
+      // Limit to 12 digits (Truncate excess)
+      const clean = raw.slice(0, 12);
+
+      // Rebuild format
+      let formatted = clean;
+      if (clean.length > 4) {
+        formatted = clean.slice(0, 4) + "-" + clean.slice(4);
+      }
+      if (clean.length > 8) {
+        // "1234-5678" is 9 chars long, so dash goes at index 9
+        formatted = formatted.slice(0, 9) + "-" + formatted.slice(9);
+      }
+      
       value = formatted;
+    }
+
+    // 3. PAN Validation (10 Chars + Uppercase + AlphaNumeric)
+    if (field === "panNumber") {
+      let val = value.toUpperCase();
+      
+      // Remove symbols/spaces (Allow only A-Z and 0-9)
+      val = val.replace(/[^A-Z0-9]/g, "");
+
+      // Limit to 10 characters (Truncate excess)
+      value = val.slice(0, 10);
     }
 
     setEmployee((p) => ({
@@ -103,11 +149,9 @@ const CurrentEmployeeProfile = () => {
     }));
   };
 
-  // ✅ Helper to Update Current Job (The LAST entry in experience array)
   const handleCurrentJobChange = (field, value) => {
     setEmployee((p) => {
       const list = [...(p.experienceDetails || [])];
-      // Target the last item
       const lastIndex = list.length - 1;
       if (lastIndex >= 0) {
         list[lastIndex] = { ...list[lastIndex], [field]: value };
@@ -116,7 +160,6 @@ const CurrentEmployeeProfile = () => {
     });
   };
 
-  // Experience Helpers (For history section)
   const updateExp = (i, field, value) => {
     setEmployee((p) => {
       const list = [...(p.experienceDetails || [])];
@@ -144,7 +187,7 @@ const CurrentEmployeeProfile = () => {
     });
   };
 
-  // ---------------- FILE UPLOAD (FIXED HTTPS) ----------------
+  // ---------------- FILE UPLOAD ----------------
 
   const handleFileUpload = async (e, type, index = null) => {
     const file = e.target.files[0];
@@ -155,16 +198,23 @@ const CurrentEmployeeProfile = () => {
 
     setUploading(prev => ({ ...prev, [type]: true }));
 
+    const token = getToken(); 
+    if (!token) {
+        alert("Authentication lost. Please log in again.");
+        setUploading(prev => ({ ...prev, [type]: false }));
+        return;
+    }
+
     try {
       const res = await axios.post(`${API_BASE}/employees/upload-doc`, uploadData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { 
+            "Content-Type": "multipart/form-data",
+            "Authorization": `Bearer ${token}` 
+        }
       });
 
-      // ✅ FIX: Force HTTPS immediately upon receiving URL
       let url = res.data.url;
-      if (url && url.startsWith("http:")) {
-        url = url.replace("http:", "https:");
-      }
+      if (url && url.startsWith("http:")) url = url.replace("http:", "https:");
 
       if (type === "pan") {
         handleNestedChange("personalDetails", "panFileUrl", url);
@@ -175,36 +225,71 @@ const CurrentEmployeeProfile = () => {
       }
     } catch (err) {
       console.error("Upload Error:", err);
-      alert("File upload failed. Please try again.");
+      alert("File upload failed: " + (err.response?.data?.message || err.message));
     } finally {
       setUploading(prev => ({ ...prev, [type]: false }));
     }
   };
 
-  // ---------------- SAVE TO BACKEND ----------------
+  // ---------------- SAVE TO BACKEND (STRICT VALIDATION) ----------------
 
   const saveChanges = async () => {
+    // 1. Phone Validation
     if (employee.phone?.length !== 10) return alert("Phone number must be 10 digits");
-    if (employee.personalDetails?.aadhaarNumber?.replace(/-/g, "").length !== 12) return alert("Aadhaar must be 12 digits");
+    
+    // 2. Aadhaar Validation
+    // Remove dashes to count digits
+    const cleanAadhaar = employee.personalDetails?.aadhaarNumber?.replace(/\D/g, "") || "";
+    if (cleanAadhaar.length > 0 && cleanAadhaar.length !== 12) {
+       return alert("Aadhaar Number must be exactly 12 digits");
+    }
+
+    // 3. PAN Validation
+    const pan = employee.personalDetails?.panNumber || "";
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (pan.length > 0 && !panRegex.test(pan)) {
+       return alert("Invalid PAN Format. Example: ABCDE1234F");
+    }
 
     const empId = String(employee.employeeId);
     const updatedEmployee = { ...employee, employeeId: empId };
 
     setSaving(true);
 
+    const token = getToken();
+    if (!token) {
+        alert("Session expired. Please log out and log in again.");
+        setSaving(false);
+        return;
+    }
+
     try {
-      const { data } = await axios.put(`${API_BASE}/employees/${empId}`, updatedEmployee);
+      const { data } = await axios.put(
+        `${API_BASE}/employees/${empId}`, 
+        updatedEmployee,
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        }
+      );
       
-      // Ensure ID stays string
       data.employeeId = String(data.employeeId);
-      sessionStorage.setItem("hrmsUser", JSON.stringify(data));
+      
+      const currentStorage = JSON.parse(sessionStorage.getItem("hrmsUser") || "{}");
+      const newData = { ...currentStorage, ...data }; 
+      if(currentStorage.token && !newData.token) newData.token = currentStorage.token;
+
+      sessionStorage.setItem("hrmsUser", JSON.stringify(newData));
       setEmployee(data);
 
       alert("✅ Profile updated successfully!");
       setIsEditing(false);
     } catch (err) {
       console.error(err);
-      alert("❌ Failed to update: " + (err.response?.data?.error || err.message));
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      alert("❌ Failed to update: " + msg);
     } finally {
       setSaving(false);
     }
@@ -215,13 +300,11 @@ const CurrentEmployeeProfile = () => {
     else setIsEditing(true);
   };
 
-  // Destructure for display
   const {
     employeeId, name, email, phone, address, emergency, emergencyPhone,
     personalDetails = {}, bankDetails = {}, experienceDetails = [],
   } = employee;
 
-  // ✅ Extract Current Job Details (Last item in array)
   const currentJob = experienceDetails.length > 0 
     ? experienceDetails[experienceDetails.length - 1] 
     : {};
@@ -243,10 +326,11 @@ const CurrentEmployeeProfile = () => {
             {isEditing && (
               <button
                 onClick={() => {
-                  // Revert changes
-                  const saved = JSON.parse(sessionStorage.getItem("hrmsUser"));
-                  saved.employeeId = String(saved.employeeId);
-                  setEmployee(saved);
+                  const saved = sessionStorage.getItem("hrmsUser");
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    setEmployee(parsed.data || parsed);
+                  }
                   setIsEditing(false);
                 }}
                 className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition"
@@ -270,8 +354,6 @@ const CurrentEmployeeProfile = () => {
         </div>
 
         <div className="p-8 space-y-8">
-          
-          {/* 1. Basic Info */}
           <Section title="Basic Information">
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StaticField label="Employee ID" value={employeeId} />
@@ -284,7 +366,6 @@ const CurrentEmployeeProfile = () => {
              </div>
           </Section>
 
-          {/* 2. Emergency Contact */}
           <Section title="Emergency Contact">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input label="Contact Name" value={emergency} onChange={(v) => handleBasicChange("emergency", v)} editable={isEditing} icon={<FaUser/>} />
@@ -292,7 +373,6 @@ const CurrentEmployeeProfile = () => {
             </div>
           </Section>
 
-          {/* 3. Personal Details */}
           <Section title="Identity & Personal Details">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                <div>
@@ -324,32 +404,20 @@ const CurrentEmployeeProfile = () => {
                </div>
             )}
             
-            {/* ✅ VIEW LINKS: Corrected to force HTTPS */}
             <div className="flex gap-4 mt-4">
                {personalDetails.aadhaarFileUrl && (
-                 <a 
-                   href={getSecureUrl(personalDetails.aadhaarFileUrl)} 
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   className="text-blue-600 underline text-sm font-semibold flex items-center gap-1"
-                 >
+                 <a href={getSecureUrl(personalDetails.aadhaarFileUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm font-semibold flex items-center gap-1">
                    <FaCheck className="text-green-500"/> View Aadhaar Document
                  </a>
                )}
                {personalDetails.panFileUrl && (
-                 <a 
-                   href={getSecureUrl(personalDetails.panFileUrl)} 
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   className="text-blue-600 underline text-sm font-semibold flex items-center gap-1"
-                 >
+                 <a href={getSecureUrl(personalDetails.panFileUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm font-semibold flex items-center gap-1">
                    <FaCheck className="text-green-500"/> View PAN Document
                  </a>
                )}
             </div>
           </Section>
 
-          {/* 4. Work Details */}
           <Section title="Current Job Details">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                <Input label="Department" value={currentJob.department} onChange={(v) => handleCurrentJobChange("department", v)} editable={isEditing} icon={<FaBuilding/>} />
@@ -359,7 +427,6 @@ const CurrentEmployeeProfile = () => {
              </div>
           </Section>
 
-          {/* 5. Bank Details */}
           <Section title="Bank Information">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -380,7 +447,6 @@ const CurrentEmployeeProfile = () => {
              </div>
           </Section>
 
-          {/* 6. Experience History */}
           <Section title="Previous Experience History">
              {isEditing && <button onClick={addExperience} className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-bold">+ Add Previous Job</button>}
              
@@ -402,12 +468,7 @@ const CurrentEmployeeProfile = () => {
                        </div>
                     )}
                     {exp.experienceLetterUrl && (
-                       <a 
-                         href={getSecureUrl(exp.experienceLetterUrl)} 
-                         target="_blank" 
-                         rel="noopener noreferrer" 
-                         className="text-blue-600 underline text-sm md:col-span-2 flex items-center gap-1"
-                        >
+                       <a href={getSecureUrl(exp.experienceLetterUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm md:col-span-2 flex items-center gap-1">
                           <FaCheck className="text-green-500"/> View Document
                         </a>
                     )}
@@ -415,7 +476,6 @@ const CurrentEmployeeProfile = () => {
                  {isEditing && <button onClick={()=>removeExperience(i)} className="mt-3 text-red-500 text-sm hover:underline flex items-center gap-1"><FaTrash/> Remove Entry</button>}
                </div>
              ))}
-             
              {experienceDetails.length <= 1 && <p className="text-slate-400 italic">No previous experience recorded.</p>}
           </Section>
 
@@ -477,12 +537,7 @@ const FileUpload = ({ label, onChange, uploading, fileUrl }) => (
          <input type="file" className="hidden" accept="image/*,.pdf" onChange={onChange} disabled={uploading} />
        </label>
        {fileUrl && (
-         <a 
-           href={getSecureUrl(fileUrl)} 
-           target="_blank" 
-           rel="noreferrer" 
-           className="text-blue-600 hover:underline text-xs"
-         >
+         <a href={getSecureUrl(fileUrl)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
            View
          </a>
        )}

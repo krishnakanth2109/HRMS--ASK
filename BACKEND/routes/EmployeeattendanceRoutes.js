@@ -9,6 +9,7 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
+// Apply protection to all routes
 router.use(protect);
 
 // Admin Only: Get All
@@ -90,7 +91,7 @@ router.post('/punch-in', async (req, res) => {
         workedHours: 0,
         workedMinutes: 0,
         workedSeconds: 0,
-        totalBreakSeconds: 0, // Init break time
+        totalBreakSeconds: 0,
         displayTime: "0h 0m 0s",
         status: "WORKING",
         loginStatus: isLate ? "LATE" : "ON_TIME",
@@ -100,7 +101,6 @@ router.post('/punch-in', async (req, res) => {
     } 
     // --- SCENARIO 2: RESUME WORK (PUNCH IN AGAIN) ---
     else {
-        // ✅ REQ: If shift completed, do not allow punch in
         if (todayRecord.workedStatus === "FULL_DAY") {
             return res.status(400).json({ message: "Your shift is completed. You cannot punch in again today." });
         }
@@ -109,16 +109,13 @@ router.post('/punch-in', async (req, res) => {
             return res.status(400).json({ message: "You are already Punched In." });
         }
 
-        // ✅ REQ: Calculate Break Time (Time between Last Punch Out and Now)
         const lastSession = todayRecord.sessions[todayRecord.sessions.length - 1];
         if (lastSession && lastSession.punchOut) {
             const breakDiff = (now - new Date(lastSession.punchOut)) / 1000;
             todayRecord.totalBreakSeconds = (todayRecord.totalBreakSeconds || 0) + breakDiff;
         }
 
-        // Create New Session
         todayRecord.sessions.push({ punchIn: now, punchOut: null, durationSeconds: 0 });
-        
         todayRecord.status = "WORKING";
         todayRecord.punchOut = null; 
     }
@@ -164,7 +161,7 @@ router.post('/punch-out', async (req, res) => {
     todayRecord.punchOutLocation = { latitude, longitude, timestamp: now };
     todayRecord.status = "COMPLETED";
 
-    // 3. Calculate Total Worked Time (Sum of all sessions)
+    // 3. Calculate Total Worked Time
     let totalSeconds = 0;
     todayRecord.sessions.forEach(sess => {
         if(sess.punchIn && sess.punchOut) {
@@ -204,6 +201,105 @@ router.post('/punch-out', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/* ====================================================================================
+   ✅ NEW: ADMIN PUNCH OUT ROUTE (This fixes the 404 Error)
+==================================================================================== */
+router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
+  try {
+    const { employeeId, punchOutTime, latitude, longitude, date } = req.body;
+
+    if (!employeeId || !punchOutTime || !date) {
+      return res.status(400).json({ message: "Employee ID, Punch Out Time and Date are required" });
+    }
+
+    const punchOutDateObj = new Date(punchOutTime);
+    
+    // Find Employee Attendance Doc
+    let attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "No attendance record found for this employee" });
+
+    // Find specific day record (formatted YYYY-MM-DD from frontend)
+    // Note: frontend sends full ISO, we might need to normalize or rely on the `date` field passed
+    let targetDateStr = date;
+    if(date.includes("T")) targetDateStr = date.split("T")[0];
+
+    let dayRecord = attendance.attendance.find(a => a.date === targetDateStr);
+    
+    if (!dayRecord) {
+        return res.status(400).json({ message: `No attendance entry found for date: ${targetDateStr}` });
+    }
+
+    // Check if already punched out
+    if (dayRecord.status === "COMPLETED" && dayRecord.punchOut) {
+        // Optional: Allow overwrite? For now, let's just update the existing punchOut
+        // return res.status(400).json({ message: "Employee is already marked as completed." });
+    }
+
+    // 1. Close Open Sessions
+    const sessions = dayRecord.sessions || [];
+    const openSession = sessions.find(s => !s.punchOut);
+
+    if (openSession) {
+        openSession.punchOut = punchOutDateObj;
+        openSession.durationSeconds = (punchOutDateObj - new Date(openSession.punchIn)) / 1000;
+    }
+
+    // 2. Update Top-Level fields
+    dayRecord.punchOut = punchOutDateObj;
+    dayRecord.punchOutLocation = { 
+        latitude: latitude || 0, 
+        longitude: longitude || 0, 
+        address: "Admin Force Logout",
+        timestamp: new Date()
+    };
+    dayRecord.status = "COMPLETED";
+    
+    // 3. Mark as Admin Action
+    dayRecord.adminPunchOut = true;
+    dayRecord.adminPunchOutBy = req.user.name; // From 'protect' middleware
+    dayRecord.adminPunchOutTimestamp = new Date();
+
+    // 4. Recalculate Totals
+    let totalSeconds = 0;
+    dayRecord.sessions.forEach(sess => {
+        if(sess.punchIn && sess.punchOut) {
+            totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+        }
+    });
+
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+
+    dayRecord.workedHours = h;
+    dayRecord.workedMinutes = m;
+    dayRecord.workedSeconds = s;
+    dayRecord.displayTime = `${h}h ${m}m ${s}s`;
+
+    // 5. Update Status based on Shift
+    let shift = await Shift.findOne({ employeeId });
+    if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
+
+    let workedStatus = "ABSENT";
+    if (h >= shift.fullDayHours) workedStatus = "FULL_DAY";
+    else if (h >= shift.halfDayHours) workedStatus = "HALF_DAY";
+    else if (h >= shift.quarterDayHours) workedStatus = "HALF_DAY"; // Flexible fallback
+
+    dayRecord.workedStatus = workedStatus;
+    dayRecord.attendanceCategory = workedStatus === "FULL_DAY" ? "FULL_DAY" : (workedStatus === "HALF_DAY" ? "HALF_DAY" : "ABSENT");
+
+    await attendance.save();
+
+    res.json({ success: true, message: "Employee punched out by Admin successfully", data: dayRecord });
+
+  } catch (err) {
+    console.error("Admin Punch Out Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ================= OTHER ROUTES ================= */
 
 router.post('/record-idle-activity', async (req, res) => {
   try {
@@ -245,3 +341,4 @@ router.get('/:employeeId', async (req, res) => {
 });
 
 export default router;
+// --- END OF FILE EmployeeattendanceRoutes.js ---

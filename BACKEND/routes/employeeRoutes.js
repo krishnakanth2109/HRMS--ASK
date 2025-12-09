@@ -1,4 +1,4 @@
-// --- UPDATED FILE: routes/employeeRoutes.js ---
+// --- START OF FILE: routes/employeeRoutes.js ---
 
 import express from "express";
 import Employee from "../models/employeeModel.js";
@@ -10,13 +10,15 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 const router = express.Router();
 
 /* ============================================================================
- 📂 1. FILE UPLOAD ROUTE  → ONLY ADMIN
+ 📂 1. FILE UPLOAD ROUTE 
+ ✅ FIX: Removed 'onlyAdmin' so regular employees can upload documents
 ============================================================================ */
-router.post("/upload-doc", protect, onlyAdmin, upload.single("file"), (req, res) => {
+router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
+    // Return the Cloudinary URL (or local path)
     res.status(200).json({ url: req.file.path });
   } catch (error) {
     console.error("Upload error:", error);
@@ -25,10 +27,10 @@ router.post("/upload-doc", protect, onlyAdmin, upload.single("file"), (req, res)
 });
 
 /* ============================================================================
- 👤 2. EMPLOYEE CRUD (ADMIN ONLY)
+ 👤 2. EMPLOYEE CRUD
 ============================================================================ */
 
-// CREATE employee  → ADMIN ONLY
+// CREATE employee → ADMIN ONLY
 router.post("/", protect, onlyAdmin, async (req, res) => {
   try {
     const employee = new Employee(req.body);
@@ -39,7 +41,7 @@ router.post("/", protect, onlyAdmin, async (req, res) => {
   }
 });
 
-// GET all employees → ADMIN + MANAGER allowed
+// GET all employees → Authenticated users allowed
 router.get("/", protect, async (req, res) => {
   try {
     const employees = await Employee.find();
@@ -49,7 +51,7 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
-// GET employee by ID → ADMIN + MANAGER allowed
+// GET employee by ID → Authenticated users allowed
 router.get("/:id", protect, async (req, res) => {
   try {
     const employee = await Employee.findOne({ employeeId: req.params.id });
@@ -61,9 +63,22 @@ router.get("/:id", protect, async (req, res) => {
   }
 });
 
-// UPDATE employee → ADMIN ONLY
-router.put("/:id", protect, onlyAdmin, async (req, res) => {
+// UPDATE employee 
+// ✅ FIX: Allow Admin OR the Employee themselves to update the profile
+router.put("/:id", protect, async (req, res) => {
   try {
+    // 1. Check if user is Admin
+    const isAdmin = req.user.role === "admin";
+    
+    // 2. Check if user is updating their OWN profile
+    // (Ensure req.user.employeeId is populated by your protect middleware)
+    const isSelf = req.user.employeeId === req.params.id; 
+
+    // 3. If not admin and not self, reject
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: "Not authorized to update this profile" });
+    }
+
     const updated = await Employee.findOneAndUpdate(
       { employeeId: req.params.id },
       req.body,
@@ -138,7 +153,7 @@ router.patch("/:id/reactivate", protect, onlyAdmin, async (req, res) => {
 });
 
 /* ============================================================================
- 🔥 IDLE DETECTION → MANAGER CAN’T CREATE, BUT THIS IS SYSTEM GENERATED
+ 🔥 IDLE DETECTION → SYSTEM GENERATED
 ============================================================================ */
 router.post("/idle-activity", protect, async (req, res) => {
   try {
