@@ -11,7 +11,7 @@ import {
   approveLeaveRequestById,
   rejectLeaveRequestById,
 } from "../api";
-import { FaCheck, FaTimes, FaFilter, FaCalendarAlt, FaUndo } from "react-icons/fa";
+import { FaCheck, FaTimes, FaFilter, FaCalendarAlt } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 
@@ -24,14 +24,12 @@ const AdminLeavePanel = () => {
   const [statusUpdating, setStatusUpdating] = useState(null);
 
   // --- UI States ---
+  // Defaulting to current month for the month filter
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filterDept, setFilterDept] = useState("All");
   const [filterStatus, setFilterStatus] = useState(
     location.state?.defaultStatus || "All"
   );
-  
-  // --- Date Filter States ---
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showMoreId, setShowMoreId] = useState(null);
@@ -101,16 +99,16 @@ const AdminLeavePanel = () => {
     ).filter(Boolean);
   }, [employeesMap]);
 
-  // Filter logic (including today and Date Ranges)
+  // Filter logic (including today and month)
   const filteredRequests = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
 
     return enrichedLeaveList.filter((req) => {
-      // 1. Department Filter
+      // 1. Filter by Department
       const matchDept =
         filterDept === "All" || req.department === filterDept;
 
-      // 2. Status Filter
+      // 2. Filter by Status
       const matchStatus =
         filterStatus === "All" ||
         req.status === filterStatus ||
@@ -119,27 +117,20 @@ const AdminLeavePanel = () => {
           today >= req.from &&
           today <= req.to);
 
-      // 3. Search Filter
+      // 3. Filter by Search Query
       const matchSearch =
         req.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         req.employeeName?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // 4. Date Range Filter
-      // Logic: A leave overlaps with the filter range if:
-      // (LeaveStart <= FilterEnd) AND (LeaveEnd >= FilterStart)
-      let matchDate = true;
-      if (filterDateFrom || filterDateTo) {
-        const leaveStart = req.from;
-        const leaveEnd = req.to;
-        const filterStart = filterDateFrom || "0000-01-01"; // Default to very old if empty
-        const filterEnd = filterDateTo || "9999-12-31";     // Default to future if empty
+      // 4. Filter by Month (New Logic)
+      // Check if the request's 'from' date starts with the selected YYYY-MM
+      const matchMonth = filterMonth
+        ? req.from.startsWith(filterMonth)
+        : true;
 
-        matchDate = leaveStart <= filterEnd && leaveEnd >= filterStart;
-      }
-
-      return matchDept && matchStatus && matchSearch && matchDate;
+      return matchDept && matchStatus && matchSearch && matchMonth;
     });
-  }, [enrichedLeaveList, filterDept, filterStatus, searchQuery, filterDateFrom, filterDateTo]);
+  }, [enrichedLeaveList, filterDept, filterStatus, searchQuery, filterMonth]);
 
   // Today on leave count
   const todayOnLeave = useMemo(() => {
@@ -192,11 +183,6 @@ const AdminLeavePanel = () => {
     );
   };
 
-  const clearDateFilters = () => {
-    setFilterDateFrom("");
-    setFilterDateTo("");
-  };
-
   if (loading)
     return <div className="p-6 text-center text-lg">Loading...</div>;
 
@@ -245,119 +231,91 @@ const AdminLeavePanel = () => {
         </div>
       </div>
 
-      {/* FILTERS CONTAINER */}
+      {/* FILTERS */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded shadow-sm border">
-          <FaFilter className="text-blue-600" />
-          
-          {/* Department Select */}
-          <select
-            value={filterDept}
-            onChange={(e) => setFilterDept(e.target.value)}
-            className="border px-2 py-1 rounded text-sm bg-white"
-          >
-            <option value="All">All Departments</option>
-            {allDepartments.map((dept) => (
-              <option key={dept}>{dept}</option>
-            ))}
-          </select>
-        </div>
+        <FaFilter className="text-blue-600" />
 
-        {/* Date Range Filter */}
-        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded shadow-sm border">
-          <span className="text-sm font-semibold text-gray-600 flex items-center gap-1">
-             <FaCalendarAlt /> Date:
-          </span>
-          <input
-            type="date"
-            className="border px-2 py-1 rounded text-sm outline-none focus:ring-1 focus:ring-blue-500"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            title="Start Date"
-          />
-          <span className="text-gray-400">-</span>
-          <input
-            type="date"
-            className="border px-2 py-1 rounded text-sm outline-none focus:ring-1 focus:ring-blue-500"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            title="End Date"
-          />
-          {(filterDateFrom || filterDateTo) && (
-            <button 
-              onClick={clearDateFilters}
-              className="text-red-500 hover:text-red-700 ml-1"
-              title="Clear Date Filter"
-            >
-              <FaUndo size={14} />
-            </button>
-          )}
-        </div>
+        {/* Month Filter */}
+        <input
+          type="month"
+          value={filterMonth}
+          onChange={(e) => setFilterMonth(e.target.value)}
+          className="border px-3 py-2 rounded shadow text-gray-700 bg-white"
+        />
 
-        {/* Status Buttons */}
-        <div className="flex flex-wrap gap-2">
-          {["All", "Pending", "Approved", "Rejected", "Today"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded text-sm font-semibold transition ${
-                filterStatus === s
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 hover:bg-blue-100 text-gray-700"
-              }`}
-            >
-              {s === "Today" ? "On Leave Today" : s}
-            </button>
+        <select
+          value={filterDept}
+          onChange={(e) => setFilterDept(e.target.value)}
+          className="border px-3 py-2 rounded shadow"
+        >
+          <option value="All">All Departments</option>
+          {allDepartments.map((dept) => (
+            <option key={dept}>{dept}</option>
           ))}
-        </div>
+        </select>
+
+        {["All", "Pending", "Approved", "Rejected", "Today"].map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilterStatus(s)}
+            className={`px-4 py-2 rounded font-semibold transition ${
+              filterStatus === s
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 hover:bg-blue-100"
+            }`}
+          >
+            {s === "Today" ? "On Leave Today" : s}
+          </button>
+        ))}
       </div>
 
       {/* SEARCH */}
       <input
         type="text"
         placeholder="Search by Name or Employee ID"
-        className="border px-4 py-2 rounded mb-4 w-full max-w-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="border px-4 py-2 rounded mb-4 w-full max-w-sm"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
 
       {/* SUMMARY */}
-      <div className="mb-4 bg-gray-50 p-3 rounded-xl shadow flex flex-wrap gap-4 text-sm font-semibold text-gray-700">
-        <span>Total: <span className="text-blue-600">{filteredRequests.length}</span></span>
-        <span>Approved: <span className="text-green-600">{filteredRequests.filter((r) => r.status === "Approved").length}</span></span>
-        <span>Pending: <span className="text-yellow-600">{filteredRequests.filter((r) => r.status === "Pending").length}</span></span>
-        <span>Rejected: <span className="text-red-600">{filteredRequests.filter((r) => r.status === "Rejected").length}</span></span>
+      <div className="mb-4 bg-gray-50 p-3 rounded-xl shadow flex gap-6 text-sm font-semibold">
+        <span>Total: {filteredRequests.length}</span>
+        <span>Approved: {filteredRequests.filter((r) => r.status === "Approved").length}</span>
+        <span>Pending: {filteredRequests.filter((r) => r.status === "Pending").length}</span>
+        <span>Rejected: {filteredRequests.filter((r) => r.status === "Rejected").length}</span>
+        <span>On Leave Today: {todayOnLeave}</span>
       </div>
 
       {/* TABLE */}
       <div className="overflow-x-auto bg-white rounded-xl shadow">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="bg-gray-100 text-left text-gray-600 uppercase tracking-wider">
-              <th className="p-4 font-semibold">ID</th>
-              <th className="p-4 font-semibold">Name</th>
-              <th className="p-4 font-semibold">Dept</th>
-              <th className="p-4 font-semibold">From</th>
-              <th className="p-4 font-semibold">To</th>
-              <th className="p-4 font-semibold">Type</th>
-              <th className="p-4 font-semibold">Reason</th>
-              <th className="p-4 font-semibold">Status</th>
-              <th className="p-4 font-semibold">Actions</th>
+            <tr className="bg-gray-100 text-left">
+              <th className="p-4">ID</th>
+              <th className="p-4">Name</th>
+              <th className="p-4">Dept</th>
+              <th className="p-4">From</th>
+              <th className="p-4">To</th>
+              <th className="p-4">Type</th>
+              <th className="p-4">Reason</th>
+              <th className="p-4">Status</th>
+              <th className="p-4">Actions</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-200">
+          <tbody>
             {filteredRequests.length ? (
               filteredRequests.map((lv) => (
                 <React.Fragment key={lv._id}>
-                  <tr className="hover:bg-blue-50 transition">
-                    <td className="p-4 font-medium text-gray-900">{lv.employeeId}</td>
-                    <td className="p-4 text-gray-700">{lv.employeeName}</td>
-                    <td className="p-4 text-gray-600">{lv.department}</td>
-                    <td className="p-4 whitespace-nowrap">{lv.from}</td>
-                    <td className="p-4 whitespace-nowrap">{lv.to}</td>
+                  <tr className="border-t hover:bg-blue-50 transition">
+                    <td className="p-4">{lv.employeeId}</td>
+                    <td className="p-4">{lv.employeeName}</td>
+                    <td className="p-4">{lv.department}</td>
+                    <td className="p-4">{lv.from}</td>
+                    <td className="p-4">{lv.to}</td>
                     <td className="p-4">{lv.leaveType}</td>
-                    <td className="p-4 max-w-xs truncate" title={lv.reason}>{lv.reason}</td>
+                    <td className="p-4">{lv.reason}</td>
                     <td className="p-4">{statusBadge(lv.status)}</td>
 
                     <td className="p-4 flex gap-2">
@@ -365,62 +323,56 @@ const AdminLeavePanel = () => {
                         onClick={() =>
                           setShowMoreId(showMoreId === lv._id ? null : lv._id)
                         }
-                        className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-xs"
+                        className="bg-blue-100 text-blue-700 px-2 py-1 rounded"
                       >
                         {showMoreId === lv._id ? "Hide" : "Details"}
                       </button>
 
-                      {lv.status === "Pending" && (
-                        <>
-                          <button
-                            onClick={() => openConfirm(lv._id, "Approved")}
-                            className="bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded"
-                            title="Approve"
-                          >
-                            <FaCheck />
-                          </button>
+                      <button
+                        onClick={() => openConfirm(lv._id, "Approved")}
+                        className="bg-green-100 text-green-700 px-2 py-1 rounded"
+                      >
+                        <FaCheck />
+                      </button>
 
-                          <button
-                            onClick={() => openConfirm(lv._id, "Rejected")}
-                            className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded"
-                            title="Reject"
-                          >
-                            <FaTimes />
-                          </button>
-                        </>
-                      )}
+                      <button
+                        onClick={() => openConfirm(lv._id, "Rejected")}
+                        className="bg-red-100 text-red-700 px-2 py-1 rounded"
+                      >
+                        <FaTimes />
+                      </button>
                     </td>
                   </tr>
 
                   {showMoreId === lv._id && (
                     <tr className="bg-gray-50">
                       <td colSpan="9" className="p-4">
-                        <div className="bg-white p-4 rounded shadow border border-gray-200">
-                          <h4 className="font-semibold mb-2 text-gray-700">
+                        <div className="bg-white p-4 rounded shadow">
+                          <h4 className="font-semibold mb-2">
                             Leave Day Details
                           </h4>
 
                           {lv.details?.length ? (
-                            <table className="min-w-full text-sm border">
+                            <table className="min-w-full text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
-                                  <th className="px-3 py-2 border">Date</th>
-                                  <th className="px-3 py-2 border">Category</th>
-                                  <th className="px-3 py-2 border">Type</th>
+                                  <th className="px-3 py-2">Date</th>
+                                  <th className="px-3 py-2">Category</th>
+                                  <th className="px-3 py-2">Type</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {lv.details.map((d, i) => (
                                   <tr key={i}>
-                                    <td className="px-3 py-2 border">{d.date}</td>
-                                    <td className="px-3 py-2 border">{d.leavecategory}</td>
-                                    <td className="px-3 py-2 border">{d.leaveDayType}</td>
+                                    <td className="px-3 py-2">{d.date}</td>
+                                    <td className="px-3 py-2">{d.leavecategory}</td>
+                                    <td className="px-3 py-2">{d.leaveDayType}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           ) : (
-                            <p className="text-gray-500 italic">No detailed breakdown available.</p>
+                            <p>No details available.</p>
                           )}
                         </div>
                       </td>
@@ -430,11 +382,8 @@ const AdminLeavePanel = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="9" className="text-center p-8 text-gray-500">
-                  <div className="flex flex-col items-center">
-                    <FaCalendarAlt className="text-4xl text-gray-300 mb-2" />
-                    <p>No leave requests found matching your filters.</p>
-                  </div>
+                <td colSpan="9" className="text-center p-4 text-gray-500">
+                  No leave requests found for this month/filter.
                 </td>
               </tr>
             )}
@@ -452,10 +401,10 @@ const AdminLeavePanel = () => {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white w-96 p-6 rounded-xl shadow-2xl"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-80 p-6 rounded-xl shadow-xl"
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
             >
               <h3 className="text-xl font-bold mb-4 text-indigo-700">
                 Confirm {confirmAction}
@@ -463,29 +412,23 @@ const AdminLeavePanel = () => {
 
               <p className="text-gray-700 mb-6">
                 Are you sure you want to{" "}
-                <b className={confirmAction === "Approved" ? "text-green-600" : "text-red-600"}>
-                  {confirmAction}
-                </b>{" "}
-                this leave request?
+                <b className="text-indigo-700">{confirmAction}</b> this leave
+                request?
               </p>
 
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setConfirmOpen(false)}
-                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 font-medium"
-                >
-                  Cancel
-                </button>
-                
+              <div className="flex justify-between">
                 <button
                   onClick={handleConfirmAction}
-                  className={`px-4 py-2 rounded text-white font-medium shadow-md ${
-                     confirmAction === "Approved" 
-                     ? "bg-green-600 hover:bg-green-700" 
-                     : "bg-red-600 hover:bg-red-700"
-                  }`}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-800"
                 >
                   Yes, Confirm
+                </button>
+
+                <button
+                  onClick={() => setConfirmOpen(false)}
+                  className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancel
                 </button>
               </div>
             </motion.div>
@@ -494,14 +437,9 @@ const AdminLeavePanel = () => {
       </AnimatePresence>
 
       {snackbar && (
-        <motion.div 
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 50, opacity: 0 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-gray-800 text-white rounded-full shadow-lg z-50"
-        >
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded shadow-lg">
           {snackbar}
-        </motion.div>
+        </div>
       )}
     </div>
   );

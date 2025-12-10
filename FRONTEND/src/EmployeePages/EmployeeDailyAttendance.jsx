@@ -398,7 +398,8 @@ const EmployeeDailyAttendance = () => {
         },
         {
           label: 'Absent',
-          data: yearlyStats.map(s => s.absent),
+          // Leaves included in Absent for graph
+          data: yearlyStats.map(s => s.absent + s.leave),
           backgroundColor: '#ef4444', 
           borderRadius: 4,
           barPercentage: 0.6,
@@ -450,17 +451,26 @@ const EmployeeDailyAttendance = () => {
     const m = selectedDate.getMonth();
     const stats = yearlyStats[m];
     
+    // Filter out future dates to get "from 1st of month to Today"
     const currentMonthData = processedCalendarData.filter(d => d.workedStatus !== "Upcoming");
+    
     const weekOffs = currentMonthData.filter(d => d.workedStatus === "Week Off").length;
     const holidaysCount = currentMonthData.filter(d => d.workedStatus === "Holiday").length;
+    
+    // UPDATED: Working Days Logic
+    // Total days passed so far - Week Offs - Holidays
+    // This gives the number of days the employee was EXPECTED to be present
     const workingDays = Math.max(0, currentMonthData.length - weekOffs - holidaysCount);
+
+    // Absent includes leaves as requested
+    const absentTotal = stats.absent + stats.leave;
 
     return {
         presentDays: stats.present,
         fullDays: stats.fullDay,
         halfDays: stats.halfDay,
         leaveDays: stats.leave,
-        absentDays: stats.absent,
+        absentDays: absentTotal,
         holidayCount: stats.holidays,
         weekOffs: weekOffs,
         workingDays: workingDays,

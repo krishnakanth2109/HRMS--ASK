@@ -10,21 +10,19 @@ import {
   FaTimes,
 } from "react-icons/fa";
 
-import { CurrentEmployeeNotificationContext } from "../../EmployeeContext/CurrentEmployeeNotificationContext";
+// Import AuthContext to get current user ID
+import { AuthContext } from "../../context/AuthContext";
+// Import API to fetch real DB data
+import api from "../../api"; 
 
 const navLinks = [
   { to: "/employee/dashboard", label: "Dashboard", icon: <FaHome /> },
   { to: "/employee/my-attendence", label: "Attendance", icon: <FaClock /> },
   { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <FaClipboardList /> },
-  { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />, isNotice: true },
+  { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />,   isNotice: true },
   { to: "/employee/empovertime", label: "Request Overtime", icon: <FaClock /> },
   { to: "/employee/leave-management", label: "Leave Requests", icon: <FaClipboardList /> },
-    { to: "/employee/reuestworkmode", label: "Request WorkMode", icon: <FaClock /> },
-  
-
-  { to: "/employee/requestpunchout", label: "Request Punch Out", icon: <FaClock /> },
-
-
+  { to: "/employee/reuestworkmode", label: "Request WorkMode", icon: <FaClock /> },
 ];
 
 const SidebarEmployee = () => {
@@ -32,15 +30,51 @@ const SidebarEmployee = () => {
   const [open, setOpen] = useState(window.innerWidth >= 768);
   const [collapsed, setCollapsed] = useState(false);
 
-  const { unreadNotices, markAllNoticesRead } = useContext(
-    CurrentEmployeeNotificationContext
-  );
+  // Get current user to check against DB records
+  const { user } = useContext(AuthContext);
+  
+  // Local state for accurate DB count
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const resize = () => setOpen(window.innerWidth >= 768);
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
+
+  // ✅ NEW: Fetch real unread count from DB
+  const fetchUnreadCount = async () => {
+    if (!user) return;
+    try {
+      const { data } = await api.get("/api/notices");
+      
+      const count = data.filter(notice => {
+        // Check if current user ID is present inside the readBy array
+        // Handle both populated objects and raw ID strings
+        const isRead = notice.readBy && notice.readBy.some(record => {
+          const recordId = typeof record.employeeId === 'object' 
+            ? record.employeeId._id 
+            : record.employeeId;
+          return recordId === (user._id || user.id);
+        });
+
+        // Return true if NOT read (to count it)
+        return !isRead;
+      }).length;
+
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Failed to fetch unread notice count", error);
+    }
+  };
+
+  // Fetch count on mount and whenever the URL changes (e.g. creating/reading notices)
+  useEffect(() => {
+    fetchUnreadCount();
+    // Optional: Set up an interval to poll for new notices every minute
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, [user, location.pathname]);
 
   return (
     <>
@@ -100,9 +134,6 @@ const SidebarEmployee = () => {
                       ? "bg-blue-600 text-white"
                       : "hover:bg-blue-700 text-gray-200"
                   } ${collapsed ? "justify-center px-2" : ""}`}
-                  onClick={() => {
-                    if (link.isNotice) markAllNoticesRead();
-                  }}
                 >
                   <span className="text-xl">{link.icon}</span>
 
@@ -110,9 +141,10 @@ const SidebarEmployee = () => {
                     <span className="relative">
                       {link.label}
 
-                      {link.isNotice && unreadNotices > 0 && (
+                      {/* ✅ Updated Badge Logic: Uses real DB calculation */}
+                      {link.isNotice && unreadCount > 0 && (
                         <span className="absolute -right-5 top-0 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                          {unreadNotices}
+                          {unreadCount}
                         </span>
                       )}
                     </span>

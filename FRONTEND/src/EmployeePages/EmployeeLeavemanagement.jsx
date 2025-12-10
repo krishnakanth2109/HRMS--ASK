@@ -125,8 +125,27 @@ const getNextMonth = (monthStr) => {
 const EmployeeLeavemanagement = () => {
   const [user, setUser] = useState(null);
   
-  // Block past dates
-  const today = new Date().toISOString().split("T")[0];
+  // --- UPDATED DATE LOGIC: Allow past dates (Present Month or 7 days ago) ---
+  const minSelectionDate = useMemo(() => {
+    const now = new Date();
+    
+    // 1. Calculate 7 days ago
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    
+    // 2. Calculate Start of Current Month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // 3. Take the earlier of the two to be permissible
+    // This allows selecting from the 1st of month even if today is the 20th,
+    // AND allows selecting 7 days ago if today is the 2nd (crossing into prev month).
+    const earliestAllowed = sevenDaysAgo < startOfMonth ? sevenDaysAgo : startOfMonth;
+    
+    // Format to YYYY-MM-DD
+    return formatDate(earliestAllowed);
+  }, []);
+
+  const todayStr = new Date().toISOString().split("T")[0]; // Just for reference if needed
   
   // Holiday state
   const [holidays, setHolidays] = useState([]);
@@ -555,12 +574,13 @@ const EmployeeLeavemanagement = () => {
         [name]: name === "reason" ? value.slice(0, REASON_LIMIT) : value,
       };
 
-      // Prevent selecting past dates at state level too (extra safety)
-      if (name === "from" && value < today) {
-        updated.from = today;
+      // Prevent selecting past dates beyond the allowed minSelectionDate
+      // Modified from checking against 'today' to 'minSelectionDate'
+      if (name === "from" && value < minSelectionDate) {
+        updated.from = minSelectionDate;
       }
-      if (name === "to" && value < today) {
-        updated.to = today;
+      if (name === "to" && value < minSelectionDate) {
+        updated.to = minSelectionDate;
       }
 
       // Auto-reset To when From changes
@@ -1183,7 +1203,7 @@ const EmployeeLeavemanagement = () => {
                       name="from" 
                       value={form.from} 
                       onChange={handleChange}
-                      min={today}
+                      min={minSelectionDate} // Updated to allow past 7 days/current month
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>
@@ -1194,7 +1214,7 @@ const EmployeeLeavemanagement = () => {
                       name="to" 
                       value={form.to} 
                       onChange={handleChange}
-                      min={form.from || today}
+                      min={form.from || minSelectionDate} // Updated to allow past 7 days/current month
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>

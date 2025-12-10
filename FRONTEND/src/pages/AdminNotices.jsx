@@ -1,28 +1,58 @@
-// --- ENHANCED AdminNotices.jsx ---
-
 import React, { useState, useEffect, useCallback } from "react";
 import { getAllNoticesForAdmin, addNotice, getEmployees, deleteNoticeById, updateNotice } from "../api";
-import { FaEdit, FaTrash, FaPaperPlane, FaUsers, FaCalendarAlt, FaTimes, FaCheck, FaChevronDown } from 'react-icons/fa';
+import api from "../api"; // Direct API import for chat
+import Swal from 'sweetalert2'; 
+import { 
+  FaEdit, FaTrash, FaPlus, FaTimes, FaSearch, FaCheck, 
+  FaChevronDown, FaChevronUp, FaUserTag, FaEye, FaReply, FaPaperPlane 
+} from 'react-icons/fa';
 
 const AdminNotices = () => {
+  // --- STATE ---
   const initialFormState = { title: "", description: "", recipients: [], sendTo: 'ALL' };
   const [noticeData, setNoticeData] = useState(initialFormState);
   const [notices, setNotices] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  
+  // UI States
   const [editingNoticeId, setEditingNoticeId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Toggle for "Specific" recipients list
+  const [expandedRecipientNoticeId, setExpandedRecipientNoticeId] = useState(null);
 
+  // ✅ POPUP STATES
+  const [viewedByNotice, setViewedByNotice] = useState(null); 
+  const [repliesNotice, setRepliesNotice] = useState(null);
+  
+  // ✅ CHAT STATES
+  const [selectedChatEmployeeId, setSelectedChatEmployeeId] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  // --- API CALLS ---
   const fetchNotices = useCallback(async () => {
     try {
       const data = await getAllNoticesForAdmin();
-      setNotices(data);
+      const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setNotices(sortedData);
+
+      // ✅ Update Chat Window if Open
+      if (repliesNotice) {
+        const updatedNotice = sortedData.find(n => n._id === repliesNotice._id);
+        
+        // Only update state if replies have actually changed (prevents flickering)
+        if (updatedNotice && JSON.stringify(updatedNotice.replies) !== JSON.stringify(repliesNotice.replies)) {
+           setRepliesNotice(updatedNotice);
+        }
+      }
     } catch (error) {
-      console.error("Error fetching all notices:", error);
+      console.error("Error fetching notices:", error);
     }
-  }, []);
+  }, [repliesNotice]);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -33,11 +63,25 @@ const AdminNotices = () => {
     }
   }, []);
 
+  // Initial Load
   useEffect(() => {
     fetchNotices();
     fetchEmployees();
-  }, [fetchNotices, fetchEmployees]);
+  }, [fetchEmployees]); 
 
+  // ✅ AUTO-REFRESH MESSAGES (POLLING)
+  // This will check for new messages every 3 seconds when the chat is open
+  useEffect(() => {
+    let interval;
+    if (repliesNotice) {
+      interval = setInterval(() => {
+        fetchNotices();
+      }, 3000); // 3 seconds
+    }
+    return () => clearInterval(interval);
+  }, [repliesNotice, fetchNotices]);
+
+  // --- HANDLERS ---
   const handleChange = (e) => {
     const { name, value } = e.target;
     setNoticeData(prev => ({ ...prev, [name]: value }));
@@ -47,65 +91,60 @@ const AdminNotices = () => {
     setNoticeData(prev => {
       const isSelected = prev.recipients.includes(employeeId);
       if (isSelected) {
-        return {
-          ...prev,
-          recipients: prev.recipients.filter(id => id !== employeeId)
-        };
+        return { ...prev, recipients: prev.recipients.filter(id => id !== employeeId) };
       } else {
-        return {
-          ...prev,
-          recipients: [...prev.recipients, employeeId]
-        };
+        return { ...prev, recipients: [...prev.recipients, employeeId] };
       }
     });
   };
 
-  const selectAllEmployees = () => {
-    setNoticeData(prev => ({
-      ...prev,
-      recipients: employees.map(emp => emp._id)
-    }));
+  const toggleRecipientList = (noticeId) => {
+    setExpandedRecipientNoticeId(prev => prev === noticeId ? null : noticeId);
   };
 
-  const clearAllSelections = () => {
-    setNoticeData(prev => ({
-      ...prev,
-      recipients: []
-    }));
+  const openModal = (notice = null) => {
+    if (notice) {
+      setEditingNoticeId(notice._id);
+      const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
+      setNoticeData({
+        title: notice.title,
+        description: notice.description,
+        recipients: isSpecific ? notice.recipients : [],
+        sendTo: isSpecific ? 'SPECIFIC' : 'ALL',
+      });
+    } else {
+      setEditingNoticeId(null);
+      setNoticeData(initialFormState);
+    }
+    setIsModalOpen(true);
   };
 
-  const resetForm = () => {
-    setNoticeData(initialFormState);
+  const closeModal = () => {
+    setIsModalOpen(false);
     setEditingNoticeId(null);
-    setMessage("");
+    setNoticeData(initialFormState);
     setIsDropdownOpen(false);
     setSearchTerm("");
   };
 
-  const handleEdit = (notice) => {
-    setEditingNoticeId(notice._id);
-    
-    const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
-    
-    setNoticeData({
-      title: notice.title,
-      description: notice.description,
-      recipients: isSpecific ? notice.recipients : [],
-      sendTo: isSpecific ? 'SPECIFIC' : 'ALL',
-    });
-    
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleDelete = async (noticeId) => {
-    if (window.confirm("Are you sure you want to delete this notice permanently?")) {
+    const result = await Swal.fire({
+      title: 'Delete Notice?',
+      text: "This action cannot be undone.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Delete'
+    });
+
+    if (result.isConfirmed) {
       try {
         await deleteNoticeById(noticeId);
-        setMessage("✅ Notice deleted successfully!");
+        Swal.fire('Deleted', 'Notice removed successfully.', 'success');
         fetchNotices();
       } catch (error) {
-        console.error(error);
-        setMessage("❌ Failed to delete notice.");
+        Swal.fire('Error', 'Failed to delete.', 'error');
       }
     }
   };
@@ -113,7 +152,6 @@ const AdminNotices = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
     try {
       if (editingNoticeId) {
         const updatePayload = {
@@ -122,7 +160,7 @@ const AdminNotices = () => {
           recipients: noticeData.sendTo === 'SPECIFIC' ? noticeData.recipients : 'ALL'
         };
         await updateNotice(editingNoticeId, updatePayload);
-        setMessage("✅ Notice updated successfully!");
+        Swal.fire('Updated', 'Notice updated successfully.', 'success');
       } else {
         const payload = {
           title: noticeData.title,
@@ -130,349 +168,456 @@ const AdminNotices = () => {
           recipients: noticeData.sendTo === 'SPECIFIC' ? noticeData.recipients : [],
         };
         await addNotice(payload);
-        setMessage("✅ Notice posted successfully!");
+        Swal.fire('Posted', 'Notice sent successfully.', 'success');
       }
-      resetForm();
+      closeModal();
       fetchNotices();
     } catch (error) {
-      console.error(error);
-      setMessage(editingNoticeId ? "❌ Failed to update notice." : "❌ Failed to post notice.");
+      Swal.fire('Error', 'Something went wrong.', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Filter employees based on search
-  const filteredEmployees = employees.filter(emp => 
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Helper to get recipient names for display
-  const getRecipientNames = (recipients) => {
-    if (recipients === 'ALL' || !Array.isArray(recipients) || recipients.length === 0) {
-      return 'All Employees';
+  // ✅ ADMIN REPLY HANDLER
+  const handleAdminReply = async () => {
+    if (!replyText.trim() || !repliesNotice || !selectedChatEmployeeId) return;
+    
+    setSendingReply(true);
+    try {
+        await api.post(`/api/notices/${repliesNotice._id}/admin-reply`, { 
+            message: replyText,
+            targetEmployeeId: selectedChatEmployeeId
+        });
+        setReplyText("");
+        fetchNotices(); 
+    } catch (error) {
+        console.error(error);
+        Swal.fire("Error", "Failed to send reply", "error");
+    } finally {
+        setSendingReply(false);
     }
-    const names = recipients
-      .map(id => employees.find(emp => emp._id === id)?.name)
-      .filter(Boolean);
-    return names.length > 0 ? names.join(', ') : 'Specific Employees';
   };
 
-  const getSelectedEmployeesCount = () => noticeData.recipients.length;
+  // ✅ DELETE MESSAGE HANDLER
+  const handleDeleteReply = async (noticeId, replyId) => {
+    if(!window.confirm("Delete this message?")) return;
+    try {
+        await api.delete(`/api/notices/${noticeId}/reply/${replyId}`);
+        fetchNotices();
+    } catch (error) {
+        console.error(error);
+        Swal.fire("Error", "Failed to delete message", "error");
+    }
+  };
 
-  const getMessageColor = () => message.includes("✅") ? "text-green-700 bg-green-50 border-green-200" : "text-red-700 bg-red-50 border-red-200";
-  
-  const getNoticeBorderColor = (index) => {
-    const colors = [
-      "border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-white",
-      "border-l-4 border-green-500 bg-gradient-to-r from-green-50 to-white", 
-      "border-l-4 border-purple-500 bg-gradient-to-r from-purple-50 to-white",
-      "border-l-4 border-orange-500 bg-gradient-to-r from-orange-50 to-white",
-      "border-l-4 border-pink-500 bg-gradient-to-r from-pink-50 to-white",
-      "border-l-4 border-indigo-500 bg-gradient-to-r from-indigo-50 to-white"
-    ];
-    return colors[index % colors.length];
+  // ✅ HELPER: Group replies
+  const getGroupedReplies = (notice) => {
+    if (!notice.replies) return {};
+    return notice.replies.reduce((acc, reply) => {
+        const empId = reply.employeeId?._id || reply.employeeId; 
+        const empName = reply.employeeId?.name || "Unknown";
+        if (empId) {
+            if (!acc[empId]) {
+                acc[empId] = { name: empName, messages: [] };
+            }
+            acc[empId].messages.push(reply);
+        }
+        return acc;
+    }, {});
+  };
+
+  const formatDateTime = (dateString) => {
+    const d = new Date(dateString);
+    return {
+      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+  };
+
+  const getRecipientNamesList = (recipientIds) => {
+    if (!recipientIds || recipientIds.length === 0) return [];
+    return recipientIds.map(id => {
+      const emp = employees.find(e => e._id === id);
+      return emp ? emp.name : 'Unknown User';
+    });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4 flex flex-col items-center">
-      {/* Form Section */}
-      <div className="bg-white shadow-2xl rounded-3xl p-8 w-full max-w-2xl mb-16 border border-gray-100 transform transition-all duration-300 hover:shadow-3xl">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <FaPaperPlane className="text-white text-2xl" />
+    <div className="min-h-screen bg-slate-50 font-sans pb-24">
+      
+      {/* 1. HEADER */}
+      <div className="relative bg-white border-b border-slate-200 shadow-sm z-30">
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Announcement Center</h1>
+            <p className="text-sm text-slate-500 font-medium mt-1">Manage and broadcast updates</p>
           </div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {editingNoticeId ? 'Edit Notice' : 'Post New Notice'}
-          </h2>
-          <p className="text-gray-500 mt-2">
-            {editingNoticeId ? 'Update your notice details' : 'Share important updates with your team'}
-          </p>
+          <button 
+            onClick={() => openModal()}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-slate-200 transition-all transform active:scale-95"
+          >
+            <FaPlus className="text-sm" /> <span className="hidden sm:inline">New Post</span>
+          </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="block font-bold text-gray-800 text-lg">Notice Title</label>
-            <input 
-              type="text" 
-              name="title" 
-              value={noticeData.title} 
-              onChange={handleChange} 
-              required 
-              placeholder="Enter a clear and concise title..."
-              className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-300 bg-gray-50 hover:bg-white" 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="block font-bold text-gray-800 text-lg">Description</label>
-            <textarea 
-              name="description" 
-              value={noticeData.description} 
-              onChange={handleChange} 
-              required 
-              rows="5" 
-              placeholder="Provide detailed information about this notice..."
-              className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-300 resize-none bg-gray-50 hover:bg-white"
-            ></textarea>
-          </div>
-
-          {/* Enhanced Recipient Selection */}
-          <div className="space-y-4">
-            <label className="block font-bold text-gray-800 text-lg">Audience</label>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'ALL' }))}
-                className={`p-4 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
-                  noticeData.sendTo === 'ALL' 
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' 
-                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <FaUsers className="text-2xl mb-2" />
-                <span className="font-semibold">All Employees</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'SPECIFIC' }))}
-                className={`p-4 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
-                  noticeData.sendTo === 'SPECIFIC' 
-                    ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-md' 
-                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <FaUsers className="text-2xl mb-2" />
-                <span className="font-semibold">Specific Employees</span>
-              </button>
-            </div>
-            
-            {noticeData.sendTo === 'SPECIFIC' && (
-              <div className="mt-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="block font-semibold text-gray-700 text-lg">Select Employees</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={selectAllEmployees}
-                      className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearAllSelections}
-                      className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Custom Dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="w-full p-4 border-2 border-gray-200 rounded-2xl bg-white flex justify-between items-center hover:border-gray-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-                        {getSelectedEmployeesCount()} selected
-                      </span>
-                      <span className="text-gray-600">
-                        {getSelectedEmployeesCount() === 0 ? 'Select employees...' : 'Employees selected'}
-                      </span>
-                    </div>
-                    <FaChevronDown className={`text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {isDropdownOpen && (
-                    <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-2xl shadow-2xl max-h-96 overflow-hidden">
-                      {/* Search Bar */}
-                      <div className="p-4 border-b border-gray-100">
-                        <input
-                          type="text"
-                          placeholder="Search employees..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full p-3 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                        />
-                      </div>
-                      
-                      {/* Employee List */}
-                      <div className="max-h-64 overflow-y-auto">
-                        {filteredEmployees.map(employee => (
-                          <div
-                            key={employee._id}
-                            onClick={() => toggleEmployeeSelection(employee._id)}
-                            className={`flex items-center gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors ${
-                              noticeData.recipients.includes(employee._id)
-                                ? 'bg-blue-50 hover:bg-blue-100'
-                                : 'hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                              noticeData.recipients.includes(employee._id)
-                                ? 'border-blue-500 bg-blue-500'
-                                : 'border-gray-300'
-                            }`}>
-                              {noticeData.recipients.includes(employee._id) && (
-                                <FaCheck className="text-white text-xs" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-gray-800">{employee.name}</div>
-                              <div className="text-sm text-gray-500">{employee.employeeId} • {employee.department}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Selected Employees Preview */}
-                {noticeData.recipients.length > 0 && (
-                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                    <div className="flex flex-wrap gap-2">
-                      {noticeData.recipients.slice(0, 5).map(empId => {
-                        const emp = employees.find(e => e._id === empId);
-                        return emp ? (
-                          <span key={empId} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
-                            {emp.name}
-                            <button
-                              type="button"
-                              onClick={() => toggleEmployeeSelection(empId)}
-                              className="text-blue-500 hover:text-blue-700"
-                            >
-                              <FaTimes className="text-xs" />
-                            </button>
-                          </span>
-                        ) : null;
-                      })}
-                      {noticeData.recipients.length > 5 && (
-                        <span className="bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                          +{noticeData.recipients.length - 5} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4 pt-4">
-            <button 
-              type="submit" 
-              disabled={isSubmitting} 
-              className="flex-1 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 transition-all duration-300 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-3 transform hover:-translate-y-0.5"
-            >
-              <FaPaperPlane /> 
-              {isSubmitting ? 'Submitting...' : (editingNoticeId ? 'Update Notice' : 'Post Notice')}
-            </button>
-            {editingNoticeId && (
-              <button 
-                type="button" 
-                onClick={resetForm} 
-                className="px-8 py-4 rounded-2xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-300 border border-gray-200"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
-        {message && (
-          <div className={`mt-6 p-4 rounded-2xl text-center font-semibold border-2 ${getMessageColor()} animate-pulse`}>
-            {message}
-          </div>
-        )}
       </div>
 
-      {/* Notices List Section */}
-      <div className="w-full max-w-7xl">
-        <div className="text-center mb-12">
-          <h3 className="text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-3">
-            All Posted Notices
-          </h3>
-          <p className="text-gray-500 text-lg">Manage and review all your organizational notices</p>
-        </div>
+      {/* 2. NOTICE FEED */}
+      <div className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
         
         {notices.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <FaPaperPlane className="text-gray-400 text-3xl" />
-            </div>
-            <p className="text-gray-500 text-xl">No notices posted yet.</p>
-            <p className="text-gray-400 mt-2">Create your first notice to get started!</p>
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-300 mx-4">
+            <div className="text-5xl mb-4 grayscale opacity-30">📯</div>
+            <p className="text-slate-400 text-lg font-medium">No active notices.</p>
+            <p className="text-slate-300 text-sm">Create one to notify your team.</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {notices.map((notice, index) => (
+          notices.map((notice, index) => {
+            const { date, time } = formatDateTime(notice.date);
+            const isSpecific = notice.recipients && notice.recipients.length > 0 && notice.recipients !== 'ALL';
+            const recipientNames = isSpecific ? getRecipientNamesList(notice.recipients) : [];
+            const isExpandedRecipients = expandedRecipientNoticeId === notice._id;
+            
+            const viewCount = notice.readBy ? notice.readBy.length : 0;
+            const groupedChats = getGroupedReplies(notice);
+            const activeChatCount = Object.keys(groupedChats).length;
+
+            return (
               <div 
-                key={notice._id} 
-                className={`p-6 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 ${getNoticeBorderColor(index)} relative overflow-hidden group`}
+                key={notice._id}
+                className="group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 overflow-visible"
               >
-                {/* Background Pattern */}
-                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-white to-transparent opacity-50 rounded-bl-3xl"></div>
-                
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className="flex-grow mb-4">
-                    <h4 className="text-2xl font-bold text-gray-800 mb-3 line-clamp-2 group-hover:text-gray-900 transition-colors">
-                      {notice.title}
-                    </h4>
-                    <p className="text-gray-600 mb-4 line-clamp-3 leading-relaxed">
-                      {notice.description}
-                    </p>
-                    
-                    {/* Recipients Badge */}
-                    <div className="mb-4">
-                      <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 text-sm font-semibold px-3 py-2 rounded-full border border-blue-200">
-                        <FaUsers className="text-blue-600" />
-                        {getRecipientNames(notice.recipients)}
-                      </span>
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${
+                  isSpecific ? 'bg-gradient-to-b from-purple-500 to-pink-500' : 'bg-gradient-to-b from-blue-500 to-cyan-500'
+                }`}></div>
+
+                <div className="p-6 pl-8">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isSpecific ? (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-purple-100">
+                              🔒 Specific
+                            </span>
+                            <button 
+                               onClick={() => toggleRecipientList(notice._id)}
+                               className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-purple-600 transition-colors bg-slate-50 px-3 py-1 rounded-full cursor-pointer hover:bg-purple-50"
+                            >
+                              {recipientNames.length} Cands 
+                              {isExpandedRecipients ? <FaChevronUp /> : <FaChevronDown />}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-100">
+                            📢 Everyone
+                          </span>
+                        )}
+
+                        <button 
+                           onClick={() => setViewedByNotice(notice)}
+                           className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-green-600 transition-colors bg-green-50 px-3 py-1 rounded-full border border-green-100 cursor-pointer"
+                        >
+                          <FaEye /> {viewCount}
+                        </button>
+
+                        <button 
+                            onClick={() => { setRepliesNotice(notice); setSelectedChatEmployeeId(null); }}
+                            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border cursor-pointer ${
+                                activeChatCount > 0 
+                                ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                                : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-orange-50 hover:text-orange-500'
+                            }`}
+                        >
+                            <FaReply /> {activeChatCount} Chats
+                        </button>
+                      </div>
+                      
+                      <div className={`overflow-hidden transition-all duration-300 ease-in-out origin-top ${isExpandedRecipients ? 'max-h-60 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 shadow-inner">
+                           <div className="flex flex-wrap gap-2">
+                              {recipientNames.map((name, i) => (
+                                <span key={i} className="flex items-center gap-1 bg-white text-slate-700 text-xs font-semibold px-2 py-1 rounded border border-slate-200 shadow-sm">
+                                  <FaUserTag className="text-slate-300" /> {name}
+                                </span>
+                              ))}
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 self-start whitespace-nowrap">
+                       <span>{date}</span>
+                       <span className="h-3 w-px bg-slate-300"></span>
+                       <span>{time}</span>
                     </div>
                   </div>
-                  
-                  <div className="border-t border-gray-100 pt-4 mt-auto">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <FaCalendarAlt className="text-gray-400" />
-                        <span className="text-sm font-medium">
-                          {new Date(notice.date).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => handleEdit(notice)} 
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300 group/edit" 
-                          title="Edit Notice"
-                        >
-                          <FaEdit className="group-hover/edit:scale-110 transition-transform" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(notice._id)} 
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 group/delete" 
-                          title="Delete Notice"
-                        >
-                          <FaTrash className="group-hover/delete:scale-110 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
+
+                  <div className="mb-4">
+                    <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-blue-700 transition-colors">
+                      {notice.title}
+                    </h3>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {notice.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-50 flex justify-end gap-2 opacity-100 sm:opacity-0 sm:translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                    <button 
+                      onClick={() => openModal(notice)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors shadow-sm"
+                    >
+                      <FaEdit /> Edit
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(notice._id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm"
+                    >
+                      <FaTrash /> Delete
+                    </button>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })
         )}
       </div>
+
+      {/* ================= MODALS ================= */}
+
+      {viewedByNotice && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setViewedByNotice(null)}></div>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95">
+                <div className="px-6 py-4 border-b border-green-100 flex justify-between items-center bg-green-50">
+                    <h3 className="font-bold text-green-800 flex items-center gap-2"><FaEye /> Viewed By ({viewedByNotice.readBy ? viewedByNotice.readBy.length : 0})</h3>
+                    <button onClick={() => setViewedByNotice(null)} className="text-green-800 hover:bg-green-100 p-1 rounded"><FaTimes /></button>
+                </div>
+                <div className="p-4 overflow-y-auto bg-slate-50 custom-scrollbar">
+                    {viewedByNotice.readBy && viewedByNotice.readBy.length > 0 ? (
+                        <div className="space-y-2">
+                            {[...viewedByNotice.readBy].reverse().map((record, index) => (
+                                <div key={index} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-xs font-bold text-green-700">
+                                            {record.employeeId?.name?.charAt(0) || "U"}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-700">{record.employeeId?.name || "Unknown"}</p>
+                                            <p className="text-[10px] text-slate-400">{record.employeeId?.employeeId || "N/A"}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-[10px] text-slate-400">
+                                        <p>{formatDateTime(record.readAt).date}</p>
+                                        <p>{formatDateTime(record.readAt).time}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-slate-400 italic">No one has viewed this yet.</div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {repliesNotice && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setRepliesNotice(null)}></div>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative z-10 overflow-hidden flex h-[80vh] animate-in fade-in zoom-in-95">
+                
+                {/* SIDEBAR */}
+                <div className="w-1/3 bg-gray-50 border-r border-gray-200 flex flex-col">
+                    <div className="p-4 border-b border-gray-200 font-bold text-gray-700 bg-white">
+                        Inbox
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {Object.keys(getGroupedReplies(repliesNotice)).length === 0 ? (
+                            <p className="text-xs text-gray-400 p-4 text-center mt-10">No messages yet.</p>
+                        ) : (
+                            Object.entries(getGroupedReplies(repliesNotice)).map(([empId, data]) => {
+                                const lastMsg = data.messages[data.messages.length - 1];
+                                return (
+                                    <div 
+                                        key={empId}
+                                        onClick={() => setSelectedChatEmployeeId(empId)}
+                                        className={`p-3 cursor-pointer border-b border-gray-100 flex items-center gap-3 transition-colors ${selectedChatEmployeeId === empId ? 'bg-white border-l-4 border-l-blue-600 shadow-sm' : 'hover:bg-gray-100'}`}
+                                    >
+                                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-blue-700">
+                                            {data.name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center mb-0.5">
+                                                <p className="text-sm font-bold text-gray-700 truncate">{data.name}</p>
+                                                <span className="text-[9px] text-gray-400">{formatDateTime(lastMsg.repliedAt).time}</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 truncate">
+                                                {lastMsg.sentBy === 'Admin' ? 'You: ' : ''}{lastMsg.message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+                </div>
+
+                {/* CHAT AREA */}
+                <div className="w-2/3 flex flex-col bg-[#e5ddd5] relative"> 
+                    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] pointer-events-none"></div>
+                    
+                    {selectedChatEmployeeId ? (
+                        <>
+                            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white z-10 shadow-sm">
+                                <h3 className="font-bold text-gray-800">{getGroupedReplies(repliesNotice)[selectedChatEmployeeId]?.name}</h3>
+                                <button onClick={() => setRepliesNotice(null)} className="text-gray-400 hover:text-red-500 p-2"><FaTimes /></button>
+                            </div>
+                            
+                            <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-2 z-10">
+                                {getGroupedReplies(repliesNotice)[selectedChatEmployeeId]?.messages.map((reply, i) => {
+                                    const isAdmin = reply.sentBy === 'Admin';
+                                    return (
+                                        <div key={i} className={`flex w-full ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[70%] p-2 px-3 rounded-lg relative shadow-sm text-sm ${
+                                                isAdmin 
+                                                ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none' 
+                                                : 'bg-white text-gray-800 rounded-tl-none'
+                                            }`}>
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <p className="leading-snug break-words">{reply.message}</p>
+                                                    <button onClick={() => handleDeleteReply(repliesNotice._id, reply._id)} className="opacity-20 hover:opacity-100 text-[10px] text-gray-500 transition-opacity"><FaTrash /></button>
+                                                </div>
+                                                <div className="text-[9px] text-right text-gray-500 mt-1">
+                                                    {formatDateTime(reply.repliedAt).time}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="p-3 bg-white z-10">
+                                <div className="flex items-center gap-2 bg-white p-2 rounded-full border border-gray-300">
+                                    <input 
+                                        className="flex-1 text-sm outline-none px-2"
+                                        placeholder="Type a message" 
+                                        value={replyText}
+                                        onChange={(e) => setReplyText(e.target.value)}
+                                        onKeyDown={(e) => { if(e.key === 'Enter') handleAdminReply(); }}
+                                    />
+                                    <button onClick={handleAdminReply} disabled={sendingReply || !replyText.trim()} className="bg-teal-600 text-white p-2 rounded-full hover:bg-teal-700 transition disabled:opacity-50">
+                                        <FaPaperPlane />
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 z-10">
+                            <FaReply className="text-5xl mb-4 opacity-20" />
+                            <p>Select a chat to start messaging</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* ✅ NEW NOTICE MODAL - MATCHING ATTACHED IMAGE EXACTLY */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingNoticeId ? 'Edit Notice' : 'New Notice'}
+              </h2>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
+                <FaTimes size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* Title Input */}
+              <input 
+                type="text"
+                name="title"
+                placeholder="Title"
+                value={noticeData.title}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded p-3 text-sm focus:outline-none focus:border-black focus:ring-0 placeholder-gray-500 text-gray-900 transition-colors"
+                required
+              />
+
+              {/* Description Input */}
+              <textarea 
+                name="description"
+                placeholder="Description"
+                value={noticeData.description}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded p-3 text-sm h-32 resize-none focus:outline-none focus:border-black focus:ring-0 placeholder-gray-500 text-gray-900 transition-colors"
+                required
+              />
+
+              {/* Toggle Buttons */}
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'ALL' }))}
+                  className={`flex-1 py-2.5 rounded text-sm font-medium border transition-colors ${
+                    noticeData.sendTo === 'ALL' 
+                      ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  All
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'SPECIFIC' }))}
+                  className={`flex-1 py-2.5 rounded text-sm font-medium border transition-colors ${
+                    noticeData.sendTo === 'SPECIFIC' 
+                      ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Specific
+                </button>
+              </div>
+
+              {/* Specific Dropdown */}
+              {noticeData.sendTo === 'SPECIFIC' && (
+                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full p-2.5 bg-white border border-gray-300 rounded flex justify-between items-center cursor-pointer text-sm text-gray-700 hover:border-gray-400">
+                          <span>{noticeData.recipients.length} Selected</span> <FaChevronDown size={12} className="text-gray-400"/>
+                      </div>
+                      {isDropdownOpen && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-xl z-30 max-h-48 overflow-y-auto p-2">
+                              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-2 border-b border-gray-100 rounded-none mb-2 outline-none text-xs text-gray-600"/>
+                              {employees.filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase())).map(emp => (
+                                  <div key={emp._id} onClick={() => toggleEmployeeSelection(emp._id)} className="flex items-center gap-3 p-2 hover:bg-blue-50 cursor-pointer rounded text-sm text-gray-700 transition-colors">
+                                      <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${noticeData.recipients.includes(emp._id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>{noticeData.recipients.includes(emp._id) && <FaCheck className="text-white text-[10px]"/>}</div>
+                                      <span>{emp.name}</span>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {/* Post Button */}
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-[#0F172A] hover:bg-[#1e293b] text-white font-bold py-3 rounded text-sm transition-colors mt-2 shadow-sm"
+              >
+                {isSubmitting ? 'Posting...' : (editingNoticeId ? 'Update Notice' : 'Post')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
