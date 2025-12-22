@@ -35,7 +35,6 @@ const DailySchema = new mongoose.Schema({
   workedMinutes: { type: Number, default: 0 },
   workedSeconds: { type: Number, default: 0 },
 
-  // ✅ NEW: Store total calculated break time (gap between sessions)
   totalBreakSeconds: { type: Number, default: 0 },
 
   displayTime: { type: String, default: "0h 0m 0s" },
@@ -67,6 +66,15 @@ const DailySchema = new mongoose.Schema({
   idleActivity: {
     type: [IdleActivitySchema],
     default: []
+  },
+
+  // ✅ NEW: Request for Late Login Correction
+  lateCorrectionRequest: {
+    hasRequest: { type: Boolean, default: false },
+    status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
+    requestedTime: { type: Date, default: null }, // The time employee claims they arrived
+    reason: { type: String, default: null },
+    adminComment: { type: String, default: null }
   },
 
   adminPunchOut: { type: Boolean, default: false },

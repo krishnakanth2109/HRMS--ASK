@@ -64,6 +64,8 @@ import IdleTime from "./pages/IdleTime";
 import AdminLocationSettings from "./components/AdminLocationSettings";
 import EmployeeWorkModeRequest from "./EmployeePages/EmployeeWorkModeRequest";
 import RequestPunchOut from "./EmployeePages/RequestPunchOut";
+import AdminLateRequests from "./pages/AdminLateRequests";
+import MeetingGenerator from "./pages/meeting";
 
 function App() {
   return (
@@ -132,6 +134,8 @@ function App() {
         <Route path="/admin/holiday-calendar" element={<AdminHolidayCalendarPage />} />
         <Route path="/admin/admin-overtime" element={<OvertimeAdmin />} />
         <Route path="/admin/admin-Leavemanage" element={<AdminLeavePanel />} />
+        <Route path="/admin/late-requests" element={<AdminLateRequests />} />
+        <Route path="/admin/meeting" element={<MeetingGenerator />} />
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}

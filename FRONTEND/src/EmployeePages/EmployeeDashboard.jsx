@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { NoticeContext } from "../context/NoticeContext";
+// ✅ Ensuring Chart imports are correct
 import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -37,9 +38,10 @@ import {
   FaHistory,
   FaHourglassHalf,
   FaCoffee,
-  FaExclamationTriangle, // Added for alert
-  FaPaperPlane, // Added for request icon
-  FaTimes // Added for modal close
+  FaExclamationTriangle,
+  FaPaperPlane,
+  FaTimes,
+  FaPen
 } from "react-icons/fa";
 import Swal from "sweetalert2"; 
 
@@ -56,6 +58,7 @@ import api, {
 import { useNavigate } from "react-router-dom";
 import ImageCropModal from "./ImageCropModal";
 
+// ✅ Registering Chart Components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -123,6 +126,11 @@ const EmployeeDashboard = () => {
   const [reqData, setReqData] = useState({ date: "", time: "", reason: "" });
   const [reqLoading, setReqLoading] = useState(false);
 
+  // ✅ Late Correction State
+  const [showLateReqModal, setShowLateReqModal] = useState(false);
+  const [lateReqData, setLateReqData] = useState({ time: "", reason: "" });
+  const [lateReqLoading, setLateReqLoading] = useState(false);
+
   const dropdownRef = useRef(null);
   const breakDropdownRef = useRef(null); 
 
@@ -169,41 +177,48 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // ✅ Get user's current location (Better Error Handling)
+  // ✅ UPDATED: Robust Location Fetcher (Retries + Fallback to Low Accuracy)
   const getCurrentLocation = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by your browser"));
-        return;
-      }
+    const getPosition = (options) => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported by your browser"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    };
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
+    return getPosition({
+      enableHighAccuracy: true,
+      timeout: 15000, 
+      maximumAge: 10000, 
+    })
+      .then((position) => ({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      }))
+      .catch(async (err) => {
+        console.warn("High Accuracy GPS failed, switching to Low Accuracy fallback...", err);
+        try {
+          const position = await getPosition({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 30000, 
+          });
+          return {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          let errorMessage = "Unable to retrieve your location";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Location access denied. Please enable location permissions.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location information unavailable.";
-              break;
-            case error.TIMEOUT:
-              errorMessage = "Location request timed out.";
-              break;
-            default:
-              break;
-          }
-          reject(new Error(errorMessage));
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    });
+          };
+        } catch (fallbackErr) {
+          let errorMessage = "Unable to retrieve your location.";
+          if (fallbackErr.code === 1) errorMessage = "Location access denied. Please enable location permissions.";
+          else if (fallbackErr.code === 2) errorMessage = "Location signal lost. Please move near a window.";
+          else if (fallbackErr.code === 3) errorMessage = "Location request timed out. Please try again.";
+          
+          throw new Error(errorMessage);
+        }
+      });
   };
 
   const loadShiftTimings = useCallback(async (empId) => {
@@ -211,7 +226,6 @@ const EmployeeDashboard = () => {
       const shiftData = await getShiftByEmployeeId(empId);
       setShiftTimings(shiftData);
     } catch (err) {
-      // Default fallback if API fails
       setShiftTimings({ 
           shiftStartTime: "09:00", 
           shiftEndTime: "18:00", 
@@ -237,7 +251,6 @@ const EmployeeDashboard = () => {
     }, []
   );
 
-  // ✅ Check for Missed Punch Yesterday Logic
   useEffect(() => {
     if (attendance.length > 0) {
         const yesterday = new Date();
@@ -246,7 +259,6 @@ const EmployeeDashboard = () => {
 
         const prevLog = attendance.find(a => a.date === yesterdayStr);
         
-        // If yesterday has Punch IN but NO Punch OUT
         if (prevLog && prevLog.punchIn && !prevLog.punchOut) {
             setMissedPunchLog(prevLog);
             setReqData(prev => ({ ...prev, date: yesterdayStr }));
@@ -266,7 +278,6 @@ const EmployeeDashboard = () => {
     } catch (err) {}
   };
 
-  // ✅ Fetch Office Settings
   useEffect(() => {
     const fetchOfficeSettings = async () => {
       try {
@@ -306,16 +317,6 @@ const EmployeeDashboard = () => {
   const role = latestExp?.role || user?.role || "N/A";
   const department = latestExp?.department || user?.department || "N/A";
 
-  const getShiftDurationInSeconds = useCallback((startTime, endTime) => {
-    if(!startTime || !endTime) return 9 * 3600; 
-    const [startH, startM] = startTime.split(':').map(Number);
-    const [endH, endM] = endTime.split(':').map(Number);
-    let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    if (diffMinutes < 0) diffMinutes += 24 * 60;
-    return diffMinutes * 60;
-  }, []);
-
-  // ✅ UPDATED TIMER LOGIC: Uses fullDayHours from admin settings
   useEffect(() => {
     let interval;
     const isWorking = todayLog?.status === "WORKING";
@@ -338,7 +339,6 @@ const EmployeeDashboard = () => {
 
         setWorkedTime(Math.floor(totalSeconds));
 
-        // UPDATED: Check against Admin Assigned Full Day Hours
         if (shiftTimings) {
             const assignedFullDaySeconds = (shiftTimings.fullDayHours || 9) * 3600;
             
@@ -441,11 +441,10 @@ const EmployeeDashboard = () => {
       if (action === "IN") {
         const { mode: effectiveMode } = calculateWorkModeStatus();
         if (effectiveMode === "WFO") {
-            if (officeConfig && officeConfig.officeLocation) {
+            if (officeConfig && officeConfig.officeLocation && officeConfig.requireAccurateLocation !== false) {
                 const distance = getDistanceFromLatLonInMeters(location.latitude, location.longitude, officeConfig.officeLocation.latitude, officeConfig.officeLocation.longitude);
-                const allowedRadius = officeConfig.allowedRadius || 200;
+                const allowedRadius = (officeConfig.allowedRadius || 200); 
                 
-                // ✅ SWEET ALERT HTML CONTENT (Restored)
                 if (distance > allowedRadius) {
                     setPunchStatus("IDLE");
                     speak("Punch failed. You are not in the office location.");
@@ -454,8 +453,8 @@ const EmployeeDashboard = () => {
                       title: 'Location Error', 
                       html: `<b>You must be at the office to punch in.</b><br/><br/>
                              Your Distance: <b>${Math.round(distance)} meters</b><br/>
-                             Required: Within <b>${allowedRadius} meters</b><br/><br/>
-                             <small>Please move closer to the office and try again.</small>`, 
+                             Allowed Radius: <b>${allowedRadius} meters</b><br/><br/>
+                             <small style="color:gray">Note: If you are in the office, please open Google Maps to refresh your GPS.</small>`, 
                       confirmButtonColor: '#d33' 
                     });
                 }
@@ -476,12 +475,12 @@ const EmployeeDashboard = () => {
       console.error("Punch error:", err);
       const msg = err.response?.data?.message || err.message || "Unknown Error";
       
-      // ✅ DETAILED ERROR HANDLING (Restored)
       if (msg.includes("Location")) { 
         Swal.fire({ 
-          icon: 'error', 
-          title: 'Location Error', 
-          text: msg 
+          icon: 'warning', 
+          title: 'Location Warning', 
+          text: msg,
+          confirmButtonText: "Try Again"
         });
       } else if (msg.toLowerCase().includes("already punched")) { 
         Swal.fire({ 
@@ -505,7 +504,6 @@ const EmployeeDashboard = () => {
     if (!user) return;
     if (action === "IN") {
         if (!todayLog) {
-            // ✅ Missed Punch Logic: If missedPunchLog exists, block and show alert
             if (missedPunchLog) {
                 Swal.fire({ 
                   icon: 'error', 
@@ -519,15 +517,14 @@ const EmployeeDashboard = () => {
     }
     
     if (action === "OUT") {
-        // ✅ UPDATED: Validate against Admin Assigned Work Hours
         const fullDaySeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
         const halfDaySeconds = shiftTimings ? (shiftTimings.halfDayHours * 3600) : (4.5 * 3600);
         
         if (workedTime >= fullDaySeconds) { await performPunchAction("OUT"); return; }
         
         let confirmMessage = workedTime < halfDaySeconds 
-          ? "“Your worked hours are below the minimum Half-Day limit. If you don’t punch in again, today will be marked as ABSENT. Do you want to continue?”" 
-          : "Your worked hours are below the Full-Day requirement. If you don’t punch in again, today will be marked as HALF-DAY. Do you want to continue?”";
+          ? "“Your worked hours are below the minimum Half-Day limit. If you don't punch in again, today will be marked as ABSENT. Do you want to continue?" 
+          : "Your worked hours are below the Full-Day requirement. If you don't punch in again, today will be marked as HALF-DAY. Do you want to continue?";
         
         Swal.fire({ 
             title: "Early Punch Out?", 
@@ -543,7 +540,6 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // ✅ HANDLER: Submit Missed Punch Request
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
     if (!reqData.time || !reqData.reason) {
@@ -569,6 +565,33 @@ const EmployeeDashboard = () => {
       Swal.fire("Error", errMsg, "error");
     } finally {
       setReqLoading(false);
+    }
+  };
+
+  const handleLateRequestSubmit = async (e) => {
+    e.preventDefault();
+    if (!lateReqData.time || !lateReqData.reason) {
+        Swal.fire("Error", "Please enter time and reason", "error");
+        return;
+    }
+    setLateReqLoading(true);
+    try {
+        const payload = {
+            employeeId: user.employeeId,
+            date: todayIso, 
+            time: lateReqData.time,
+            reason: lateReqData.reason
+        };
+        await api.post('/api/attendance/request-correction', payload);
+        Swal.fire("Success", "Request for On-Time login sent to Admin.", "success");
+        setShowLateReqModal(false);
+        setLateReqData({ time: "", reason: "" });
+        await loadAttendance(user.employeeId);
+    } catch (error) {
+        const errMsg = error.response?.data?.message || error.message;
+        Swal.fire("Error", errMsg, "error");
+    } finally {
+        setLateReqLoading(false);
     }
   };
 
@@ -640,7 +663,6 @@ const EmployeeDashboard = () => {
     const spinner = <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />;
     if (punchStatus === "FETCHING") return <>{spinner} Extracting...</>;
     if (punchStatus === "PUNCHING") return <>{spinner} {action === "IN" ? "Punching In..." : "Punching Out..."}</>;
-    // ✅ REQ: Change button text to "Resume Work" if resuming
     if (action === "IN") return todayLog?.punchIn ? "Resume Work" : "Punch In";
     return "Punch Out";
   };
@@ -650,7 +672,6 @@ const EmployeeDashboard = () => {
     try { const [h, m] = timeString.split(':'); const hr = parseInt(h); const ampm = hr >= 12 ? 'PM' : 'AM'; return `${hr % 12 || 12}:${m} ${ampm}`; } catch (error) { return timeString; }
   };
 
-  // ✅ NEW HELPER: Display Formatted Assigned Work Hours
   const getTargetWorkHours = () => {
     if (!shiftTimings) return "9h 0m";
     const hrs = shiftTimings.fullDayHours || 9;
@@ -659,7 +680,6 @@ const EmployeeDashboard = () => {
     return `${h}h ${m}m`;
   };
 
-  // ✅ NEW HELPER: Display Formatted Half Day Hours
   const getTargetHalfDayHours = () => {
     if (!shiftTimings) return "4h 30m";
     const hrs = shiftTimings.halfDayHours || 4.5;
@@ -674,7 +694,6 @@ const EmployeeDashboard = () => {
     if (!todayLog?.punchIn) return { label: "--", color: "text-gray-500" };
     if (!todayLog.punchOut) { return { label: "Working...", color: "bg-blue-100 text-blue-800 animate-pulse" }; }
     
-    // ✅ UPDATED: Use Admin Assigned Work Hours for Status
     const fullDaySeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
     const halfDaySeconds = shiftTimings ? (shiftTimings.halfDayHours * 3600) : (4.5 * 3600);
     const currentWorkedSeconds = workedTime; 
@@ -682,13 +701,82 @@ const EmployeeDashboard = () => {
     if (currentWorkedSeconds >= fullDaySeconds) { return { label: "Full Day", color: "bg-green-100 text-green-800" }; } else if (currentWorkedSeconds >= halfDaySeconds) { return { label: "Half Day", color: "bg-yellow-100 text-yellow-800" }; } else { return { label: "Absent", color: "bg-red-100 text-red-800" }; }
   };
 
+  // ✅ HELPER: Display Login Status (Calculated Logic)
   const getDisplayLoginStatus = () => {
-    if (!todayLog?.punchIn || !shiftTimings) return todayLog?.loginStatus || "--";
-    if (todayLog.loginStatus === "LATE") return "LATE";
-    try { const punchTime = new Date(todayLog.punchIn); const [sHour, sMin] = shiftTimings.shiftStartTime.split(':').map(Number); const shiftTime = new Date(punchTime); shiftTime.setHours(sHour, sMin, 0, 0); shiftTime.setMinutes(shiftTime.getMinutes() + (shiftTimings.lateGracePeriod || 15)); if (punchTime > shiftTime) { return "LATE"; } return "On Time"; } catch (e) { return todayLog.loginStatus || "On Time"; }
+      if (!todayLog?.punchIn) return "--";
+
+      let status = todayLog.loginStatus || "ON_TIME";
+      
+      // ✅ FORCE RECALCULATION: Check if shift timings exist and compare time
+      if (shiftTimings) {
+           const punchTime = new Date(todayLog.punchIn); 
+           const [sHour, sMin] = shiftTimings.shiftStartTime.split(':').map(Number); 
+           const shiftTime = new Date(punchTime); 
+           shiftTime.setHours(sHour, sMin, 0, 0); 
+           
+           const grace = shiftTimings.lateGracePeriod || 15;
+           shiftTime.setMinutes(shiftTime.getMinutes() + grace);
+           
+           // If punchTime is AFTER shiftTime (including grace), it is LATE
+           if (punchTime > shiftTime) {
+               status = "LATE";
+           } else {
+               status = "ON_TIME";
+           }
+      }
+
+      const req = todayLog?.lateCorrectionRequest;
+      const isPending = req?.hasRequest && req?.status === "PENDING";
+      const isRejected = req?.hasRequest && req?.status === "REJECTED";
+
+      return (
+          <div className="flex flex-col items-start gap-1">
+             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}> 
+                {status} 
+             </span>
+             {status === "LATE" && isPending && (
+                 <span className="text-xs text-orange-600 font-semibold animate-pulse">Request Pending...</span>
+             )}
+              {status === "LATE" && isRejected && (
+                 <span className="text-xs text-red-600 font-semibold">Request Rejected</span>
+             )}
+             {/* ✅ Added: Request Button inside Table Cell if NO request is pending */}
+             {status === "LATE" && !isPending && !isRejected && (
+                  <button 
+                      onClick={() => setShowLateReqModal(true)} 
+                      className="text-xs text-blue-600 hover:text-blue-800 underline font-semibold mt-1"
+                  >
+                      Request On-Time Login
+                  </button>
+             )}
+          </div>
+      );
   };
 
-  // ✅ UPDATED: Progress Bar uses Assigned Hours
+  // ✅ HELPER: Should show correction button?
+  const shouldShowCorrectionButton = () => {
+      if (!todayLog?.punchIn) return false;
+      let status = "ON_TIME"; // Default safe
+      
+      // ✅ FORCE RECALCULATION
+      if (shiftTimings) {
+           const punchTime = new Date(todayLog.punchIn); 
+           const [sHour, sMin] = shiftTimings.shiftStartTime.split(':').map(Number); 
+           const shiftTime = new Date(punchTime); 
+           shiftTime.setHours(sHour, sMin, 0, 0); 
+           const grace = shiftTimings.lateGracePeriod || 15;
+           shiftTime.setMinutes(shiftTime.getMinutes() + grace);
+           
+           if (punchTime > shiftTime) status = "LATE";
+      }
+      
+      const req = todayLog?.lateCorrectionRequest;
+      const isPending = req?.hasRequest && req?.status === "PENDING";
+      
+      return status === "LATE" && !isPending;
+  };
+
+  // ✅ MEMOIZED CHART DATA
   const workMeterData = useMemo(() => {
     let targetSeconds = 9 * 3600; 
     if (shiftTimings?.fullDayHours) { 
@@ -708,25 +796,21 @@ const EmployeeDashboard = () => {
   if (loading) return <div className="p-8 text-center text-lg font-semibold">Loading Dashboard...</div>;
   if (!user) return <div className="p-8 text-center text-red-600 font-semibold">Could not load employee data.</div>;
 
-  const displayStatus = getDisplayLoginStatus();
+  const displayLoginStatusContent = getDisplayLoginStatus();
+  const showCorrectionBtn = shouldShowCorrectionButton();
   const workedStatusBadge = getWorkedStatusBadge();
   const calculatedTargetHours = getTargetWorkHours();
   const { mode: currentWorkMode, description: workModeDesc } = calculateWorkModeStatus();
   
-  // ✅ UPDATED: Shift Completion Logic
-  // Check if user is punched out AND (has marked FULL_DAY status OR has calculated worked time >= target)
   const targetSeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
   const isShiftCompleted = todayLog?.punchOut && (todayLog?.workedStatus === "FULL_DAY" || workedTime >= targetSeconds);
   
-  // ✅ CHECK IF SHIFT REQUIREMENT IS MET (For dynamic button switching)
   const isShiftReqCompleted = workedTime >= targetSeconds;
-
   const showPunchInButton = !todayLog || todayLog.status !== "WORKING";
 
   return (
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen relative">
       
-      {/* ✅ MISSED PUNCH WARNING BANNER */}
       {missedPunchLog && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r shadow-md flex flex-col md:flex-row justify-between items-center gap-4 animate-pulse-slow">
             <div className="flex items-center gap-3">
@@ -769,15 +853,31 @@ const EmployeeDashboard = () => {
                             {currentWorkMode === 'WFH' ? <FaLaptopHouse size={16} /> : <FaBuilding size={16} />} {currentWorkMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
                         </span>
                     </div>
-                    <div className="text-xs text-gray-500 font-medium italic flex items-center gap-1 ml-1"><FaInfoCircle size={10} /> {workModeDesc}</div>
+                    <div className="text-xs text-gray-500 font-medium italic flex items-center gap-1 ml-1">
+                      <FaInfoCircle size={10} /> 
+                      {currentWorkMode === 'WFO' && officeConfig?.requireAccurateLocation !== false 
+                        ? 'Accurate office location required'
+                        : workModeDesc
+                      }
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-gray-700 mt-2 text-sm">
                     <div><b>ID:</b> {employeeId}</div> <div><b>Email:</b> {email}</div> <div><b>Department:</b> {department}</div> <div><b>Role:</b> {role}</div>
                 </div>
              </div>
 
-             <div className="flex gap-2">
-                {/* Break Taken Dropdown */}
+             <div className="flex gap-2 items-start flex-wrap justify-end">
+                
+                {/* ✅ Request Correction Button */}
+                {showCorrectionBtn && (
+                    <button 
+                        onClick={() => setShowLateReqModal(true)} 
+                        className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg shadow-sm hover:bg-red-50 transition-all text-sm font-semibold animate-pulse-slow"
+                    >
+                        <FaPen size={12} /> Request on-time login
+                    </button>
+                )}
+
                 {todayLog?.sessions?.length > 0 && (
                     <div className="relative" ref={breakDropdownRef}>
                         <button onClick={() => setIsBreakDropdownOpen(!isBreakDropdownOpen)} className="flex items-center gap-2 bg-white text-orange-700 border border-orange-200 px-4 py-2 rounded-lg shadow-sm hover:bg-orange-50 transition-all text-sm font-semibold"> <FaHistory /> Breaks & Sessions <FaChevronDown className={`transform transition-transform ${isBreakDropdownOpen ? 'rotate-180' : ''}`} size={12}/> </button>
@@ -803,7 +903,6 @@ const EmployeeDashboard = () => {
                     </div>
                 )}
 
-                {/* ✅ UPDATED: Shift Details Dropdown with Admin Assigned Settings */}
                 {shiftTimings && (
                     <div className="relative" ref={dropdownRef}>
                         <button onClick={() => setIsShiftDropdownOpen(!isShiftDropdownOpen)} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition-all text-sm font-semibold"> <FaRegClock /> Shift Details <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12}/> </button>
@@ -814,7 +913,6 @@ const EmployeeDashboard = () => {
                                     <div className="flex justify-between"><span>Start Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
                                     <div className="flex justify-between"><span>End Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>
                                     
-                                    {/* Added Admin Assigned Work Hours */}
                                     <div className="flex justify-between bg-blue-50 p-1 rounded"><span>Required Work:</span> <span className="font-bold text-blue-700">{calculatedTargetHours}</span></div>
                                     <div className="flex justify-between text-xs text-gray-500"><span>Min Half Day:</span> <span>{getTargetHalfDayHours()}</span></div>
                                     <div className="flex justify-between text-xs text-gray-500"><span>Late Grace:</span> <span>{shiftTimings.lateGracePeriod} mins</span></div>
@@ -853,7 +951,6 @@ const EmployeeDashboard = () => {
             </thead>
             <tbody className="bg-white">
               <tr className="text-gray-700 border-b border-gray-200 hover:bg-gray-100 transition-colors duration-200">
-                {/* ✅ UPDATED: Date Format to DD/MM/YYYY */}
                 <td className="px-4 py-3 font-medium">{formatDateDDMMYYYY(todayIso)}</td>
                 <td className="px-4 py-3">{todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}</td>
                 <td className="px-4 py-3">
@@ -864,23 +961,22 @@ const EmployeeDashboard = () => {
                     )}
                 </td>
                 <td className="px-4 py-3 font-mono font-bold text-blue-600">{todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}</td>
+                
+                {/* ✅ UPDATED Login Status Cell */}
                 <td className="px-4 py-3">
-                  {todayLog?.punchIn ? ( <span className={`px-3 py-1 rounded-full text-xs font-semibold ${displayStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}> {displayStatus} </span> ) : "--"}
+                  {displayLoginStatusContent}
                 </td>
+                
                 <td className="px-4 py-3 capitalize"> {todayLog?.punchIn ? ( <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span> ) : ( <span className="text-gray-500">--</span> )} </td>
                 <td className="px-4 py-3 font-mono text-purple-600"> {todayLog?.totalBreakSeconds ? formatWorkedTime(todayLog.totalBreakSeconds) : "0h 0m 0s"} </td>
                 <td className="px-4 py-3 font-mono font-bold text-orange-600"> {todayLog?.punchIn ? getTodayIdleTimeStr() : "--"} </td>
                 
-                {/* ✅ DYNAMIC ACTION BUTTON LOGIC */}
                 <td className="px-4 py-3 text-center">
                   {isShiftCompleted ? (
                       <span className="text-gray-500 font-bold text-xs bg-gray-200 px-3 py-1 rounded-full">Completed</span>
                   ) : showPunchInButton ? ( 
-                      // If missed punch exists, button is disabled visually or alerts via handlePunch
                       <button className={`px-4 py-2 rounded-md mx-auto flex gap-2 shadow-sm text-white ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`} onClick={() => handlePunch("IN")} disabled={punchStatus !== "IDLE"}>{getPunchButtonContent("IN")}</button>
                   ) : ( 
-                      // ✅ If Shift NOT completed: Show BREAK button
-                      // ✅ If Shift IS completed: Show PUNCH OUT button
                       isShiftReqCompleted ? (
                         <button className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>
                             {punchStatus === "PUNCHING" ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : null}
@@ -907,6 +1003,7 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
+      {/* ✅ GRAPHS SECTION (Restored) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-2xl shadow p-6 h-80 flex flex-col">
           <h2 className="font-bold flex items-center gap-2 mb-4 text-gray-700"><FaCalendarAlt className="text-blue-500" /> Attendance Summary</h2>
@@ -921,14 +1018,13 @@ const EmployeeDashboard = () => {
             </div>
             <div className="flex justify-between w-full px-8 mt-4 border-t pt-3">
                 <div className="text-center"> <p className="text-xs text-gray-500 uppercase font-semibold">Worked Hrs</p> <p className="text-lg font-bold text-blue-600">{formatWorkedTime(workMeterData.rawValues.currentWorked)}</p> </div>
-                {/* Updated Label to reflect Target */}
                 <div className="text-center"> <p className="text-xs text-gray-500 uppercase font-semibold">Target Work</p> <p className="text-lg font-bold text-gray-400">{formatWorkedTime(workMeterData.rawValues.targetSeconds)}</p> </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ✅ REQUEST PUNCH OUT MODAL */}
+      {/* ✅ MODAL: Missed Punch Yesterday Request */}
       {showReqModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
@@ -983,9 +1079,65 @@ const EmployeeDashboard = () => {
           </div>
       )}
 
+      {/* ✅ NEW MODAL: Late Login Correction Request (Today) */}
+      {showLateReqModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
+                  <div className="bg-orange-600 px-6 py-4 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2"><FaRegClock /> Request On-Time Login</h3>
+                      <button onClick={() => setShowLateReqModal(false)} className="text-white hover:bg-orange-700 p-1 rounded"><FaTimes /></button>
+                  </div>
+                  <div className="p-6">
+                      <p className="text-sm text-gray-600 mb-4 bg-orange-50 border border-orange-200 p-2 rounded">
+                          You are marked as <b>LATE</b>. If you arrived on time but missed punching in, or If you have a valid reason for the delay, Raise a correction request.
+                      </p>
+                      <form onSubmit={handleLateRequestSubmit} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Today's Date</label>
+                              <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 bg-gray-100">
+                                  <FaCalendarAlt className="text-gray-400 mr-2"/>
+                                  <input type="text" value={formatDateDDMMYYYY(todayIso)} disabled className="bg-transparent outline-none w-full text-gray-500 cursor-not-allowed" />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Actual Arrival Time</label>
+                              <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 bg-white focus-within:ring-2 ring-orange-200 transition">
+                                  <FaRegClock className="text-gray-400 mr-2"/>
+                                  <input 
+                                      type="time" 
+                                      value={lateReqData.time} 
+                                      onChange={(e) => setLateReqData({...lateReqData, time: e.target.value})} 
+                                      className="bg-transparent outline-none w-full text-gray-700" 
+                                      required 
+                                  />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Reason</label>
+                              <textarea 
+                                  value={lateReqData.reason} 
+                                  onChange={(e) => setLateReqData({...lateReqData, reason: e.target.value})} 
+                                  placeholder="Reason for late login..." 
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-orange-200 h-24 resize-none transition" 
+                                  required 
+                              />
+                          </div>
+                          <div className="flex justify-end gap-3 pt-2">
+                              <button type="button" onClick={() => setShowLateReqModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                              <button type="submit" disabled={lateReqLoading} className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-semibold shadow-sm disabled:opacity-50 flex items-center gap-2">
+                                  {lateReqLoading ? "Sending..." : "Submit Request"}
+                              </button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {showCropModal && imageToCrop && ( <ImageCropModal imageSrc={imageToCrop} onCropComplete={handleCropComplete} onCancel={() => { setShowCropModal(false); setImageToCrop(null); }} isUploading={uploadingImage} /> )}
     </div>
   );
 };
 
 export default EmployeeDashboard;
+// --- END OF FILE EmployeeDashboard.jsx ---
