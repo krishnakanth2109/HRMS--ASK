@@ -8,21 +8,28 @@ import {
   FaUser,
   FaBars,
   FaTimes,
+  FaUsers
 } from "react-icons/fa";
 
 // Import AuthContext to get current user details
 import { AuthContext } from "../../context/AuthContext";
 // Import API to fetch real DB data
-import api from "../../api"; 
+import api from "../../api";
 
 const navLinks = [
   { to: "/employee/dashboard", label: "Dashboard", icon: <FaHome /> },
   { to: "/employee/my-attendence", label: "Attendance", icon: <FaClock /> },
   { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <FaClipboardList /> },
-  { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />,   isNotice: true },
+  { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />, isNotice: true },
   { to: "/employee/empovertime", label: "Request Overtime", icon: <FaClock /> },
   { to: "/employee/leave-management", label: "Leave Requests", icon: <FaClipboardList /> },
   { to: "/employee/reuestworkmode", label: "Request WorkMode", icon: <FaClock /> },
+  {
+    to: "/employee/teams",
+    label: "My Teams",
+    icon: <FaUsers />,
+  }
+
 ];
 
 const SidebarEmployee = () => {
@@ -32,7 +39,7 @@ const SidebarEmployee = () => {
 
   // Get current user to check against DB records and get NAME
   const { user } = useContext(AuthContext);
-  
+
   // Local state for accurate DB count
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -62,12 +69,12 @@ const SidebarEmployee = () => {
     if (!user) return;
     try {
       const { data } = await api.get("/api/notices");
-      
+
       const count = data.filter(notice => {
         // Check if current user ID is present inside the readBy array
         const isRead = notice.readBy && notice.readBy.some(record => {
-          const recordId = typeof record.employeeId === 'object' 
-            ? record.employeeId._id 
+          const recordId = typeof record.employeeId === 'object'
+            ? record.employeeId._id
             : record.employeeId;
           return recordId === (user._id || user.id);
         });
@@ -78,11 +85,11 @@ const SidebarEmployee = () => {
 
       // ✅ SOUND LOGIC: Check if count increased
       if (!firstLoadRef.current) {
-         if (count > lastCountRef.current) {
-            playNoticeSound();
-         }
+        if (count > lastCountRef.current) {
+          playNoticeSound();
+        }
       } else {
-         firstLoadRef.current = false; // Mark initial load complete
+        firstLoadRef.current = false; // Mark initial load complete
       }
 
       // Update Ref
@@ -90,7 +97,7 @@ const SidebarEmployee = () => {
 
       // Only update state if count is different to prevent blinking/re-renders
       setUnreadCount(prev => prev !== count ? count : prev);
-      
+
     } catch (error) {
       console.error("Failed to fetch unread notice count", error);
     }
@@ -106,7 +113,7 @@ const SidebarEmployee = () => {
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, [fetchUnreadCount, location.pathname]); 
+  }, [fetchUnreadCount, location.pathname]);
 
   return (
     <>
@@ -120,11 +127,9 @@ const SidebarEmployee = () => {
       )}
 
       <div
-        className={`fixed md:static top-0 left-0 h-full ${
-          collapsed ? "w-20" : "w-64"
-        } bg-gradient-to-b from-blue-900 to-blue-700 text-white shadow-xl flex flex-col p-4 md:p-6 z-40 transition-all ${
-          open ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0`}
+        className={`fixed md:static top-0 left-0 h-full ${collapsed ? "w-20" : "w-64"
+          } bg-gradient-to-b from-blue-900 to-blue-700 text-white shadow-xl flex flex-col p-4 md:p-6 z-40 transition-all ${open ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0`}
       >
         <button
           className="hidden md:block absolute top-4 right-6 text-white text-xl bg-blue-700 rounded-full p-2"
@@ -143,9 +148,8 @@ const SidebarEmployee = () => {
         )}
 
         <div
-          className={`mb-8 flex items-center gap-1 mt-2 ${
-            collapsed ? "justify-center" : ""
-          }`}
+          className={`mb-8 flex items-center gap-1 mt-2 ${collapsed ? "justify-center" : ""
+            }`}
         >
           {!collapsed && <FaUser className="text-3xl" />}
           {!collapsed && (
@@ -161,11 +165,10 @@ const SidebarEmployee = () => {
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-semibold ${
-                    isActive
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-semibold ${isActive
                       ? "bg-blue-600 text-white"
                       : "hover:bg-blue-700 text-gray-200"
-                  } ${collapsed ? "justify-center px-2" : ""}`}
+                    } ${collapsed ? "justify-center px-2" : ""}`}
                 >
                   <span className="text-xl">{link.icon}</span>
 

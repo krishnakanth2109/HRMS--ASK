@@ -15,7 +15,8 @@ import {
   FaAngleDown,
   FaAngleRight,
   FaUserClock,
-  FaBell
+  FaBell,
+  FaLayerGroup
 } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { getLeaveRequests, getAllOvertimeRequests, getAllNoticesForAdmin } from "../../api";
@@ -37,9 +38,11 @@ const navLinks = [
     icon: <FaUsers />,
     children: [
       { to: "/employees", label: "Employee Management", icon: <FaUsers /> },
+      { to: "/admin/groups", label: "Group Management", icon: <FaLayerGroup /> }, // ✅ NEW
       { to: "/attendance", label: "Employees Attendance", icon: <FaUserClock /> },
     ],
   },
+
 
   // --- GROUP: LEAVES ---
   {
@@ -59,9 +62,9 @@ const navLinks = [
   // --- OTHER LINKS ---
   { to: "/admin/idle-time", label: "Idle Time", icon: <FaChartPie /> },
   { to: "/admin/payroll", label: "Payroll", icon: <FaFileAlt /> },
-  { 
-    to: "/admin/notices", 
-    label: "Post Notices", 
+  {
+    to: "/admin/notices",
+    label: "Post Notices",
     icon: <FaClipboardList />,
     isNotice: true, // New: For notice badge
   },
@@ -74,54 +77,54 @@ const navLinks = [
     icon: <FaChartPie />,
     isOvertime: true,
   },
-  { to: "/admin/shifttype", label: "Location Settings", icon:<MapPinnedIcon /> },
+  { to: "/admin/shifttype", label: "Location Settings", icon: <MapPinnedIcon /> },
 ];
 
 // ✅ HELPER: Calculate unread notices using SERVER STATE
 const calculateUnreadNotices = (notices, readState) => {
   if (!notices || !Array.isArray(notices)) return 0;
-  
+
   let unreadNoticeCount = 0;
-  
+
   notices.forEach(notice => {
     // Skip system configuration notices
     if (notice.title && notice.title.startsWith("__SYSTEM_")) return;
     if (!notice.replies || !Array.isArray(notice.replies)) return;
-    
+
     // Group replies by employee
     const groups = notice.replies.reduce((acc, reply) => {
-      const empId = reply.employeeId?._id || reply.employeeId; 
+      const empId = reply.employeeId?._id || reply.employeeId;
       if (empId) {
         if (!acc[empId]) acc[empId] = [];
         acc[empId].push(reply);
       }
       return acc;
     }, {});
-    
+
     // Check if any employee in this notice has unread messages
     let hasAnyUnreadInNotice = false;
-    
+
     Object.keys(groups).forEach(empId => {
       const messages = groups[empId];
       const lastEmployeeMsg = [...messages].reverse().find(m => m.sentBy === 'Employee');
-      
+
       if (lastEmployeeMsg) {
         const storageKey = `${notice._id}_${empId}`;
         // ✅ Check against SERVER STATE instead of local storage
         const storedLastId = readState[storageKey];
-        
+
         // If the last message ID matches what's on the server, it's read. Otherwise, unread.
         if (lastEmployeeMsg._id !== storedLastId) {
-           hasAnyUnreadInNotice = true;
+          hasAnyUnreadInNotice = true;
         }
       }
     });
-    
+
     if (hasAnyUnreadInNotice) {
       unreadNoticeCount++;
     }
   });
-  
+
   return unreadNoticeCount;
 };
 
@@ -131,7 +134,7 @@ const Sidebar = () => {
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [pendingOvertime, setPendingOvertime] = useState(0);
   const [socket, setSocket] = useState(null);
-  
+
   // ✅ State for unread notice count & Server Read State
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
   const [serverReadState, setServerReadState] = useState({});
@@ -140,7 +143,7 @@ const Sidebar = () => {
   const prevPendingLeaves = useRef(0);
   const prevPendingOvertime = useRef(0);
   const prevUnreadNoticeCount = useRef(0);
-  
+
   // ✅ Track if we're currently on notices page
   const isOnNoticesPage = useRef(false);
   const hasPlayedSoundForCurrentCount = useRef(0);
@@ -158,21 +161,21 @@ const Sidebar = () => {
   // -----------------------------
   const playNotificationSound = useCallback((type = "generic") => {
     if (isOnNoticesPage.current) return; // Don't play if looking at notices
-    
+
     try {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800; 
+
+      oscillator.frequency.value = 800;
       oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); 
+
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-      
+
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
@@ -186,16 +189,16 @@ const Sidebar = () => {
   const fetchAndCalculateUnreadNotices = useCallback(async (forceUpdate = false) => {
     try {
       const data = await getAllNoticesForAdmin();
-      
+
       // 1. Extract Read State from Hidden Notice
       const configNotice = data.find(n => n.title === "__SYSTEM_READ_STATE__");
       let currentServerState = {};
-      
+
       if (configNotice) {
-          try {
-              currentServerState = JSON.parse(configNotice.description);
-              setServerReadState(currentServerState);
-          } catch(e) { console.error("Error parsing read state", e); }
+        try {
+          currentServerState = JSON.parse(configNotice.description);
+          setServerReadState(currentServerState);
+        } catch (e) { console.error("Error parsing read state", e); }
       }
 
       // 2. Filter Real Notices
@@ -203,13 +206,13 @@ const Sidebar = () => {
 
       // 3. Calculate Count
       const count = calculateUnreadNotices(realNotices, currentServerState);
-      
+
       actualUnreadCount.current = count;
-      
+
       if (!tempHideNoticeBadge || forceUpdate) {
         setUnreadNoticeCount(count);
       }
-      
+
     } catch (error) {
       console.error("Error fetching unread notices:", error);
     }
@@ -225,8 +228,8 @@ const Sidebar = () => {
     if (pendingOvertime > prevPendingOvertime.current) playNotificationSound("overtime");
     prevPendingOvertime.current = pendingOvertime;
 
-    if (unreadNoticeCount > prevUnreadNoticeCount.current && 
-        unreadNoticeCount > hasPlayedSoundForCurrentCount.current) {
+    if (unreadNoticeCount > prevUnreadNoticeCount.current &&
+      unreadNoticeCount > hasPlayedSoundForCurrentCount.current) {
       playNotificationSound("notice");
       hasPlayedSoundForCurrentCount.current = unreadNoticeCount;
     }
@@ -242,12 +245,12 @@ const Sidebar = () => {
   useEffect(() => {
     const wasOnNoticesPage = isOnNoticesPage.current;
     isOnNoticesPage.current = location.pathname === "/admin/notices";
-    
+
     if (location.pathname === "/admin/notices") {
-        setTempHideNoticeBadge(true); // Hide badge while on the page
+      setTempHideNoticeBadge(true); // Hide badge while on the page
     } else if (wasOnNoticesPage && location.pathname !== "/admin/notices") {
-        setTempHideNoticeBadge(false); // Restore when leaving
-        setTimeout(() => setUnreadNoticeCount(actualUnreadCount.current), 100);
+      setTempHideNoticeBadge(false); // Restore when leaving
+      setTimeout(() => setUnreadNoticeCount(actualUnreadCount.current), 100);
     }
   }, [location.pathname]);
 
@@ -260,7 +263,7 @@ const Sidebar = () => {
       setPendingLeaves(data.filter((l) => isPending(l.status)).length);
     };
     fetchLeaves();
-    
+
     const fetchOT = async () => {
       const data = await getAllOvertimeRequests();
       setPendingOvertime(data.filter((o) => isPending(o.status)).length);
@@ -282,7 +285,7 @@ const Sidebar = () => {
           const user = JSON.parse(raw);
           if (user?._id || user?.id) s.emit("register", user?._id || user?.id);
         }
-      } catch (err) {}
+      } catch (err) { }
     });
     setSocket(s);
     return () => s.disconnect();
@@ -293,7 +296,7 @@ const Sidebar = () => {
   // -----------------------------
   useEffect(() => {
     if (!socket) return;
-    
+
     // Leaves & OT
     socket.on("leave:new", () => setPendingLeaves(p => p + 1));
     socket.on("leave:updated", (d) => !isPending(d.status) && setPendingLeaves(p => Math.max(p - 1, 0)));
@@ -308,15 +311,15 @@ const Sidebar = () => {
         setTimeout(() => fetchAndCalculateUnreadNotices(true), 1000);
       }
     };
-    
+
     // ✅ SYSTEM STATE UPDATED (When read on another device)
     const handleNoticeUpdate = () => {
-        setTimeout(() => fetchAndCalculateUnreadNotices(true), 1000);
+      setTimeout(() => fetchAndCalculateUnreadNotices(true), 1000);
     };
 
     socket.on("notice:reply:new", handleNewReply);
     socket.on("notice:updated", handleNoticeUpdate); // Catches the __SYSTEM_READ_STATE__ update
-    
+
     return () => {
       socket.off("leave:new"); socket.off("leave:updated");
       socket.off("overtime:new"); socket.off("overtime:updated");
@@ -411,7 +414,7 @@ const Sidebar = () => {
           );
         })}
       </ul>
-      <div className={`mt-auto text-center text-xs text-slate-500 ${collapsed ? "opacity-0 hidden" : "opacity-100 block"}`}>&copy; {new Date().getFullYear()} HRMS Admin</div>
+      <div className={`mt-auto text-center text-xs text-slate-300 ${collapsed ? "opacity-0 hidden" : "opacity-100 block"}`}>&copy; {new Date().getFullYear()} HRMS Admin</div>
     </div>
   );
 };

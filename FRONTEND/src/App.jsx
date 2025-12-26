@@ -53,10 +53,14 @@ import OvertimeForm from "./EmployeePages/EmployeeOvertimeForm";
 import NewEmployeeAttendance from "./EmployeePages/EmployeeAttendance";
 import EmployeeDailyAttendance from "./EmployeePages/EmployeeDailyAttendance";
 import EmployeeNotifications from "./pages/EmployeeNotifications";
+import EmployeeTeamsPage from "./EmployeePages/EmployeeTeamsPage";
+
 
 // Admin pages
 import OvertimeAdmin from "./pages/OvertimeAdmin";
 import AdminLeavePanel from "./pages/AdminLeavemanagmentPanel";
+import AdminGroupPage from "./pages/AdminGroupPage";
+
 
 // Route protection
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -90,7 +94,8 @@ function App() {
         <Route path="/employees/edit/:id" element={<EditEmployee />} />
         <Route path="/employee/:id/profile" element={<EmployeeProfile />} />
         <Route path="/attendance" element={<AdminViewAttendance />} />
-        
+
+
         <Route
           path="/attendance/overtime"
           element={
@@ -114,10 +119,12 @@ function App() {
         <Route path="/admin/leave-summary" element={<AdminLeaveSummary />} />
         <Route path="/admin/idle-time" element={<IdleTime />} />
         <Route path="/admin/settings" element={<SettingsPage />} />
-               <Route path="/admin/shifttype" element={<AdminLocationSettings/>} />
+        <Route path="/admin/shifttype" element={<AdminLocationSettings />} />
         <Route path="/admin/payroll" element={<Payroll />} />
         <Route path="/admin/notifications" element={<AdminNotifications />} />
         <Route path="/admin/on-leave-today" element={<EmployeesOnLeaveToday />} />
+        {/* 🔥 GROUP MANAGEMENT */}
+        <Route path="/admin/groups" element={<AdminGroupPage />} />
 
         <Route
           path="/admin/notices"
@@ -152,11 +159,16 @@ function App() {
         <Route path="/employee/notifications" element={<EmployeeNotifications />} />
         <Route path="/employee/leave-management" element={<LeaveWithModal />} />
         <Route path="/employee/empovertime" element={<OvertimeForm />} />
-        <Route path="/employee/reuestworkmode" element={<EmployeeWorkModeRequest/>} />
-        <Route path="/employee/requestpunchout" element={<RequestPunchOut/>} />
+        <Route path="/employee/reuestworkmode" element={<EmployeeWorkModeRequest />} />
+        <Route path="/employee/requestpunchout" element={<RequestPunchOut />} />
         <Route path="/employee/my-attendence" element={<EmployeeDailyAttendance />} />
         <Route path="/employee/new-attendence" element={<NewEmployeeAttendance />} />
-        
+  
+        <Route
+          path="/employee/teams"
+          element={<EmployeeTeamsPage />}
+        />
+
 
         <Route
           path="/employee/holiday-calendar"

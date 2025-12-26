@@ -484,4 +484,70 @@ export const updateEmployeeWorkMode = async (employeeId, mode) => {
   }
 };
 
+
+
+
+
+
+
+/* =============================================================================
+   GROUP MANAGEMENT
+============================================================================= */
+
+// Get all groups
+export const getGroups = async () => {
+  const res = await api.get("/api/groups");
+  return (
+    res.data?.data ||
+    res.data?.groups ||
+    (Array.isArray(res.data) ? res.data : [])
+  );
+};
+
+// Get single group by ID
+export const getGroupById = async (groupId) => {
+  const res = await api.get(`/api/groups/${groupId}`);
+  return res.data?.data || res.data;
+};
+
+// Create new group
+export const createGroupApi = async (data) => {
+  const res = await api.post("/api/groups", data);
+  return res.data;
+};
+
+// Update group (permissions, name, etc.)
+export const updateGroupApi = async (groupId, data) => {
+  const res = await api.put(`/api/groups/${groupId}`, data);
+  return res.data;
+};
+
+// Change group leader
+export const changeGroupLeaderApi = async (groupId, leaderId) => {
+  const res = await api.put(`/api/groups/${groupId}/leader`, { leaderId });
+  return res.data;
+};
+
+// Add member to group
+export const addGroupMemberApi = async (groupId, data) => {
+  const res = await api.post(`/api/groups/${groupId}/member`, data);
+  return res.data;
+};
+
+// Remove member from group
+export const removeGroupMemberApi = async (groupId, employeeId) => {
+  const res = await api.delete(`/api/groups/${groupId}/member`, {
+    data: { employeeId },
+  });
+  return res.data;
+};
+
+// Deactivate group
+export const deleteGroupApi = async (groupId) => {
+  const res = await api.delete(`/api/groups/${groupId}`);
+  return res.data;
+};
+
+
+
 export default api;

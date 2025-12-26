@@ -264,7 +264,7 @@ const NoticeList = () => {
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply blur-3xl opacity-30 animate-blob"></div>
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 py-12">
+      <div className="relative max-w-4xl mx-auto px-4 py-12">
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
