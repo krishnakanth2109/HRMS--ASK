@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const officeSettingsSchema = new mongoose.Schema({
@@ -18,6 +19,11 @@ const officeSettingsSchema = new mongoose.Schema({
     type: String, 
     enum: ["WFO", "WFH"], 
     default: "WFO" 
+  },
+  // NEW FIELD: Control whether to enforce accurate office location for WFO
+  requireAccurateLocation: {
+    type: Boolean,
+    default: true // Default is enabled (strict location check)
   },
   // Store individual employee work mode overrides and schedules
   employeeWorkModes: [{

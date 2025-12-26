@@ -11,7 +11,13 @@ import {
   FaTimesCircle,
   FaUsers,
   FaTag,
-  FaInfoCircle
+  FaInfoCircle,
+  FaLayerGroup,
+  FaPlus,
+  FaTimes,
+  FaCheck,
+  FaExclamationCircle,
+  FaUsersCog
 } from "react-icons/fa";
 import {
   getEmployees,
@@ -19,6 +25,10 @@ import {
   createOrUpdateShift,
   deleteShift,
   bulkCreateShifts,
+  // ✅ Imported Notice APIs for Group Persistence
+  getAllNoticesForAdmin,
+  addNotice,
+  updateNotice
 } from "../api";
 
 const DepartmentSettings = () => {
@@ -33,36 +43,27 @@ const DepartmentSettings = () => {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [viewMode, setViewMode] = useState("individual"); // "individual" | "bulk"
 
-  // --- Category System (Session Storage) ---
-  const [categories, setCategories] = useState(() => {
-    const saved = sessionStorage.getItem("shiftCategories");
-    return saved ? JSON.parse(saved) : [
-      { id: "day", name: "Day Shift", isDefault: true },
-      { id: "night", name: "Night Shift", isDefault: true },
-      { id: "nonit", name: "Non-IT", isDefault: true },
-    ];
-  });
-  
-  const [selectedCategoryId, setSelectedCategoryId] = useState("all"); 
-  const [employeeCategories, setEmployeeCategories] = useState(() => {
-    const saved = sessionStorage.getItem("employeeCategories");
-    return saved ? JSON.parse(saved) : {};
-  });
+  // -------------------------------------------------------------------------
+  // ✅ GROUP MANAGEMENT STATE (Server Synced)
+  // -------------------------------------------------------------------------
+  const [groups, setGroups] = useState([]);
+  const [groupConfigId, setGroupConfigId] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState("all");
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
-  // Save categories to SESSION storage whenever they change
-  useEffect(() => {
-    sessionStorage.setItem("shiftCategories", JSON.stringify(categories));
-    sessionStorage.setItem("employeeCategories", JSON.stringify(employeeCategories));
-  }, [categories, employeeCategories]);
+  // Group Form State
+  const [groupForm, setGroupForm] = useState({ name: "", members: [] });
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [viewUnassigned, setViewUnassigned] = useState(false);
 
   // Default Form State 
-  // UPDATED: Default Full Day Hours set to 9 manually
   const defaultShift = {
     shiftStartTime: "09:00",
     shiftEndTime: "18:00",
     lateGracePeriod: 15,
-    fullDayHours: 9, // Changed from 8 to 9
-    halfDayHours: 4.5, // Changed from 4 to 4.5 (half of 9)
+    fullDayHours: 9,
+    halfDayHours: 4.5,
     autoExtendShift: true,
     weeklyOffDays: [0], // Sunday
   };
@@ -79,9 +80,10 @@ const DepartmentSettings = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [employeesData, shiftsData] = await Promise.all([
+      const [employeesData, shiftsData, noticesData] = await Promise.all([
         getEmployees(),
         getAllShifts(),
+        getAllNoticesForAdmin() // Fetch notices to get groups
       ]);
 
       const empList = Array.isArray(employeesData) ? employeesData : (employeesData?.data || []);
@@ -89,12 +91,113 @@ const DepartmentSettings = () => {
 
       setEmployees(empList);
       setShifts(shiftList);
+
+      // ✅ EXTRACT GROUPS
+      if (Array.isArray(noticesData)) {
+        const configNotice = noticesData.find(n => n.title === "__SYSTEM_GROUPS_CONFIG__");
+        if (configNotice) {
+          setGroupConfigId(configNotice._id);
+          try {
+            const parsedGroups = JSON.parse(configNotice.description);
+            if (Array.isArray(parsedGroups)) setGroups(parsedGroups);
+          } catch (e) { console.error("Error parsing groups", e); }
+        }
+      }
+
     } catch (error) {
       console.error("Fetch error:", error);
       showMessage("error", "Failed to load data");
     } finally {
       setLoading(false);
     }
+  };
+
+  // ---------------- Group Logic (Server Sync) ----------------
+  const saveGroupsToBackend = async (updatedGroups) => {
+    try {
+      const payload = {
+        title: "__SYSTEM_GROUPS_CONFIG__",
+        description: JSON.stringify(updatedGroups),
+        recipients: []
+      };
+      if (groupConfigId) {
+        await updateNotice(groupConfigId, payload);
+      } else {
+        const res = await addNotice(payload);
+        // If created new, update config ID if response returns it, or re-fetch
+        if(res && res._id) setGroupConfigId(res._id); 
+      }
+      setGroups(updatedGroups);
+    } catch (error) {
+      console.error("Failed to save groups", error);
+      showMessage("error", "Could not save groups to server");
+    }
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupForm.name.trim()) { showMessage("error", "Group name required"); return; }
+    if (groupForm.members.length === 0) { showMessage("error", "Select members"); return; }
+
+    let updatedGroups;
+    if (editingGroupId) {
+      updatedGroups = groups.map(g =>
+        g.id === editingGroupId ? { ...g, name: groupForm.name, members: groupForm.members } : g
+      );
+    } else {
+      const newGroup = {
+        id: Date.now().toString(),
+        name: groupForm.name,
+        members: groupForm.members
+      };
+      updatedGroups = [...groups, newGroup];
+    }
+    await saveGroupsToBackend(updatedGroups);
+    resetGroupForm();
+    showMessage("success", "Group saved successfully");
+  };
+
+  const handleEditGroup = (group) => {
+    setEditingGroupId(group.id);
+    setGroupForm({ name: group.name, members: group.members });
+    setViewUnassigned(false);
+  };
+
+  const handleDeleteGroup = (groupId) => {
+    if (window.confirm("Delete this group?")) {
+      const updatedGroups = groups.filter(g => g.id !== groupId);
+      saveGroupsToBackend(updatedGroups);
+      if (editingGroupId === groupId) resetGroupForm();
+      if (selectedGroupId === groupId) setSelectedGroupId("all");
+    }
+  };
+
+  const resetGroupForm = () => {
+    setGroupForm({ name: "", members: [] });
+    setEditingGroupId(null);
+    setGroupSearchTerm("");
+    setViewUnassigned(false);
+  };
+
+  const toggleGroupMemberSelection = (employeeId) => {
+    setGroupForm(prev => {
+      const isSelected = prev.members.includes(employeeId);
+      if (isSelected) {
+        return { ...prev, members: prev.members.filter(id => id !== employeeId) };
+      } else {
+        return { ...prev, members: [...prev.members, employeeId] };
+      }
+    });
+  };
+
+  const getUnassignedEmployees = () => {
+    const assignedIds = new Set();
+    groups.forEach(g => {
+      if (Array.isArray(g.members)) {
+        g.members.forEach(m => assignedIds.add(String(m)));
+      }
+    });
+    // Match against employee._id because groups store _id
+    return employees.filter(e => !assignedIds.has(String(e._id)));
   };
 
   // ---------------- Helpers ----------------
@@ -115,7 +218,6 @@ const DepartmentSettings = () => {
         shiftStartTime: existingShift.shiftStartTime || "09:00",
         shiftEndTime: existingShift.shiftEndTime || "18:00",
         lateGracePeriod: existingShift.lateGracePeriod ?? 15,
-        // Ensure we load existing hours or fallback to new default of 9
         fullDayHours: existingShift.fullDayHours || 9,
         halfDayHours: existingShift.halfDayHours || 4.5,
         autoExtendShift: existingShift.autoExtendShift ?? true,
@@ -172,36 +274,6 @@ const DepartmentSettings = () => {
     }
   };
 
-  // ---------------- Category Logic ----------------
-  const handleAddCategory = () => {
-    const name = prompt("Enter new category name:");
-    if (!name) return;
-    const id = name.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now().toString();
-    setCategories((prev) => [...prev, { id, name, isDefault: false }]);
-  };
-
-  const handleDeleteCategory = (categoryId) => {
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category || category.isDefault) return;
-    if (!window.confirm(`Delete category "${category.name}"?`)) return;
-
-    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-    setEmployeeCategories((prev) => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach((empId) => {
-        if (updated[empId] === categoryId) updated[empId] = null;
-      });
-      return updated;
-    });
-
-    if (selectedCategoryId === categoryId) setSelectedCategoryId("all");
-  };
-
-  const handleAssignCategory = (employeeId, categoryIdOrEmpty) => {
-    const categoryId = categoryIdOrEmpty || null;
-    setEmployeeCategories((prev) => ({ ...prev, [employeeId]: categoryId }));
-  };
-
   // ---------------- Save Logic ----------------
   const handleSaveShift = async (e) => {
     e.preventDefault();
@@ -216,8 +288,8 @@ const DepartmentSettings = () => {
         shiftStartTime: shiftForm.shiftStartTime,
         shiftEndTime: shiftForm.shiftEndTime,
         lateGracePeriod: Number(shiftForm.lateGracePeriod),
-        fullDayHours: Number(shiftForm.fullDayHours), // Send manual input
-        halfDayHours: Number(shiftForm.halfDayHours), // Send manual input
+        fullDayHours: Number(shiftForm.fullDayHours),
+        halfDayHours: Number(shiftForm.halfDayHours),
         autoExtendShift: shiftForm.autoExtendShift,
         weeklyOffDays: shiftForm.weeklyOffDays,
       };
@@ -244,8 +316,8 @@ const DepartmentSettings = () => {
         shiftStartTime: bulkShiftForm.shiftStartTime,
         shiftEndTime: bulkShiftForm.shiftEndTime,
         lateGracePeriod: Number(bulkShiftForm.lateGracePeriod),
-        fullDayHours: Number(bulkShiftForm.fullDayHours), // Send manual input
-        halfDayHours: Number(bulkShiftForm.halfDayHours), // Send manual input
+        fullDayHours: Number(bulkShiftForm.fullDayHours),
+        halfDayHours: Number(bulkShiftForm.halfDayHours),
         autoExtendShift: bulkShiftForm.autoExtendShift,
         weeklyOffDays: bulkShiftForm.weeklyOffDays,
       };
@@ -285,11 +357,17 @@ const DepartmentSettings = () => {
     );
   });
 
+  // ✅ Updated Filter Logic using Groups
   const filteredEmployees = baseFilteredEmployees.filter((emp) => {
-    const empCat = employeeCategories[emp.employeeId] || null;
-    if (selectedCategoryId === "all") return true;
-    if (selectedCategoryId === "unassigned") return empCat === null;
-    return empCat === selectedCategoryId;
+    if (selectedGroupId === "all") return true;
+    if (selectedGroupId === "unassigned") {
+      // Check if employee._id is NOT in any group
+      const allGroupMembers = new Set(groups.flatMap(g => g.members));
+      return !allGroupMembers.has(String(emp._id));
+    }
+    const group = groups.find(g => g.id === selectedGroupId);
+    // Check if employee._id is in the selected group
+    return group ? group.members.includes(String(emp._id)) : false;
   });
 
   const weekDays = [
@@ -337,20 +415,23 @@ const DepartmentSettings = () => {
         </div>
       )}
 
-      {/* CATEGORY FILTER */}
+      {/* ✅ GROUP FILTER (Replaces Category Filter) */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800 text-sm flex gap-2 items-center"><FaTag className="text-blue-500"/> Filter by Category</h3>
-          <button onClick={handleAddCategory} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">+ Add Category</button>
+          <h3 className="font-semibold text-gray-800 text-sm flex gap-2 items-center"><FaLayerGroup className="text-blue-500"/> Filter by Group</h3>
+          <button onClick={() => setIsGroupModalOpen(true)} className="flex items-center gap-2 text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"><FaUsersCog /> Manage Groups</button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setSelectedCategoryId("all")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedCategoryId === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>All</button>
-          <button onClick={() => setSelectedCategoryId("unassigned")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedCategoryId === "unassigned" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>Unassigned</button>
-          {categories.map((cat) => (
-            <div key={cat.id} className={`flex items-center px-3 py-1 rounded-full text-xs border ${selectedCategoryId === cat.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}>
-              <button onClick={() => setSelectedCategoryId(cat.id)} className="font-semibold">{cat.name}</button>
-              {!cat.isDefault && <button onClick={() => handleDeleteCategory(cat.id)} className="ml-2 text-red-400 hover:text-white">×</button>}
-            </div>
+          <button onClick={() => setSelectedGroupId("all")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>All</button>
+          <button onClick={() => setSelectedGroupId("unassigned")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === "unassigned" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>Unassigned</button>
+          {groups.map((group) => (
+            <button 
+              key={group.id} 
+              onClick={() => setSelectedGroupId(group.id)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === group.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}
+            >
+              {group.name}
+            </button>
           ))}
         </div>
       </div>
@@ -389,18 +470,9 @@ const DepartmentSettings = () => {
                     {viewMode === "bulk" && <input type="checkbox" checked={selectedEmployeeIds.includes(emp.employeeId)} readOnly className="w-4 h-4 text-blue-600 rounded" />}
                     <div>
                       <p className="font-semibold text-gray-800 text-sm">{emp.name}</p>
-                      <p className="text-xs text-gray-500">{emp.employeeId} • {emp.department || "N/A"}</p>
+                      <p className="text-xs text-gray-500">{emp.employeeId} </p>
                     </div>
                   </div>
-                  <select 
-                    value={employeeCategories[emp.employeeId] || ""} 
-                    onClick={(e) => e.stopPropagation()} 
-                    onChange={(e) => handleAssignCategory(emp.employeeId, e.target.value)} 
-                    className="text-[10px] border border-gray-200 rounded bg-gray-50 px-1 py-0.5"
-                  >
-                    <option value="">Unassigned</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
                 </div>
               </div>
             ))}
@@ -428,7 +500,6 @@ const DepartmentSettings = () => {
                     <input type="time" name="shiftEndTime" value={shiftForm.shiftEndTime} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
                   
-                  {/* --- UPDATED SECTION: Manual Work Hours --- */}
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
                     <input type="number" step="0.5" name="fullDayHours" value={shiftForm.fullDayHours} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
@@ -437,7 +508,6 @@ const DepartmentSettings = () => {
                     <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
                     <input type="number" step="0.5" name="halfDayHours" value={shiftForm.halfDayHours} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
-                  {/* ------------------------------------------ */}
 
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
@@ -497,7 +567,6 @@ const DepartmentSettings = () => {
                     <input type="time" name="shiftEndTime" value={bulkShiftForm.shiftEndTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
 
-                  {/* --- UPDATED SECTION: Manual Work Hours (Bulk) --- */}
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
                     <input type="number" step="0.5" name="fullDayHours" value={bulkShiftForm.fullDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
@@ -506,7 +575,6 @@ const DepartmentSettings = () => {
                     <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
                     <input type="number" step="0.5" name="halfDayHours" value={bulkShiftForm.halfDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
-                  {/* ----------------------------------------------- */}
 
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
@@ -537,6 +605,41 @@ const DepartmentSettings = () => {
           )}
         </div>
       </div>
+
+      {/* ✅ MANAGE GROUPS MODAL */}
+      {isGroupModalOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-[95%] md:w-full max-w-4xl h-[90vh] md:h-[80vh] flex flex-col md:flex-row overflow-hidden">
+            {/* Left Panel: List */}
+            <div className="w-full md:w-1/3 h-[35%] md:h-full bg-slate-50 border-r border-slate-200 flex flex-col border-b md:border-b-0">
+              <div className="p-5 border-b border-slate-200 bg-white"><h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><FaLayerGroup className="text-blue-600" /> My Groups</h3></div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {groups.length === 0 && (<div className="text-center py-10 text-slate-400"><p>No groups created yet.</p></div>)}
+                {groups.map(group => (
+                  <div
+                    key={group.id}
+                    onClick={() => handleEditGroup(group)}
+                    className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex justify-between items-center group cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+                  >
+                    <div className="min-w-0 flex-1"><h4 className="font-bold text-slate-700 truncate">{group.name}</h4><p className="text-xs text-slate-500">{group.members.length} members</p></div>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"><FaTrash /></button>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-slate-100 border-t border-slate-200"><div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System</div><div onClick={() => { setViewUnassigned(true); resetGroupForm(); }} className={`bg-white p-3 rounded-lg border shadow-sm cursor-pointer transition-all ${viewUnassigned ? 'border-orange-400 ring-1 ring-orange-400' : 'border-slate-200 hover:border-orange-300'}`}><div className="flex justify-between items-center"><h4 className={`font-bold text-sm ${viewUnassigned ? 'text-orange-700' : 'text-slate-600'}`}>Unassigned Employees</h4><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${viewUnassigned ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-600'}`}>{getUnassignedEmployees().length}</span></div></div></div>
+            </div>
+            
+            {/* Right Panel: Form */}
+            <div className="w-full md:w-2/3 h-[65%] md:h-full flex flex-col bg-white">
+              {viewUnassigned ? (
+                <><div className="p-5 border-b border-slate-100 flex justify-between items-center bg-orange-50/50"><div><h3 className="font-bold text-xl text-orange-800 flex items-center gap-2"><FaExclamationCircle /> Unassigned Employees</h3></div><button onClick={() => setIsGroupModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"><FaTimes size={20} /></button></div><div className="p-6 flex-1 overflow-y-auto"><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{getUnassignedEmployees().length === 0 ? (<div className="col-span-2 text-center py-12 text-slate-400"><FaCheck className="mx-auto mb-2 text-green-400" size={24} /><p>All employees assigned!</p></div>) : (getUnassignedEmployees().map(emp => (<div key={emp._id} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-slate-50"><div className="w-8 h-8 rounded bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">{emp.name.charAt(0)}</div><div className="min-w-0"><p className="text-sm font-bold text-slate-700 truncate">{emp.name}</p><p className="text-xs text-slate-500">{emp.employeeId}</p></div></div>)))}</div></div></>
+              ) : (
+                <><div className="p-5 border-b border-slate-100 flex justify-between items-center"><div><h3 className="font-bold text-xl text-slate-800">{editingGroupId ? 'Edit Group' : 'Create New Group'}</h3></div><button onClick={() => setIsGroupModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"><FaTimes size={20} /></button></div><div className="p-6 flex-1 overflow-y-auto"><div className="mb-6"><label className="block text-sm font-bold text-slate-700 mb-2">Group Name</label><input type="text" placeholder="e.g. Marketing Team" value={groupForm.name} onChange={e => setGroupForm({ ...groupForm, name: e.target.value })} className="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div><div className="mb-3 flex justify-between items-end"><label className="block text-sm font-bold text-slate-700">Select Members ({groupForm.members.length})</label><input type="text" placeholder="Search..." value={groupSearchTerm} onChange={e => setGroupSearchTerm(e.target.value)} className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:border-blue-500 outline-none" /></div><div className="border border-slate-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto bg-slate-50/50">{employees.filter(e => e.name.toLowerCase().includes(groupSearchTerm.toLowerCase())).map(emp => { const isSelected = groupForm.members.includes(emp._id); return (<div key={emp._id} onClick={() => toggleGroupMemberSelection(emp._id)} className={`flex items-center gap-3 p-3 border-b border-slate-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-white'}`}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>{isSelected && <FaCheck className="text-white text-xs" />}</div><div><p className={`text-sm font-semibold ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>{emp.name}</p><p className="text-xs text-slate-500">{emp.employeeId}</p></div></div>) })}</div></div><div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">{editingGroupId && (<button onClick={resetGroupForm} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg">Cancel Edit</button>)}<button onClick={handleSaveGroup} className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md flex items-center gap-2">{editingGroupId ? <FaSave /> : <FaPlus size={12} />} {editingGroupId ? 'Update' : 'Create'}</button></div></>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

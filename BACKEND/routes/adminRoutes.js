@@ -18,6 +18,7 @@ router.get("/settings/office", async (req, res) => {
         officeLocation: { latitude: 0, longitude: 0 },
         allowedRadius: 200,
         globalWorkMode: "WFO",
+        requireAccurateLocation: true, // NEW: Default enabled
         employeeWorkModes: [],
         categories: []
       });
@@ -31,10 +32,10 @@ router.get("/settings/office", async (req, res) => {
 
 router.put("/settings/office", async (req, res) => {
   try {
-    const { officeLocation, allowedRadius, globalWorkMode } = req.body;
+    const { officeLocation, allowedRadius, globalWorkMode, requireAccurateLocation } = req.body;
     const settings = await OfficeSettings.findOneAndUpdate(
       { type: "Global" },
-      { $set: { officeLocation, allowedRadius, globalWorkMode } },
+      { $set: { officeLocation, allowedRadius, globalWorkMode, requireAccurateLocation } },
       { new: true, upsert: true }
     );
     res.status(200).json({ message: "Office settings updated successfully", data: settings });

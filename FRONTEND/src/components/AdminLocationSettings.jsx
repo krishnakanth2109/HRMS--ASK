@@ -1,11 +1,14 @@
+// [file name]: AdminLocationSettings.jsx
+// [file content begin]
 import React, { useState, useEffect, useMemo } from "react";
 import Swal from "sweetalert2";
 import { 
   FaMapMarkerAlt, FaSave, FaSatelliteDish, FaUsers, 
   FaLaptopHouse, FaBuilding, FaSearch, FaLayerGroup, 
-  FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes, 
+  FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes,
   FaUserMinus, FaListAlt, FaUserPlus, FaCheck, FaCalendarAlt, FaClock, FaEdit,
-  FaEnvelopeOpenText, FaCheckCircle, FaTimesCircle
+  FaEnvelopeOpenText, FaCheckCircle, FaTimesCircle,
+  FaLocationArrow
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -470,7 +473,13 @@ const ExceptionsModal = ({ isOpen, onClose, employees }) => {
 
 const AdminLocationSettings = () => {
   const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState({ latitude: "", longitude: "", allowedRadius: 200, globalWorkMode: "WFO" });
+  const [settings, setSettings] = useState({ 
+    latitude: "", 
+    longitude: "", 
+    allowedRadius: 200, 
+    globalWorkMode: "WFO",
+    requireAccurateLocation: true 
+  });
   const [employees, setEmployees] = useState([]); 
   const [categories, setCategories] = useState([]); 
   const [loadingEmployees, setLoadingEmployees] = useState(false);
@@ -502,8 +511,17 @@ const AdminLocationSettings = () => {
     try {
       const { data } = await api.get("/api/admin/settings/office");
       if (data) {
-        setSettings({ latitude: data.officeLocation?.latitude || "", longitude: data.officeLocation?.longitude || "", allowedRadius: data.allowedRadius || 200, globalWorkMode: data.globalWorkMode || "WFO" });
-        if (data.officeLocation?.latitude) { setMapCenter([data.officeLocation.latitude, data.officeLocation.longitude]); setSelectedCoords([data.officeLocation.latitude, data.officeLocation.longitude]); }
+        setSettings({ 
+          latitude: data.officeLocation?.latitude || "", 
+          longitude: data.officeLocation?.longitude || "", 
+          allowedRadius: data.allowedRadius || 200, 
+          globalWorkMode: data.globalWorkMode || "WFO",
+          requireAccurateLocation: data.requireAccurateLocation !== undefined ? data.requireAccurateLocation : true
+        });
+        if (data.officeLocation?.latitude) { 
+          setMapCenter([data.officeLocation.latitude, data.officeLocation.longitude]); 
+          setSelectedCoords([data.officeLocation.latitude, data.officeLocation.longitude]); 
+        }
       }
     } catch (error) { console.error(error); }
   };
@@ -528,13 +546,68 @@ const AdminLocationSettings = () => {
   };
 
   // Map Logic
-  const openMap = () => { if (settings.latitude && settings.longitude) { const lat = parseFloat(settings.latitude); const lng = parseFloat(settings.longitude); setMapCenter([lat, lng]); setSelectedCoords([lat, lng]); } setShowMap(true); };
-  const handleMapSearch = async () => { if(!searchQuery) return; setSearchingMap(true); try { const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`); const data = await response.json(); if(data && data.length > 0) { const { lat, lon } = data[0]; const newCenter = [parseFloat(lat), parseFloat(lon)]; setMapCenter(newCenter); } else { Swal.fire("Not Found", "Location not found.", "info"); } } catch (err) { Swal.fire("Error", "Search failed.", "error"); } finally { setSearchingMap(false); } };
-  const confirmLocation = () => { if(selectedCoords) { setSettings(prev => ({ ...prev, latitude: selectedCoords[0], longitude: selectedCoords[1] })); setShowMap(false); } else { Swal.fire("Select Location", "Please click on the map to place a pin.", "warning"); } };
+  const openMap = () => { 
+    if (settings.latitude && settings.longitude) { 
+      const lat = parseFloat(settings.latitude); 
+      const lng = parseFloat(settings.longitude); 
+      setMapCenter([lat, lng]); 
+      setSelectedCoords([lat, lng]); 
+    } 
+    setShowMap(true); 
+  };
+  
+  const handleMapSearch = async () => { 
+    if(!searchQuery) return; 
+    setSearchingMap(true); 
+    try { 
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`); 
+      const data = await response.json(); 
+      if(data && data.length > 0) { 
+        const { lat, lon } = data[0]; 
+        const newCenter = [parseFloat(lat), parseFloat(lon)]; 
+        setMapCenter(newCenter); 
+      } else { 
+        Swal.fire("Not Found", "Location not found.", "info"); 
+      } 
+    } catch (err) { 
+      Swal.fire("Error", "Search failed.", "error"); 
+    } finally { 
+      setSearchingMap(false); 
+    } 
+  };
+  
+  const confirmLocation = () => { 
+    if(selectedCoords) { 
+      setSettings(prev => ({ ...prev, latitude: selectedCoords[0], longitude: selectedCoords[1] })); 
+      setShowMap(false); 
+    } else { 
+      Swal.fire("Select Location", "Please click on the map to place a pin.", "warning"); 
+    } 
+  };
 
   const handleSaveGlobalSettings = async () => {
-    if (settings.globalWorkMode === "WFO" && (!settings.latitude || !settings.longitude)) { return Swal.fire("Warning", "Please set Latitude and Longitude for WFO.", "warning"); }
-    try { setLoading(true); await api.put("/api/admin/settings/office", { officeLocation: { latitude: parseFloat(settings.latitude || 0), longitude: parseFloat(settings.longitude || 0) }, allowedRadius: parseInt(settings.allowedRadius), globalWorkMode: settings.globalWorkMode }); Swal.fire("Saved", "Global settings updated.", "success"); } catch (error) { Swal.fire("Error", "Failed to save settings.", "error"); } finally { setLoading(false); }
+    // If WFO mode is selected and requireAccurateLocation is enabled, validate coordinates
+    if (settings.globalWorkMode === "WFO" && settings.requireAccurateLocation && (!settings.latitude || !settings.longitude)) { 
+      return Swal.fire("Warning", "Please set Latitude and Longitude for WFO with accurate location enabled.", "warning"); 
+    }
+    
+    try { 
+      setLoading(true); 
+      await api.put("/api/admin/settings/office", { 
+        officeLocation: { 
+          latitude: parseFloat(settings.latitude || 0), 
+          longitude: parseFloat(settings.longitude || 0) 
+        }, 
+        allowedRadius: parseInt(settings.allowedRadius), 
+        globalWorkMode: settings.globalWorkMode,
+        requireAccurateLocation: settings.requireAccurateLocation
+      }); 
+      Swal.fire("Saved", "Global settings updated.", "success"); 
+    } catch (error) { 
+      Swal.fire("Error", "Failed to save settings.", "error"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleOpenScheduleModal = (employee) => { setEditingEmployee(employee); setScheduleModalOpen(true); };
@@ -579,16 +652,133 @@ const AdminLocationSettings = () => {
                  <div>
                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Default Global Mode</label>
                      <div className="flex bg-gray-100 p-1 rounded-xl">
-                        <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer transition-all ${settings.globalWorkMode === "WFO" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}><input type="radio" value="WFO" checked={settings.globalWorkMode === "WFO"} onChange={(e) => setSettings({ ...settings, globalWorkMode: e.target.value })} className="hidden" /><FaBuilding /> <span className="font-bold text-sm">Office</span></label>
-                        <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer transition-all ${settings.globalWorkMode === "WFH" ? "bg-white text-green-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}><input type="radio" value="WFH" checked={settings.globalWorkMode === "WFH"} onChange={(e) => setSettings({ ...settings, globalWorkMode: e.target.value })} className="hidden" /><FaLaptopHouse /> <span className="font-bold text-sm">Remote</span></label>
+                        <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer transition-all ${settings.globalWorkMode === "WFO" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                          <input 
+                            type="radio" 
+                            value="WFO" 
+                            checked={settings.globalWorkMode === "WFO"} 
+                            onChange={(e) => setSettings({ ...settings, globalWorkMode: e.target.value })} 
+                            className="hidden" 
+                          />
+                          <FaBuilding /> 
+                          <span className="font-bold text-sm">Office</span>
+                        </label>
+                        <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer transition-all ${settings.globalWorkMode === "WFH" ? "bg-white text-green-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                          <input 
+                            type="radio" 
+                            value="WFH" 
+                            checked={settings.globalWorkMode === "WFH"} 
+                            onChange={(e) => setSettings({ ...settings, globalWorkMode: e.target.value })} 
+                            className="hidden" 
+                          />
+                          <FaLaptopHouse /> 
+                          <span className="font-bold text-sm">Remote</span>
+                        </label>
                      </div>
                  </div>
-                 <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Geo-Fencing Radius</label><select value={settings.allowedRadius} onChange={(e) => setSettings({ ...settings, allowedRadius: e.target.value })} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" disabled={settings.globalWorkMode === "WFH"}><option value="50">50 Meters (Strict)</option><option value="100">100 Meters</option><option value="200">200 Meters (Standard)</option><option value="500">500 Meters</option><option value="1000">1 Kilometer</option></select></div>
+                 
+                 {/* Location Accuracy Toggle - Only show when WFO is selected */}
+                 {settings.globalWorkMode === "WFO" && (
+                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                     <div className="flex items-center justify-between mb-2">
+                       <div className="flex items-center gap-2">
+                         <FaLocationArrow className="text-blue-600" />
+                         <label className="block text-sm font-bold text-gray-700">Enforce Office Location</label>
+                       </div>
+                       <div className="relative inline-block w-12 mr-2 align-middle select-none">
+                         <input 
+                           type="checkbox" 
+                           id="requireAccurateLocation"
+                           checked={settings.requireAccurateLocation}
+                           onChange={(e) => setSettings({ ...settings, requireAccurateLocation: e.target.checked })}
+                           className="sr-only"
+                         />
+                         <label 
+                           htmlFor="requireAccurateLocation" 
+                           className={`block h-6 w-12 cursor-pointer rounded-full transition-all duration-200 ${settings.requireAccurateLocation ? 'bg-blue-600' : 'bg-gray-300'}`}
+                         >
+                           <div className={`h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${settings.requireAccurateLocation ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                         </label>
+                       </div>
+                     </div>
+                     <p className="text-xs text-gray-600">
+                       {settings.requireAccurateLocation 
+                         ? "Employees must be at the office location to punch in. GPS coordinates will be validated."
+                         : "Employees can work from anywhere. Office location will not be enforced for punch-in."
+                       }
+                     </p>
+                   </div>
+                 )}
+                 
+                 <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Geo-Fencing Radius</label>
+                   <select 
+                     value={settings.allowedRadius} 
+                     onChange={(e) => setSettings({ ...settings, allowedRadius: e.target.value })} 
+                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" 
+                     disabled={settings.globalWorkMode === "WFH" || (settings.globalWorkMode === "WFO" && !settings.requireAccurateLocation)}
+                   >
+                     <option value="50">50 Meters (Strict)</option>
+                     <option value="100">100 Meters</option>
+                     <option value="200">200 Meters (Standard)</option>
+                     <option value="500">500 Meters</option>
+                     <option value="1000">1 Kilometer</option>
+                   </select>
+                   {settings.globalWorkMode === "WFO" && !settings.requireAccurateLocation && (
+                     <p className="text-xs text-gray-500 mt-1">Radius setting is disabled when location enforcement is off.</p>
+                   )}
+                 </div>
              </div>
              <div className="space-y-6">
                  <div>
-                    <div className="flex justify-between items-center mb-2"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Office Coordinates</label><div className="flex gap-2"><button onClick={handleGetCurrentLocation} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1 transition"><FaMapMarkerAlt /> Auto-Detect</button><button onClick={openMap} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100 flex items-center gap-1 transition"><FaMapMarkerAlt /> Choose on Map</button></div></div>
-                    <div className="grid grid-cols-2 gap-3"><div className="relative"><span className="absolute top-2.5 left-3 text-gray-400 text-[10px] font-bold">LAT</span><input type="number" value={settings.latitude} onChange={(e) => setSettings({...settings, latitude: e.target.value})} className="w-full pl-9 p-2.5 bg-white border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0.0000" /></div><div className="relative"><span className="absolute top-2.5 left-3 text-gray-400 text-xs font-bold">LNG</span><input type="number" value={settings.longitude} onChange={(e) => setSettings({...settings, longitude: e.target.value})} className="w-full pl-10 p-2.5 bg-white border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0.0000" /></div></div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Office Coordinates</label>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={handleGetCurrentLocation} 
+                          className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition ${settings.requireAccurateLocation ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                          disabled={!settings.requireAccurateLocation}
+                        >
+                          <FaMapMarkerAlt /> Auto-Detect
+                        </button>
+                        <button 
+                          onClick={openMap} 
+                          className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition ${settings.requireAccurateLocation ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                          disabled={!settings.requireAccurateLocation}
+                        >
+                          <FaMapMarkerAlt /> Choose on Map
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative">
+                        <span className="absolute top-2.5 left-3 text-gray-400 text-[10px] font-bold">LAT</span>
+                        <input 
+                          type="number" 
+                          value={settings.latitude} 
+                          onChange={(e) => setSettings({...settings, latitude: e.target.value})} 
+                          className={`w-full pl-9 p-2.5 ${!settings.requireAccurateLocation ? 'bg-gray-100' : 'bg-white'} border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none`} 
+                          placeholder="0.0000" 
+                          disabled={!settings.requireAccurateLocation}
+                        />
+                      </div>
+                      <div className="relative">
+                        <span className="absolute top-2.5 left-3 text-gray-400 text-xs font-bold">LNG</span>
+                        <input 
+                          type="number" 
+                          value={settings.longitude} 
+                          onChange={(e) => setSettings({...settings, longitude: e.target.value})} 
+                          className={`w-full pl-10 p-2.5 ${!settings.requireAccurateLocation ? 'bg-gray-100' : 'bg-white'} border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none`} 
+                          placeholder="0.0000" 
+                          disabled={!settings.requireAccurateLocation}
+                        />
+                      </div>
+                    </div>
+                    {!settings.requireAccurateLocation && (
+                      <p className="text-xs text-gray-500 mt-2 italic">
+                        Coordinates are not required when location enforcement is disabled.
+                      </p>
+                    )}
                  </div>
                  <button onClick={handleSaveGlobalSettings} disabled={loading} className="w-full bg-gray-900 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-black transition shadow-sm flex justify-center items-center gap-2">{loading ? "Saving..." : <><FaSave /> Save Configuration</>}</button>
              </div>
@@ -653,3 +843,4 @@ const AdminLocationSettings = () => {
 };
 
 export default AdminLocationSettings;
+// [file content end]

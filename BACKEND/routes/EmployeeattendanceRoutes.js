@@ -202,9 +202,7 @@ router.post('/punch-out', async (req, res) => {
   }
 });
 
-/* ====================================================================================
-   ✅ NEW: ADMIN PUNCH OUT ROUTE (This fixes the 404 Error)
-==================================================================================== */
+/* ================= ADMIN PUNCH OUT ROUTE ================= */
 router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
   try {
     const { employeeId, punchOutTime, latitude, longitude, date } = req.body;
@@ -215,12 +213,9 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
 
     const punchOutDateObj = new Date(punchOutTime);
     
-    // Find Employee Attendance Doc
     let attendance = await Attendance.findOne({ employeeId });
     if (!attendance) return res.status(404).json({ message: "No attendance record found for this employee" });
 
-    // Find specific day record (formatted YYYY-MM-DD from frontend)
-    // Note: frontend sends full ISO, we might need to normalize or rely on the `date` field passed
     let targetDateStr = date;
     if(date.includes("T")) targetDateStr = date.split("T")[0];
 
@@ -230,13 +225,6 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
         return res.status(400).json({ message: `No attendance entry found for date: ${targetDateStr}` });
     }
 
-    // Check if already punched out
-    if (dayRecord.status === "COMPLETED" && dayRecord.punchOut) {
-        // Optional: Allow overwrite? For now, let's just update the existing punchOut
-        // return res.status(400).json({ message: "Employee is already marked as completed." });
-    }
-
-    // 1. Close Open Sessions
     const sessions = dayRecord.sessions || [];
     const openSession = sessions.find(s => !s.punchOut);
 
@@ -245,7 +233,6 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
         openSession.durationSeconds = (punchOutDateObj - new Date(openSession.punchIn)) / 1000;
     }
 
-    // 2. Update Top-Level fields
     dayRecord.punchOut = punchOutDateObj;
     dayRecord.punchOutLocation = { 
         latitude: latitude || 0, 
@@ -254,13 +241,10 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
         timestamp: new Date()
     };
     dayRecord.status = "COMPLETED";
-    
-    // 3. Mark as Admin Action
     dayRecord.adminPunchOut = true;
-    dayRecord.adminPunchOutBy = req.user.name; // From 'protect' middleware
+    dayRecord.adminPunchOutBy = req.user.name; 
     dayRecord.adminPunchOutTimestamp = new Date();
 
-    // 4. Recalculate Totals
     let totalSeconds = 0;
     dayRecord.sessions.forEach(sess => {
         if(sess.punchIn && sess.punchOut) {
@@ -277,14 +261,13 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
     dayRecord.workedSeconds = s;
     dayRecord.displayTime = `${h}h ${m}m ${s}s`;
 
-    // 5. Update Status based on Shift
     let shift = await Shift.findOne({ employeeId });
     if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
 
     let workedStatus = "ABSENT";
     if (h >= shift.fullDayHours) workedStatus = "FULL_DAY";
     else if (h >= shift.halfDayHours) workedStatus = "HALF_DAY";
-    else if (h >= shift.quarterDayHours) workedStatus = "HALF_DAY"; // Flexible fallback
+    else if (h >= shift.quarterDayHours) workedStatus = "HALF_DAY";
 
     dayRecord.workedStatus = workedStatus;
     dayRecord.attendanceCategory = workedStatus === "FULL_DAY" ? "FULL_DAY" : (workedStatus === "HALF_DAY" ? "HALF_DAY" : "ABSENT");
@@ -297,6 +280,125 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
     console.error("Admin Punch Out Error:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+/* ====================================================================================
+   ✅ NEW: EMPLOYEE REQUEST FOR LATE CORRECTION (Request On Time)
+==================================================================================== */
+router.post('/request-correction', async (req, res) => {
+    try {
+        const { employeeId, date, time, reason } = req.body;
+        // User sends time as "HH:mm" (e.g. "09:00")
+        
+        let attendance = await Attendance.findOne({ employeeId });
+        if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+
+        let dayRecord = attendance.attendance.find(a => a.date === date);
+        if (!dayRecord) return res.status(400).json({ message: "No attendance found for this date." });
+
+        // Construct Date object for requested time
+        const requestedDateObj = new Date(`${date}T${time}:00`);
+
+        // Update the request fields inside the Daily Schema
+        dayRecord.lateCorrectionRequest = {
+            hasRequest: true,
+            status: "PENDING",
+            requestedTime: requestedDateObj,
+            reason: reason
+        };
+
+        await attendance.save();
+        res.json({ success: true, message: "Request sent to Admin." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/* ====================================================================================
+   ✅ NEW: ADMIN APPROVE CORRECTION (Update 1st Punch In & Recalculate)
+==================================================================================== */
+router.post('/approve-correction', onlyAdmin, async (req, res) => {
+    try {
+        const { employeeId, date, status, adminComment } = req.body; 
+        // status: "APPROVED" or "REJECTED"
+
+        let attendance = await Attendance.findOne({ employeeId });
+        if (!attendance) return res.status(404).json({ message: "Record not found" });
+
+        let dayRecord = attendance.attendance.find(a => a.date === date);
+        if (!dayRecord || !dayRecord.lateCorrectionRequest?.hasRequest) {
+            return res.status(400).json({ message: "No pending request found." });
+        }
+
+        if (status === "REJECTED") {
+            dayRecord.lateCorrectionRequest.status = "REJECTED";
+            dayRecord.lateCorrectionRequest.adminComment = adminComment;
+        } 
+        else if (status === "APPROVED") {
+            const newPunchIn = new Date(dayRecord.lateCorrectionRequest.requestedTime);
+
+            // 1. Update Request Status
+            dayRecord.lateCorrectionRequest.status = "APPROVED";
+            dayRecord.lateCorrectionRequest.adminComment = adminComment;
+
+            // 2. Update First Session Punch In
+            if (dayRecord.sessions.length > 0) {
+                dayRecord.sessions[0].punchIn = newPunchIn;
+                
+                // Recalculate duration if punchOut exists
+                if (dayRecord.sessions[0].punchOut) {
+                    dayRecord.sessions[0].durationSeconds = (new Date(dayRecord.sessions[0].punchOut) - newPunchIn) / 1000;
+                }
+            }
+
+            // 3. Update Root Punch In
+            dayRecord.punchIn = newPunchIn;
+
+            // 4. Recalculate Login Status (Is it Late?)
+            let shift = await Shift.findOne({ employeeId });
+            // Fallback default
+            if (!shift) shift = { shiftStartTime: "09:00", lateGracePeriod: 15 };
+
+            const diffMin = getTimeDifferenceInMinutes(newPunchIn, shift.shiftStartTime);
+            
+            // If new time is within grace period, mark ON TIME
+            if (diffMin <= shift.lateGracePeriod) {
+                dayRecord.loginStatus = "ON_TIME";
+            } else {
+                dayRecord.loginStatus = "LATE";
+            }
+
+            // 5. Recalculate Total Worked Hours (Since start time changed)
+            let totalSeconds = 0;
+            dayRecord.sessions.forEach(sess => {
+                if(sess.punchIn && sess.punchOut) {
+                    totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+                } else if (sess.punchIn && dayRecord.status === "WORKING") {
+                   // If currently working, we don't calculate total worked yet for saving, 
+                   // but standard flow usually only sums completed sessions or uses current time on frontend.
+                   // Here we just sum completed.
+                }
+            });
+            
+            // Only update worked hours if the session was completed, otherwise it stays partial until punchout
+            // But if shift is completed, update totals
+            if (dayRecord.status === "COMPLETED") {
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = Math.floor(totalSeconds % 60);
+
+                dayRecord.workedHours = h;
+                dayRecord.workedMinutes = m;
+                dayRecord.workedSeconds = s;
+                dayRecord.displayTime = `${h}h ${m}m ${s}s`;
+            }
+        }
+
+        await attendance.save();
+        res.json({ success: true, message: `Request ${status.toLowerCase()} successfully.` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* ================= OTHER ROUTES ================= */

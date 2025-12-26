@@ -38,7 +38,9 @@ import {
   FaCouch,        
   FaUmbrellaBeach,
   FaFileDownload,
-  FaBriefcase
+  FaBriefcase,
+  FaListAlt, // Added for the Requests button
+  FaTimes // Added for closing modal
 } from "react-icons/fa";
 
 // --- Register Chart.js components ---
@@ -144,6 +146,9 @@ const EmployeeDailyAttendance = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'descending' });
+  
+  // ✅ New State for Requests Modal
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
 
   // --- Fetch Data ---
   const loadData = useCallback(async (empId) => {
@@ -458,11 +463,8 @@ const EmployeeDailyAttendance = () => {
     const holidaysCount = currentMonthData.filter(d => d.workedStatus === "Holiday").length;
     
     // UPDATED: Working Days Logic
-    // Total days passed so far - Week Offs - Holidays
-    // This gives the number of days the employee was EXPECTED to be present
     const workingDays = Math.max(0, currentMonthData.length - weekOffs - holidaysCount);
 
-    // Absent includes leaves as requested
     const absentTotal = stats.absent + stats.leave;
 
     return {
@@ -490,6 +492,19 @@ const EmployeeDailyAttendance = () => {
     const monthName = selectedDate.toLocaleString('default', { month: 'long' });
     return `Monthly Breakdown of ${monthName} ${selectedDate.getFullYear()}`;
   };
+
+  // ✅ MEMOIZED: Get Late Requests for Selected Period
+  const lateRequestsHistory = useMemo(() => {
+    const selectedMonth = selectedDate.getMonth();
+    const selectedYear = selectedDate.getFullYear();
+
+    return attendance.filter(record => {
+        const recordDate = new Date(record.date);
+        return record.lateCorrectionRequest?.hasRequest && 
+               recordDate.getMonth() === selectedMonth && 
+               recordDate.getFullYear() === selectedYear;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [attendance, selectedDate]);
 
   // --- Event Handlers (Defined BEFORE they are used in JSX) ---
   
@@ -587,7 +602,15 @@ const EmployeeDailyAttendance = () => {
             </select>
           </div>
           
-          <div className="flex-grow md:text-right">
+          <div className="flex-grow md:text-right flex justify-end gap-3">
+             {/* ✅ Added View Requests Button */}
+             <button 
+                onClick={() => setShowRequestsModal(true)}
+                className="inline-flex items-center gap-2 bg-white border border-orange-200 text-orange-600 hover:bg-orange-50 px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors"
+             >
+                <FaListAlt /> Late Requests History
+             </button>
+
              <button 
                 onClick={handleExport}
                 className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors"
@@ -775,6 +798,75 @@ const EmployeeDailyAttendance = () => {
             </table>
           </div>
         </div>
+
+        {/* ✅ LATE REQUESTS MODAL */}
+        {showRequestsModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-fade-in-down flex flex-col max-h-[80vh]">
+                    <div className="bg-orange-600 px-6 py-4 flex justify-between items-center text-white">
+                        <div>
+                            <h3 className="text-lg font-bold flex items-center gap-2"><FaUserClock /> Late Requests History</h3>
+                            <p className="text-xs text-orange-100 opacity-90 mt-1">Showing requests for {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+                        </div>
+                        <button onClick={() => setShowRequestsModal(false)} className="hover:bg-orange-700 p-2 rounded-full transition"><FaTimes /></button>
+                    </div>
+                    
+                    <div className="p-0 overflow-auto flex-1">
+                        <table className="min-w-full text-sm text-left">
+                            <thead className="bg-gray-50 sticky top-0 shadow-sm z-10">
+                                <tr className="text-gray-600 uppercase">
+                                    <th className="px-6 py-3 font-semibold">Date</th>
+                                    <th className="px-6 py-3 font-semibold">Status</th>
+                                    <th className="px-6 py-3 font-semibold">Punch In</th>
+                                    <th className="px-6 py-3 font-semibold">Requested Time</th>
+                                    <th className="px-6 py-3 font-semibold">Reason</th>
+                                    <th className="px-6 py-3 font-semibold">Admin Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {lateRequestsHistory.length > 0 ? (
+                                    lateRequestsHistory.map((req, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-medium text-gray-800">
+                                                {new Date(req.date).toLocaleDateString('en-GB')}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                                                    req.lateCorrectionRequest.status === "APPROVED" ? "bg-green-100 text-green-700 border-green-200" :
+                                                    req.lateCorrectionRequest.status === "REJECTED" ? "bg-red-100 text-red-700 border-red-200" :
+                                                    "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                                }`}>
+                                                    {req.lateCorrectionRequest.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500">
+                                                {req.punchIn ? new Date(req.punchIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "--:--"}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono text-blue-600 font-bold">
+                                                {new Date(req.lateCorrectionRequest.requestedTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                            </td>
+                                            <td className="px-6 py-4 max-w-xs truncate" title={req.lateCorrectionRequest.reason}>
+                                                {req.lateCorrectionRequest.reason}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500 italic">
+                                                {req.lateCorrectionRequest.adminComment || "--"}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="6" className="text-center py-12 text-gray-400">
+                                            No late correction requests found for this month.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );

@@ -20,7 +20,7 @@ import {
 } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { getLeaveRequests, getAllOvertimeRequests, getAllNoticesForAdmin } from "../../api";
-import { MapPinnedIcon, MapPinPlusInsideIcon } from "lucide-react";
+import { AlarmClockCheck, MapPinnedIcon, MapPinPlusInsideIcon } from "lucide-react";
 
 // SOCKET URL
 const SOCKET_URL =
@@ -65,6 +65,10 @@ const navLinks = [
   {
     to: "/admin/notices",
     label: "Post Notices",
+  },
+  { 
+    to: "/admin/notices", 
+    label: "Announcements", 
     icon: <FaClipboardList />,
     isNotice: true, // New: For notice badge
   },
@@ -78,6 +82,9 @@ const navLinks = [
     isOvertime: true,
   },
   { to: "/admin/shifttype", label: "Location Settings", icon: <MapPinnedIcon /> },
+  { to: "/admin/shifttype", label: "Location Settings", icon:<MapPinnedIcon /> },
+  { to: "/admin/late-requests", label: "Late Login Requests", icon:<AlarmClockCheck /> },
+  // { to: "/admin/meeting", label: "Meeting Scheduler", icon:<MapPinPlusInsideIcon /> },
 ];
 
 // ✅ HELPER: Calculate unread notices using SERVER STATE
