@@ -20,7 +20,7 @@
     "clsx": "^2.1.1",
     "docx": "^9.5.1",
     "file-saver": "^2.0.5",
-    "framer-motion": "^12.23.22",
+    "framer-motion": "^12.23.26",
     "gapi-script": "^1.2.0",
     "html-to-image": "^1.11.13",
     "html2pdf.js": "^0.10.3",
