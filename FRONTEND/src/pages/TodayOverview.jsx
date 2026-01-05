@@ -488,12 +488,31 @@ const MessageModal = ({ isOpen, onClose, employee, phoneNumber }) => {
 // Employee Card Component
 const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick }) => {
   const profilePic = employee.profilePic;
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowDropdown(false);
+    
+    if (showDropdown) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+    };
+  }, [showDropdown]);
+
+  const toggleDropdown = (e) => {
+    e.stopPropagation();
+    setShowDropdown(!showDropdown);
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-slate-200"
+      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-slate-200 relative"
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
@@ -539,9 +558,52 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
             </div>
           </div>
           
-          <button className="text-slate-400 hover:text-slate-600 p-1">
-            <FaEllipsisV className="text-sm" />
-          </button>
+          {/* Dynamic Dropdown Logic */}
+          <div className="relative">
+            {employee.phoneNumber && (
+              <>
+                <button 
+                  onClick={toggleDropdown}
+                  className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <FaEllipsisV className="text-sm" />
+                </button>
+
+                <AnimatePresence>
+                  {showDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            onCallClick(employee);
+                            setShowDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                        >
+                          <FaPhone className="text-xs" /> Call
+                        </button>
+                        <button
+                          onClick={() => {
+                            onMessageClick(employee);
+                            setShowDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                        >
+                          <FaEnvelope className="text-xs" /> Message
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+          </div>
         </div>
         
         <div className="space-y-2.5">
@@ -591,37 +653,7 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
         </div>
       </div>
       
-      <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/50">
-        <div className="flex gap-2">
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={() => onCallClick(employee)}
-            disabled={!employee.phoneNumber}
-            className={`flex-1 py-2 text-white font-medium rounded-md transition-all flex items-center justify-center gap-1.5 text-sm ${
-              employee.phoneNumber 
-                ? 'bg-slate-800 hover:bg-slate-900' 
-                : 'bg-slate-300 cursor-not-allowed'
-            }`}
-          >
-            <FaPhone className="text-xs" /> Call
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={() => onMessageClick(employee)}
-            disabled={!employee.phoneNumber}
-            className={`flex-1 py-2 text-white font-medium rounded-md transition-all flex items-center justify-center gap-1.5 text-sm ${
-              employee.phoneNumber 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-blue-300 cursor-not-allowed'
-            }`}
-          >
-            <FaEnvelope className="text-xs" /> Message
-          </motion.button>
-        </div>
-      </div>
+      {/* Bottom buttons removed as requested */}
     </motion.div>
   );
 };

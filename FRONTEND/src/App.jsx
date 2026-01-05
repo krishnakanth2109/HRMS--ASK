@@ -71,6 +71,8 @@ import RequestPunchOut from "./EmployeePages/RequestPunchOut";
 import AdminLateRequests from "./pages/AdminLateRequests";
 import MeetingGenerator from "./pages/meeting";
 import TodayOverview from "./pages/TodayOverview";
+import EmployeeViewRules from "./EmployeePages/EmployeeViewRules";
+import AdminRulesPost from "./pages/AdminRulespost";
 
 function App() {
   return (
@@ -145,6 +147,7 @@ function App() {
         <Route path="/admin/late-requests" element={<AdminLateRequests />} />
         <Route path="/admin/meeting" element={<MeetingGenerator />} />
         <Route path="/admin/today-overview" element={<TodayOverview />} />
+          <Route path="/admin/rules" element={<AdminRulesPost />} />
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}
@@ -169,6 +172,7 @@ function App() {
         <Route path="/employee/requestpunchout" element={<RequestPunchOut />} />
         <Route path="/employee/my-attendence" element={<EmployeeDailyAttendance />} />
         <Route path="/employee/new-attendence" element={<NewEmployeeAttendance />} />
+            <Route path="/employee/rules" element={<EmployeeViewRules />} />
   
         <Route
           path="/employee/teams"

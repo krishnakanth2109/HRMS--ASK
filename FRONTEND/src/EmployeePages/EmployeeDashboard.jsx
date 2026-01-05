@@ -36,7 +36,6 @@ import {
   FaBuilding,
   FaInfoCircle,
   FaHistory,
-  FaHourglassHalf,
   FaCoffee,
   FaExclamationTriangle,
   FaPaperPlane,
@@ -52,7 +51,6 @@ import api, {
   uploadProfilePic,
   getProfilePic,
   deleteProfilePic,
-  sendIdleActivity,
   getShiftByEmployeeId,
 } from "../api";
 import { useNavigate } from "react-router-dom";
@@ -68,15 +66,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
-// IDLE CONFIGURATION
-const INACTIVITY_LIMIT_MS = 2 * 60 * 1000; // 2 Minutes
-const WORK_START_HOUR = 0;
-const WORK_END_HOUR = 24;
-
-const recordIdleActivityLocally = async (data) => {
-  return api.post("/api/attendance/record-idle-activity", data);
-};
 
 // Helper: Haversine Formula
 const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
@@ -144,12 +133,6 @@ const EmployeeDashboard = () => {
   const alarmPlayedRef = useRef(false);
 
   const todayIso = new Date().toISOString().split("T")[0]; // YYYY-MM-DD for logic
-
-  // IDLE TRACKING REFS
-  const isIdleRef = useRef(false);
-  const idleStartTimeRef = useRef(null);
-  const idleNotifiedRef = useRef(false); 
-  const LOCAL_STORAGE_KEY = `lastActive_${user?.employeeId}`;
 
   // --- Voice Feedback ---
   const speak = (text) => {
@@ -360,27 +343,6 @@ const EmployeeDashboard = () => {
     return () => { if (interval) clearInterval(interval); };
   }, [todayLog, shiftTimings]);
 
-  const getTodayIdleTimeStr = () => {
-    const activities = todayLog?.idleActivity || [];
-    if (activities.length === 0) return "--";
-    let totalMs = 0;
-    activities.forEach((item) => {
-      const start = new Date(item.idleStart).getTime();
-      const end = item.idleEnd ? new Date(item.idleEnd).getTime() : new Date().getTime();
-      if (todayLog.punchOut && !item.idleEnd) {
-         const punchOutTime = new Date(todayLog.punchOut).getTime();
-         if (punchOutTime > start) totalMs += (punchOutTime - start);
-      } else {
-         if (end > start) totalMs += (end - start);
-      }
-    });
-    const totalSec = Math.floor(totalMs / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return `${h}h ${m}m ${s}s`;
-  };
-
   const calculateWorkModeStatus = useCallback(() => {
     const defaults = { 
       mode: officeConfig?.globalWorkMode || 'WFO', 
@@ -420,18 +382,6 @@ const EmployeeDashboard = () => {
   }, [officeConfig, user]);
 
   const performPunchAction = async (action) => {
-    if (action === "OUT" && isIdleRef.current) {
-        try { 
-          await recordIdleActivityLocally({ 
-            employeeId: user.employeeId, 
-            idleEnd: new Date().toISOString(), 
-            isIdle: false, 
-            idleStart: idleStartTimeRef.current 
-          }); 
-          isIdleRef.current = false; 
-        } catch(e) { console.error(e); }
-    }
-    
     setPunchStatus("FETCHING");
 
     try {
@@ -460,7 +410,6 @@ const EmployeeDashboard = () => {
                 }
             }
         }
-        localStorage.setItem(LOCAL_STORAGE_KEY, Date.now());
         alarmPlayedRef.current = false; 
         await punchIn({ employeeId: user.employeeId, employeeName: user.name, latitude: location.latitude, longitude: location.longitude });
         speak(`${user.name}, punch in successful`);
@@ -636,31 +585,6 @@ const EmployeeDashboard = () => {
         if (result.isConfirmed) { await deleteProfilePic(); setProfileImage(null); sessionStorage.removeItem("profileImage"); }
     });
   };
-
-  useEffect(() => {
-    if (!user || !user.employeeId || !todayLog?.punchIn || todayLog?.punchOut) return;
-    const handleActivity = () => {
-      const now = Date.now();
-      const lastSaved = parseInt(localStorage.getItem(LOCAL_STORAGE_KEY) || 0);
-      if (now - lastSaved > 1000) { localStorage.setItem(LOCAL_STORAGE_KEY, now); }
-      if (isIdleRef.current && idleStartTimeRef.current) {
-        const startT = idleStartTimeRef.current; isIdleRef.current = false; idleStartTimeRef.current = null; idleNotifiedRef.current = false;
-        recordIdleActivityLocally({ employeeId: user.employeeId, idleEnd: new Date().toISOString(), isIdle: false, idleStart: startT }).then(() => { loadAttendance(user.employeeId); }).catch(err => console.error(err));
-      }
-    };
-    window.addEventListener("mousemove", handleActivity); window.addEventListener("keydown", handleActivity); window.addEventListener("click", handleActivity);
-    const intervalId = setInterval(async () => {
-      const now = Date.now();
-      const hour = new Date().getHours();
-      if (hour < WORK_START_HOUR || hour >= WORK_END_HOUR) return;
-      const lastActive = parseInt(localStorage.getItem(LOCAL_STORAGE_KEY) || Date.now());
-      if (now - lastActive >= INACTIVITY_LIMIT_MS && !isIdleRef.current) {
-        isIdleRef.current = true; idleStartTimeRef.current = new Date().toISOString();
-        try { await recordIdleActivityLocally({ employeeId: user.employeeId, idleStart: idleStartTimeRef.current, isIdle: true }); if (!idleNotifiedRef.current) { idleNotifiedRef.current = true; await sendIdleActivity({ employeeId: user.employeeId, name: user.name, department, role, lastActiveAt: new Date(lastActive).toISOString() }); } } catch (e) {}
-      }
-    }, 1000);
-    return () => { window.removeEventListener("mousemove", handleActivity); window.removeEventListener("keydown", handleActivity); window.removeEventListener("click", handleActivity); clearInterval(intervalId); };
-  }, [user, department, role, todayLog, loadAttendance, LOCAL_STORAGE_KEY]);
 
   const formatWorkedTime = (totalSeconds) => {
     if (isNaN(totalSeconds) || totalSeconds < 0) return "0h 0m 0s";
@@ -956,7 +880,6 @@ const EmployeeDashboard = () => {
                 <th className="px-4 py-3 text-left">Login Status</th>
                 <th className="px-4 py-3 text-left">Worked Status</th>
                 <th className="px-4 py-3 text-left">Break Time</th>
-                <th className="px-4 py-3 text-left">Idle Time</th>
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
@@ -980,7 +903,6 @@ const EmployeeDashboard = () => {
                 
                 <td className="px-4 py-3 capitalize"> {todayLog?.punchIn ? ( <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span> ) : ( <span className="text-gray-500">--</span> )} </td>
                 <td className="px-4 py-3 font-mono text-purple-600"> {todayLog?.totalBreakSeconds ? formatWorkedTime(todayLog.totalBreakSeconds) : "0h 0m 0s"} </td>
-                <td className="px-4 py-3 font-mono font-bold text-orange-600"> {todayLog?.punchIn ? getTodayIdleTimeStr() : "--"} </td>
                 
                 <td className="px-4 py-3 text-center">
                   {isShiftCompleted ? (

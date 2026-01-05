@@ -29,6 +29,7 @@ import requestWorkModeRoutes from "./routes/requestWorkModeRoutes.js";
 import punchOutRoutes from './routes/punchOutRequestRoutes.js';
 import groupRoutes from "./routes/groupRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
+import rulesRoutes from './routes/rules.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -142,6 +143,7 @@ app.use("/api/work-mode", requestWorkModeRoutes);
 app.use('/api/punchoutreq', punchOutRoutes); 
 app.use("/api/groups", groupRoutes);
 app.use('/api/meetings', meetingRoutes); 
+app.use('/api/rules', rulesRoutes);
 
 
 

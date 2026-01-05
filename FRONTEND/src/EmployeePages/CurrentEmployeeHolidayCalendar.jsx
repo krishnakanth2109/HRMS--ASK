@@ -100,7 +100,10 @@ const EmployeeHolidays = () => {
       const d = normalize(date);
       const holiday = holidays.find((h) => d >= h.start && d <= h.end);
       return holiday ? (
-        <div className="holiday-tooltip">{holiday.name}</div>
+        <div className="holiday-tooltip">
+          <div className="font-bold">{holiday.name}</div>
+          {holiday.description && <div className="text-[10px] font-normal opacity-90 border-t border-gray-500 mt-1 pt-1">{holiday.description}</div>}
+        </div>
       ) : null;
     }
   };
@@ -215,6 +218,12 @@ const EmployeeHolidays = () => {
                         <p className="text-gray-500 text-sm">
                            {h.start.toDateString()}
                         </p>
+                        {/* Description Added Here */}
+                        {h.description && (
+                          <p className="text-gray-500 text-xs mt-2 italic border-t pt-2 border-gray-100">
+                            {h.description}
+                          </p>
+                        )}
                       </div>
                       
                       <FaStar className="text-yellow-400 text-xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -283,13 +292,14 @@ const EmployeeHolidays = () => {
           transform: translateX(-50%);
           background: #333;
           color: white;
-          padding: 4px 8px;
+          padding: 6px 10px;
           border-radius: 6px;
           font-size: 12px;
           opacity: 0;
           transition: 0.3s;
           z-index: 10;
           white-space: nowrap;
+          pointer-events: none;
         }
         .holiday-tile:hover .holiday-tooltip { opacity: 1; }
         .animate-bounce-slow { animation: bounce 2s infinite; }

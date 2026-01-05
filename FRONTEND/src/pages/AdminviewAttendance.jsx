@@ -717,7 +717,11 @@ const AdminAttendance = () => {
   const [allEmployees, setAllEmployees] = useState([]);
   
   // Summary Date States
-  const [summaryStartDate, setSummaryStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]);
+// NEW (Fixed: Manually creates YYYY-MM-01)
+const [summaryStartDate, setSummaryStartDate] = useState(() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+});
   const [summaryEndDate, setSummaryEndDate] = useState(todayISO);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
 
@@ -943,23 +947,26 @@ const AdminAttendance = () => {
     }
   };
 
-  const handleMonthChange = (e) => {
-    const val = e.target.value;
-    setSelectedMonth(val);
-    
-    if(val) {
-        const [year, month] = val.split('-').map(Number);
-        const start = new Date(year, month - 1, 1);
-        const end = new Date(year, month, 0); 
-        
-        const startStr = new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        const endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
-        setSummaryStartDate(startStr);
-        setSummaryEndDate(endStr);
-    }
-  };
+// NEW Function
+const handleMonthChange = (e) => {
+  const val = e.target.value;
+  setSelectedMonth(val);
+  
+  if(val) {
+      // ✅ FIX: Simply append "-01" to the YYYY-MM value from the picker
+      const startStr = `${val}-01`;
 
+      // Calculate end date (Last day of month)
+      const [year, month] = val.split('-').map(Number);
+      const end = new Date(year, month, 0);
+      // Use local string formatting for end date to avoid timezone shifts
+      const offset = end.getTimezoneOffset() * 60000;
+      const endStr = new Date(end.getTime() - offset).toISOString().split('T')[0];
+      
+      setSummaryStartDate(startStr);
+      setSummaryEndDate(endStr);
+  }
+};
   useEffect(() => { fetchShifts(); fetchHolidays(); fetchDailyData(startDate, endDate); fetchPunchOutRequests(); }, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays, fetchPunchOutRequests]);
   useEffect(() => { fetchAllEmployees(); fetchSummaryData(summaryStartDate, summaryEndDate); fetchOvertimeData(); }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees]);
 

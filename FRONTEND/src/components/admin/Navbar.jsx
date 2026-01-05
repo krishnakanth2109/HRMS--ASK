@@ -181,7 +181,15 @@ const Navbar = () => {
                 >
                   <FaCog className="text-blue-600" /> Shift Settings
                 </div>
-
+              <div
+                  onClick={() => {
+                    navigate("/admin/rules");
+                    setShowMenu(false);
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition border-t"
+                >
+                  <FaCog className="text-blue-600" /> Company Rules & Regulations
+                </div>
                 {/* THEME COLORS */}
                 <div className="border-t">
                   <div

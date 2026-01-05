@@ -125,12 +125,12 @@ const NavbarEmployee = () => {
 
               <div
                 onClick={() => {
-                  navigate("/employee/settings");
+                  navigate("/employee/rules");
                   setShowMenu(false);
                 }}
                 className="flex items-center gap-2 px-4 py-3 hover:bg-blue-50 text-gray-700 cursor-pointer transition-all"
               >
-                <FaCog className="text-blue-600" /> Settings
+                <FaCog className="text-blue-600" /> Company Policys
               </div>
 
               <div
