@@ -549,5 +549,41 @@ export const deleteGroupApi = async (groupId) => {
 };
 
 
+/* =============================================================================
+   RULES & REGULATIONS (Add this to api.js)
+============================================================================= */
+export const getRules = async () => {
+  try {
+    const response = await api.get("/api/rules");
+    return response.data;
+  } catch (error) {
+    console.error("Get rules error:", error);
+    throw error;
+  }
+};
+
+export const createRule = async (formData) => {
+  try {
+    // Axios automatically handles Content-Type: multipart/form-data when passing FormData
+    const response = await api.post("/api/rules", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Create rule error:", error);
+    throw error;
+  }
+};
+
+export const deleteRule = async (id) => {
+  try {
+    const response = await api.delete(`/api/rules/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Delete rule error:", error);
+    throw error;
+  }
+};
+
 
 export default api;

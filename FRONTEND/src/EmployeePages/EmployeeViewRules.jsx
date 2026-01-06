@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// 1. Remove axios
+// 2. Import the getRules function from your api.js
+import { getRules } from '../api'; 
 
 // --- SUB-COMPONENT: Single Rule Card (Handles Slider & Full Screen Logic) ---
 const RuleCard = ({ rule }) => {
@@ -222,13 +224,14 @@ const EmployeeViewRules = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // --- 1. Fetch Rules ---
+  // --- 1. Fetch Rules (UPDATED) ---
   useEffect(() => {
     const fetchRules = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/rules');
-        setRules(res.data);
-        setFilteredRules(res.data);
+        // UPDATED: Used getRules from api.js instead of axios.get with localhost
+        const data = await getRules();
+        setRules(data);
+        setFilteredRules(data);
       } catch (error) {
         console.error("Error fetching rules", error);
       } finally {

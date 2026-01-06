@@ -10,8 +10,7 @@ import {
   FaChevronRight,
   FaSyncAlt,
   FaClock,
-  FaUserSlash,
-  FaCalendarAlt
+  FaArrowRight
 } from "react-icons/fa";
 import {
   BarChart,
@@ -21,14 +20,14 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Cell
 } from "recharts";
-import DepartmentPieChart from "../components/DepartmentPieChart";
+import DepartmentPieChart from "../components/DepartmentPieChart"; 
 import { EmployeeContext } from "../context/EmployeeContext";
 import { AttendanceContext } from "../context/AttendanceContext";
 import { LeaveRequestContext } from "../context/LeaveRequestContext";
 import { getAttendanceByDateRange } from "../api";
-import { CalendarCheck2 } from "lucide-react";
 
 const AdminDashboard = () => {
   const { employees } = useContext(EmployeeContext);
@@ -37,18 +36,17 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const [selectedDept, setSelectedDept] = useState("All");
-  const [currentWeek, setCurrentWeek] = useState(0); // 0 = Current Week, -1 = Last Week, etc.
+  const [currentWeek, setCurrentWeek] = useState(0); 
   const [weeklyAttendanceData, setWeeklyAttendanceData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
 
-  // State for today's overview counts
   const [todayCounts, setTodayCounts] = useState({
     present: 0,
     notLoggedIn: 0,
     onLeave: 0
   });
 
-  // --- 1. General Dashboard Stats (Cards) ---
+  // --- 1. General Dashboard Stats ---
   const { statCards, activeEmployees, departmentList } = useMemo(
     () => getDashboardData(employees, leaveRequests),
     [employees, leaveRequests, getDashboardData]
@@ -62,19 +60,14 @@ const AdminDashboard = () => {
         const todayAttendance = await getAttendanceByDateRange(today, today);
         const attendanceArray = Array.isArray(todayAttendance) ? todayAttendance : [];
 
-        // Filter approved leave requests for today
         const todayLeaveRequests = leaveRequests.filter(leave => {
           if (leave.status !== 'Approved') return false;
           return today >= leave.from && today <= leave.to;
         });
 
-        // Count present (with punchIn time)
         const present = attendanceArray.filter(att => att.punchIn).length;
-
-        // Count on leave
         const onLeave = todayLeaveRequests.length;
 
-        // Count active employees not present and not on leave
         const activeEmployeeIds = new Set(
           activeEmployees.filter(e => e.isActive !== false).map(e => e.employeeId)
         );
@@ -100,28 +93,24 @@ const AdminDashboard = () => {
     calculateTodayCounts();
   }, [activeEmployees, leaveRequests]);
 
-  // --- 3. Calculate Week Range (Sunday to Saturday) ---
+  // --- 3. Calculate Week Range ---
   const weekDates = useMemo(() => {
     const today = new Date();
     today.setDate(today.getDate() + currentWeek * 7);
 
-    const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+    const dayOfWeek = today.getDay(); 
 
-    // Calculate Sunday (Start of week)
     const sunday = new Date(today);
     sunday.setDate(today.getDate() - dayOfWeek);
     sunday.setHours(0, 0, 0, 0);
 
-    // Calculate Saturday (End of week)
     const saturday = new Date(sunday);
     saturday.setDate(sunday.getDate() + 6);
     saturday.setHours(23, 59, 59, 999);
 
-    // Helper to format YYYY-MM-DD in Local Time
     const formatDate = (date) => {
       const offset = date.getTimezoneOffset() * 60000;
-      const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 10);
-      return localISOTime;
+      return new Date(date.getTime() - offset).toISOString().slice(0, 10);
     };
 
     return {
@@ -132,7 +121,7 @@ const AdminDashboard = () => {
     };
   }, [currentWeek]);
 
-  // --- 4. Fetch Accurate Attendance Data from API ---
+  // --- 4. Fetch Attendance Data ---
   useEffect(() => {
     const fetchWeeklyData = async () => {
       setLoadingGraph(true);
@@ -149,60 +138,42 @@ const AdminDashboard = () => {
     fetchWeeklyData();
   }, [weekDates]);
 
-  // --- 5. Process Data for Graph (Stop at Today) ---
+  // --- 5. Process Data for Graph ---
   const weeklyChartData = useMemo(() => {
-    // A. Filter Active Employees by Selected Department
     const deptEmployees = activeEmployees.filter(e =>
       selectedDept === "All" || e.department === selectedDept
     );
     const totalActiveCount = deptEmployees.length;
-
-    // Valid IDs for this department
     const validEmployeeIds = new Set(deptEmployees.map(e => e.employeeId));
 
     const data = [];
     const startObj = new Date(weekDates.startDateObj);
-
-    // Use midnight comparison for "Today"
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // B. Loop 7 days (Sunday to Saturday)
     for (let i = 0; i < 7; i++) {
       const loopDate = new Date(startObj);
       loopDate.setDate(startObj.getDate() + i);
 
-      // Stop if future
       if (loopDate > today) break;
 
-      // Current loop date string in Local Time (YYYY-MM-DD)
       const offset = loopDate.getTimezoneOffset() * 60000;
       const dateStr = new Date(loopDate.getTime() - offset).toISOString().slice(0, 10);
-
       const dayName = loopDate.toLocaleDateString('en-US', { weekday: 'short' });
 
-      // C. Count Present
       const presentSet = new Set();
 
       weeklyAttendanceData.forEach(record => {
-        // 1. Determine the record's date in LOCAL TIME
-        // Prefer punchIn timestamp; fallback to date string
         const recordRawDate = record.punchIn ? new Date(record.punchIn) : new Date(record.date);
-
-        // Convert record timestamp to Local YYYY-MM-DD string
         const rOffset = recordRawDate.getTimezoneOffset() * 60000;
         const recordLocalStr = new Date(recordRawDate.getTime() - rOffset).toISOString().slice(0, 10);
 
-        // 2. Compare Local String AND Check if Employee is Valid
-        // We include record.punchIn check to ensure they actually started a shift
         if (recordLocalStr === dateStr && record.punchIn && validEmployeeIds.has(record.employeeId)) {
           presentSet.add(record.employeeId);
         }
       });
 
       const presentCount = presentSet.size;
-
-      // D. Count Absent
       let absentCount = totalActiveCount - presentCount;
       if (absentCount < 0) absentCount = 0;
 
@@ -217,7 +188,21 @@ const AdminDashboard = () => {
     return data;
   }, [weeklyAttendanceData, activeEmployees, selectedDept, weekDates]);
 
-  // --- 6. Helpers ---
+  // --- 6. Process Employee Distribution Data ---
+  const departmentData = useMemo(() => {
+    const counts = {};
+    activeEmployees.forEach((emp) => {
+      const dept = emp.department || "Unassigned";
+      counts[dept] = (counts[dept] || 0) + 1;
+    });
+
+    return Object.keys(counts).map((dept) => ({
+      name: dept,
+      employees: counts[dept]
+    }));
+  }, [activeEmployees]);
+
+  // --- Helpers ---
   const formatWeekRange = (start, end) => {
     const startDate = new Date(`${start}T00:00:00`);
     const endDate = new Date(`${end}T00:00:00`);
@@ -226,136 +211,109 @@ const AdminDashboard = () => {
   };
 
   const isCurrentWeek = currentWeek >= 0;
+  const COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Main Stat Cards - Updated Compact Design */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Today's Overview Card */}
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 font-sans text-gray-800">
+      
+      {/* Top Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        
+        {/* 1. Today's Attendance Overview - FIXED COMPACT UI */}
         <div 
-          className="bg-white rounded-xl shadow hover:shadow-md transition-all duration-200 border border-gray-200 cursor-pointer"
+          className="bg-white rounded-xl shadow-md border-l-4 border-indigo-600 p-4 cursor-pointer hover:shadow-lg transition-all duration-200"
           onClick={() => navigate("/admin/today-overview")}
         >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-green-50 rounded-lg">
-                  <CalendarCheck2 className="text-green-600 w-4 h-4" />
-                </div>
-                <h3 className="text-gray-800 font-semibold text-sm">Today's Attendence Overview</h3>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-2">
-              {/* Present */}
-              <div className="text-center p-2">
-                <div className="flex flex-col items-center gap-0.5">
-                  <p className="text-xs text-gray-500 font-medium">Present</p>
-                  <p className="text-xl font-bold text-gray-800">{todayCounts.present}</p>
-                  <div className="w-2 h-2 rounded-full bg-green-500 mt-0.5"></div>
-                </div>
-              </div>
-
-              {/* Absent */}
-              <div className="text-center p-2">
-                <div className="flex flex-col items-center gap-0.5">
-                  <p className="text-xs text-gray-500 font-medium">Absent</p>
-                  <p className="text-xl font-bold text-gray-800">{todayCounts.notLoggedIn}</p>
-                  <div className="w-2 h-2 rounded-full bg-amber-500 mt-0.5"></div>
-                </div>
-              </div>
-
-              {/* On Leave */}
-              <div className="text-center p-2">
-                <div className="flex flex-col items-center gap-0.5">
-                  <p className="text-xs text-gray-500 font-medium">On Leave</p>
-                  <p className="text-xl font-bold text-gray-800">{todayCounts.onLeave}</p>
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-0.5"></div>
-                </div>
-              </div>
-            </div>
-                    <p className="text-center text-blue-500 font-medium">View More Details...</p>
+          <div className="flex justify-between items-center mb-3">
+             <h3 className="text-gray-700 font-bold text-base">Today's Attendance</h3>
+             <FaClock className="text-indigo-500 w-4 h-4" />
           </div>
-  
+
+          <div className="grid grid-cols-3 gap-3">
+             {/* Present */}
+             <div className="flex flex-col items-center justify-center bg-green-50 rounded-lg py-2 border border-green-100">
+                <span className="text-2xl font-bold text-green-600 leading-none">{todayCounts.present}</span>
+                <span className="text-xs font-semibold text-green-700 mt-1">Present</span>
+             </div>
+             
+             {/* Absent */}
+             <div className="flex flex-col items-center justify-center bg-red-50 rounded-lg py-2 border border-red-100">
+                <span className="text-2xl font-bold text-red-600 leading-none">{todayCounts.notLoggedIn}</span>
+                <span className="text-xs font-semibold text-red-700 mt-1">Absent</span>
+             </div>
+
+             {/* Leave */}
+             <div className="flex flex-col items-center justify-center bg-amber-50 rounded-lg py-2 border border-amber-100">
+                <span className="text-2xl font-bold text-amber-600 leading-none">{todayCounts.onLeave}</span>
+                <span className="text-xs font-semibold text-amber-700 mt-1">Leave</span>
+             </div>
+          </div>
+          
+          <div className="mt-3 flex justify-end">
+             <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1 hover:underline">
+               Details <FaArrowRight className="w-2.5 h-2.5" />
+             </span>
+          </div>
         </div>
 
-        {/* Total Employees Card */}
+        {/* 2. Total Employees */}
         <div 
-          className="bg-white rounded-xl shadow hover:shadow-md transition-all duration-200 border border-gray-200 cursor-pointer flex flex-col"
+          className="bg-white rounded-xl shadow-md border border-gray-100 p-5 cursor-pointer hover:shadow-lg transition-all flex items-center justify-between"
           onClick={() => navigate("/employees")}
         >
-          <div className="p-4 flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <FaUsers className="text-blue-600 w-4 h-4" />
-                </div>
-                
-                <h3 className="text-gray-800 font-semibold text-sm">Total Employees</h3>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-800">{statCards.totalEmployees}</p>
-            </div>
+          <div>
+            <p className="text-gray-500 text-sm font-semibold mb-1">Total Employees</p>
+            <h3 className="text-3xl font-extrabold text-gray-800">{statCards.totalEmployees}</h3>
+          </div>
+          <div className="p-3 bg-blue-100 rounded-full text-blue-600">
+            <FaUsers className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Leaves Approvals Card */}
+        {/* 3. Leave Approvals */}
         <div 
-          className="bg-white rounded-xl shadow hover:shadow-md transition-all duration-200 border border-gray-200 cursor-pointer flex flex-col"
+          className="bg-white rounded-xl shadow-md border border-gray-100 p-5 cursor-pointer hover:shadow-lg transition-all flex items-center justify-between"
           onClick={() => navigate("/admin/admin-Leavemanage", { state: { defaultStatus: "Pending" } })}
         >
-          <div className="p-4 flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-purple-50 rounded-lg">
-                  <FaClipboardList className="text-purple-600 w-4 h-4" />
-                </div>
-                <h3 className="text-gray-800 font-semibold text-sm">Leaves Approvals</h3>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-800">{statCards.pendingLeaves}</p>
-            </div>
+           <div>
+            <p className="text-gray-500 text-sm font-semibold mb-1">Leave Request</p>
+            <h3 className="text-3xl font-extrabold text-gray-800">{statCards.pendingLeaves}</h3>
+          </div>
+          <div className="p-3 bg-purple-100 rounded-full text-purple-600">
+            <FaClipboardList className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Departments Card */}
-        <div className="bg-white rounded-xl shadow hover:shadow-md transition-all duration-200 border border-gray-200 flex flex-col">
-          <div className="p-4 flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-green-50 rounded-lg">
-                  <FaBuilding className="text-green-600 w-4 h-4" />
-                </div>
-                <h3 className="text-gray-800 font-semibold text-sm">Departments</h3>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-800">{statCards.totalDepartments}</p>
-            </div>
+        {/* 4. Departments */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 flex items-center justify-between">
+           <div>
+            <p className="text-gray-500 text-sm font-semibold mb-1">Departments</p>
+            <h3 className="text-3xl font-extrabold text-gray-800">{statCards.totalDepartments}</h3>
+          </div>
+          <div className="p-3 bg-orange-100 rounded-full text-orange-600">
+            <FaBuilding className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* Week Navigation & Filters */}
-      <div className="mt-8 bg-white p-4 rounded-xl shadow-lg flex flex-col lg:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setCurrentWeek(currentWeek - 1)}
-            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition shadow"
+            className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
             title="Previous Week"
           >
             <FaChevronLeft />
           </button>
 
-          <span className="font-semibold text-gray-700 w-64 text-center">
+          <span className="font-bold text-gray-800 text-lg w-64 text-center">
             {formatWeekRange(weekDates.start, weekDates.end)}
           </span>
 
           <button
             onClick={() => setCurrentWeek(currentWeek + 1)}
-            className={`p-2 rounded-lg transition shadow text-white ${isCurrentWeek ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
+            className={`p-2 rounded-lg transition ${isCurrentWeek ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
             disabled={isCurrentWeek}
             title="Next Week"
           >
@@ -363,53 +321,53 @@ const AdminDashboard = () => {
           </button>
 
           {currentWeek !== 0 && (
-            <button onClick={() => setCurrentWeek(0)} className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow" title="Go to Current Week">
+            <button onClick={() => setCurrentWeek(0)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition" title="Go to Current Week">
               <FaSyncAlt />
             </button>
           )}
         </div>
 
         <div className="w-full lg:w-auto">
-          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="border border-gray-300 px-4 py-2 rounded-lg w-full lg:w-64 font-semibold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none">
+          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="border border-gray-300 px-4 py-2 rounded-lg w-full lg:w-64 font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="All">All Departments</option>
             {departmentList.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-        {/* Weekly Attendance Overview - Updated Graph */}
-        <div className="col-span-1 xl:col-span-2 bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-blue-700 font-bold text-lg mb-4">Weekly Attendance Overview</h3>
+        {/* Weekly Attendance Bar Chart */}
+        <div className="col-span-1 xl:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="text-gray-800 font-bold text-lg mb-6">Weekly Attendance</h3>
           <div className="w-full h-80">
             {loadingGraph ? (
               <div className="flex items-center justify-center h-full text-gray-400">Loading Chart...</div>
             ) : weeklyChartData.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">No data available yet</div>
+              <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={weeklyChartData}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
                   barGap={8}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
                     dy={10}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ fill: '#f3f4f6' }}
+                    cursor={{ fill: '#f9fafb' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                   />
                   <Legend
@@ -418,14 +376,12 @@ const AdminDashboard = () => {
                   />
                   <Bar
                     dataKey="Present"
-                    name="Present"
-                    fill="#22c55e"
+                    fill="#10b981"
                     radius={[4, 4, 0, 0]}
                     barSize={20}
                   />
                   <Bar
                     dataKey="Absent"
-                    name="Absent"
                     fill="#ef4444"
                     radius={[4, 4, 0, 0]}
                     barSize={20}
@@ -436,16 +392,47 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="col-span-1 bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-blue-700 font-bold text-lg mb-4">Employee Distribution</h3>
+        {/* Employee Distribution Graph */}
+        <div className="col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="text-gray-800 font-bold text-lg mb-6">Employee Distribution</h3>
           <div className="w-full h-80">
-            <DepartmentPieChart data={activeEmployees} />
+            {departmentData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-400">No Data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={departmentData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={100}
+                    tick={{ fill: '#4b5563', fontSize: 12, fontWeight: 500 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    cursor={{fill: 'transparent'}}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <Bar dataKey="employees" barSize={20} radius={[0, 4, 4, 0]}>
+                    {departmentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
+
       </div>
     </div>
   );
 };
 
 export default AdminDashboard;
-// --- END OF FILE AdminDashboard.jsx ---

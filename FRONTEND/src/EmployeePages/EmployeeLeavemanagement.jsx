@@ -1,14 +1,16 @@
 // --- START OF FILE EmployeeLeavemanagement.jsx ---
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   getLeaveRequestsForEmployee,
   applyForLeave,
   cancelLeaveRequestById,
   getHolidays,
-  getLeaveRequests, // To fetch other leaves
-  getEmployees      // Added to fetch names
+  getLeaveRequests,
+  getEmployees,
+  getAttendanceForEmployee,
+  getShiftByEmployeeId // ✅ ADDED: To get week off days
 } from "../api";
 
 const REASON_LIMIT = 50;
@@ -109,22 +111,43 @@ const getMonthFromString = (monthStr) => {
   return { year: parseInt(year), month: parseInt(month) };
 };
 
-const getNextMonth = (monthStr) => {
-  const { year, month } = getMonthFromString(monthStr);
-  let nextYear = year;
-  let nextMonth = month + 1;
-  
-  if (nextMonth > 12) {
-    nextMonth = 1;
-    nextYear = year + 1;
-  }
-  
-  return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+// Convert Date to YYYY-MM-DD for accurate comparison
+const toISODateString = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const EmployeeLeavemanagement = () => {
   const [user, setUser] = useState(null);
   
+  // ✅ ADDED: State for attendance data and unplanned absences
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [unplannedAbsences, setUnplannedAbsences] = useState([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [shiftDetails, setShiftDetails] = useState(null); // ✅ ADDED: For week off days
+  const [loadingShift, setLoadingShift] = useState(false);
+  
+  // ✅ ADDED: State for LOP warning
+  const [showLOPWarning, setShowLOPWarning] = useState(false);
+  const [LOPWarningDetails, setLOPWarningDetails] = useState({
+    pendingLeaves: 0,
+    requestedDays: 0,
+    willBeLOP: 0
+  });
+  
+  // Use ref to track if data has been loaded
+  const dataLoadedRef = useRef({
+    leaves: false,
+    holidays: false,
+    attendance: false,
+    allLeaves: false,
+    shift: false
+  });
+
   // --- UPDATED DATE LOGIC: Allow past dates (Present Month or 7 days ago) ---
   const minSelectionDate = useMemo(() => {
     const now = new Date();
@@ -137,15 +160,13 @@ const EmployeeLeavemanagement = () => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
     // 3. Take the earlier of the two to be permissible
-    // This allows selecting from the 1st of month even if today is the 20th,
-    // AND allows selecting 7 days ago if today is the 2nd (crossing into prev month).
     const earliestAllowed = sevenDaysAgo < startOfMonth ? sevenDaysAgo : startOfMonth;
     
     // Format to YYYY-MM-DD
     return formatDate(earliestAllowed);
   }, []);
 
-  const todayStr = new Date().toISOString().split("T")[0]; // Just for reference if needed
+  const todayStr = new Date().toISOString().split("T")[0];
   
   // Holiday state
   const [holidays, setHolidays] = useState([]);
@@ -157,11 +178,14 @@ const EmployeeLeavemanagement = () => {
   
   // Overlap States
   const [overlappingColleagues, setOverlappingColleagues] = useState([]);
-  const [expandOverlaps, setExpandOverlaps] = useState(false); // To toggle "Show all"
+  const [expandOverlaps, setExpandOverlaps] = useState(false);
 
+  // Load user from storage
   useEffect(() => {
     const saved = sessionStorage.getItem("hrmsUser") || localStorage.getItem("hrmsUser");
-    if (saved) setUser(JSON.parse(saved));
+    if (saved) {
+      setUser(JSON.parse(saved));
+    }
   }, []);
 
   // filters
@@ -193,14 +217,104 @@ const EmployeeLeavemanagement = () => {
 
   // Stats states
   const [stats, setStats] = useState({
-    monthlyAvailable: 1,    
+    monthlyAvailable: 1,
     totalLeaveDays: 0,
-    normalLeaveDays: 0, // Added to track normal leaves separately
-    extraLeaves: 0,         
-    sandwichLeavesCount: 0, 
-    sandwichDaysCount: 0,   
-    pendingLeaves: 1,       
+    normalLeaveDays: 0,
+    extraLeaves: 0,
+    sandwichLeavesCount: 0,
+    sandwichDaysCount: 0,
+    pendingLeaves: 1,
+    unplannedAbsenceDays: 0,
   });
+
+  // ✅ OPTIMIZED: Function to calculate unplanned absences WITH WEEK OFF & HOLIDAY EXCLUSION
+  const calculateUnplannedAbsences = useCallback((attendanceData, holidaysList, leavesList, monthStr, shiftData) => {
+    if (!attendanceData.length || !monthStr) {
+      setUnplannedAbsences([]);
+      return [];
+    }
+    
+    const { year, month } = getMonthFromString(monthStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Get all dates in selected month up to today
+    const datesInMonth = [];
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    
+    let currentDate = new Date(startDate);
+    while (currentDate <= endDate && currentDate <= today) {
+      datesInMonth.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // ✅ GET WEEK OFF DAYS FROM SHIFT DATA (0 = Sunday, 1 = Monday, etc.)
+    const weekOffDays = shiftData?.weeklyOffDays || [0]; // Default to Sunday if no shift data
+    
+    const absences = [];
+    
+    datesInMonth.forEach(date => {
+      const dateStr = toISODateString(date);
+      const dayOfWeek = date.getDay();
+      
+      // ✅ SKIP if it's a week off (from shift data)
+      if (weekOffDays.includes(dayOfWeek)) {
+        return; // Don't count week offs as absences
+      }
+      
+      // ✅ SKIP if it's a holiday
+      const isHoliday = holidaysList.some(h => {
+        const hStart = new Date(h.startDate);
+        const hEnd = new Date(h.endDate || h.startDate);
+        hStart.setHours(0, 0, 0, 0);
+        hEnd.setHours(23, 59, 59, 999);
+        return date >= hStart && date <= hEnd;
+      });
+      
+      if (isHoliday) return;
+      
+      // Check if there's an approved leave for this date
+      const hasApprovedLeave = leavesList.some(leave => {
+        if (leave.status !== 'Approved') return false;
+        const leaveStart = new Date(leave.from);
+        const leaveEnd = new Date(leave.to);
+        leaveStart.setHours(0, 0, 0, 0);
+        leaveEnd.setHours(23, 59, 59, 999);
+        return date >= leaveStart && date <= leaveEnd;
+      });
+      
+      if (hasApprovedLeave) return;
+      
+      // Check attendance record
+      const attendanceRecord = attendanceData.find(a => {
+        const recordDate = a.date ? new Date(a.date) : null;
+        return recordDate && toISODateString(recordDate) === dateStr;
+      });
+      
+      // If no attendance record or status indicates absence
+      if (!attendanceRecord) {
+        absences.push({
+          date: dateStr,
+          dateObj: new Date(date),
+          reason: "No attendance record found",
+          type: "UNPLANNED"
+        });
+      } else if (attendanceRecord.status === "Absent" || 
+                 attendanceRecord.status === "ABSENT" ||
+                 attendanceRecord.workedStatus === "Absent") {
+        absences.push({
+          date: dateStr,
+          dateObj: new Date(date),
+          reason: "Marked as absent in attendance",
+          type: "UNPLANNED"
+        });
+      }
+    });
+    
+    setUnplannedAbsences(absences);
+    return absences;
+  }, []);
 
   // Filtered leave list
   const filteredLeaveList = useMemo(() => {
@@ -215,8 +329,10 @@ const EmployeeLeavemanagement = () => {
     });
   }, [leaveList, selectedMonth, selectedStatus]);
 
-  // --- UPDATED STATS CALCULATION ---
+  // ✅ UPDATED STATS CALCULATION: Include unplanned absences
   useEffect(() => {
+    if (!leaveList.length || !selectedMonth) return;
+    
     // 1. Calculate Approved Days (only from leaves)
     const approvedLeavesInMonth = filteredLeaveList.filter(leave => leave.status === 'Approved');
     const approvedDaysCount = approvedLeavesInMonth.reduce((total, leave) => {
@@ -228,27 +344,31 @@ const EmployeeLeavemanagement = () => {
       return total + (sandwich.daysCount || 0);
     }, 0);
 
-    // 3. Total Consumed = Approved Days + Sandwich Gap Days
-    const totalConsumed = approvedDaysCount + sandwichGapDays;
+    // 3. Calculate Unplanned Absences
+    const unplannedAbsenceDays = unplannedAbsences.length;
 
-    // 4. Pending Calculation
+    // 4. Total Consumed = Approved Days + Sandwich Gap Days + Unplanned Absences
+    const totalConsumed = approvedDaysCount + sandwichGapDays + unplannedAbsenceDays;
+
+    // 5. Pending Calculation
     // Logic: 1 leave per month credit. Pending = Credit - Used.
     const monthlyCredit = 1;
     const pending = Math.max(0, monthlyCredit - totalConsumed);
 
-    // 5. Extra Leaves
+    // 6. Extra Leaves (including unplanned absences as extra)
     const extra = Math.max(0, totalConsumed - monthlyCredit);
 
-    setStats(prev => ({
-      ...prev,
+    setStats({
+      monthlyAvailable: monthlyCredit,
       pendingLeaves: pending,
       totalLeaveDays: totalConsumed, 
-      normalLeaveDays: approvedDaysCount, // Tracking normal separately
+      normalLeaveDays: approvedDaysCount,
       extraLeaves: extra,
       sandwichLeavesCount: sandwichLeaves.length,
       sandwichDaysCount: sandwichGapDays,
-    }));
-  }, [filteredLeaveList, sandwichLeaves]);
+      unplannedAbsenceDays: unplannedAbsenceDays,
+    });
+  }, [filteredLeaveList, sandwichLeaves, unplannedAbsences, selectedMonth]);
   
   const fetchHolidays = useCallback(async () => {
     try {
@@ -259,15 +379,35 @@ const EmployeeLeavemanagement = () => {
         end: normalize(h.endDate || h.startDate), 
       }));
       setHolidays(formatted);
+      dataLoadedRef.current.holidays = true;
     } catch (err) {
       console.error("Error fetching holidays:", err);
+      dataLoadedRef.current.holidays = true;
+    }
+  }, []);
+
+  // ✅ ADDED: Fetch shift details for week off days
+  const fetchShiftDetails = useCallback(async (empId) => {
+    if (!empId || dataLoadedRef.current.shift) return;
+    
+    setLoadingShift(true);
+    try {
+      const shiftRes = await getShiftByEmployeeId(empId);
+      setShiftDetails(shiftRes);
+      dataLoadedRef.current.shift = true;
+    } catch (err) {
+      console.error("Error fetching shift details:", err);
+      // Use default if API fails
+      setShiftDetails({ weeklyOffDays: [0] }); // Default to Sunday
+      dataLoadedRef.current.shift = true;
+    } finally {
+      setLoadingShift(false);
     }
   }, []);
 
   // Fetch ALL leaves & Employees for overlap detection and team view
   const fetchAllEmployeesLeaves = useCallback(async () => {
     try {
-      // Fetch both leaves and employee details to map names correctly
       const [allLeaves, allEmployees] = await Promise.all([
         getLeaveRequests(),
         getEmployees()
@@ -290,40 +430,70 @@ const EmployeeLeavemanagement = () => {
         }));
 
       setAllApprovedLeaves(approved);
+      dataLoadedRef.current.allLeaves = true;
     } catch (err) {
       console.error("Error fetching all leaves/employees:", err);
+      dataLoadedRef.current.allLeaves = true;
+    }
+  }, []);
+
+  // ✅ OPTIMIZED: Fetch attendance data
+  const fetchAttendance = useCallback(async (empId) => {
+    if (!empId || dataLoadedRef.current.attendance) return;
+    
+    setLoadingAttendance(true);
+    try {
+      const attendanceRes = await getAttendanceForEmployee(empId);
+      const attendanceData = Array.isArray(attendanceRes) ? attendanceRes : (attendanceRes?.data || []);
+      setAttendanceData(attendanceData);
+      dataLoadedRef.current.attendance = true;
+    } catch (err) {
+      console.error("Error fetching attendance:", err);
+      setAttendanceData([]);
+      dataLoadedRef.current.attendance = true;
+    } finally {
+      setLoadingAttendance(false);
     }
   }, []);
 
   // Fetch individual leaves
-  const fetchLeaves = useCallback(async () => {
-    if (!user?.employeeId) {
+  const fetchLeaves = useCallback(async (empId) => {
+    if (!empId) {
       setLeaveList([]);
       setLoading(false);
       return;
     }
+    
     setLoading(true);
     setError("");
     try {
+      let leavesData = [];
+      
       if (typeof getLeaveRequestsForEmployee === "function") {
         try {
-          const maybeResult = await getLeaveRequestsForEmployee(user.employeeId);
+          const maybeResult = await getLeaveRequestsForEmployee(empId);
           if (Array.isArray(maybeResult)) {
-            setLeaveList(maybeResult);
-            return;
+            leavesData = maybeResult;
           }
-        } catch (err) {}
+        } catch (err) {
+          console.warn("Failed to fetch leaves via function, trying API directly", err);
+        }
       }
 
-      const API_BASE = "http://localhost:5000/api/leaves";
-      const url = new URL(API_BASE, window.location.origin);
-      url.searchParams.set("employeeId", user.employeeId);
+      // Fallback to API if function fails
+      if (!leavesData.length) {
+        const API_BASE = "http://localhost:5000/api/leaves";
+        const url = new URL(API_BASE, window.location.origin);
+        url.searchParams.set("employeeId", empId);
 
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error("Failed to fetch leave list");
-      
-      const data = await res.json();
-      const normalized = (data || []).map((d) => ({
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error("Failed to fetch leave list");
+        
+        const data = await res.json();
+        leavesData = data || [];
+      }
+
+      const normalized = leavesData.map((d) => ({
         _id: d._id || d.id,
         from: d.from,
         to: d.to,
@@ -335,23 +505,70 @@ const EmployeeLeavemanagement = () => {
         approvedBy: d.approvedBy || d.approved_by || "-",
         status: d.status || "Pending",
       }));
+      
       setLeaveList(normalized);
+      dataLoadedRef.current.leaves = true;
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching leaves:", err);
       setError("Failed to load leaves.");
       setLeaveList([]);
+      dataLoadedRef.current.leaves = true;
     } finally {
       setLoading(false);
     }
-  }, [user?.employeeId]);
+  }, []);
 
-  useEffect(() => {
-    if (user) {
-      fetchLeaves();
-      fetchHolidays();
-      fetchAllEmployeesLeaves(); // Trigger global fetch
+  // ✅ UPDATED: Fetch all data including shift details
+  const fetchAllData = useCallback(async () => {
+    if (!user?.employeeId) return;
+    
+    // Reset loading flags
+    dataLoadedRef.current = {
+      leaves: false,
+      holidays: false,
+      attendance: false,
+      allLeaves: false,
+      shift: false
+    };
+    
+    try {
+      // Fetch in parallel where possible
+      await Promise.all([
+        fetchLeaves(user.employeeId),
+        fetchHolidays(),
+        fetchAttendance(user.employeeId),
+        fetchAllEmployeesLeaves(),
+        fetchShiftDetails(user.employeeId)
+      ]);
+    } catch (error) {
+      console.error("Error fetching all data:", error);
     }
-  }, [user, fetchLeaves, fetchHolidays, fetchAllEmployeesLeaves]);
+  }, [user, fetchLeaves, fetchHolidays, fetchAttendance, fetchAllEmployeesLeaves, fetchShiftDetails]);
+
+  // Initial data load
+  useEffect(() => {
+    if (user?.employeeId) {
+      fetchAllData();
+    }
+  }, [user, fetchAllData]);
+
+  // ✅ UPDATED: Calculate absences when all data is loaded (including shift)
+  useEffect(() => {
+    if (dataLoadedRef.current.leaves && 
+        dataLoadedRef.current.holidays && 
+        dataLoadedRef.current.attendance &&
+        dataLoadedRef.current.shift &&
+        attendanceData.length > 0) {
+      calculateUnplannedAbsences(attendanceData, holidays, leaveList, selectedMonth, shiftDetails);
+    }
+  }, [attendanceData, holidays, leaveList, selectedMonth, shiftDetails, calculateUnplannedAbsences]);
+
+  // Recalculate when month changes
+  useEffect(() => {
+    if (attendanceData.length > 0 && holidays.length > 0 && leaveList.length > 0 && shiftDetails) {
+      calculateUnplannedAbsences(attendanceData, holidays, leaveList, selectedMonth, shiftDetails);
+    }
+  }, [selectedMonth, attendanceData, holidays, leaveList, shiftDetails, calculateUnplannedAbsences]);
 
   // --- UPDATED SANDWICH LOGIC (DASHBOARD DISPLAY) ---
   const calculateSandwichLeaves = useCallback(() => {
@@ -407,38 +624,55 @@ const EmployeeLeavemanagement = () => {
               reason: `Sandwich around holiday: ${holiday.name}. Holiday period counted as leave.`,
               month: selectedMonth,
               type: 'holiday',
-              daysCount: duration // Add duration of the holiday as leave taken
+              daysCount: duration
             });
           }
         }
       }
     });
 
-    // 2. Weekend Sandwiches (Sat/Mon)
+    // 2. Weekend Sandwiches (Sat/Mon) - BUT CONSIDER WEEK OFF DAYS
     for (const [dateStr, isFullDay] of approvedLeaveMap.entries()) {
       if (!isFullDay) continue; 
 
       const date = new Date(dateStr);
       const dayOfWeek = date.getDay();
-
-      // Case: Saturday(6) checking Monday(1)
-      if (dayOfWeek === 6) {
-        const mondayDate = addDays(date, 2);
-        const mondayStr = formatDate(mondayDate);
-
-        // Check if Monday is booked AND is Full Day
-        if (approvedLeaveMap.get(mondayStr) === true) {
-          const patternKey = `${dateStr}|${mondayStr}`;
+      
+      // Get week off days from shift
+      const weekOffDays = shiftDetails?.weeklyOffDays || [0];
+      
+      // Check if next consecutive days are week offs
+      let consecutiveWeekOffCount = 0;
+      let checkDate = new Date(date);
+      
+      // Count consecutive week off days after this date
+      for (let i = 1; i <= 7; i++) {
+        checkDate.setDate(date.getDate() + i);
+        const checkDayOfWeek = checkDate.getDay();
+        if (weekOffDays.includes(checkDayOfWeek)) {
+          consecutiveWeekOffCount++;
+        } else {
+          break;
+        }
+      }
+      
+      // If we have consecutive week offs and the day after them is also a leave
+      if (consecutiveWeekOffCount > 0) {
+        const dayAfterWeekOffs = addDays(date, consecutiveWeekOffCount + 1);
+        const dayAfterWeekOffsStr = formatDate(dayAfterWeekOffs);
+        
+        if (approvedLeaveMap.get(dayAfterWeekOffsStr) === true) {
+          const patternKey = `${dateStr}|${dayAfterWeekOffsStr}`;
           const existingPattern = newSandwichLeaves.find(p => p.key === patternKey);
 
-          if (!existingPattern && (isDateInMonth(dateStr, selectedMonth) || isDateInMonth(mondayStr, selectedMonth))) {
+          if (!existingPattern && (isDateInMonth(dateStr, selectedMonth) || isDateInMonth(dayAfterWeekOffsStr, selectedMonth))) {
             newSandwichLeaves.push({
               key: patternKey,
-              dates: `${dateStr} (Sat) & ${mondayStr} (Mon)`,
-              reason: 'Full Day leaves on Sat & Mon sandwiching Sunday. Sunday counted as leave.',
+              dates: `${dateStr} & ${dayAfterWeekOffsStr}`,
+              reason: `Full Day leaves sandwiching ${consecutiveWeekOffCount} week off day(s). Week off(s) counted as leave.`,
               month: selectedMonth,
               type: 'weekend',
-              daysCount: 1 // Sunday is 1 day
+              daysCount: consecutiveWeekOffCount
             });
           }
         }
@@ -446,98 +680,17 @@ const EmployeeLeavemanagement = () => {
     }
 
     setSandwichLeaves(newSandwichLeaves);
-  }, [filteredLeaveList, holidays, selectedMonth]);
+  }, [filteredLeaveList, holidays, selectedMonth, shiftDetails]);
 
   useEffect(() => {
     calculateSandwichLeaves();
-  }, [filteredLeaveList, holidays, selectedMonth, calculateSandwichLeaves]);
-
-
-  // --- UPDATED SANDWICH CHECK (FORM VALIDATION) ---
-  const checkForSandwichLeave = useCallback((fromDate, toDate) => {
-    if (!fromDate || !toDate) {
-      setSandwichWarning(null);
-      return;
-    }
-
-    // 1. Gather all "Booked" dates with Full Day status
-    const approvedLeaves = filteredLeaveList.filter(leave => leave.status === 'Approved');
-    const bookedMap = new Map();
-    const currentSelectedDates = new Set();
-
-    approvedLeaves.forEach(leave => {
-      const isFullDay = !leave.halfDaySession;
-      let curr = new Date(leave.from);
-      const end = new Date(leave.to);
-      while (curr <= end) {
-        bookedMap.set(formatDate(curr), isFullDay);
-        curr = addDays(curr, 1);
-      }
-    });
-
-    // Current selection status
-    const isCurrentSelectionFullDay = !(form.from === form.to && form.halfDaySession);
-
-    let selStart = new Date(fromDate);
-    const selEnd = new Date(toDate);
-    while (selStart <= selEnd) {
-      const fDate = formatDate(selStart);
-      currentSelectedDates.add(fDate);
-      bookedMap.set(fDate, isCurrentSelectionFullDay); 
-      selStart = addDays(selStart, 1);
-    }
-
-    const warnings = [];
-
-    // 2. Check Holiday Sandwiches
-    holidays.forEach(holiday => {
-      const hStart = new Date(holiday.start);
-      const hEnd = new Date(holiday.end);
-      const dayBefore = formatDate(addDays(hStart, -1));
-      const dayAfter = formatDate(addDays(hEnd, 1));
-
-      const beforeIsFull = bookedMap.get(dayBefore) === true;
-      const afterIsFull = bookedMap.get(dayAfter) === true;
-
-      if (beforeIsFull && afterIsFull) {
-        if (currentSelectedDates.has(dayBefore) || currentSelectedDates.has(dayAfter)) {
-           const msg = `Sandwich Detected: Full Day leaves surround '${holiday.name}'. The holiday period will be counted as leave(s).`;
-           if (!warnings.some(w => w.message === msg)) {
-             warnings.push({ type: 'holiday', message: msg });
-           }
-        }
-      }
-    });
-
-    // 3. Check Weekend Sandwiches
-    for (const [dateStr, isFullDay] of bookedMap.entries()) {
-      if (!isFullDay) continue; 
-      const d = new Date(dateStr);
-      if (d.getDay() === 6) { // Saturday
-        const mondayStr = formatDate(addDays(d, 2));
-        if (bookedMap.get(mondayStr) === true) {
-          if (currentSelectedDates.has(dateStr) || currentSelectedDates.has(mondayStr)) {
-            const msg = `Sandwich Detected: Full Day leaves on Sat & Mon. Sunday will be counted as a leave.`;
-             if (!warnings.some(w => w.message === msg)) {
-               warnings.push({ type: 'weekend', message: msg });
-             }
-          }
-        }
-      }
-    }
-
-    if (warnings.length > 0) {
-      setSandwichWarning(warnings);
-    } else {
-      setSandwichWarning(null);
-    }
-  }, [filteredLeaveList, holidays, selectedMonth, form.halfDaySession, form.from, form.to]);
+  }, [filteredLeaveList, holidays, selectedMonth, shiftDetails, calculateSandwichLeaves]);
 
   // Check Overlaps with Colleagues
   const checkColleagueOverlaps = useCallback((fromDate, toDate) => {
     if(!fromDate || !toDate) {
       setOverlappingColleagues([]);
-      setExpandOverlaps(false); // Reset expansion on date change
+      setExpandOverlaps(false);
       return;
     }
 
@@ -561,8 +714,67 @@ const EmployeeLeavemanagement = () => {
     });
 
     setOverlappingColleagues(overlaps);
-
   }, [allApprovedLeaves, user]);
+
+  // ✅ NEW: Check if leave will be LOP and show warning
+  const checkLOPWarning = useCallback((fromDate, toDate) => {
+    if (!fromDate || !toDate) {
+      setShowLOPWarning(false);
+      return false;
+    }
+    
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    
+    // Calculate requested days (excluding week offs and holidays)
+    let requestedDays = 0;
+    let currentDate = new Date(start);
+    
+    // Get week off days
+    const weekOffDays = shiftDetails?.weeklyOffDays || [0];
+    
+    while (currentDate <= end) {
+      const dayOfWeek = currentDate.getDay();
+      
+      // Skip week offs
+      if (weekOffDays.includes(dayOfWeek)) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        continue;
+      }
+      
+      // Skip holidays
+      const isHoliday = holidays.some(h => {
+        const hStart = new Date(h.startDate);
+        const hEnd = new Date(h.endDate || h.startDate);
+        hStart.setHours(0, 0, 0, 0);
+        hEnd.setHours(23, 59, 59, 999);
+        return currentDate >= hStart && currentDate <= hEnd;
+      });
+      
+      if (!isHoliday) {
+        requestedDays++;
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Check if requested days exceed pending leaves
+    const pendingLeaves = stats.pendingLeaves;
+    const willBeLOP = Math.max(0, requestedDays - pendingLeaves);
+    
+    if (willBeLOP > 0) {
+      setLOPWarningDetails({
+        pendingLeaves,
+        requestedDays,
+        willBeLOP
+      });
+      return true;
+    }
+    
+    return false;
+  }, [stats.pendingLeaves, shiftDetails, holidays]);
 
   // Handle input changes with auto-reset & min date logic
   const handleChange = (e) => {
@@ -575,7 +787,6 @@ const EmployeeLeavemanagement = () => {
       };
 
       // Prevent selecting past dates beyond the allowed minSelectionDate
-      // Modified from checking against 'today' to 'minSelectionDate'
       if (name === "from" && value < minSelectionDate) {
         updated.from = minSelectionDate;
       }
@@ -606,10 +817,18 @@ const EmployeeLeavemanagement = () => {
       const toDate = updated.to;
 
       if (fromDate && toDate) {
-         // Logic checks handled in useEffect below
+        // Check for sandwich warnings
+        checkForSandwichLeave(fromDate, toDate);
+        checkColleagueOverlaps(fromDate, toDate);
+        // Check for LOP warning
+        const hasLOPWarning = checkLOPWarning(fromDate, toDate);
+        if (hasLOPWarning) {
+          // Don't show LOP warning yet, wait for submit
+        }
       } else {
         setSandwichWarning(null);
         setOverlappingColleagues([]);
+        setShowLOPWarning(false);
       }
 
       return updated;
@@ -618,16 +837,103 @@ const EmployeeLeavemanagement = () => {
     setSubmitError("");
     setSubmitSuccess("");
   };
-  
-  // Re-run checks when form dates/type change
-  useEffect(() => {
-    if (form.from && form.to) {
-      checkForSandwichLeave(form.from, form.to);
-      checkColleagueOverlaps(form.from, form.to);
-    }
-  }, [form.from, form.to, form.halfDaySession, checkForSandwichLeave, checkColleagueOverlaps]);
 
-  // Submit leave
+  // Check for sandwich leave
+  const checkForSandwichLeave = useCallback((fromDate, toDate) => {
+    const approvedLeaves = filteredLeaveList.filter(leave => leave.status === 'Approved');
+    const bookedMap = new Map();
+    const currentSelectedDates = new Set();
+
+    approvedLeaves.forEach(leave => {
+      const isFullDay = !leave.halfDaySession;
+      let curr = new Date(leave.from);
+      const end = new Date(leave.to);
+      while (curr <= end) {
+        bookedMap.set(formatDate(curr), isFullDay);
+        curr = addDays(curr, 1);
+      }
+    });
+
+    const isCurrentSelectionFullDay = !(form.from === form.to && form.halfDaySession);
+
+    let selStart = new Date(fromDate);
+    const selEnd = new Date(toDate);
+    while (selStart <= selEnd) {
+      const fDate = formatDate(selStart);
+      currentSelectedDates.add(fDate);
+      bookedMap.set(fDate, isCurrentSelectionFullDay); 
+      selStart = addDays(selStart, 1);
+    }
+
+    const warnings = [];
+
+    // Check Holiday Sandwiches
+    holidays.forEach(holiday => {
+      const hStart = new Date(holiday.start);
+      const hEnd = new Date(holiday.end);
+      const dayBefore = formatDate(addDays(hStart, -1));
+      const dayAfter = formatDate(addDays(hEnd, 1));
+
+      const beforeIsFull = bookedMap.get(dayBefore) === true;
+      const afterIsFull = bookedMap.get(dayAfter) === true;
+
+      if (beforeIsFull && afterIsFull) {
+        if (currentSelectedDates.has(dayBefore) || currentSelectedDates.has(dayAfter)) {
+           const msg = `Sandwich Detected: Full Day leaves surround '${holiday.name}'. The holiday period will be counted as leave(s).`;
+           if (!warnings.some(w => w.message === msg)) {
+             warnings.push({ type: 'holiday', message: msg });
+           }
+        }
+      }
+    });
+
+    // Check Weekend Sandwiches - CONSIDER WEEK OFF DAYS
+    for (const [dateStr, isFullDay] of bookedMap.entries()) {
+      if (!isFullDay) continue; 
+      const d = new Date(dateStr);
+      const dayOfWeek = d.getDay();
+      
+      // Get week off days
+      const weekOffDays = shiftDetails?.weeklyOffDays || [0];
+      
+      // Check consecutive week offs after this date
+      let consecutiveWeekOffCount = 0;
+      let checkDate = new Date(d);
+      
+      for (let i = 1; i <= 7; i++) {
+        checkDate.setDate(d.getDate() + i);
+        const checkDayOfWeek = checkDate.getDay();
+        if (weekOffDays.includes(checkDayOfWeek)) {
+          consecutiveWeekOffCount++;
+        } else {
+          break;
+        }
+      }
+      
+      // If we have consecutive week offs
+      if (consecutiveWeekOffCount > 0) {
+        const dayAfterWeekOffs = addDays(d, consecutiveWeekOffCount + 1);
+        const dayAfterWeekOffsStr = formatDate(dayAfterWeekOffs);
+        
+        if (bookedMap.get(dayAfterWeekOffsStr) === true) {
+          if (currentSelectedDates.has(dateStr) || currentSelectedDates.has(dayAfterWeekOffsStr)) {
+            const msg = `Sandwich Detected: Full Day leaves sandwiching ${consecutiveWeekOffCount} week off day(s). Week off(s) will be counted as leave.`;
+             if (!warnings.some(w => w.message === msg)) {
+               warnings.push({ type: 'weekend', message: msg });
+             }
+          }
+        }
+      }
+    }
+
+    if (warnings.length > 0) {
+      setSandwichWarning(warnings);
+    } else {
+      setSandwichWarning(null);
+    }
+  }, [filteredLeaveList, holidays, selectedMonth, form.halfDaySession, form.from, form.to, shiftDetails]);
+
+  // ✅ UPDATED: Submit leave with LOP check
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { from, to, reason, halfDaySession, leaveType } = form;
@@ -636,11 +942,20 @@ const EmployeeLeavemanagement = () => {
       return;
     }
     
+    // First check for sandwich warning
     if (sandwichWarning && sandwichWarning.length > 0) {
       setShowSandwichAlert(true);
       return;
     }
     
+    // Then check for LOP warning
+    const hasLOPWarning = checkLOPWarning(from, to);
+    if (hasLOPWarning) {
+      setShowLOPWarning(true);
+      return;
+    }
+    
+    // If no warnings, proceed with submission
     await submitLeaveRequest();
   };
 
@@ -664,7 +979,9 @@ const EmployeeLeavemanagement = () => {
         try {
           await applyForLeave(payload);
           applied = true;
-        } catch (err) {}
+        } catch (err) {
+          console.error("Error applying leave via function:", err);
+        }
       }
 
       if (!applied) {
@@ -692,9 +1009,11 @@ const EmployeeLeavemanagement = () => {
       setSandwichWarning(null);
       setOverlappingColleagues([]); 
       setShowSandwichAlert(false);
+      setShowLOPWarning(false);
       setModalOpen(false);
-      await fetchLeaves();
-      await fetchAllEmployeesLeaves(); 
+      
+      // Refresh data
+      await fetchAllData();
       
       setTimeout(() => {
         setSubmitSuccess("");
@@ -713,7 +1032,9 @@ const EmployeeLeavemanagement = () => {
         try {
           await cancelLeaveRequestById(leaveId);
           canceled = true;
-        } catch (err) {}
+        } catch (err) {
+          console.error("Error cancelling leave via function:", err);
+        }
       }
       if (!canceled) {
         const API_BASE = "http://localhost:5000/api/leaves";
@@ -723,8 +1044,7 @@ const EmployeeLeavemanagement = () => {
           if (!res.ok) throw new Error("Cancel failed");
         }
       }
-      await fetchLeaves();
-      fetchAllEmployeesLeaves(); // Sync
+      await fetchAllData();
       alert("Leave request cancelled successfully!");
     } catch (err) {
       console.error("cancel error", err);
@@ -756,7 +1076,6 @@ const EmployeeLeavemanagement = () => {
     const todayDate = new Date();
     todayDate.setHours(0,0,0,0);
     
-    // Filter leaves where 'to' date is today or later
     return allApprovedLeaves
       .filter(l => {
         const endDate = new Date(l.to);
@@ -766,7 +1085,19 @@ const EmployeeLeavemanagement = () => {
       .sort((a, b) => new Date(a.from) - new Date(b.from));
   }, [allApprovedLeaves, user]);
 
-  if (loading) return (
+  // Refresh all data
+  const handleRefresh = () => {
+    dataLoadedRef.current = {
+      leaves: false,
+      holidays: false,
+      attendance: false,
+      allLeaves: false,
+      shift: false
+    };
+    fetchAllData();
+  };
+
+  if (loading && !leaveList.length) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -808,7 +1139,7 @@ const EmployeeLeavemanagement = () => {
           </div>
           
           <div className="flex gap-3 mt-4 lg:mt-0">
-            {/* NEW BUTTON: Upcoming Team Leaves */}
+            {/* Team Leaves Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -829,14 +1160,14 @@ const EmployeeLeavemanagement = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards - Updated Grid to fill screen (grid-cols-4) with Pending Card */}
+        {/* ✅ UPDATED Stats Cards - Added Unplanned Absences Card */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 w-full"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8 w-full"
         >
-          {/* Pending Leaves Card (Added) */}
+          {/* Pending Leaves Card */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 h-full">
             <div className="flex items-center justify-between h-full">
               <div>
@@ -850,7 +1181,7 @@ const EmployeeLeavemanagement = () => {
             </div>
           </div>
 
-          {/* Total Leave Days Card - UPDATED WITH BREAKDOWN */}
+          {/* Total Leave Days Card */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-cyan-500 h-full">
             <div className="flex items-center justify-between h-full">
               <div>
@@ -858,10 +1189,25 @@ const EmployeeLeavemanagement = () => {
                 <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalLeaveDays}</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {stats.normalLeaveDays} Normal + {stats.sandwichDaysCount} Sandwich
+                  {stats.unplannedAbsenceDays > 0 && ` + ${stats.unplannedAbsenceDays} Unplanned`}
                 </p>
               </div>
               <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center">
                  <span className="text-3xl">📅</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Unplanned Absences Card */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-red-500 h-full">
+            <div className="flex items-center justify-between h-full">
+              <div>
+                <p className="text-gray-600 text-sm font-semibold">Unplanned Absences</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.unplannedAbsenceDays}</p>
+                <p className="text-xs text-gray-500 mt-1">Days without leave</p>
+              </div>
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
               </div>
             </div>
           </div>
@@ -894,6 +1240,37 @@ const EmployeeLeavemanagement = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* ✅ ADDED: Week Off Info Card */}
+        {shiftDetails && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-white rounded-2xl shadow-lg p-6 mb-8 border-l-4 border-indigo-500"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Week Off Information</h3>
+                <p className="text-gray-700">
+                  Your week off days:{" "}
+                  <span className="font-semibold text-indigo-600">
+                    {shiftDetails.weeklyOffDays?.map(day => {
+                      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                      return days[day];
+                    }).join(', ')}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Week off days and holidays are excluded from unplanned absence calculations.
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📅</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Filters */}
         <motion.div 
@@ -935,10 +1312,11 @@ const EmployeeLeavemanagement = () => {
 
             <div className="flex-1 text-right">
               <button
-                onClick={() => { fetchLeaves(); fetchAllEmployeesLeaves(); }}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
+                onClick={handleRefresh}
+                disabled={loadingAttendance || loadingShift}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                🔄 Refresh
+                {(loadingAttendance || loadingShift) ? "🔄 Loading..." : "🔄 Refresh"}
               </button>
             </div>
           </div>
@@ -1050,12 +1428,84 @@ const EmployeeLeavemanagement = () => {
           </div>
         </motion.div>
 
+        {/* ✅ UPDATED: Unplanned Absences Section with Week Off info */}
+        {unplannedAbsences.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-2xl shadow-lg border border-red-200 mb-8 overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-xl text-white">⚠️</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Unplanned Absences</h2>
+                  <p className="text-red-100 text-sm">
+                    Days marked as absent without leave application for {formatMonth(selectedMonth)} • {unplannedAbsences.length} day{unplannedAbsences.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-700 text-sm mb-3">
+                  The following working days (excluding week offs and holidays) were marked as "Absent" in your attendance record but you did not apply for leave:
+                </p>
+                
+                {/* Week Off Info */}
+                {shiftDetails && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-800 text-sm">
+                      <span className="font-semibold">Note:</span> Week offs ({shiftDetails.weeklyOffDays?.map(day => {
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        return days[day];
+                      }).join(', ')}) and holidays are excluded from this calculation.
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {unplannedAbsences.map((absence, index) => (
+                  <div key={index} className="bg-red-50 border border-red-200 rounded-xl p-4 hover:shadow-md transition duration-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {formatDisplayDate(absence.date)}
+                        </p>
+                        <p className="text-gray-600 text-xs mt-1">
+                          {absence.dateObj.toLocaleDateString('en-US', { weekday: 'long' })}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                        <span className="text-red-600 text-xs font-bold">ABS</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-700 text-xs mt-2">{absence.reason}</p>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800 text-sm flex items-center">
+                  <span className="mr-2">💡</span>
+                  <strong>Note:</strong> These unplanned absences are automatically counted in your total leave days and contribute to your extra leaves calculation. To avoid these, please apply for leave in advance.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Sandwich Leaves Section */}
         {sandwichLeaves.length > 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.5 }}
             className="bg-white rounded-2xl shadow-lg border border-orange-200 mb-8 overflow-hidden"
           >
             <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4">
@@ -1100,7 +1550,7 @@ const EmployeeLeavemanagement = () => {
         )}
       </div>
 
-      {/* NEW MODAL: Upcoming Team Leaves */}
+      {/* Team Leaves Modal */}
       <AnimatePresence>
         {upcomingModalOpen && (
           <motion.div
@@ -1136,7 +1586,6 @@ const EmployeeLeavemanagement = () => {
                     {upcomingTeamLeaves.map((leave) => (
                       <div key={leave._id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition">
                          <div className="flex items-center gap-4">
-                           {/* Replaced Avatar with simple Name/ID Layout */}
                            <div className="flex-1">
                              <p className="font-bold text-gray-800 text-lg">{leave.employeeName}</p>
                              <p className="text-xs text-gray-500 uppercase font-semibold">ID: {leave.employeeId}</p>
@@ -1203,7 +1652,7 @@ const EmployeeLeavemanagement = () => {
                       name="from" 
                       value={form.from} 
                       onChange={handleChange}
-                      min={minSelectionDate} // Updated to allow past 7 days/current month
+                      min={minSelectionDate}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>
@@ -1214,20 +1663,19 @@ const EmployeeLeavemanagement = () => {
                       name="to" 
                       value={form.to} 
                       onChange={handleChange}
-                      min={form.from || minSelectionDate} // Updated to allow past 7 days/current month
+                      min={form.from || minSelectionDate}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     />
                   </div>
                 </div>
 
-                {/* --- NEW OVERLAP NOTICE with VIEW ALL --- */}
+                {/* Overlap Notice */}
                 {overlappingColleagues.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-xs font-bold text-blue-700 uppercase mb-2">
                       📅 Heads up! Others on leave:
                     </p>
                     <ul className="text-xs text-blue-800 space-y-2">
-                      {/* Show items: If expand is true show all, otherwise show top 3 */}
                       {(expandOverlaps ? overlappingColleagues : overlappingColleagues.slice(0, 3)).map((col, idx) => (
                         <li key={idx} className="flex justify-between items-start border-b border-blue-100 pb-1 last:border-0 last:pb-0">
                           <div>
@@ -1241,7 +1689,6 @@ const EmployeeLeavemanagement = () => {
                       ))}
                     </ul>
 
-                    {/* Toggle Button for "View All" */}
                     {overlappingColleagues.length > 3 && (
                        <div className="mt-2 text-right">
                          {!expandOverlaps ? (
@@ -1310,6 +1757,7 @@ const EmployeeLeavemanagement = () => {
                     <option value="SICK">Sick Leave</option>
                     <option value="EMERGENCY">Emergency Leave</option>
                     <option value="PAID">Paid Leave</option>
+                    <option value="LOP">Loss of Pay (LOP)</option>
                   </select>
                 </div>
 
@@ -1399,7 +1847,13 @@ const EmployeeLeavemanagement = () => {
                 <button
                   onClick={() => {
                     setShowSandwichAlert(false);
-                    submitLeaveRequest();
+                    // Check for LOP warning before submitting
+                    const hasLOPWarning = checkLOPWarning(form.from, form.to);
+                    if (hasLOPWarning) {
+                      setShowLOPWarning(true);
+                    } else {
+                      submitLeaveRequest();
+                    }
                   }}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
                 >
@@ -1412,6 +1866,87 @@ const EmployeeLeavemanagement = () => {
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
                 >
                   Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ✅ NEW: LOP Warning Modal */}
+      <AnimatePresence>
+        {showLOPWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-2xl text-red-600">💰</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
+              </div>
+              
+              <div className="mb-6 space-y-3">
+                <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
+                  <p className="text-sm text-red-700">
+                    <strong>Warning:</strong> Your pending leave balance is completed for this month!
+                  </p>
+                </div>
+                
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-700">Available Pending Leaves:</span>
+                      <span className="text-sm font-semibold">{LOPWarningDetails.pendingLeaves} day(s)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-700">Requested Leave Days:</span>
+                      <span className="text-sm font-semibold">{LOPWarningDetails.requestedDays} day(s)</span>
+                    </div>
+                    <div className="flex justify-between border-t border-yellow-200 pt-2">
+                      <span className="text-sm font-semibold text-red-600">Will be marked as LOP:</span>
+                      <span className="text-sm font-bold text-red-600">{LOPWarningDetails.willBeLOP} day(s)</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-700">
+                    <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Do you want to continue with this leave request as LOP?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowLOPWarning(false);
+                    submitLeaveRequest();
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Yes, Proceed as LOP
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLOPWarning(false);
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Cancel Request
                 </button>
               </div>
             </motion.div>

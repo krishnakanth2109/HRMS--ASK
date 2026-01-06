@@ -1,9 +1,10 @@
+
 // --- START OF FILE AdminHolidayCalendarPage.jsx ---
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import * as XLSX from "xlsx"; // SheetJS
-import Swal from "sweetalert2"; // SweetAlert2
+import * as XLSX from "xlsx"; 
+import Swal from "sweetalert2"; 
 import { getHolidays, addHoliday, deleteHolidayById, getEmployees } from "../api";
 import { 
   FaChevronLeft, 
@@ -25,22 +26,18 @@ const AdminHolidayCalendarPage = () => {
     endDate: "",
   });
 
-  // --- Data States ---
   const [holidays, setHolidays] = useState([]);
   const [birthdays, setBirthdays] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  // --- UI States ---
-  const [activeDate, setActiveDate] = useState(new Date()); // Calendar View Date
+  const [activeDate, setActiveDate] = useState(new Date()); 
   const [isModalOpen, setIsModalOpen] = useState(false); 
   
-  // Cursors for the side lists
   const [birthdayCursor, setBirthdayCursor] = useState(new Date());
   const [holidayCursor, setHolidayCursor] = useState(new Date());
 
   const fileInputRef = useRef(null);
 
-  // Helper: Normalize Date (Strip time)
   const normalizeDate = (date) => {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -56,7 +53,6 @@ const AdminHolidayCalendarPage = () => {
       setHolidays(response);
     } catch (error) {
       console.error(error);
-      Swal.fire("Error", "Failed to load holidays.", "error");
     }
   }, []);
 
@@ -70,23 +66,13 @@ const AdminHolidayCalendarPage = () => {
           dob: new Date(emp.personalDetails.dob),
         }));
       setBirthdays(result);
-    } catch (err) {
-      console.error("Error loading birthdays:", err);
-    }
+    } catch (err) { console.error(err); }
   }, []);
 
-  useEffect(() => {
-    fetchHolidays();
-    fetchBirthdays();
-  }, [fetchHolidays, fetchBirthdays]);
+  useEffect(() => { fetchHolidays(); fetchBirthdays(); }, [fetchHolidays, fetchBirthdays]);
 
-  const handleChange = (e) => {
-    setHolidayData({ ...holidayData, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setHolidayData({ ...holidayData, [e.target.name]: e.target.value });
 
-  /* =========================================================
-      IMPORT LOGIC
-  ==========================================================*/
   const findKey = (obj, searchStr) => Object.keys(obj).find(key => key.toLowerCase().replace(/[^a-z]/g, '').includes(searchStr.toLowerCase()));
 
   const parseImportDate = (val) => {
@@ -101,7 +87,8 @@ const AdminHolidayCalendarPage = () => {
     return null;
   };
 
-  const handleFileUpload = (e) => {
+  // --- Handlers ---
+    const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setLoading(true);
@@ -164,43 +151,19 @@ const AdminHolidayCalendarPage = () => {
     reader.readAsBinaryString(file);
   };
 
-  /* =========================================================
-      CRUD LOGIC
-  ==========================================================*/
-  const handleSubmit = async (e) => {
+
+  const handleSubmit = async (e) => { 
     e.preventDefault();
-    setLoading(true);
-    try {
-      await addHoliday({ ...holidayData, endDate: holidayData.endDate || holidayData.startDate });
-      Swal.fire('Success', 'Holiday added!', 'success');
-      setHolidayData({ name: "", description: "", startDate: "", endDate: "" });
-      fetchHolidays();
-      setIsModalOpen(false);
-    } catch (error) {
-      Swal.fire("Error", "Failed to add holiday.", "error");
-    } finally {
-      setLoading(false);
-    }
+    await addHoliday({ ...holidayData, endDate: holidayData.endDate || holidayData.startDate });
+    fetchHolidays();
+    setIsModalOpen(false);
+    Swal.fire('Success', 'Added', 'success');
   };
-
   const handleDelete = async (id) => {
-    const result = await Swal.fire({
-      title: 'Delete?', text: "Irreversible action!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33'
-    });
-    if (result.isConfirmed) {
-      try {
-        await deleteHolidayById(id);
-        fetchHolidays();
-        Swal.fire('Deleted', '', 'success');
-      } catch (error) {
-        Swal.fire('Error', 'Failed to delete.', 'error');
-      }
-    }
+    await deleteHolidayById(id);
+    fetchHolidays();
   };
 
-  /* =========================================================
-      LIST FILTERING LOGIC
-  ==========================================================*/
   const changeMonth = (setter) => (increment) => {
     setter((prev) => {
       const newDate = new Date(prev);
@@ -209,11 +172,9 @@ const AdminHolidayCalendarPage = () => {
     });
   };
 
-  // Filter Birthdays for Side List
   const currentMonthBirthdays = birthdays.filter((b) => b.dob.getMonth() === birthdayCursor.getMonth());
   currentMonthBirthdays.sort((a, b) => a.dob.getDate() - b.dob.getDate());
 
-  // Filter Holidays for Side List
   const currentMonthHolidays = holidays.filter((h) => {
     const hDate = normalizeDate(h.startDate);
     return hDate.getMonth() === holidayCursor.getMonth() && hDate.getFullYear() === holidayCursor.getFullYear();
@@ -222,209 +183,178 @@ const AdminHolidayCalendarPage = () => {
 
 
   /* =========================================================
-      CALENDAR RENDERING LOGIC
+      CALENDAR LOGIC
   ==========================================================*/
-  
-  // 1. Get Details for a specific Tile Date
   const getTileDetails = (date) => {
     const current = normalizeDate(date);
-    
-    // Check Holiday
     const holiday = holidays.find(h => {
       const s = normalizeDate(h.startDate);
       const e = normalizeDate(h.endDate);
       return current >= s && current <= e;
     });
-
-    // Check Birthday (Match Day & Month)
     const birthday = birthdays.find(b => b.dob.getDate() === date.getDate() && b.dob.getMonth() === date.getMonth());
-
     return { holiday, birthday };
   };
 
-  // 2. Class Name Logic (Green for Holiday, None specific for just Birthday unless overlapping)
   const tileClassName = ({ date, view }) => {
     if (view !== "month") return "";
-    const { holiday } = getTileDetails(date);
-    
-    // User Requirement: Green Color Mark for Holiday
-    if (holiday) return "holiday-tile-green";
-    
+    const { holiday, birthday } = getTileDetails(date);
+    if (holiday) return "holiday-date-circle";
+    if (birthday) return "birthday-date-circle";
     return "";
   };
 
-  // 3. Tile Content (Indicators & Tooltip)
   const tileContent = ({ date, view }) => {
-    if (view !== "month") return null;
-    const { holiday, birthday } = getTileDetails(date);
+  if (view !== "month") return null;
+  const { holiday, birthday } = getTileDetails(date);
 
-    if (!holiday && !birthday) return null;
-
-    return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        {/* Indicators */}
-        <div className="flex gap-1 items-center justify-center mt-6">
-           {/* If Birthday: Show Emoji */}
-           {birthday && <span className="text-sm animate-pulse">🎂</span>}
-        </div>
-
-        {/* HOVER TOOLTIP (Dropdown Style) */}
-        <div className="custom-tooltip group-hover:block hidden">
-          {holiday && (
-            <div className="mb-2">
-              <div className="font-bold text-green-300">Holiday: {holiday.name}</div>
-              {/* Added Description to Tooltip */}
-              {holiday.description && (
-                <div className="text-[10px] text-gray-300 whitespace-normal leading-tight max-w-[150px] mt-1 border-t border-gray-600 pt-1">
-                  {holiday.description}
-                </div>
-              )}
-            </div>
-          )}
-          {birthday && (
-            <div>
-              <span className="font-bold text-orange-300">Birthday:</span> {birthday.name}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  if (!holiday && !birthday) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 font-sans text-slate-800">
+    <div className="relative w-full h-full flex items-start justify-center group">
+
+      {/* 🎂 INDICATOR */}
+      <div className="absolute top-1 flex gap-1 items-center justify-center">
+        {birthday && (
+          <span className="text-sm animate-pulse">🎂</span>
+        )}
+      </div>
+
+      {/* 🔥 HOVER TOOLTIP */}
+      <div className="custom-tooltip hidden group-hover:block">
+        {holiday && (
+          <div className="mb-2">
+            <div className="font-bold text-green-300">
+              🎉 Holiday: {holiday.name}
+            </div>
+            {holiday.description && (
+              <div className="text-[10px] text-gray-300 whitespace-normal leading-tight max-w-[150px] mt-1 border-t border-gray-600 pt-1">
+                {holiday.description}
+              </div>
+            )}
+          </div>
+        )}
+
+        {birthday && (
+          <div className="text-orange-300 font-bold">
+            🎂 Birthday: {birthday.name}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};
+
+  
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6 font-sans text-slate-800">
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Holiday Calendar</h1>
             <p className="text-slate-500 text-sm mt-1">Manage holidays & track birthdays</p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg transition-transform transform hover:scale-105 active:scale-95"
-          >
-            <FaPlus className="text-xs" /> Add New Holiday 
+          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition">
+            <FaPlus className="inline mr-2"/> Add New Holiday
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6">
+        <div className="grid lg:grid-cols-12 gap-8">
           
-          {/* --- LEFT SIDE: LISTS (4 Columns) --- */}
-          <div className="lg:col-span-4 space-y-6">
-            
-            {/* UPCOMING HOLIDAYS CARD */}
+          {/* --- LEFT SIDE: LISTS --- */}
+          <div className="lg:col-span-6 space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 bg-gradient-to-r from-emerald-500 to-teal-600 flex justify-between items-center text-white">
-                <div className="flex items-center gap-2">
-                  <FaCalendarAlt /> <span className="font-bold">Holidays</span>
-                </div>
+                <div className="flex items-center gap-2"><FaCalendarAlt /> <span className="font-bold">Holidays</span></div>
                 <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
                   <button onClick={() => changeMonth(setHolidayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
                   <span className="text-xs font-mono w-16 text-center">{holidayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
                   <button onClick={() => changeMonth(setHolidayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
                 </div>
               </div>
-              
-              <div className="p-4 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
-                {currentMonthHolidays.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <span className="text-2xl opacity-50">🏝️</span>
-                    <span className="text-xs mt-2">No holidays this month</span>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {currentMonthHolidays.map(h => (
-                      <div key={h._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-md transition-shadow group">
-                        <div className="flex items-center gap-3 w-full">
-                          <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none flex-shrink-0">
-                            <span className="text-sm">{new Date(h.startDate).getDate()}</span>
-                          </div>
-                          <div className="overflow-hidden">
-                            <p className="text-sm font-bold text-slate-700 leading-tight truncate">{h.name}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">{new Date(h.startDate).toLocaleDateString()}</p>
-                            {/* Added Description Here */}
-                            {h.description && (
-                                <p className="text-[10px] text-slate-500 truncate mt-0.5" title={h.description}>
-                                    {h.description}
-                                </p>
-                            )}
-                          </div>
-                        </div>
-                        <button onClick={() => handleDelete(h._id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-2"><FaTrash size={12}/></button>
+              <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
+                {currentMonthHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays</p> : 
+                  currentMonthHolidays.map(h => (
+                  <div key={h._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-md transition group">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none">
+                        <span className="text-sm">{new Date(h.startDate).getDate()}</span>
                       </div>
-                    ))}
+                      <div>
+                        <p className="text-sm font-bold text-slate-700">{h.name}</p>
+                        <p className="text-[10px] text-slate-400">{new Date(h.startDate).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => handleDelete(h._id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><FaTrash size={12}/></button>
                   </div>
-                )}
+                ))}
               </div>
             </div>
 
-            {/* BIRTHDAYS CARD */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 bg-gradient-to-r from-orange-400 to-pink-500 flex justify-between items-center text-white">
-                <div className="flex items-center gap-2">
-                  <FaBirthdayCake /> <span className="font-bold">Birthdays</span>
-                </div>
+                <div className="flex items-center gap-2"><FaBirthdayCake /> <span className="font-bold">Birthdays</span></div>
                 <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
                   <button onClick={() => changeMonth(setBirthdayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
                   <span className="text-xs font-mono w-16 text-center">{birthdayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
                   <button onClick={() => changeMonth(setBirthdayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
                 </div>
               </div>
-              
-              <div className="p-4 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
-                {currentMonthBirthdays.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <span className="text-2xl opacity-50">🎂</span>
-                    <span className="text-xs mt-2">No birthdays this month</span>
+              <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
+                {currentMonthBirthdays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No birthdays</p> :
+                  currentMonthBirthdays.map((b, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
+                      {b.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{b.name}</p>
+                      <p className="text-[10px] text-slate-400">{b.dob.getDate()} {b.dob.toLocaleString('default',{month:'short'})}</p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {currentMonthBirthdays.map((b, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
-                          {b.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-700">{b.name}</p>
-                          <p className="text-[10px] text-slate-400">
-                             Turns a year older on {b.dob.getDate()} {b.dob.toLocaleString('default',{month:'short'})}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-
           </div>
 
-          {/* --- RIGHT SIDE: CALENDAR (8 Columns) --- */}
-          <div className="lg:col-span-8">
-            <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-6 h-full relative">
+          {/* --- RIGHT SIDE: CALENDAR --- */}
+          <div className="lg:col-span-6">
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 h-full relative">
               <Calendar
                 tileClassName={tileClassName}
                 tileContent={tileContent}
                 onActiveStartDateChange={({ activeStartDate }) => setActiveDate(activeStartDate)}
-                className="custom-calendar w-full border-none"
+                className="best-ui-calendar"
                 next2Label={null}
                 prev2Label={null}
+                formatShortWeekday={(locale, date) => ['M', 'T', 'W', 'T', 'F', 'S', 'S'][date.getDay() === 0 ? 6 : date.getDay() - 1]}
               />
               
-              {/* Legend */}
-              <div className="flex gap-6 justify-center mt-6 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
+              {/* --- UPDATED LEGEND SECTION (Badge Style) --- */}
+              <div className="flex justify-center gap-8 mt-10 pt-6 border-t border-slate-50">
+                
+                {/* Holiday Badge (Green Gradient) */}
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500 block"></span> Holiday
+                   <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-emerald-400 to-teal-500 shadow-md shadow-emerald-100 flex items-center gap-2">
+                     🎉 Holiday
+                   </span>
                 </div>
+
+                {/* Birthday Badge (Pink Gradient) */}
                 <div className="flex items-center gap-2">
-                  <span className="text-lg leading-none">🎂</span> Birthday
+                   <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-orange-400 to-pink-500 shadow-md shadow-rose-100 flex items-center gap-2">
+                     🎂 Birthday
+                   </span>
                 </div>
+
               </div>
             </div>
           </div>
-        
+
         </div>
       </div>
 
@@ -493,86 +423,127 @@ const AdminHolidayCalendarPage = () => {
         </div>
       )}
 
-      {/* --- STYLES --- */}
+      {/* --- CSS --- */}
       <style>{`
-        /* CALENDAR BASE */
-        .react-calendar { width: 100%; font-family: inherit; border: none; }
+        .react-calendar { width: 100%; border: none; font-family: inherit; }
         
-        /* NAVIGATION HEADER */
-        .react-calendar__navigation { margin-bottom: 20px; }
-        .react-calendar__navigation button { font-size: 1.2rem; font-weight: 700; color: #334155; }
-        .react-calendar__navigation button:enabled:hover,
-        .react-calendar__navigation button:enabled:focus { background-color: #f1f5f9; border-radius: 8px; }
+        /* HEADER NAV (BLACK COLOR FIX) */
+        .react-calendar__navigation { margin-bottom: 30px; display: flex; }
+        
+        .react-calendar__navigation__label { 
+            font-size: 1.5rem; 
+            font-weight: 800; 
+            color: #000000 !important; /* Force Black */
+        }
+        
+        .react-calendar__navigation button { 
+            min-width: 44px; 
+            background: none; 
+            font-size: 1.5rem; 
+            color: #000000 !important; /* Force Black */
+        }
+        /* No hover change for nav buttons */
+        .react-calendar__navigation button:hover { 
+            color: #000000 !important; 
+            background: transparent;
+        }
         
         /* WEEKDAYS */
-        .react-calendar__month-view__weekdays { text-transform: uppercase; font-size: 0.75rem; font-weight: 700; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 10px; }
+        .react-calendar__month-view__weekdays { 
+            text-align: center; font-size: 0.8rem; font-weight: 700; color: #94a3b8; 
+            margin-bottom: 20px; border-bottom: 1px solid #f8fafc; padding-bottom: 10px;
+        }
         .react-calendar__month-view__weekdays__weekday abbr { text-decoration: none; }
 
-        /* TILES (DATES) */
-        .react-calendar__tile {
-          height: 90px; /* Fixed height for consistency */
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          padding-top: 8px;
-          position: relative;
-          overflow: visible !important; /* Allow tooltip to overflow */
-          border-radius: 12px;
-          font-weight: 600;
-          color: #475569;
-          transition: all 0.2s ease;
-        }
-
-        .react-calendar__tile:enabled:hover { background-color: #f8fafc; }
-        .react-calendar__tile--now { background: #f1f5f9; color: #0f172a; }
-
-        /* HOLIDAY STYLE (Green Rounded Mark) */
-        .holiday-tile-green {
-          background-color: #ecfdf5 !important; /* light green bg */
-          color: #059669 !important; /* green text */
-          border: 1px solid #d1fae5;
-        }
-
-        /* CUSTOM TOOLTIP (Pop-up dropdown style) */
-        .custom-tooltip {
-          position: absolute;
-          bottom: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          background: #1e293b; /* Slate 800 */
-          color: white;
-          padding: 8px 12px;
-          border-radius: 8px;
-          font-size: 0.75rem;
-          white-space: nowrap;
-          z-index: 50;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-          margin-bottom: 8px;
-          opacity: 0;
-          animation: fadeIn 0.2s forwards;
+        /* GRID */
+        .react-calendar__month-view__days { 
+            display: grid !important; 
+            grid-template-columns: repeat(7, 1fr); 
+            row-gap: 12px; 
         }
         
-        /* Tooltip Arrow */
+        /* TILE */
+        .react-calendar__tile {
+            border-radius: 10px;
+            padding: 6px;
+            height: 64px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 6px;
+            background: transparent !important;
+            position: relative;
+            overflow: visible !important;
+        }
+
+        /* CIRCLE NUMBER */
+        .react-calendar__tile abbr {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            min-width: 32px;     
+            min-height: 32px;
+            border-radius: 50%;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+
+        .react-calendar__tile:not(.holiday-date-circle):not(.birthday-date-circle):hover abbr {
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        /* Today */
+        .react-calendar__tile--now abbr {
+            background-color: transparent;
+            border: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: 800;
+        }
+
+        /* EVENTS */
+        .holiday-date-circle abbr {
+            background-color: #10b981 !important;
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .birthday-date-circle abbr {
+            background-color: #f43f5e !important; 
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(244, 63, 94, 0.3);
+        }
+
+        /* Tooltip */
+        .custom-tooltip {
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  z-index: 50;
+  white-space: nowrap;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+
+        
         .custom-tooltip::after {
           content: "";
           position: absolute;
-          top: 100%;
-          left: 50%;
-          margin-left: -5px;
-          border-width: 5px;
-          border-style: solid;
+          top: 100%; left: 50%; margin-left: -5px;
+          border-width: 5px; border-style: solid;
           border-color: #1e293b transparent transparent transparent;
         }
-
-        .react-calendar__tile:hover .custom-tooltip {
-          display: block;
-          opacity: 1;
-        }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 5px); } to { opacity: 1; transform: translate(-50%, 0); } }
-
-        /* SCROLLBAR */
+        
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }

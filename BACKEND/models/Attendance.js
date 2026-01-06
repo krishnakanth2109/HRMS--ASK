@@ -9,10 +9,6 @@ const LocationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: null }
 }, { _id: false });
 
-const IdleActivitySchema = new mongoose.Schema({
-  idleStart: { type: Date, required: true },
-  idleEnd: { type: Date, default: null },
-}, { _id: false });
 
 const SessionSchema = new mongoose.Schema({
   punchIn: { type: Date, required: true },
@@ -63,10 +59,6 @@ const DailySchema = new mongoose.Schema({
     default: "NOT_APPLICABLE"
   },
 
-  idleActivity: {
-    type: [IdleActivitySchema],
-    default: []
-  },
 
   // ✅ NEW: Request for Late Login Correction
   lateCorrectionRequest: {

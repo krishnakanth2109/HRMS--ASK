@@ -652,8 +652,6 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
           )}
         </div>
       </div>
-      
-      {/* Bottom buttons removed as requested */}
     </motion.div>
   );
 };
@@ -767,8 +765,8 @@ const TodayOverview = () => {
     fetchAllData();
   }, []);
 
-  // Process data with login status
-  const processedData = useMemo(() => {
+  // 1. First, create the consolidated unfiltered data for everyone today
+  const allDailyData = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     const empNameMap = allEmployees.reduce((acc, emp) => {
       acc[emp.employeeId] = emp.name || emp.employeeName;
@@ -844,10 +842,20 @@ const TodayOverview = () => {
         };
       });
 
-    const allData = [...attendanceWithDetails, ...onLeaveToday, ...notLoggedIn];
+    return [...attendanceWithDetails, ...onLeaveToday, ...notLoggedIn];
+  }, [attendanceData, leaveData, allEmployees, shiftsMap, employeeImages, employeePhoneNumbers]);
 
-    // Apply filters
-    let filtered = allData;
+  // 2. Filter only by department (Used for Summary Stats)
+  const departmentFilteredData = useMemo(() => {
+    if (departmentFilter === "All") {
+      return allDailyData;
+    }
+    return allDailyData.filter(item => item.department === departmentFilter);
+  }, [allDailyData, departmentFilter]);
+
+  // 3. Filter for Display (Late, Search, Category)
+  const processedData = useMemo(() => {
+    let filtered = departmentFilteredData;
     
     // Apply late filter
     if (showLateOnly) {
@@ -864,14 +872,10 @@ const TodayOverview = () => {
       );
     }
     
-    if (departmentFilter !== "All") {
-      filtered = filtered.filter(item => item.department === departmentFilter);
-    }
-    
     return filtered;
-  }, [attendanceData, leaveData, allEmployees, shiftsMap, searchTerm, departmentFilter, employeeImages, employeePhoneNumbers, showLateOnly]);
+  }, [departmentFilteredData, showLateOnly, searchTerm]);
 
-  // Categorize data
+  // Categorize data (based on displayed processedData for Top Tiles functionality)
   const categorizedData = useMemo(() => {
     const categories = {
       WORKING: processedData.filter(item => item.category === 'WORKING'),
@@ -882,12 +886,12 @@ const TodayOverview = () => {
     return categories;
   }, [processedData]);
 
-  // Late employees count
+  // Late employees count (based on processedData for Top Tiles)
   const lateEmployeesCount = useMemo(() => {
     return processedData.filter(item => item.loginStatus?.isLate === true).length;
   }, [processedData]);
 
-  // Statistics
+  // Statistics for Top Tiles (Dynamic based on filter)
   const stats = useMemo(() => ({
     working: categorizedData.WORKING.length,
     completed: categorizedData.COMPLETED.length,
@@ -897,11 +901,28 @@ const TodayOverview = () => {
     total: processedData.length
   }), [categorizedData, processedData, lateEmployeesCount]);
 
+  // 4. Calculate Summary Metrics (Based on departmentFilteredData, IGNORING Search/Late filters)
+  const summaryMetrics = useMemo(() => {
+    const total = departmentFilteredData.length;
+    const working = departmentFilteredData.filter(i => i.category === 'WORKING').length;
+    const completed = departmentFilteredData.filter(i => i.category === 'COMPLETED').length;
+    const late = departmentFilteredData.filter(i => i.loginStatus?.isLate === true).length;
+    const withPhone = departmentFilteredData.filter(i => i.phoneNumber).length;
+    
+    return {
+      total,
+      present: working + completed,
+      late,
+      withPhone,
+      attendanceRate: total > 0 ? Math.round(((working + completed) / total) * 100) : 0
+    };
+  }, [departmentFilteredData]);
+
   // Get unique departments
   const departments = useMemo(() => {
-    const depts = processedData.map(item => item.department).filter(Boolean);
+    const depts = allDailyData.map(item => item.department).filter(Boolean);
     return ['All', ...new Set(depts)];
-  }, [processedData]);
+  }, [allDailyData]);
 
   // Get displayed data based on selection
   const displayedData = useMemo(() => {
@@ -1182,33 +1203,33 @@ const TodayOverview = () => {
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
               <div className="text-sm font-medium text-slate-500 mb-1">Attendance Rate</div>
               <div className="text-2xl font-semibold text-slate-900">
-                {processedData.length > 0 ? Math.round(((stats.working + stats.completed) / processedData.length) * 100) : 0}%
+                {summaryMetrics.attendanceRate}%
               </div>
               <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
-                  style={{ width: `${processedData.length > 0 ? ((stats.working + stats.completed) / processedData.length) * 100 : 0}%` }}
+                  style={{ width: `${summaryMetrics.attendanceRate}%` }}
                 ></div>
               </div>
             </div>
             
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
               <div className="text-sm font-medium text-slate-500 mb-1">Active Employees</div>
-              <div className="text-2xl font-semibold text-slate-900">{stats.working + stats.completed}</div>
+              <div className="text-2xl font-semibold text-slate-900">{summaryMetrics.present}</div>
               <div className="mt-1 text-xs text-slate-600">Currently engaged</div>
             </div>
             
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
               <div className="text-sm font-medium text-slate-500 mb-1">Contactable</div>
               <div className="text-2xl font-semibold text-blue-700">
-                {processedData.filter(e => e.phoneNumber).length}
+                {summaryMetrics.withPhone}
               </div>
               <div className="mt-1 text-xs text-slate-600">Employees with phone</div>
             </div>
             
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
               <div className="text-sm font-medium text-slate-500 mb-1">Punctuality</div>
-              <div className="text-2xl font-semibold text-amber-700">{stats.late}</div>
+              <div className="text-2xl font-semibold text-amber-700">{summaryMetrics.late}</div>
               <div className="mt-1 text-xs text-slate-600">Late arrivals</div>
             </div>
           </div>

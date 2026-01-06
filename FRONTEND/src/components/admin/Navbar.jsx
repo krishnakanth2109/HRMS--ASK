@@ -172,15 +172,6 @@ const Navbar = () => {
                   <FaKey className="text-blue-600" /> Change Password
                 </div>
 
-                <div
-                  onClick={() => {
-                    navigate("/admin/settings");
-                    setShowMenu(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition border-t"
-                >
-                  <FaCog className="text-blue-600" /> Shift Settings
-                </div>
               <div
                   onClick={() => {
                     navigate("/admin/rules");
@@ -190,40 +181,7 @@ const Navbar = () => {
                 >
                   <FaCog className="text-blue-600" /> Company Rules & Regulations
                 </div>
-                {/* THEME COLORS */}
-                <div className="border-t">
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation(); // keep main menu open
-                      setShowThemeColors((p) => !p);
-                    }}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition"
-                  >
-                    <span className="flex items-center gap-3">
-                      <FaPaintBrush className="text-blue-600" /> Theme Change
-                    </span>
-                    <FaChevronDown
-                      className={`ml-1 text-gray-600 transition-transform duration-200 ${showThemeColors ? "rotate-180" : ""
-                        }`}
-                    />
-                  </div>
-
-                  {showThemeColors && (
-                    <div
-                      className="px-4 py-3 grid grid-cols-4 gap-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {colors.map((color) => (
-                        <button
-                          key={color}
-                          className="w-8 h-8 rounded-full border shadow hover:scale-110 transition"
-                          style={{ backgroundColor: color }}
-                          onClick={() => setThemeColor(color)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+         
 
                 {/* LOGOUT */}
                 <div

@@ -64,7 +64,7 @@ import AdminGroupPage from "./pages/AdminGroupPage";
 
 // Route protection
 import ProtectedRoute from "./components/ProtectedRoute";
-import IdleTime from "./pages/IdleTime";
+
 import AdminLocationSettings from "./components/AdminLocationSettings";
 import EmployeeWorkModeRequest from "./EmployeePages/EmployeeWorkModeRequest";
 import RequestPunchOut from "./EmployeePages/RequestPunchOut";
@@ -122,7 +122,6 @@ function App() {
         <Route path="/attendance/profile/:employeeId" element={<EmployeeAttendanceProfile />} />
         <Route path="/leave-management" element={<LeaveManagement />} />
         <Route path="/admin/leave-summary" element={<AdminLeaveSummary />} />
-        <Route path="/admin/idle-time" element={<IdleTime />} />
         <Route path="/admin/settings" element={<SettingsPage />} />
         <Route path="/admin/shifttype" element={<AdminLocationSettings />} />
         <Route path="/admin/payroll" element={<Payroll />} />

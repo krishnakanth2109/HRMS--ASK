@@ -1,7 +1,13 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { saveAs } from "file-saver";
-import { getLeaveRequests, getEmployees, getHolidays } from "../api";
+import { 
+  getLeaveRequests, 
+  getEmployees, 
+  getHolidays, 
+  getAttendanceByDateRange, 
+  getAllShifts            
+} from "../api";
 
 // --- HELPER FUNCTIONS ---
 
@@ -11,19 +17,17 @@ const addDays = (date, days) => {
   return result;
 };
 
-// Timezone safe formatter
-const formatDate = (date) => {
-  const d = new Date(date);
+// Robust Date Formatter (YYYY-MM-DD)
+// Uses local time to ensure consistency with the loop generator
+const formatDate = (dateInput) => {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-const normalize = (d) => {
-  const date = new Date(d);
-  date.setHours(0, 0, 0, 0);
-  return date;
 };
 
 const calculateLeaveDays = (from, to) => {
@@ -94,18 +98,17 @@ const AdminLeaveSummary = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [employeeLeaveHistory, setEmployeeLeaveHistory] = useState([]);
 
-  // Month options based on current year
+  // Attendance & Shifts
+  const [rawAttendance, setRawAttendance] = useState([]);
+  const [shiftsMap, setShiftsMap] = useState({});
+
   const allMonths = useMemo(() => getMonthsForYear(), []);
 
   const fetchHolidays = async () => {
     try {
       const data = await getHolidays();
-      const formatted = data.map((h) => ({
-        ...h,
-        start: normalize(h.startDate),
-        end: normalize(h.endDate || h.startDate),
-      }));
-      setHolidays(formatted);
+      // Only keep raw data, we will format inside the logic to ensure consistency
+      setHolidays(data || []);
     } catch (err) {
       console.error("Error fetching holidays:", err);
     }
@@ -115,16 +118,36 @@ const AdminLeaveSummary = () => {
     const fetchAllData = async () => {
       try {
         setIsLoading(true);
-        const [leaves, employees] = await Promise.all([
+        const year = new Date().getFullYear();
+        const startOfYear = `${year}-01-01`;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const [leaves, employees, attendanceData, shiftsData] = await Promise.all([
           getLeaveRequests(),
           getEmployees(),
+          getAttendanceByDateRange(startOfYear, todayStr),
+          getAllShifts()
         ]);
+
         setAllRequests(leaves);
+        setRawAttendance(Array.isArray(attendanceData) ? attendanceData : []);
 
         const empMap = new Map(
           employees.map((emp) => [emp.employeeId, emp.name])
         );
         setEmployeesMap(empMap);
+
+        const sMap = {};
+        if (Array.isArray(shiftsData)) {
+            shiftsData.forEach(shift => {
+                if (shift.employeeId) sMap[shift.employeeId] = shift;
+            });
+        } else if (shiftsData?.data) {
+             shiftsData.data.forEach(shift => {
+                if (shift.employeeId) sMap[shift.employeeId] = shift;
+            });
+        }
+        setShiftsMap(sMap);
 
         await fetchHolidays();
       } catch (err) {
@@ -146,23 +169,21 @@ const AdminLeaveSummary = () => {
     [allRequests, employeesMap]
   );
 
-  // --- CORE SANDWICH LOGIC (Matches Employee Side) ---
-  const calculateSandwichData = (employeeLeaves, monthFilter) => {
-    const approvedLeaves = employeeLeaves.filter(
+  // --- CORE SANDWICH LOGIC ---
+  const calculateSandwichData = (combinedLeaves, monthFilter) => {
+    const activeLeaves = combinedLeaves.filter(
       (leave) =>
-        leave.status === "Approved" &&
         (monthFilter === "All" ||
           isDateInMonth(leave.from, monthFilter) ||
           isDateInMonth(leave.to, monthFilter))
     );
 
-    if (approvedLeaves.length === 0 && holidays.length === 0) {
+    if (activeLeaves.length === 0 && holidays.length === 0) {
       return { count: 0, days: 0, details: [] };
     }
 
-    // 1. Build Map of Booked Dates -> IsFullDay
     const bookedMap = new Map();
-    approvedLeaves.forEach((leave) => {
+    activeLeaves.forEach((leave) => {
       const isFullDay = !leave.halfDaySession;
       let curr = new Date(leave.from);
       const end = new Date(leave.to);
@@ -176,48 +197,46 @@ const AdminLeaveSummary = () => {
     let sandwichDays = 0;
     const sandwichDetails = [];
 
-    // 2. Check Holiday Sandwiches
+    // Check Holiday Sandwiches using String Comparison
     holidays.forEach((holiday) => {
-      const hStart = new Date(holiday.start);
-      const hEnd = new Date(holiday.end);
+      // Use formatDate to get string YYYY-MM-DD
+      const hStartStr = formatDate(holiday.startDate);
+      const hEndStr = formatDate(holiday.endDate || holiday.startDate);
+
+      // Check if holiday falls in selected month
+      if (monthFilter !== "All" && !isDateInMonth(hStartStr, monthFilter)) return;
+
+      const hStart = new Date(hStartStr);
+      const hEnd = new Date(hEndStr);
       
-      // We check filter validity for the holiday itself
-      // (If holiday is in Nov, and we filter Nov, we count it)
-      if (monthFilter !== "All" && !isDateInMonth(formatDate(hStart), monthFilter)) return;
+      const dayBeforeStr = formatDate(addDays(hStart, -1));
+      const dayAfterStr = formatDate(addDays(hEnd, 1));
 
-      const dayBefore = formatDate(addDays(hStart, -1));
-      const dayAfter = formatDate(addDays(hEnd, 1));
-
-      // Check if both surrounding days exist in map AND are Full Day
-      const beforeIsFull = bookedMap.get(dayBefore) === true;
-      const afterIsFull = bookedMap.get(dayAfter) === true;
+      const beforeIsFull = bookedMap.get(dayBeforeStr) === true;
+      const afterIsFull = bookedMap.get(dayAfterStr) === true;
 
       if (beforeIsFull && afterIsFull) {
         const duration = calculateLeaveDays(hStart, hEnd);
         sandwichCount++;
         sandwichDays += duration;
         sandwichDetails.push(
-          `Holiday Sandwich: '${holiday.name}' (${formatDate(hStart)})`
+          `Holiday Sandwich: '${holiday.name}' (${hStartStr})`
         );
       }
     });
 
-    // 3. Check Weekend Sandwiches (Sat/Mon)
-    // We iterate the map entries to find Saturdays
+    // Check Weekend Sandwiches (Sat/Mon)
     for (const [dateStr, isFullDay] of bookedMap.entries()) {
       if (!isFullDay) continue;
 
       const d = new Date(dateStr);
-      // Filter check: The Saturday (start of sandwich) should be in the selected month
       if (monthFilter !== "All" && !isDateInMonth(dateStr, monthFilter)) continue;
 
       if (d.getDay() === 6) { // Saturday
         const mondayStr = formatDate(addDays(d, 2));
-        
-        // Check if Monday is Full Day
         if (bookedMap.get(mondayStr) === true) {
           sandwichCount++;
-          sandwichDays += 1; // Sunday is 1 day
+          sandwichDays += 1;
           sandwichDetails.push(
             `Weekend Sandwich: Sat (${dateStr}) & Mon (${mondayStr})`
           );
@@ -231,37 +250,104 @@ const AdminLeaveSummary = () => {
   // --- STATS CALCULATION (Per Employee) ---
   const employeeStats = useMemo(() => {
     const uniqueEmployees = Array.from(employeesMap.entries());
+    const today = new Date(); 
+    today.setHours(0,0,0,0);
 
     return uniqueEmployees.map(([empId, empName]) => {
       const employeeLeaves = enrichedRequests.filter(
         (req) => req.employeeId === empId
       );
 
-      // Filter leaves based on selection
-      const monthFilteredLeaves = employeeLeaves.filter(
-        (leave) =>
-          selectedMonth === "All" ||
-          isDateInMonth(leave.from, selectedMonth) ||
-          isDateInMonth(leave.to, selectedMonth)
+      const absents = [];
+      const shift = shiftsMap[empId] || { weeklyOffDays: [0] }; 
+      const weeklyOffs = shift.weeklyOffDays || [0];
+
+      // Use Set of Strings for Punches
+      const employeePunches = new Set(
+        rawAttendance
+          .filter(r => r.employeeId === empId && r.punchIn)
+          .map(r => formatDate(r.date))
       );
 
-      // 1. Approved (Normal) Days
-      const approvedLeaves = monthFilteredLeaves.filter(
+      let loopStart, loopEnd;
+      const currentYear = new Date().getFullYear();
+
+      if (selectedMonth === "All") {
+          loopStart = new Date(currentYear, 0, 1);
+          loopEnd = new Date(); 
+      } else {
+          const [y, m] = selectedMonth.split('-');
+          loopStart = new Date(parseInt(y), parseInt(m) - 1, 1);
+          loopEnd = new Date(parseInt(y), parseInt(m), 0);
+          if (loopEnd > today) loopEnd = new Date(); 
+      }
+
+      const appliedLeaveDates = new Set();
+      employeeLeaves.forEach(l => {
+          if(l.status === 'Approved' || l.status === 'Pending') {
+              let c = new Date(l.from);
+              const e = new Date(l.to);
+              while(c <= e) {
+                  appliedLeaveDates.add(formatDate(c));
+                  c = addDays(c, 1);
+              }
+          }
+      });
+
+      // Loop through dates
+      for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
+          const dateStr = formatDate(d); // YYYY-MM-DD
+          const dayOfWeek = d.getDay();
+
+          // ✅ FIXED HOLIDAY CHECK: String Comparison
+          const isHol = holidays.some(h => {
+             const startStr = formatDate(h.startDate);
+             const endStr = formatDate(h.endDate || h.startDate);
+             return dateStr >= startStr && dateStr <= endStr;
+          });
+
+          if (isHol) continue; // It's a holiday, don't mark absent
+          if (weeklyOffs.includes(dayOfWeek)) continue; // Weekly off
+          if (employeePunches.has(dateStr)) continue; // Present
+          if (appliedLeaveDates.has(dateStr)) continue; // Applied Leave
+
+          absents.push({
+              _id: `absent-${empId}-${dateStr}`,
+              from: dateStr,
+              to: dateStr,
+              status: "Approved", 
+              leaveType: "Absent (System)",
+              reason: "Not Logged In",
+              isAbsentRecord: true
+          });
+      }
+
+      const approvedLeavesOnly = employeeLeaves.filter(
         (leave) => leave.status === "Approved"
       );
-      const normalLeaveDays = approvedLeaves.reduce(
+      
+      const leavesInMonth = approvedLeavesOnly.filter(
+          (leave) =>
+            selectedMonth === "All" ||
+            isDateInMonth(leave.from, selectedMonth) ||
+            isDateInMonth(leave.to, selectedMonth)
+      );
+
+      // Combine for Sandwich Calculation
+      const combinedForStats = [...leavesInMonth, ...absents];
+
+      const normalLeaveDays = leavesInMonth.reduce(
         (total, leave) => total + calculateLeaveDays(leave.from, leave.to),
         0
       );
 
-      // 2. Sandwich Days
-      const sandwichData = calculateSandwichData(employeeLeaves, selectedMonth);
+      const absentDaysCount = absents.length;
+      
+      // Calculate sandwich using mixed list (leaves + absents)
+      const sandwichData = calculateSandwichData([...approvedLeavesOnly, ...absents], selectedMonth);
 
-      // 3. Total Consumed
-      const totalConsumed = normalLeaveDays + sandwichData.days;
-
-      // 4. Pending & Extra Calculation
-      // Rule: 1 Credit per month. Pending = 1 - Total. Extra = Total - 1.
+      const totalConsumed = normalLeaveDays + absentDaysCount + sandwichData.days;
+      
       const monthlyCredit = 1;
       const pendingLeaves = Math.max(0, monthlyCredit - totalConsumed);
       const extraLeaves = Math.max(0, totalConsumed - monthlyCredit);
@@ -271,14 +357,17 @@ const AdminLeaveSummary = () => {
         employeeName: empName,
         pendingLeaves,
         totalLeaveDays: totalConsumed,
-        normalLeaveDays,
+        normalLeaveDays, 
+        absentDays: absentDaysCount, 
         extraLeaves,
         sandwichLeavesCount: sandwichData.count,
         sandwichLeavesDays: sandwichData.days,
-        sandwichDetails: sandwichData.details
+        sandwichDetails: sandwichData.details,
+        rawLeaves: employeeLeaves,
+        rawAbsents: absents 
       };
     });
-  }, [enrichedRequests, employeesMap, selectedMonth, holidays]);
+  }, [enrichedRequests, employeesMap, selectedMonth, holidays, rawAttendance, shiftsMap]);
 
   const filteredEmployeeStats = useMemo(() => {
     let filtered = [...employeeStats];
@@ -324,7 +413,8 @@ const AdminLeaveSummary = () => {
       "Employee Name",
       "Pending Leaves",
       "Total Leave Days",
-      "Normal Leaves",
+      "Applied Leaves",
+      "Absent Days", 
       "Extra Leaves (LOP)",
       "Sandwich Count",
       "Sandwich Days",
@@ -336,6 +426,7 @@ const AdminLeaveSummary = () => {
         emp.pendingLeaves,
         emp.totalLeaveDays,
         emp.normalLeaveDays,
+        emp.absentDays,
         emp.extraLeaves,
         emp.sandwichLeavesCount,
         emp.sandwichLeavesDays,
@@ -349,24 +440,23 @@ const AdminLeaveSummary = () => {
   };
 
   const handleViewDetails = (employeeId) => {
-    const employeeLeaves = enrichedRequests.filter(
-      (req) =>
-        req.employeeId === employeeId &&
-        (selectedMonth === "All" ||
+    const empStats = employeeStats.find((emp) => emp.employeeId === employeeId);
+    if(!empStats) return;
+
+    const leaves = empStats.rawLeaves.filter(
+        (req) =>
+          selectedMonth === "All" ||
           isDateInMonth(req.from, selectedMonth) ||
-          isDateInMonth(req.to, selectedMonth))
+          isDateInMonth(req.to, selectedMonth)
     );
-
-    const sortedLeaves = employeeLeaves.sort(
+    
+    const mergedHistory = [...leaves, ...empStats.rawAbsents].sort(
       (a, b) =>
-        new Date(b.requestDate || b.from) -
-        new Date(a.requestDate || a.from)
+        new Date(b.from) - new Date(a.from)
     );
 
-    setEmployeeLeaveHistory(sortedLeaves);
-    setSelectedEmployee(
-      employeeStats.find((emp) => emp.employeeId === employeeId)
-    );
+    setEmployeeLeaveHistory(mergedHistory);
+    setSelectedEmployee(empStats);
     setShowDetailsModal(true);
   };
 
@@ -397,7 +487,7 @@ const AdminLeaveSummary = () => {
                 📊 Employee Leave Statistics
               </h1>
               <p className="text-gray-600">
-                Comprehensive overview of all employee leave data
+                Comprehensive overview including Leaves and Absents
               </p>
             </div>
 
@@ -485,8 +575,7 @@ const AdminLeaveSummary = () => {
               Employee Leave Details
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Click column headers to sort • {filteredEmployeeStats.length} total
-              records
+              Includes Applied Leaves + Unplanned Absents
             </p>
           </div>
 
@@ -498,79 +587,37 @@ const AdminLeaveSummary = () => {
                     onClick={() => handleSort("employeeId")}
                     className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center gap-2">
-                      Employee ID
-                      {sortConfig.key === "employeeId" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    ID
                   </th>
                   <th
                     onClick={() => handleSort("employeeName")}
                     className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center gap-2">
-                      Employee Name
-                      {sortConfig.key === "employeeName" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    Name
                   </th>
                   <th
                     onClick={() => handleSort("pendingLeaves")}
                     className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center justify-center gap-2">
-                      Pending
-                      {sortConfig.key === "pendingLeaves" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    Pending
                   </th>
                   <th
                     onClick={() => handleSort("totalLeaveDays")}
                     className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center justify-center gap-2">
-                      Total Days
-                      {sortConfig.key === "totalLeaveDays" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    Total Days
                   </th>
                   <th
                     onClick={() => handleSort("extraLeaves")}
                     className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center justify-center gap-2">
-                      Extra (LOP)
-                      {sortConfig.key === "extraLeaves" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    Extra (LOP)
                   </th>
                   <th
                     onClick={() => handleSort("sandwichLeavesDays")}
                     className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
                   >
-                    <div className="flex items-center justify-center gap-2">
-                      Sandwich Days
-                      {sortConfig.key === "sandwichLeavesDays" && (
-                        <span>
-                          {sortConfig.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
+                    Sandwich Days
                   </th>
                   <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Actions
@@ -589,18 +636,10 @@ const AdminLeaveSummary = () => {
                         transition={{ delay: index * 0.02 }}
                         className="hover:bg-blue-50 transition duration-150"
                       >
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-bold text-gray-900">
-                            {emp.employeeId}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {emp.employeeName}
-                          </div>
-                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900">{emp.employeeId}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{emp.employeeName}</td>
                         <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center justify-center min-w-[3rem] px-3 py-2 rounded-full bg-blue-100 text-blue-800 font-bold text-sm shadow-sm">
+                          <span className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-2 rounded-full font-bold text-sm shadow-sm ${emp.pendingLeaves === 0 ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>
                             {emp.pendingLeaves}
                           </span>
                         </td>
@@ -609,8 +648,8 @@ const AdminLeaveSummary = () => {
                             <span className="inline-flex items-center justify-center min-w-[3rem] px-3 py-2 rounded-full bg-green-100 text-green-800 font-bold text-sm shadow-sm">
                               {emp.totalLeaveDays}
                             </span>
-                            <span className="text-[10px] text-gray-500 mt-1">
-                              {emp.normalLeaveDays} Normal + {emp.sandwichLeavesDays} Sandwich
+                            <span className="text-[10px] text-gray-500 mt-1 whitespace-nowrap">
+                              {emp.normalLeaveDays} Applied + {emp.absentDays} Absent + {emp.sandwichLeavesDays} SW
                             </span>
                           </div>
                         </td>
@@ -648,18 +687,8 @@ const AdminLeaveSummary = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <div className="text-gray-500">
-                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <span className="text-2xl">🔍</span>
-                          </div>
-                          <p className="text-lg font-semibold mb-2">
-                            No employees found
-                          </p>
-                          <p className="text-sm">
-                            Try adjusting your search or filter criteria
-                          </p>
-                        </div>
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                         No employees found
                       </td>
                     </tr>
                   )}
@@ -676,20 +705,18 @@ const AdminLeaveSummary = () => {
               <div className="flex items-center">
                 <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
                 <span>
-                  <strong>Pending Leaves:</strong> 1 (Credit) - Total Consumed.
+                  <strong>Pending:</strong> 1 (Credit) - (Applied + Absent + Sandwich).
                 </span>
               </div>
               <div className="flex items-center">
                 <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
                 <span>
-                  <strong>Total Days:</strong> Approved Days + Sandwich Gap Days.
+                  <strong>Total Days:</strong> Sum of Approved Leaves, Unplanned Absents, and Sandwich Days.
                 </span>
               </div>
               <div className="flex items-center">
-                <span className="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
-                <span>
-                  <strong>Extra (LOP):</strong> Total Days - 1.
-                </span>
+                 <span className="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
+                 <span><strong>Absent:</strong> Working days with no punch and no leave request.</span>
               </div>
             </div>
           </div>
@@ -714,7 +741,7 @@ const AdminLeaveSummary = () => {
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div className="text-white">
-                      <h3 className="text-2xl font-bold">Leave History</h3>
+                      <h3 className="text-2xl font-bold">Leave & Absent History</h3>
                       <p className="text-blue-100 text-sm mt-1">
                         {selectedEmployee.employeeName} (
                         {selectedEmployee.employeeId})
@@ -740,7 +767,7 @@ const AdminLeaveSummary = () => {
                       <p className="text-2xl font-bold text-green-600">
                         {selectedEmployee.totalLeaveDays}
                       </p>
-                      <p className="text-xs text-gray-600">Total Days</p>
+                      <p className="text-xs text-gray-600">Total Consumed</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-orange-600">
@@ -749,10 +776,10 @@ const AdminLeaveSummary = () => {
                       <p className="text-xs text-gray-600">Extra (LOP)</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-purple-600">
-                        {selectedEmployee.sandwichLeavesCount}
+                      <p className="text-2xl font-bold text-red-500">
+                        {selectedEmployee.absentDays}
                       </p>
-                      <p className="text-xs text-gray-600">Sandwich Incidents</p>
+                      <p className="text-xs text-gray-600">Unplanned Absent</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-purple-600">
@@ -764,23 +791,17 @@ const AdminLeaveSummary = () => {
                 </div>
 
                 <div className="overflow-y-auto max-h-[60vh] p-6">
-                  {/* Show Sandwich Alerts First */}
                    {selectedEmployee.sandwichDetails && selectedEmployee.sandwichDetails.length > 0 && (
                       <div className="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg">
                         <div className="flex items-start">
-                          <span className="text-orange-600 text-xl mr-2">
-                            🥪
-                          </span>
+                          <span className="text-orange-600 text-xl mr-2">🥪</span>
                           <div className="flex-1">
                             <p className="font-semibold text-orange-800 mb-2">
-                              Sandwich Leaves Detected in Selection
+                              Sandwich Leaves Detected
                             </p>
                             {selectedEmployee.sandwichDetails.map(
                               (reason, idx) => (
-                                <p
-                                  key={idx}
-                                  className="text-sm text-orange-700 mb-1"
-                                >
+                                <p key={idx} className="text-sm text-orange-700 mb-1">
                                   • {reason}
                                 </p>
                               )
@@ -792,91 +813,79 @@ const AdminLeaveSummary = () => {
 
                   {employeeLeaveHistory.length > 0 ? (
                     <div className="space-y-4">
-                      {employeeLeaveHistory.map((leave, index) => (
-                        <motion.div
-                          key={leave._id || index}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg transition duration-200"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="text-lg font-bold text-gray-900">
-                                  {formatDisplayDate(leave.from)}
-                                  <span className="mx-2 text-gray-400">→</span>
-                                  {formatDisplayDate(leave.to)}
-                                </span>
-                                <span
-                                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                    leave.status === "Approved"
-                                      ? "bg-green-100 text-green-800"
-                                      : leave.status === "Rejected"
-                                      ? "bg-red-100 text-red-800"
-                                      : leave.status === "Pending"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-gray-100 text-gray-800"
-                                  }`}
-                                >
-                                  {leave.status}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <p className="text-gray-600 font-semibold">
-                                    Leave Type:
-                                  </p>
-                                  <p className="text-gray-900">
-                                    {leave.leaveType || "-"}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-600 font-semibold">
-                                    Applied Date:
-                                  </p>
-                                  <p className="text-gray-900">
-                                    {formatDisplayDate(
-                                      leave.requestDate || leave.createdAt
+                      {employeeLeaveHistory.map((leave, index) => {
+                          const isAbsentRecord = leave.isAbsentRecord;
+                          return (
+                            <motion.div
+                              key={leave._id || index}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className={`border rounded-xl p-5 hover:shadow-lg transition duration-200 ${
+                                  isAbsentRecord ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-lg font-bold text-gray-900">
+                                      {formatDisplayDate(leave.from)}
+                                      {leave.from !== leave.to && (
+                                          <>
+                                            <span className="mx-2 text-gray-400">→</span>
+                                            {formatDisplayDate(leave.to)}
+                                          </>
+                                      )}
+                                    </span>
+                                    {isAbsentRecord ? (
+                                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                                            ABSENT (No Punch)
+                                        </span>
+                                    ) : (
+                                        <span
+                                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                            leave.status === "Approved"
+                                              ? "bg-green-100 text-green-800"
+                                              : leave.status === "Rejected"
+                                              ? "bg-red-100 text-red-800"
+                                              : leave.status === "Pending"
+                                              ? "bg-yellow-100 text-yellow-800"
+                                              : "bg-gray-100 text-gray-800"
+                                          }`}
+                                        >
+                                          {leave.status}
+                                        </span>
                                     )}
-                                  </p>
-                                </div>
-                                <div className="col-span-2">
-                                  <p className="text-gray-600 font-semibold">
-                                    Reason:
-                                  </p>
-                                  <p className="text-gray-900">
-                                    {leave.reason || "-"}
-                                  </p>
-                                </div>
-                                {leave.halfDaySession && (
-                                  <div className="col-span-2">
-                                    <p className="text-gray-600 font-semibold">
-                                      Half Day Session:
-                                    </p>
-                                    <p className="text-gray-900">
-                                      {leave.halfDaySession}
-                                    </p>
                                   </div>
-                                )}
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-gray-600 font-semibold">Type:</p>
+                                      <p className="text-gray-900">{leave.leaveType || "Absent"}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-600 font-semibold">
+                                        {isAbsentRecord ? "Detected Date:" : "Applied Date:"}
+                                      </p>
+                                      <p className="text-gray-900">
+                                        {formatDisplayDate(leave.requestDate || leave.createdAt || leave.from)}
+                                      </p>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <p className="text-gray-600 font-semibold">Reason:</p>
+                                      <p className="text-gray-900 italic">
+                                        "{leave.reason || "System marked as absent due to missing punch"}"
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                            </motion.div>
+                          );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl">📭</span>
-                      </div>
-                      <p className="text-lg font-semibold mb-2">
-                        No leave history found
-                      </p>
-                      <p className="text-sm">
-                        This employee has no leave records for the selected
-                        period
-                      </p>
+                      <p className="text-lg font-semibold mb-2">No records found</p>
                     </div>
                   )}
                 </div>

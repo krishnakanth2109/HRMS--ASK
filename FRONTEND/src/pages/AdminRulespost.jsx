@@ -1,43 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import Swal from 'sweetalert2';
+// 1. Remove axios import
+// 2. Import the new functions from your api.js file
+import { getRules, createRule, deleteRule } from '../api'; // Adjust path if api.js is in a different folder
 
-// --- SUB-COMPONENT: Single Rule Card with Auto-Scroll & Full Screen ---
+// --- SUB-COMPONENT: Single Rule Card ---
 const RuleCard = ({ rule, onDelete }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  
-  // Full Screen Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
 
-  // --- 1. Robust Image Data Handling ---
   const getImages = () => {
     if (rule.images && rule.images.length > 0) {
-      // Handle if images are objects (from Multer) or strings
       return typeof rule.images[0] === 'string' 
         ? rule.images 
         : rule.images.map(img => img.url);
     }
-    // Fallback for old single fileUrl
     if (rule.fileUrl) return [rule.fileUrl];
     return [];
   };
 
   const images = getImages();
 
-  // --- 2. Auto-Slide Logic ---
   useEffect(() => {
-    // Run timer only if: >1 image, not hovering, and modal is closed
     if (images.length > 1 && !isHovered && !isModalOpen) {
       const timer = setInterval(() => {
         setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-      }, 5000); // 5 Seconds
+      }, 5000);
       return () => clearInterval(timer);
     }
   }, [images.length, isHovered, isModalOpen]);
 
-  // --- 3. Navigation Handlers ---
   const handleNext = (e) => {
     if(e) e.stopPropagation();
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
@@ -48,11 +42,10 @@ const RuleCard = ({ rule, onDelete }) => {
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
-  // --- 4. Modal Handlers ---
   const openModal = () => {
     setModalIndex(currentImageIndex);
     setIsModalOpen(true);
-    setIsHovered(true); // Pause background slider
+    setIsHovered(true);
   };
 
   const closeModal = () => {
@@ -72,10 +65,7 @@ const RuleCard = ({ rule, onDelete }) => {
 
   return (
     <>
-      {/* --- CARD VIEW --- */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition duration-300 relative flex flex-col h-full">
-        
-        {/* Header Section */}
         <div className="flex justify-between items-start mb-4">
           <div>
             <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase mb-2 ${
@@ -103,7 +93,6 @@ const RuleCard = ({ rule, onDelete }) => {
           {rule.description}
         </p>
 
-        {/* --- CAROUSEL SECTION --- */}
         {images.length > 0 && (
           <div className="mt-4 border-t border-gray-100 pt-4">
             <div 
@@ -112,8 +101,6 @@ const RuleCard = ({ rule, onDelete }) => {
               onMouseLeave={() => setIsHovered(false)}
               onClick={openModal}
             >
-              
-              {/* Image Display */}
               <div className="w-full h-full flex items-center justify-center bg-black">
                 <img 
                   src={images[currentImageIndex]} 
@@ -122,43 +109,23 @@ const RuleCard = ({ rule, onDelete }) => {
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
               </div>
-
-              {/* Overlay Trigger */}
               <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end items-end h-full pointer-events-none">
-                 <button 
-                    className="bg-white text-gray-900 text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2 pointer-events-auto hover:bg-gray-100"
-                 >
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                 <button className="bg-white text-gray-900 text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2 pointer-events-auto hover:bg-gray-100">
                    Click to Expand
                  </button>
               </div>
 
-              {/* Navigation Buttons (Only if > 1 image) */}
               {images.length > 1 && (
                 <>
-                  <button 
-                    onClick={handlePrev}
-                    className="absolute top-1/2 left-2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 z-10"
-                  >
+                  <button onClick={handlePrev} className="absolute top-1/2 left-2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 z-10">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                   </button>
-
-                  <button 
-                    onClick={handleNext}
-                    className="absolute top-1/2 right-2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 z-10"
-                  >
+                  <button onClick={handleNext} className="absolute top-1/2 right-2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 z-10">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </button>
-
-                  {/* Dots Indicator */}
                   <div className="absolute top-2 right-2 flex gap-1 z-10">
                     {images.map((_, idx) => (
-                      <div 
-                        key={idx}
-                        className={`h-1.5 w-1.5 rounded-full shadow-sm ${
-                          idx === currentImageIndex ? 'bg-white' : 'bg-white/30'
-                        }`}
-                      />
+                      <div key={idx} className={`h-1.5 w-1.5 rounded-full shadow-sm ${idx === currentImageIndex ? 'bg-white' : 'bg-white/30'}`} />
                     ))}
                   </div>
                 </>
@@ -167,7 +134,6 @@ const RuleCard = ({ rule, onDelete }) => {
           </div>
         )}
 
-        {/* Footer */}
         <div className="flex items-center justify-end mt-4">
           <span className="text-xs text-gray-400 font-medium">
             {new Date(rule.createdAt).toLocaleDateString('en-US', {
@@ -177,44 +143,21 @@ const RuleCard = ({ rule, onDelete }) => {
         </div>
       </div>
 
-      {/* --- FULL SCREEN MODAL POPUP --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
-          
-          {/* Close Button */}
-          <button 
-            onClick={closeModal}
-            className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all z-50"
-          >
+          <button onClick={closeModal} className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all z-50">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
-
-          {/* Main Image Container */}
           <div className="relative w-full h-full flex items-center justify-center">
-            
-            <img 
-              src={images[modalIndex]} 
-              alt="Full Screen View" 
-              className="max-h-screen max-w-full object-contain shadow-2xl rounded-sm select-none"
-            />
-
-            {/* Modal Navigation (Only if > 1 image) */}
+            <img src={images[modalIndex]} alt="Full Screen" className="max-h-screen max-w-full object-contain shadow-2xl rounded-sm select-none" />
             {images.length > 1 && (
               <>
-                <button 
-                  onClick={handleModalPrev}
-                  className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-sm transition-all hover:scale-110"
-                >
-                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                <button onClick={handleModalPrev} className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-sm transition-all hover:scale-110">
+                   <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-
-                <button 
-                  onClick={handleModalNext}
-                  className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-sm transition-all hover:scale-110"
-                >
-                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                <button onClick={handleModalNext} className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full backdrop-blur-sm transition-all hover:scale-110">
+                   <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
-                
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-1 rounded-full text-white text-sm border border-white/20">
                   {modalIndex + 1} / {images.length}
                 </div>
@@ -229,30 +172,22 @@ const RuleCard = ({ rule, onDelete }) => {
 
 // --- MAIN PARENT COMPONENT ---
 const AdminRulesPost = () => {
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    title: '',
-    category: 'General',
-    description: ''
-  });
+  const [formData, setFormData] = useState({ title: '', category: 'General', description: '' });
   const [selectedImages, setSelectedImages] = useState([]);
-  
-  // Data State
   const [rules, setRules] = useState([]);
   const [filteredRules, setFilteredRules] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false); 
   const [fetching, setFetching] = useState(true); 
 
-  // --- 1. Fetch Rules ---
-  const fetchRules = async () => {
+  // --- 1. Fetch Rules (UPDATED) ---
+  const fetchRulesData = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/rules');
-      setRules(res.data);
-      setFilteredRules(res.data);
+      // USING API.JS FUNCTION
+      const data = await getRules();
+      setRules(data);
+      setFilteredRules(data);
       setFetching(false);
     } catch (error) {
       console.error("Error fetching rules", error);
@@ -260,7 +195,7 @@ const AdminRulesPost = () => {
     }
   };
 
-  useEffect(() => { fetchRules(); }, []);
+  useEffect(() => { fetchRulesData(); }, []);
 
   // --- 2. Dynamic Search ---
   useEffect(() => {
@@ -285,7 +220,7 @@ const AdminRulesPost = () => {
     }
   };
 
-  // --- 4. Handle Submit ---
+  // --- 4. Handle Submit (UPDATED) ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -300,9 +235,9 @@ const AdminRulesPost = () => {
     }
 
     try {
-      await axios.post('http://localhost:5000/api/rules', data);
+      // USING API.JS FUNCTION
+      await createRule(data);
       
-      // Close Modal & Reset
       setIsModalOpen(false);
       setFormData({ title: '', category: 'General', description: '' });
       setSelectedImages([]);
@@ -315,7 +250,7 @@ const AdminRulesPost = () => {
         showConfirmButton: false
       });
 
-      fetchRules(); // Refresh list
+      fetchRulesData(); 
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -327,7 +262,7 @@ const AdminRulesPost = () => {
     }
   };
 
-  // --- 5. Handle Delete ---
+  // --- 5. Handle Delete (UPDATED) ---
   const handleDelete = async (id) => {
     const result = await Swal.fire({
       title: 'Are you sure?',
@@ -340,7 +275,9 @@ const AdminRulesPost = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:5000/api/rules/${id}`);
+        // USING API.JS FUNCTION
+        await deleteRule(id);
+        
         setRules(rules.filter(rule => rule._id !== id));
         Swal.fire('Deleted!', 'Regulation removed.', 'success');
       } catch (error) {
@@ -360,10 +297,8 @@ const AdminRulesPost = () => {
         <p className="text-gray-500">Manage compliance documents and employee guidelines.</p>
       </div>
 
-      {/* CONTROLS (Add Button + Search) */}
+      {/* CONTROLS */}
       <div className="max-w-5xl mx-auto mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        {/* POST BUTTON - Opens Modal */}
         <button 
           onClick={() => setIsModalOpen(true)}
           className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition transform flex items-center gap-2"
@@ -374,7 +309,6 @@ const AdminRulesPost = () => {
           Post New Rule
         </button>
 
-        {/* SEARCH BAR */}
         <div className="relative w-full md:w-96">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -409,36 +343,27 @@ const AdminRulesPost = () => {
         )}
       </div>
 
-      {/* --- CREATE MODAL (POPUP) FORM --- */}
+      {/* --- CREATE MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
             onClick={() => setIsModalOpen(false)}
           ></div>
-
-          {/* Modal Content */}
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-            
-            {/* Modal Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 flex justify-between items-center shrink-0">
               <h2 className="text-white text-xl font-bold">Create New Policy</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-white/80 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
-
-            {/* Modal Body (Scrollable) */}
             <div className="p-6 overflow-y-auto">
               <form id="ruleForm" onSubmit={handleSubmit} className="space-y-5">
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="group">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
                     <input type="text" name="title" value={formData.title} onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-gray-50 border focus:border-blue-500 outline-none"/>
                   </div>
-
                   <div className="group">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
                     <select name="category" value={formData.category} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-gray-50 border focus:border-blue-500 outline-none">
@@ -449,12 +374,10 @@ const AdminRulesPost = () => {
                     </select>
                   </div>
                 </div>
-
                 <div className="group">
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
                   <textarea name="description" value={formData.description} onChange={handleChange} rows="4" required className="w-full px-4 py-3 rounded-lg bg-gray-50 border focus:border-blue-500 outline-none resize-none" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Attach Images</label>
                   <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-blue-50 cursor-pointer bg-gray-50">
@@ -468,7 +391,6 @@ const AdminRulesPost = () => {
                       </span>
                     </div>
                   </div>
-                  {/* File Names Preview */}
                   {selectedImages.length > 0 && (
                      <div className="mt-2 text-xs text-gray-500 max-h-20 overflow-y-auto">
                         {selectedImages.map((f, i) => <div key={i}>{f.name}</div>)}
@@ -477,8 +399,6 @@ const AdminRulesPost = () => {
                 </div>
               </form>
             </div>
-
-            {/* Modal Footer */}
             <div className="p-5 border-t border-gray-100 flex justify-end gap-3 shrink-0 bg-gray-50">
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -495,11 +415,9 @@ const AdminRulesPost = () => {
                 {loading ? 'Publishing...' : 'Publish Rule'}
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 };

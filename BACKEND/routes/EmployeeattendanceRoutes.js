@@ -95,7 +95,7 @@ router.post('/punch-in', async (req, res) => {
         displayTime: "0h 0m 0s",
         status: "WORKING",
         loginStatus: isLate ? "LATE" : "ON_TIME",
-        idleActivity: [],
+  
       };
       attendance.attendance.push(todayRecord);
     } 
@@ -403,28 +403,6 @@ router.post('/approve-correction', onlyAdmin, async (req, res) => {
 
 /* ================= OTHER ROUTES ================= */
 
-router.post('/record-idle-activity', async (req, res) => {
-  try {
-    const { employeeId, idleStart, idleEnd, isIdle } = req.body;
-    const today = getToday();
-    const record = await Attendance.findOne({ employeeId });
-    if (!record) return res.status(404).json({ message: "Not found" });
-
-    const todayEntry = record.attendance.find(a => a.date === today);
-    if (!todayEntry) return res.status(400).json({ message: "Punch in first" });
-
-    if (!todayEntry.idleActivity) todayEntry.idleActivity = [];
-    if (isIdle) todayEntry.idleActivity.push({ idleStart: new Date(idleStart) });
-    else {
-      const last = todayEntry.idleActivity[todayEntry.idleActivity.length - 1];
-      if (last && !last.idleEnd) last.idleEnd = new Date(idleEnd);
-    }
-    await record.save();
-    res.json({ success: true, data: todayEntry });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 router.get('/:employeeId', async (req, res) => {
   try {

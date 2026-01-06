@@ -1,13 +1,12 @@
 // --- START OF FILE CurrentEmployeeProfile.jsx ---
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// 1. Swap axios for your centralized api instance
+import api from "../api"; 
 import { 
   FaUser, FaEnvelope, FaPhone, FaBuilding, FaMoneyBill, FaCalendarAlt, 
   FaCreditCard, FaAddressCard, FaFileUpload, FaCheck, FaSpinner, FaIdCard, FaEdit, FaSave, FaTrash
 } from "react-icons/fa";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 const INDIAN_BANKS = [
   "State Bank of India (SBI)",
@@ -65,23 +64,6 @@ const CurrentEmployeeProfile = () => {
     setLoading(false);
   }, []);
 
-  // --- HELPER: ROBUST TOKEN RETRIEVAL ---
-  const getToken = () => {
-    let token = sessionStorage.getItem("token");
-    if (!token) {
-        const saved = sessionStorage.getItem("hrmsUser");
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                token = parsed.token || (parsed.data && parsed.data.token);
-            } catch (e) {
-                console.error("JSON Parse Error checking token:", e);
-            }
-        }
-    }
-    return token;
-  };
-
   if (loading) return <div className="p-10 text-center text-blue-600 font-bold"><FaSpinner className="animate-spin inline mr-2"/>Loading profile...</div>;
 
   if (!employee)
@@ -103,7 +85,7 @@ const CurrentEmployeeProfile = () => {
     setEmployee((p) => ({ ...p, [field]: value }));
   };
 
-  // ✅ IMPROVED VALIDATION LOGIC (Fixed Aadhaar & PAN typing)
+  // ✅ IMPROVED VALIDATION LOGIC
   const handleNestedChange = (section, field, value) => {
     
     // 1. Account Number (Digits Only)
@@ -113,33 +95,22 @@ const CurrentEmployeeProfile = () => {
 
     // 2. Aadhaar Validation (12 Digits + Formatting)
     if (field === "aadhaarNumber") {
-      // Remove any non-digit character
       const raw = value.replace(/\D/g, "");
-
-      // Limit to 12 digits (Truncate excess)
       const clean = raw.slice(0, 12);
-
-      // Rebuild format
       let formatted = clean;
       if (clean.length > 4) {
         formatted = clean.slice(0, 4) + "-" + clean.slice(4);
       }
       if (clean.length > 8) {
-        // "1234-5678" is 9 chars long, so dash goes at index 9
         formatted = formatted.slice(0, 9) + "-" + formatted.slice(9);
       }
-      
       value = formatted;
     }
 
     // 3. PAN Validation (10 Chars + Uppercase + AlphaNumeric)
     if (field === "panNumber") {
       let val = value.toUpperCase();
-      
-      // Remove symbols/spaces (Allow only A-Z and 0-9)
       val = val.replace(/[^A-Z0-9]/g, "");
-
-      // Limit to 10 characters (Truncate excess)
       value = val.slice(0, 10);
     }
 
@@ -187,7 +158,7 @@ const CurrentEmployeeProfile = () => {
     });
   };
 
-  // ---------------- FILE UPLOAD ----------------
+  // ---------------- FILE UPLOAD (UPDATED) ----------------
 
   const handleFileUpload = async (e, type, index = null) => {
     const file = e.target.files[0];
@@ -198,18 +169,12 @@ const CurrentEmployeeProfile = () => {
 
     setUploading(prev => ({ ...prev, [type]: true }));
 
-    const token = getToken(); 
-    if (!token) {
-        alert("Authentication lost. Please log in again.");
-        setUploading(prev => ({ ...prev, [type]: false }));
-        return;
-    }
-
     try {
-      const res = await axios.post(`${API_BASE}/employees/upload-doc`, uploadData, {
+      // UPDATED: Use api instance instead of axios. 
+      // api.js handles the Base URL (Production/Local) and Authorization Token.
+      const res = await api.post(`/api/employees/upload-doc`, uploadData, {
         headers: { 
-            "Content-Type": "multipart/form-data",
-            "Authorization": `Bearer ${token}` 
+            "Content-Type": "multipart/form-data"
         }
       });
 
@@ -231,14 +196,13 @@ const CurrentEmployeeProfile = () => {
     }
   };
 
-  // ---------------- SAVE TO BACKEND (STRICT VALIDATION) ----------------
+  // ---------------- SAVE TO BACKEND (UPDATED) ----------------
 
   const saveChanges = async () => {
     // 1. Phone Validation
     if (employee.phone?.length !== 10) return alert("Phone number must be 10 digits");
     
     // 2. Aadhaar Validation
-    // Remove dashes to count digits
     const cleanAadhaar = employee.personalDetails?.aadhaarNumber?.replace(/\D/g, "") || "";
     if (cleanAadhaar.length > 0 && cleanAadhaar.length !== 12) {
        return alert("Aadhaar Number must be exactly 12 digits");
@@ -256,23 +220,11 @@ const CurrentEmployeeProfile = () => {
 
     setSaving(true);
 
-    const token = getToken();
-    if (!token) {
-        alert("Session expired. Please log out and log in again.");
-        setSaving(false);
-        return;
-    }
-
     try {
-      const { data } = await axios.put(
-        `${API_BASE}/employees/${empId}`, 
-        updatedEmployee,
-        {
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            }
-        }
+      // UPDATED: Use api instance. No need to pass token manually.
+      const { data } = await api.put(
+        `/api/employees/${empId}`, 
+        updatedEmployee
       );
       
       data.employeeId = String(data.employeeId);

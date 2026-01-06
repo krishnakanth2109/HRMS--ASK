@@ -69,7 +69,6 @@ const navLinks = [
   },
 
   // --- OTHER LINKS ---
-  { to: "/admin/idle-time", label: "Idle Time", icon: <FaChartPie /> },
   { to: "/admin/payroll", label: "Payroll", icon: <FaFileAlt /> },
 
   { 
@@ -91,6 +90,13 @@ const navLinks = [
     to: "/admin/shifttype", 
     label: "Location Settings", 
     icon: <FaMapMarkerAlt />,
+    isWorkModeRequests: true // ✅ For work mode requests count
+  },
+
+    { 
+    to: "/admin/settings", 
+    label: "Shift Management", 
+    icon:  <FaChartPie />,
     isWorkModeRequests: true // ✅ For work mode requests count
   },
 
