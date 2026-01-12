@@ -40,7 +40,8 @@ import {
   FaFileDownload,
   FaBriefcase,
   FaListAlt, // Added for the Requests button
-  FaTimes // Added for closing modal
+  FaTimes, // Added for closing modal
+  FaCheckCircle // Added for Present icon
 } from "react-icons/fa";
 
 // --- Register Chart.js components ---
@@ -465,6 +466,7 @@ const EmployeeDailyAttendance = () => {
     // UPDATED: Working Days Logic
     const workingDays = Math.max(0, currentMonthData.length - weekOffs - holidaysCount);
 
+    // Consolidated Absent Count (Regular Absent + Leaves)
     const absentTotal = stats.absent + stats.leave;
 
     return {
@@ -623,13 +625,14 @@ const EmployeeDailyAttendance = () => {
         {/* Stats & Chart Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
           
-          {/* Summary Column - UPDATED DYNAMIC TITLE */}
+          {/* Summary Column - UPDATED DYNAMIC TITLE & CONTENT */}
           <div className="lg:col-span-2 p-6 bg-white rounded-xl shadow-md border border-gray-100">
             <h3 className="font-bold text-lg mb-4 text-gray-800 border-b pb-2">
               {getBreakdownTitle()}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
               
+              {/* Full Days (Kept) */}
               <BreakdownItem 
                 icon={<FaBusinessTime />} 
                 title="Full Days" 
@@ -638,6 +641,7 @@ const EmployeeDailyAttendance = () => {
                 bg="bg-green-50" 
               />
               
+              {/* Half Days (Kept) */}
               <BreakdownItem 
                 icon={<FaStarHalfAlt />} 
                 title="Half Days" 
@@ -646,36 +650,40 @@ const EmployeeDailyAttendance = () => {
                 bg="bg-yellow-50" 
               />
 
+              {/* Present (New - replaced Working Days) */}
                <BreakdownItem 
-                icon={<FaBriefcase />} 
-                title="Working Days" 
-                value={summaryStats.workingDays} 
+                icon={<FaCheckCircle />} 
+                title="Present" 
+                value={summaryStats.presentDays} 
                 color="text-blue-600" 
                 bg="bg-blue-50" 
               />
               
+              {/* On Time (New - replaced Leaves) */}
               <BreakdownItem 
-                icon={<FaCouch />} 
-                title="Leaves" 
-                value={summaryStats.leaveDays} 
-                color="text-orange-600" 
-                bg="bg-orange-50" 
+                icon={<FaUserClock />} 
+                title="On Time" 
+                value={summaryStats.onTimeCount} 
+                color="text-teal-600" 
+                bg="bg-teal-50" 
               />
 
+              {/* Late Login (New - replaced Holidays) */}
               <BreakdownItem 
-                icon={<FaTimesCircle />} 
-                title="Absent" 
-                value={summaryStats.absentDays} 
+                icon={<FaExclamationTriangle />} 
+                title="Late Login" 
+                value={summaryStats.lateCount} 
                 color="text-red-600" 
                 bg="bg-red-50" 
               />
               
+              {/* Absent (Consolidated: Leave + Absent) */}
               <BreakdownItem 
-                icon={<FaUmbrellaBeach />} 
-                title="Holidays" 
-                value={summaryStats.holidayCount} 
-                color="text-purple-600" 
-                bg="bg-purple-50" 
+                icon={<FaTimesCircle />} 
+                title="Absent" 
+                value={summaryStats.absentDays} 
+                color="text-rose-700" 
+                bg="bg-rose-50" 
               />
 
             </div>
@@ -690,12 +698,7 @@ const EmployeeDailyAttendance = () => {
           </div>
         </div>
 
-        {/* Quick Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <StatCard icon={<FaCalendarCheck className="text-white" />} title={`Present Days`} value={summaryStats.presentDays} colorClass="bg-blue-500" />
-          <StatCard icon={<FaUserClock className="text-white" />} title="On Time Arrivals" value={summaryStats.onTimeCount} colorClass="bg-green-500" />
-          <StatCard icon={<FaExclamationTriangle className="text-white" />} title="Late Arrivals" value={summaryStats.lateCount} colorClass="bg-red-500" />
-        </div>
+
 
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100">

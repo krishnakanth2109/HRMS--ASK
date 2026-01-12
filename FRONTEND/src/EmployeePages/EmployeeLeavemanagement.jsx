@@ -1171,7 +1171,7 @@ const EmployeeLeavemanagement = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 h-full">
             <div className="flex items-center justify-between h-full">
               <div>
-                <p className="text-gray-600 text-sm font-semibold">Pending Leaves</p>
+                <p className="text-gray-600 text-sm font-semibold">Leave Balance</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">{stats.pendingLeaves}</p>
                 <p className="text-xs text-gray-500 mt-1">Available this month</p>
               </div>
@@ -1185,7 +1185,7 @@ const EmployeeLeavemanagement = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-cyan-500 h-full">
             <div className="flex items-center justify-between h-full">
               <div>
-                <p className="text-gray-600 text-sm font-semibold">Total Leave Days</p>
+                <p className="text-gray-600 text-sm font-semibold">Overall Leaves</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalLeaveDays}</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {stats.normalLeaveDays} Normal + {stats.sandwichDaysCount} Sandwich
@@ -1216,7 +1216,7 @@ const EmployeeLeavemanagement = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500 h-full">
             <div className="flex items-center justify-between h-full">
               <div>
-                <p className="text-gray-600 text-sm font-semibold">Extra Leaves Taken</p>
+                <p className="text-gray-600 text-sm font-semibold">LOP</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">{stats.extraLeaves}</p>
                 <p className="text-xs text-gray-500 mt-1">Beyond 1 day this month</p>
               </div>

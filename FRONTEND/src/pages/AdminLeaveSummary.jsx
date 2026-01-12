@@ -132,8 +132,11 @@ const AdminLeaveSummary = () => {
         setAllRequests(leaves);
         setRawAttendance(Array.isArray(attendanceData) ? attendanceData : []);
 
+        // Filter only active employees (isActive !== false)
+        const activeEmployees = employees.filter(emp => emp.isActive !== false);
+        
         const empMap = new Map(
-          employees.map((emp) => [emp.employeeId, emp.name])
+          activeEmployees.map((emp) => [emp.employeeId, emp.name])
         );
         setEmployeesMap(empMap);
 
@@ -487,7 +490,7 @@ const AdminLeaveSummary = () => {
                 📊 Employee Leave Statistics
               </h1>
               <p className="text-gray-600">
-                Comprehensive overview including Leaves and Absents
+                Comprehensive overview including Leaves and Absents..
               </p>
             </div>
 
@@ -545,7 +548,7 @@ const AdminLeaveSummary = () => {
           {(searchQuery || selectedMonth !== "All") && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-gray-600">
-                Showing {filteredEmployeeStats.length} employee
+                Showing {filteredEmployeeStats.length} active employee
                 {filteredEmployeeStats.length !== 1 ? "s" : ""}
                 {selectedMonth !== "All" &&
                   ` for ${formatMonth(selectedMonth)}`}
@@ -572,7 +575,7 @@ const AdminLeaveSummary = () => {
         >
           <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <h2 className="text-xl font-bold text-gray-900">
-              Employee Leave Details
+              Employee Leave Details...
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               Includes Applied Leaves + Unplanned Absents
@@ -688,7 +691,7 @@ const AdminLeaveSummary = () => {
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                         No employees found
+                         No active employees found
                       </td>
                     </tr>
                   )}

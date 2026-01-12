@@ -65,12 +65,16 @@ const SidebarEmployee = () => {
   };
 
   // ✅ FETCH REAL UNREAD COUNT (Wrapped in useCallback)
+ // ✅ FETCH REAL UNREAD COUNT (Wrapped in useCallback)
   const fetchUnreadCount = useCallback(async () => {
     if (!user) return;
     try {
       const { data } = await api.get("/api/notices");
 
       const count = data.filter(notice => {
+        // 🔴 ADD THIS LINE: Skip system status notices so they don't show in the badge
+        if (notice.title === "__SYSTEM_READ_STATE__") return false;
+
         // Check if current user ID is present inside the readBy array
         const isRead = notice.readBy && notice.readBy.some(record => {
           const recordId = typeof record.employeeId === 'object'
@@ -89,13 +93,10 @@ const SidebarEmployee = () => {
           playNoticeSound();
         }
       } else {
-        firstLoadRef.current = false; // Mark initial load complete
+        firstLoadRef.current = false; 
       }
 
-      // Update Ref
       lastCountRef.current = count;
-
-      // Only update state if count is different to prevent blinking/re-renders
       setUnreadCount(prev => prev !== count ? count : prev);
 
     } catch (error) {

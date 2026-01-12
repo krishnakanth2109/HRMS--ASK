@@ -30,6 +30,7 @@ import punchOutRoutes from './routes/punchOutRequestRoutes.js';
 import groupRoutes from "./routes/groupRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import rulesRoutes from './routes/rules.js';
+import chatRoutes from "./routes/chat.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -144,6 +145,8 @@ app.use('/api/punchoutreq', punchOutRoutes);
 app.use("/api/groups", groupRoutes);
 app.use('/api/meetings', meetingRoutes); 
 app.use('/api/rules', rulesRoutes);
+app.use("/api/chat", chatRoutes);
+// app.use("/api/companies", companyRoutes);
 
 
 

@@ -185,7 +185,6 @@ router.post("/idle-activity", protect, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 export default router;
 
 // --- END OF FILE routes/employeeRoutes.js ---

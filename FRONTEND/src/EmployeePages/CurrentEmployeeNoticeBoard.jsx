@@ -1,55 +1,97 @@
 import React, { useEffect, useState, useContext, useRef, useCallback } from "react";
 import { AuthContext } from "../context/AuthContext"; 
-import api, { sendReplyWithImage } from "../api"; 
-import { FaPaperPlane, FaTrash, FaComments, FaTimes, FaRobot, FaPen, FaPaperclip, FaVideo, FaClock } from "react-icons/fa";
+import api, { sendReplyWithImage, getEmployees, addNotice } from "../api"; 
+import { 
+  FaPaperPlane, FaTrash, FaComments, FaTimes, FaRobot, 
+  FaPen, FaPaperclip, FaVideo, FaClock, FaPlus, FaBullhorn, 
+  FaCheck, FaSearch, FaUserTag, FaChevronDown, FaUserFriends,
+  FaLayerGroup, FaUsers, FaEye, FaChevronUp, FaCommentDots, FaPhone, FaEllipsisH, FaEllipsisV,
+  FaCheckDouble
+} from "react-icons/fa";
 
 const NoticeList = () => {
+  // --- EXISTING NOTICE STATES ---
   const [notices, setNotices] = useState([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [employees, setEmployees] = useState([]); 
+  const [groups, setGroups] = useState([]); 
   
-  // ✅ REAL-TIME CLOCK STATE FOR COUNTDOWN
+  const [previewGroup, setPreviewGroup] = useState(null); 
+  const [expandedNoticeId, setExpandedNoticeId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const { user } = useContext(AuthContext);
   const currentUserId = user?._id || user?.id;
 
-  // Chat Modal State
+  // --- POST/EDIT NOTICE STATES ---
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNoticeId, setEditNoticeId] = useState(null);
+  const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const initialPostState = { title: "", description: "", recipients: [], sendTo: 'ALL', selectedGroupId: null };
+  const [postData, setPostData] = useState(initialPostState);
+
+  // --- EXISTING NOTICE CHAT STATES ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeNotice, setActiveNotice] = useState(null); 
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
   
-  // ✅ Image Upload State
+  // --- IMAGE & AI STATES ---
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
-
-  // ✅ NEW: Image Lightbox State
   const [previewImage, setPreviewImage] = useState(null);
-
-  // ✅ NEW: Ref to store local image URL to prevent "Flash" upon server sync
   const lastUploadedImageRef = useRef(null);
-  
-  // AI Suggestions State
   const [aiSuggestions, setAiSuggestions] = useState([]);
-
-  // Auto-scroll to bottom of chat
   const messagesEndRef = useRef(null);
 
-  // ✅ REF TO TRACK NEWLY READ NOTICES
+  // Refs
   const newlyReadIdsRef = useRef(new Set());
-
-  // ✅ REF TO TRACK MEETINGS ALREADY ALERTED (Audio)
   const alertedMeetingsRef = useRef(new Set());
 
-  // ✅ STABLE FETCH FUNCTION
+  // ==========================================
+  // ✅ NEW: DIRECT CHAT STATES (1-to-1)
+  // ==========================================
+  const [isDirectChatOpen, setIsDirectChatOpen] = useState(false);
+  const [selectedChatUser, setSelectedChatUser] = useState(null);
+  const [chatList, setChatList] = useState([]); 
+  const [directMessages, setDirectMessages] = useState([]);
+  const [directMsgText, setDirectMsgText] = useState("");
+  const [directSearchTerm, setDirectSearchTerm] = useState("");
+  
+  // ✅ NEW: Unread Counts State
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+
+  // Edit & Menu States
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null); // Track which message menu is open
+
+  const directChatEndRef = useRef(null);
+
+  // --- EXISTING FETCH LOGIC ---
   const fetchNotices = useCallback(async (silent = false) => {
     try {
       if (!silent) setIsInitialLoading(true);
       
       const { data } = await api.get("/api/notices");
-      const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const configNotice = data.find(n => n.title === "__SYSTEM_GROUPS_CONFIG__");
+      if (configNotice) {
+        try {
+          const parsedGroups = JSON.parse(configNotice.description);
+          if (Array.isArray(parsedGroups)) setGroups(parsedGroups);
+        } catch (e) { console.error("Error parsing admin groups", e); }
+      }
+
+      const filteredData = data.filter(notice => 
+        notice.title !== "__SYSTEM_READ_STATE__" && 
+        notice.title !== "__SYSTEM_GROUPS_CONFIG__"
+      );
+
+      const sortedData = filteredData.sort((a, b) => new Date(b.date) - new Date(a.date));
       
-      // ✅ INTERCEPT DATA: Keep notices colored if they are in the 5s grace period
       const processedData = sortedData.map(notice => {
           if (newlyReadIdsRef.current.has(notice._id)) {
               return {
@@ -70,12 +112,8 @@ const NoticeList = () => {
       
       autoMarkAsRead(sortedData);
       
-      // Update Active Chat Window Silently
       if (activeNotice) {
         const updatedActive = sortedData.find(n => n._id === activeNotice._id);
-        
-        // ✅ FIX: Do NOT update active notice if we are currently sending a reply.
-        // This keeps the optimistic "loading" image visible until upload finishes.
         if (!sendingReply && updatedActive && JSON.stringify(updatedActive.replies) !== JSON.stringify(activeNotice.replies)) {
            setActiveNotice(updatedActive);
         }
@@ -85,16 +123,22 @@ const NoticeList = () => {
     } finally {
       if (!silent) setIsInitialLoading(false);
     }
-  }, [activeNotice, currentUserId, sendingReply]); 
+  }, [activeNotice, currentUserId, sendingReply]);
 
-  // Initial Load Only
+  const fetchEmployeeList = async () => {
+    try {
+      const data = await getEmployees();
+      setEmployees(data.filter(emp => emp.isActive !== false));
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => { 
     if (user) {
         fetchNotices(false); 
+        fetchEmployeeList();
     }
   }, [user]); 
 
-  // Polling: Check for messages every 3s
   useEffect(() => {
     const interval = setInterval(() => {
         fetchNotices(true); 
@@ -102,7 +146,6 @@ const NoticeList = () => {
     return () => clearInterval(interval);
   }, [fetchNotices]);
 
-  // ✅ TIMER INTERVAL: Update 'currentTime' every second
   useEffect(() => {
     const timer = setInterval(() => {
         setCurrentTime(new Date());
@@ -110,14 +153,189 @@ const NoticeList = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-scroll
   useEffect(() => {
     if (isChatOpen && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeNotice?.replies?.length, isChatOpen]);
 
-  // ✅ AI SUGGESTION LOGIC
+  // ==========================================
+  // ✅ DIRECT CHAT LOGIC UPDATES
+  // ==========================================
+  
+  // 1. Fetch Chat List (Persistence & Unread Counts)
+  const fetchChatList = useCallback(async () => {
+     try {
+         const { data } = await api.get('/api/chat/users'); 
+         setChatList(data || []);
+         
+         // Calculate total unread
+         const total = data.reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
+         setTotalUnreadCount(total);
+     } catch (e) {
+         console.error("Failed to fetch chat list");
+     }
+  }, []);
+
+  // Poll for global unread counts even if chat is closed
+  useEffect(() => {
+      fetchChatList(); // Initial fetch
+      const interval = setInterval(fetchChatList, 3000);
+      return () => clearInterval(interval);
+  }, [fetchChatList]);
+
+  // 2. Fetch Messages
+  const fetchDirectMessages = useCallback(async () => {
+    if (!selectedChatUser || !currentUserId) return;
+    try {
+      const { data } = await api.get(`/api/chat/history/${selectedChatUser._id}`);
+      setDirectMessages(data || []);
+    } catch (error) {
+      console.error("Failed to fetch messages");
+    }
+  }, [selectedChatUser, currentUserId]);
+
+  useEffect(() => {
+    if (isDirectChatOpen && selectedChatUser) {
+        fetchDirectMessages();
+        const chatInterval = setInterval(() => {
+            fetchDirectMessages();
+            // Also mark as read periodically if window is open
+            markMessagesAsRead(selectedChatUser._id);
+        }, 3000); 
+        return () => clearInterval(chatInterval);
+    }
+  }, [isDirectChatOpen, selectedChatUser, fetchDirectMessages]);
+
+  useEffect(() => {
+    // Only scroll if we aren't editing something high up, or just strictly scroll on new message
+    if (isDirectChatOpen && directChatEndRef.current && !editingMessageId) {
+        directChatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [directMessages.length, isDirectChatOpen, selectedChatUser, editingMessageId]);
+
+  // ✅ 3. MARK MESSAGES AS READ
+  const markMessagesAsRead = async (senderId) => {
+      try {
+          await api.put(`/api/chat/read/${senderId}`);
+          // Update local unread count immediately
+          setChatList(prev => prev.map(u => 
+             u._id === senderId ? { ...u, unreadCount: 0 } : u
+          ));
+          setTotalUnreadCount(prev => {
+              const user = chatList.find(u => u._id === senderId);
+              return user ? Math.max(0, prev - (user.unreadCount || 0)) : prev;
+          });
+      } catch (e) {
+          console.error("Failed to mark read");
+      }
+  };
+
+  // 4. User Selection
+  const handleSelectUser = (emp) => {
+      setSelectedChatUser(emp);
+      setDirectSearchTerm(""); 
+      setEditingMessageId(null);
+      setDirectMsgText("");
+      
+      // Optimistically add to list if not present
+      setChatList(prev => {
+          if (prev.find(u => u._id === emp._id)) return prev;
+          return [emp, ...prev];
+      });
+
+      // ✅ Mark messages as read when opening chat
+      markMessagesAsRead(emp._id);
+  };
+
+  // 5. Send or Edit Message
+  const handleSendDirectMessage = async () => {
+    if (!directMsgText.trim() && !selectedFile) return;
+
+    // --- EDIT MODE ---
+    if (editingMessageId) {
+        try {
+            // Update UI immediately
+            setDirectMessages(prev => prev.map(msg => 
+                msg._id === editingMessageId ? { ...msg, message: directMsgText } : msg
+            ));
+            
+            await api.put(`/api/chat/${editingMessageId}`, { message: directMsgText });
+            
+            setEditingMessageId(null);
+            setDirectMsgText("");
+            fetchDirectMessages(); // Sync
+        } catch (e) {
+            alert("Failed to update message");
+        }
+        return;
+    }
+    
+    // --- SEND MODE ---
+    const newMessage = {
+        _id: Date.now(),
+        sender: { _id: currentUserId, name: user.name }, 
+        receiver: selectedChatUser._id,
+        message: directMsgText,
+        createdAt: new Date().toISOString(),
+        isPending: true,
+        isRead: false
+    };
+    
+    setDirectMessages(prev => [...prev, newMessage]);
+    const txtToSend = directMsgText;
+    setDirectMsgText("");
+    
+    // Move user to top of list
+    setChatList(prev => {
+        const filtered = prev.filter(u => u._id !== selectedChatUser._id);
+        return [selectedChatUser, ...filtered];
+    });
+
+    try {
+        await api.post('/api/chat/send', {
+            receiverId: selectedChatUser._id,
+            message: txtToSend
+        });
+        fetchDirectMessages();
+        fetchChatList(); // Refresh list to update order
+    } catch (error) {
+        console.error("Failed to send DM");
+    }
+  };
+
+  const startEditing = (msg) => {
+      setEditingMessageId(msg._id);
+      setDirectMsgText(msg.message);
+      setOpenMenuId(null); // Close menu
+  };
+
+  const handleDeleteMessage = async (msgId) => {
+      if(!window.confirm("Delete this message?")) return;
+      
+      // Optimistic delete
+      setDirectMessages(prev => prev.filter(m => m._id !== msgId));
+      setOpenMenuId(null);
+
+      try {
+          await api.delete(`/api/chat/${msgId}`);
+          fetchDirectMessages();
+      } catch (e) {
+          alert("Failed to delete");
+      }
+  };
+
+  // Close menus when clicking elsewhere
+  useEffect(() => {
+      const handleClickOutside = () => setOpenMenuId(null);
+      if(openMenuId) document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
+
+  // ==========================================
+  // --- EXISTING HELPER LOGIC ---
+  // ==========================================
+
   useEffect(() => {
     if (!activeNotice) return;
     const replies = activeNotice.replies || [];
@@ -125,7 +343,6 @@ const NoticeList = () => {
     const incomingText = lastIncoming ? lastIncoming.message.toLowerCase() : "";
 
     let suggestions = ["Noted sir", "Alright sir", "Understood sir"];
-
     if (incomingText) {
         if (incomingText.includes("urgent") || incomingText.includes("asap")) {
             suggestions = ["On it sir", "Working on it sir"];
@@ -140,42 +357,30 @@ const NoticeList = () => {
     setAiSuggestions([...new Set(suggestions)]);
   }, [activeNotice]); 
 
-
-  // ✅ AUDIO ALERT LOGIC (Checks every second via currentTime)
   useEffect(() => {
     notices.forEach(notice => {
-        // Detect Meeting
         const detectedLink = notice.description ? (notice.description.match(/(https?:\/\/[^\s]+)/) || [])[0] : null;
         const isMeeting = detectedLink && (
              notice.title.toLowerCase().includes('meeting') || 
-             notice.description.toLowerCase().includes('meeting') ||
-             notice.description.includes('meet.google') ||
-             notice.description.includes('zoom.us')
+             notice.description.toLowerCase().includes('meeting')
         );
 
         if (isMeeting) {
             const components = getMeetingDateTimeComponents(notice.description);
             if (components) {
                 const diff = calculateTimeLeft(components.date, components.time);
-                // Trigger if time is up (diff <= 0) and we haven't alerted yet.
-                // We check diff > -5000 to ensure we don't alert for old meetings on page load.
                 if (diff !== null && diff <= 0 && diff > -5000 && !alertedMeetingsRef.current.has(notice._id)) {
-                    // 🔊 PLAY SOUND / SPEAK
                     try {
                         const utterance = new SpeechSynthesisUtterance("Please join the meeting");
                         window.speechSynthesis.speak(utterance);
                         alertedMeetingsRef.current.add(notice._id);
-                    } catch (e) {
-                        console.error("Audio playback failed", e);
-                    }
+                    } catch (e) { console.error(e); }
                 }
             }
         }
     });
   }, [currentTime, notices]);
 
-
-  // ✅ AUTO MARK LOGIC
   const autoMarkAsRead = async (fetchedNotices) => {
     if (!currentUserId) return;
     const unreadNotices = fetchedNotices.filter(notice => {
@@ -190,57 +395,98 @@ const NoticeList = () => {
     unreadNotices.forEach(n => newlyReadIdsRef.current.add(n._id));
 
     try {
-      Promise.all(unreadNotices.map(n => api.put(`/api/notices/${n._id}/read`))).catch(e => console.error(e));
+      api.put(`/api/notices/${unreadNotices[0]._id}/read`).catch(e => console.error(e));
       setTimeout(() => {
-        let changed = false;
-        unreadNotices.forEach(n => {
-            if (newlyReadIdsRef.current.has(n._id)) {
-                newlyReadIdsRef.current.delete(n._id);
-                changed = true;
-            }
-        });
-        if(changed) fetchNotices(true);
+        unreadNotices.forEach(n => newlyReadIdsRef.current.delete(n._id));
+        fetchNotices(true);
       }, 5000);
-    } catch (error) { 
-      console.error("Error auto-marking notices:", error); 
-    }
+    } catch (error) { console.error(error); }
   };
 
-  // ✅ UPDATED SEND REPLY HANDLER
+  const handlePostNotice = async (e) => {
+    e.preventDefault();
+    setIsSubmittingNotice(true);
+    try {
+      const payload = {
+        title: postData.title,
+        description: postData.description,
+        recipients: postData.sendTo === 'ALL' ? [] : postData.recipients
+      };
+      
+      if (isEditing) {
+        await api.put(`/api/notices/${editNoticeId}`, payload);
+      } else {
+        await addNotice(payload);
+      }
+      
+      setIsPostModalOpen(false);
+      setIsEditing(false);
+      setEditNoticeId(null);
+      setPostData(initialPostState);
+      fetchNotices(true);
+    } catch (err) { alert("Failed to save notice"); } 
+    finally { setIsSubmittingNotice(false); }
+  };
+
+  const openEditNotice = (notice) => {
+    setIsEditing(true);
+    setEditNoticeId(notice._id);
+    const recipients = Array.isArray(notice.recipients) ? notice.recipients : [];
+    const recipientIds = recipients.map(r => r._id || r);
+    setPostData({
+        title: notice.title,
+        description: notice.description,
+        recipients: recipientIds,
+        sendTo: recipientIds.length > 0 ? 'SPECIFIC' : 'ALL',
+        selectedGroupId: null
+    });
+    setIsPostModalOpen(true);
+  };
+
+  const handleDeleteNotice = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this notice?")) return;
+    try {
+      await api.delete(`/api/notices/${id}`);
+      fetchNotices(true);
+    } catch (err) { alert("Failed to delete notice"); }
+  };
+
+  const toggleRecipient = (id) => {
+    setPostData(prev => ({
+      ...prev,
+      recipients: prev.recipients.includes(id) 
+        ? prev.recipients.filter(rid => rid !== id) 
+        : [...prev.recipients, id]
+    }));
+  };
+
   const handleSendReply = async (customMessage = null) => {
     const messageToSend = (typeof customMessage === 'string' && customMessage) ? customMessage : replyText;
-
     if ((!messageToSend || !messageToSend.trim()) && !selectedFile) return;
     
-    // Create local preview URL for optimistic update
     let tempImageUrl = null;
     if (selectedFile) {
         tempImageUrl = URL.createObjectURL(selectedFile);
-        // ✅ SAVE BLOB URL TO REF (To prevent flash later)
         lastUploadedImageRef.current = { url: tempImageUrl, timestamp: Date.now() };
     }
 
-    // Optimistic Update
-    const tempId = Date.now();
     const optimisticReply = {
-        _id: tempId,
+        _id: Date.now(),
         message: messageToSend,
         image: tempImageUrl, 
         sentBy: 'Employee',
+        employeeId: { 
+            _id: currentUserId, 
+            name: user?.name, 
+            employeeId: user?.employeeId || user?.empId 
+        }, 
         repliedAt: new Date().toISOString(),
-        isSending: true // ✅ Flag to show loading spinner
+        isSending: true 
     };
     
     setReplyText("");
     setSelectedFile(null); 
-    if(fileInputRef.current) fileInputRef.current.value = "";
-    
-    // Update local state immediately
-    setActiveNotice(prev => ({
-        ...prev,
-        replies: [...(prev.replies || []), optimisticReply]
-    }));
-
+    setActiveNotice(prev => ({ ...prev, replies: [...(prev.replies || []), optimisticReply] }));
     setSendingReply(true); 
     
     try {
@@ -252,25 +498,15 @@ const NoticeList = () => {
       } else {
         await api.post(`/api/notices/${activeNotice._id}/reply`, { message: messageToSend });
       }
-      
       await fetchNotices(true); 
-
-    } catch (error) { 
-        alert("Failed to send reply"); 
-    } finally { 
-        setSendingReply(false); 
-    }
+    } catch (error) { alert("Failed to send reply"); } 
+    finally { setSendingReply(false); }
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file) {
-        if (file.size > 5 * 1024 * 1024) { 
-            alert("File too large. Max 5MB.");
-            return;
-        }
-        setSelectedFile(file);
-    }
+    if (file && file.size <= 5 * 1024 * 1024) setSelectedFile(file);
+    else if (file) alert("Max 5MB");
   };
 
   const clearSelectedFile = () => {
@@ -279,16 +515,12 @@ const NoticeList = () => {
   };
 
   const handleDeleteReply = async (noticeId, replyId) => {
-    if(!window.confirm("Delete this message?")) return;
+    if(!window.confirm("Delete?")) return;
     try { 
-        setActiveNotice(prev => ({
-            ...prev,
-            replies: prev.replies.filter(r => r._id !== replyId)
-        }));
-
+        setActiveNotice(prev => ({ ...prev, replies: prev.replies.filter(r => r._id !== replyId) }));
         await api.delete(`/api/notices/${noticeId}/reply/${replyId}`); 
         fetchNotices(true);
-    } catch(e) { alert("Error deleting"); }
+    } catch(e) { alert("Error"); }
   };
 
   const openChatModal = (notice) => {
@@ -303,197 +535,180 @@ const NoticeList = () => {
     return { date: d.toLocaleDateString(), time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
   };
 
-  // ✅ HELPER: Extract raw components for countdown logic
   const getMeetingDateTimeComponents = (description) => {
     if (!description) return null;
     const match = description.match(/scheduled meeting\s+(.+?)\s+at\s+(.+?)\s+as per/i);
-    if (match && match[1] && match[2]) {
-        return { date: match[1], time: match[2] };
-    }
-    return null;
+    return (match && match[1] && match[2]) ? { date: match[1], time: match[2] } : null;
   };
 
-  // ✅ HELPER: Calculate time difference
   const calculateTimeLeft = (dateStr, timeStr) => {
       if(!dateStr || !timeStr) return null;
       try {
           const target = new Date(`${dateStr}T${timeStr}`);
-          const diff = target - currentTime;
-          return diff;
+          return target - currentTime;
       } catch (e) { return null; }
   };
 
-  if (isInitialLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
+  if (isInitialLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-bold">Loading Notices...</div>;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] overflow-hidden relative font-sans">
-      {/* Background blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply blur-3xl opacity-30 animate-blob"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto px-4 py-12">
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12zm0 4a1 1 0 011 1v4a1 1 0 11-2 0V9a1 1 0 011-1zm0 6a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" />
-              </svg>
+        <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
+                <FaBullhorn className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900">Team Announcements</h1>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">Company Announcements</h1>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-gray-600">
-            <p className="text-sm font-medium">
-              Important updates and communications for <span className="font-semibold text-blue-600">{user?.name || "Team Member"}</span>
+            <p className="text-sm text-gray-600">
+              Welcome, <span className="font-semibold text-blue-600">{user?.name || "Team Member"}</span>
             </p>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="font-medium">{notices.length} active announcement{notices.length !== 1 ? 's' : ''}</span>
-            </div>
+          </div>
+
+          <div className="flex gap-3">
+            {/* ✅ CONNECT WITH EMPLOYEE BUTTON (With Unread Bubble) */}
+            <button 
+                onClick={() => setIsDirectChatOpen(true)}
+                className="relative flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95"
+            >
+                <FaCommentDots /> Connect with Employee
+                {totalUnreadCount > 0 && (
+                   <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+                      {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                   </span>
+                )}
+            </button>
+
+            <button 
+                onClick={() => { setIsEditing(false); setPostData(initialPostState); setIsPostModalOpen(true); }}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95"
+            >
+                <FaPlus /> Post Announcement
+            </button>
           </div>
         </div>
 
-        {/* Notices List */}
+        {/* --- EXISTING NOTICES LIST RENDERING --- */}
         <div className="space-y-5">
-          {notices.map((notice, index) => {
-            const { date, time } = formatDateTime(notice.date); // Standard notice time
-            const isRead = notice.readBy && notice.readBy.some(record => {
-              const rId = typeof record.employeeId === 'object' ? record.employeeId._id : record.employeeId;
-              return rId === currentUserId;
-            });
+          {notices.map((notice) => {
+            const { date, time } = formatDateTime(notice.date);
+            const isRead = notice.readBy?.some(record => (record.employeeId?._id || record.employeeId) === currentUserId);
+            const isOwner = (notice.createdBy?._id || notice.createdBy) === currentUserId;
             const replies = notice.replies || [];
-            const lastReply = replies.length > 0 ? replies[replies.length - 1] : null;
-            const hasAdminReply = lastReply && lastReply.sentBy === 'Admin';
+            const hasAdminReply = replies[replies.length - 1]?.sentBy === 'Admin';
             
-            // ✅ DETECT IF MEETING NOTICE (DYNAMIC LINK CHECK)
             const detectedLink = notice.description ? (notice.description.match(/(https?:\/\/[^\s]+)/) || [])[0] : null;
-            const isMeeting = detectedLink && (
-                 notice.title.toLowerCase().includes('meeting') || 
-                 notice.description.toLowerCase().includes('meeting') ||
-                 notice.description.includes('meet.google') ||
-                 notice.description.includes('zoom.us')
-            );
-
-            // ✅ EXTRACT ACTUAL MEETING TIME COMPONENTS
+            const isMeeting = detectedLink && (notice.title.toLowerCase().includes('meeting') || notice.description.includes('meet.google'));
             const meetingComponents = isMeeting ? getMeetingDateTimeComponents(notice.description) : null;
-            const displayMeetingTime = meetingComponents ? `${meetingComponents.date} at ${meetingComponents.time}` : `${date}, ${time}`;
 
-            // ✅ CALCULATE COUNTDOWN AND VISIBILITY
             let countdownString = null;
             let isMeetingStarted = false;
-
             if (isMeeting && meetingComponents) {
                 const diff = calculateTimeLeft(meetingComponents.date, meetingComponents.time);
                 if (diff !== null) {
                     if (diff > 0) {
-                        // FUTURE: Show Countdown
-                        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-                        const minutes = Math.floor((diff / 1000 / 60) % 60);
-                        const seconds = Math.floor((diff / 1000) % 60);
-                        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                        
-                        if (days > 0) {
-                            countdownString = `Starts in ${days}d ${hours}h ${minutes}m`;
-                        } else {
-                            countdownString = `Starts in ${hours}h ${minutes}m ${seconds}s`;
-                        }
-                    } else {
-                        // PAST: Check if it's within 20 mins of starting
-                        const twentyMinsInMs = 20 * 60 * 1000;
-                        if (diff > -twentyMinsInMs) {
-                            isMeetingStarted = true;
-                            countdownString = "🔴 Join the Meeting";
-                        } else {
-                            // Older than 20 mins - Hide the Timer
-                            countdownString = null; 
-                        }
+                        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                        const m = Math.floor((diff / 1000 / 60) % 60);
+                        const s = Math.floor((diff / 1000) % 60);
+                        countdownString = `Starts in ${h}h ${m}m ${s}s`;
+                    } else if (diff > -1200000) {
+                        isMeetingStarted = true;
+                        countdownString = "🔴 Join Meeting Now";
                     }
                 }
             }
 
+            const recipientsArr = Array.isArray(notice.recipients) ? notice.recipients : [];
+            const recipientIds = recipientsArr.map(r => r._id || r);
+            const isSpecific = recipientIds.length > 0;
+            const matchedGroup = isSpecific ? groups.find(g => 
+              g.members.length === recipientIds.length && 
+              g.members.every(m => recipientIds.includes(String(m)))
+            ) : null;
+
             return (
               <div key={notice._id} className={`group relative bg-white/90 backdrop-blur-md rounded-2xl p-6 transition-all hover:shadow-xl border ${isMeeting ? 'border-indigo-100 shadow-indigo-100/50' : 'border-slate-100'}`}>
-                {/* Meeting Indicator Stripe */}
                 {isMeeting && <div className="absolute top-0 left-8 right-8 h-1 bg-indigo-500 rounded-b-md opacity-50"></div>}
 
                 <div className="flex flex-col md:flex-row gap-5">
                   <div className="hidden md:flex flex-col items-center">
-                    <div 
-                      className={`p-3 rounded-2xl shadow-lg transition-colors duration-1000 ${
-                        isRead 
-                        ? (isMeeting ? 'bg-indigo-50 text-indigo-400 border border-indigo-200' : 'bg-slate-100 text-slate-400 border border-slate-200') 
-                        : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white animate-pulse' 
-                      }`}
-                    >
-                      {isMeeting ? <FaVideo className="w-6 h-6" /> : (
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
-                      )}
+                    <div className={`p-3 rounded-2xl shadow-lg transition-colors duration-1000 ${isRead ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white animate-pulse' }`}>
+                      {isMeeting ? <FaVideo className="w-6 h-6" /> : <FaBullhorn className="w-6 h-6" />}
                     </div>
-                    <div className={`h-full w-0.5 mt-4 rounded-full ${isMeeting ? 'bg-indigo-100' : 'bg-slate-100'}`}></div>
+                    <div className="h-full w-0.5 mt-4 rounded-full bg-slate-100"></div>
                   </div>
 
                   <div className="flex-1">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mb-2">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                {notice.title}
-                            </h3>
-                            
-                            {/* 1. Posted Time (Standard) */}
-                            <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 mb-2">
-                                <span>{date}, {time}</span>
+                            <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-xl font-bold text-slate-800">{notice.title}</h3>
+                                {isOwner && (
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                        <button onClick={() => openEditNotice(notice)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="Edit"><FaPen size={14} /></button>
+                                        <button onClick={() => handleDeleteNotice(notice._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete"><FaTrash size={14} /></button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                {!isSpecific ? (
+                                    <span className="text-[10px] font-bold bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded border border-cyan-100">📢 Everyone</span>
+                                ) : matchedGroup ? (
+                                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">👥 {matchedGroup.name}</span>
+                                ) : (
+                                    <button onClick={() => setExpandedNoticeId(expandedNoticeId === notice._id ? null : notice._id)} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 hover:bg-amber-100 transition-colors">
+                                      🔒 Specific ({recipientIds.length}) {expandedNoticeId === notice._id ? <FaChevronUp /> : <FaChevronDown />}
+                                    </button>
+                                )}
+                                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                                  {notice.createdBy?.name || "System"} ({notice.createdBy?.employeeId || "Admin"})
+                                </span>
+                                <span className="text-[10px] text-slate-400">{date}, {time}</span>
                             </div>
 
-                            {/* 2. Highlighted Meeting Time & Date */}
-                            {isMeeting && (
-                                <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg inline-flex border border-indigo-100 mb-2">
-                                    <FaVideo />
-                                    <span className="text-indigo-400">| Meeting Timings</span>
-                                    <span>{displayMeetingTime}</span>
+                            {expandedNoticeId === notice._id && isSpecific && !matchedGroup && (
+                                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Selected Employees:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {recipientsArr.map((r, i) => {
+                                          const name = typeof r === 'object' ? r.name : (employees.find(e => e._id === r)?.name || "User");
+                                          return <span key={i} className="text-[10px] font-semibold bg-white text-slate-600 px-2 py-1 rounded shadow-sm border border-slate-100">{name}</span>
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* RIGHT SIDE: CHAT BUTTON + COUNTDOWN */}
                         <div className="flex flex-col items-end gap-2">
-                            {/* ✅ COUNTDOWN TIMER (Disappears after 20 mins) */}
                             {isMeeting && countdownString && (
-                                <div className={`text-[10px] font-bold px-2 py-1 rounded-md shadow-sm border animate-in slide-in-from-right-2 ${isMeetingStarted ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                    <span className="flex items-center gap-1">
-                                        <FaClock className="text-[9px]" /> {countdownString}
-                                    </span>
+                                <div className={`text-[10px] font-bold px-2 py-1 rounded-md border ${isMeetingStarted ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                    <FaClock className="inline mr-1" /> {countdownString}
                                 </div>
                             )}
-
-                            <button 
-                                onClick={() => openChatModal(notice)}
-                                className="relative flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-100"
-                            >
+                            <button onClick={() => openChatModal(notice)} className="relative flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-blue-100 border border-blue-100">
                                 <FaComments /> Chat
                                 {hasAdminReply && (
                                     <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
                                     </span>
                                 )}
                             </button>
                         </div>
                     </div>
                     
-                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{notice.description}</p>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap mb-4">{notice.description}</p>
                     
-                    {/* ✅ JOIN MEETING BUTTON (Uses Dynamic Link) */}
                     {isMeeting && detectedLink && (
-                         <div className="mt-5">
-                             <a 
-                                href={detectedLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-auto justify-center"
-                             >
-                                <FaVideo className="animate-pulse" /> Join Meeting Now
-                             </a>
-                         </div>
+                         <a href={detectedLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all w-full sm:w-auto justify-center">
+                            <FaVideo className="animate-pulse" /> Join Meeting Now
+                         </a>
                     )}
                   </div>
                 </div>
@@ -503,55 +718,221 @@ const NoticeList = () => {
         </div>
       </div>
 
-      {/* CHAT POPUP */}
+      {/* --- POST/EDIT NOTICE MODAL --- */}
+      {isPostModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="bg-gradient-to-r from-blue-700 to-blue-500 p-6 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                   {isEditing ? <FaPen className="text-xl" /> : <FaBullhorn className="text-xl" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{isEditing ? "Edit Announcement" : "Create New Announcement"}</h2>
+                  <p className="text-blue-100 text-xs">Share updates with your team members</p>
+                </div>
+              </div>
+              <button onClick={() => setIsPostModalOpen(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><FaTimes size={20} /></button>
+            </div>
+
+            <form onSubmit={handlePostNotice} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block ml-1">Notice Heading</label>
+                <input required className="w-full bg-gray-50 border border-gray-200 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-800 font-semibold" placeholder="e.g. Project Update" value={postData.title} onChange={e => setPostData({...postData, title: e.target.value})} />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block ml-1">Detailed Message</label>
+                <textarea required className="w-full bg-gray-50 border border-gray-200 p-4 rounded-2xl h-44 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all resize-none text-gray-700" placeholder="Type the announcement details here..." value={postData.description} onChange={e => setPostData({...postData, description: e.target.value})} />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block ml-1">Who can see this?</label>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setPostData({...postData, sendTo: 'ALL', selectedGroupId: null})} className={`flex-1 py-4 px-2 rounded-2xl border-2 font-bold transition-all flex flex-col items-center justify-center gap-1 ${postData.sendTo === 'ALL' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-gray-50 border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                    <FaUserFriends /> Everyone
+                  </button>
+                  <button type="button" onClick={() => setPostData({...postData, sendTo: 'GROUP', recipients: []})} className={`flex-1 py-4 px-2 rounded-2xl border-2 font-bold transition-all flex flex-col items-center justify-center gap-1 ${postData.sendTo === 'GROUP' ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-gray-50 border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                    <FaLayerGroup /> Group Sending
+                  </button>
+                  <button type="button" onClick={() => setPostData({...postData, sendTo: 'SPECIFIC', selectedGroupId: null})} className={`flex-1 py-4 px-2 rounded-2xl border-2 font-bold transition-all flex flex-col items-center justify-center gap-1 ${postData.sendTo === 'SPECIFIC' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-gray-50 border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                    <FaUserTag /> Specific Employees
+                  </button>
+                </div>
+              </div>
+
+              {postData.sendTo === 'GROUP' && (
+                <div className="space-y-3 animate-in slide-in-from-top-4">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block ml-1">Select Group</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {groups.length > 0 ? (
+                      groups.map(group => (
+                        <div 
+                          key={group.id} 
+                          onClick={() => setPostData({...postData, selectedGroupId: group.id, recipients: group.members})}
+                          className={`p-4 rounded-xl border-2 cursor-pointer flex justify-between items-center transition-all ${postData.selectedGroupId === group.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-gray-100 hover:border-indigo-200'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${postData.selectedGroupId === group.id ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {group.name.charAt(0)}
+                             </div>
+                             <div>
+                                <p className={`text-sm font-bold ${postData.selectedGroupId === group.id ? 'text-indigo-800' : 'text-gray-700'}`}>{group.name}</p>
+                                <p className="text-[10px] text-gray-500">{group.members.length} Members</p>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button 
+                               type="button" 
+                               onClick={(e) => { e.stopPropagation(); setPreviewGroup(group); }}
+                               className="text-[10px] font-bold bg-white border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1 transition-colors"
+                            >
+                                <FaEye /> View Employees
+                            </button>
+                            {postData.selectedGroupId === group.id && <FaCheck className="text-indigo-600" />}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center p-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 text-sm">
+                        No groups available. Groups created by admin will appear here.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {postData.sendTo === 'SPECIFIC' && (
+                <div className="space-y-3 animate-in slide-in-from-top-4 duration-300">
+                  <div onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full bg-gray-50 border border-gray-200 p-4 rounded-2xl text-sm flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px]">{postData.recipients.length}</div>
+                        <span className="font-bold text-gray-700">Recipients Selected</span>
+                    </div>
+                    <FaChevronDown className={`text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  
+                  {isDropdownOpen && (
+                    <div className="bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-72">
+                      <div className="p-3 border-b bg-gray-50 flex items-center gap-2">
+                        <FaSearch className="text-gray-400 ml-2" />
+                        <input type="text" placeholder="Search by name or employee ID..." className="w-full bg-transparent p-2 text-sm outline-none font-medium" onChange={e => setSearchTerm(e.target.value.toLowerCase())} />
+                      </div>
+                      <div className="overflow-y-auto p-2 custom-scrollbar">
+                        {employees.filter(e => e.name.toLowerCase().includes(searchTerm) || e.employeeId.toLowerCase().includes(searchTerm)).map(emp => (
+                          <div key={emp._id} onClick={() => toggleRecipient(emp._id)} className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all mb-1 ${postData.recipients.includes(emp._id) ? 'bg-blue-50 border-blue-100' : 'hover:bg-gray-50'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${postData.recipients.includes(emp._id) ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                    {emp.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-gray-800">{emp.name}</p>
+                                    <p className="text-[10px] text-gray-500 font-medium">ID: {emp.employeeId}</p>
+                                </div>
+                            </div>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all ${postData.recipients.includes(emp._id) ? 'bg-blue-600 border-blue-600' : 'border-gray-200'}`}>
+                              {postData.recipients.includes(emp._id) && <FaCheck className="text-white text-[10px]" />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-4">
+                <button type="submit" disabled={isSubmittingNotice} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3 disabled:opacity-70 transform active:scale-[0.98]">
+                    {isSubmittingNotice ? (
+                        <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                        <><FaPaperPlane /> {isEditing ? "Update Announcement" : "Publish Announcement"}</>
+                    )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- GROUP MEMBER PREVIEW --- */}
+      {previewGroup && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
+                    <h3 className="font-bold flex items-center gap-2"><FaUsers /> Members: {previewGroup.name}</h3>
+                    <button onClick={() => setPreviewGroup(null)} className="p-1 hover:bg-white/20 rounded"><FaTimes /></button>
+                </div>
+                <div className="p-4 max-h-80 overflow-y-auto custom-scrollbar space-y-2">
+                    {previewGroup.members.map(id => {
+                        const emp = employees.find(e => e._id === String(id));
+                        return (
+                            <div key={id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                                    {emp?.name?.charAt(0) || "?"}
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">{emp?.name || "Unknown"}</p>
+                                    <p className="text-[10px] text-slate-400">{emp?.employeeId || "N/A"}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="p-3 bg-slate-50 border-t border-slate-100 text-right">
+                    <button onClick={() => setPreviewGroup(null)} className="text-xs font-bold text-indigo-600 px-4 py-2 hover:bg-indigo-50 rounded-lg transition-colors">Close</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* --- NOTICE CHAT MODAL --- */}
       {isChatOpen && activeNotice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl h-[85vh] rounded-xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-200">
-                {/* HEADER */}
                 <div className="sticky top-0 bg-[#464775] text-white p-4 flex justify-between items-center z-20 shadow-md">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
                             <FaComments className="text-white" />
                         </div>
                         <div className="max-w-md">
-                            <h3 className="font-bold text-sm">Discussion: {activeNotice.title}</h3>
-                            <p className="text-xs text-gray-300 truncate">
-                                {activeNotice.replies?.length || 0} messages • Announcement chat
-                            </p>
+                            <h3 className="font-bold text-sm truncate">Discussion: {activeNotice.title}</h3>
+                            <p className="text-xs text-gray-300">{activeNotice.replies?.length || 0} messages</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => setIsChatOpen(false)} 
-                            className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
-                        >
-                            <FaTimes />
-                        </button>
-                    </div>
+                    <button onClick={() => setIsChatOpen(false)} className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"><FaTimes /></button>
                 </div>
 
-                {/* MESSAGES */}
                 <div className="flex-1 flex flex-col bg-[#f3f2f1] overflow-hidden relative">
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <div className="p-4 space-y-3 min-h-full flex flex-col justify-end pb-4">
                             {(!activeNotice.replies || activeNotice.replies.length === 0) ? (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm italic py-20">
-                                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                                        <FaComments className="text-gray-400 text-2xl" />
-                                    </div>
+                                    <FaComments className="text-gray-400 text-2xl mb-2" />
                                     <p>No messages yet</p>
-                                    <p className="text-xs mt-1">Start a conversation with Admin</p>
                                 </div>
                             ) : (
                                 activeNotice.replies.map((reply, i) => {
-                                    const isMe = reply.sentBy === 'Employee';
-                                    
-                                    // ✅ SMART IMAGE RENDERING to Prevent Flash
+                                    const senderId = reply.employeeId?._id || reply.employeeId;
+                                    const isMe = reply.sentBy === 'Employee' && currentUserId && (senderId === currentUserId);
+
                                     let imageSrc = reply.image;
                                     const isLastMessage = i === activeNotice.replies.length - 1;
                                     if (isMe && isLastMessage && !reply.isSending && lastUploadedImageRef.current) {
-                                        if (Date.now() - lastUploadedImageRef.current.timestamp < 30000) {
-                                            imageSrc = lastUploadedImageRef.current.url;
+                                        if (Date.now() - lastUploadedImageRef.current.timestamp < 30000) imageSrc = lastUploadedImageRef.current.url;
+                                    }
+
+                                    let displayName = "Admin";
+                                    if (isMe) {
+                                        displayName = "You";
+                                    } else if (reply.sentBy === 'Employee') {
+                                        const empInfo = reply.employeeId;
+                                        if (typeof empInfo === 'object' && empInfo !== null) {
+                                            const name = empInfo.name || "Employee";
+                                            const id = empInfo.employeeId || empInfo.empId || "";
+                                            displayName = id ? `${name} (${id})` : name;
+                                        } else {
+                                            displayName = "Employee";
                                         }
                                     }
 
@@ -560,32 +941,17 @@ const NoticeList = () => {
                                             <div className={`max-w-[70%] p-3 rounded-lg ${isMe ? 'rounded-br-none' : 'rounded-bl-none'}`}>
                                                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                                     <div className={`flex items-center gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                                        <span className="text-xs font-semibold text-gray-700">
-                                                            {isMe ? 'You' : 'Admin'}
-                                                        </span>
-                                                        <span className="text-[10px] text-gray-500">
-                                                            {formatDateTime(reply.repliedAt).time}
-                                                        </span>
+                                                        <span className={`text-xs font-semibold ${isMe ? 'text-blue-600' : 'text-gray-700'}`}>{displayName}</span>
+                                                        <span className="text-[10px] text-gray-500">{formatDateTime(reply.repliedAt).time}</span>
                                                     </div>
-                                                    
                                                     <div className={`relative group ${isMe ? 'ml-auto' : ''}`}>
-                                                        <div className={`p-3 rounded-lg shadow-sm ${isMe 
-                                                            ? 'bg-[#6264a7] text-white' 
-                                                            : 'bg-white text-gray-800 border border-gray-200'
-                                                        }`}>
-                                                            {/* ✅ DISPLAY IMAGE (With Loading & Flash Prevention) */}
+                                                        <div className={`p-3 rounded-lg shadow-sm ${isMe ? 'bg-[#6264a7] text-white' : 'bg-white text-gray-800 border border-gray-200'}`}>
                                                             {imageSrc && (
                                                               <div className="mb-2 relative cursor-pointer" onClick={() => !reply.isSending && setPreviewImage(imageSrc)}>
-                                                                <img 
-                                                                  src={imageSrc} 
-                                                                  alt="attachment" 
-                                                                  className={`rounded-lg max-w-full max-h-60 object-cover border border-black/10 ${reply.isSending ? 'opacity-70' : ''}`}
-                                                                />
-                                                                
-                                                                {/* ✅ SPINNER OVERLAY FOR UPLOADING IMAGE */}
+                                                                <img src={imageSrc} className={`rounded-lg max-w-full max-h-60 object-cover border border-black/10 ${reply.isSending ? 'opacity-70' : ''}`} alt="att" />
                                                                 {reply.isSending && (
                                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
-                                                                       <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                                       <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                                                                    </div>
                                                                 )}
                                                               </div>
@@ -593,11 +959,7 @@ const NoticeList = () => {
                                                             {reply.message && <p className="text-sm leading-relaxed break-words">{reply.message}</p>}
                                                         </div>
                                                         {isMe && !reply.isSending && (
-                                                            <button 
-                                                                onClick={() => handleDeleteReply(activeNotice._id, reply._id)} 
-                                                                className="absolute -right-2 -top-2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 hover:border-red-300 shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200"
-                                                                title="Delete message"
-                                                            >
+                                                            <button onClick={() => handleDeleteReply(activeNotice._id, reply._id)} className="absolute -right-2 -top-2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 shadow-md opacity-0 group-hover:opacity-100 transition-all">
                                                                 <FaTrash size={10} />
                                                             </button>
                                                         )}
@@ -612,106 +974,33 @@ const NoticeList = () => {
                         </div>
                     </div>
 
-                    {/* ✅ FOOTER WITH STICKY SUGGESTIONS & INPUT */}
-                    <div className="sticky bottom-0 bg-white border-t border-gray-200 z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-                        
-                        {/* 🔹 IMAGE PREVIEW AREA */}
+                    <div className="sticky bottom-0 bg-white border-t border-gray-200 z-30 shadow-lg">
                         {selectedFile && (
-                          <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
-                             <div className="relative w-12 h-12 border border-gray-300 rounded-lg overflow-hidden bg-white">
-                                <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-full h-full object-cover" />
-                             </div>
+                          <div className="px-4 py-2 border-b bg-gray-50 flex items-center gap-3">
+                             <img src={URL.createObjectURL(selectedFile)} className="w-10 h-10 border rounded object-cover" alt="prev" />
                              <div className="flex-1 overflow-hidden">
-                                <p className="text-xs font-semibold text-gray-700 truncate">{selectedFile.name}</p>
-                                <p className="text-[10px] text-gray-500">{(selectedFile.size/1024).toFixed(1)} KB</p>
+                                <p className="text-xs font-bold truncate">{selectedFile.name}</p>
+                                <p className="text-[10px] text-gray-400">{(selectedFile.size/1024).toFixed(1)} KB</p>
                              </div>
-                             <button onClick={clearSelectedFile} className="text-gray-400 hover:text-red-500">
-                                <FaTimes />
-                             </button>
+                             <button onClick={clearSelectedFile} className="text-gray-400 hover:text-red-500"><FaTimes /></button>
                           </div>
                         )}
 
-                        {/* 🔹 AI SUGGESTIONS ROW */}
                         <div className="px-4 pt-3 pb-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                             <div className="flex items-center gap-1.5 text-[#6264a7] text-xs font-bold mr-2 shrink-0">
-                                <FaRobot /> AI Suggestions:
-                             </div>
-                             
+                             <div className="flex items-center gap-1.5 text-[#6264a7] text-xs font-bold mr-2 shrink-0"><FaRobot /> AI:</div>
                              {aiSuggestions.map((sugg, idx) => (
-                                <div key={idx} className="group relative shrink-0">
-                                    <div className="bg-white border border-[#e0e0e0] hover:border-[#6264a7] rounded-full px-4 py-1.5 text-xs text-gray-600 font-medium shadow-sm transition-all cursor-pointer group-hover:opacity-0">
-                                        {sugg}
-                                    </div>
-                                    <div className="absolute inset-0 flex items-center justify-between gap-1 bg-[#6264a7] rounded-full px-2 opacity-0 group-hover:opacity-100 transition-all shadow-md">
-                                        <button 
-                                            onClick={() => setReplyText(sugg)}
-                                            className="flex-1 text-white text-[10px] font-bold flex items-center justify-center hover:bg-white/20 rounded py-1 px-2"
-                                        >
-                                           <FaPen />
-                                        </button>
-                                        <div className="w-px h-3 bg-white/30"></div>
-                                        <button 
-                                            onClick={() => handleSendReply(sugg)}
-                                            className="flex-1 text-white text-[10px] font-bold flex items-center justify-center hover:bg-white/20 rounded py-1 px-2"
-                                        >
-                                           <FaPaperPlane />
-                                        </button>
-                                    </div>
-                                </div>
+                                <button key={idx} onClick={() => setReplyText(sugg)} className="bg-white border border-gray-200 hover:border-[#6264a7] rounded-full px-4 py-1 text-xs font-medium whitespace-nowrap shadow-sm transition-all">{sugg}</button>
                              ))}
                         </div>
 
-                        {/* 🔹 INPUT AREA */}
                         <div className="p-4 pt-2">
                             <div className="flex items-center gap-3">
-                                {/* IMAGE UPLOAD BUTTON */}
-                                <input 
-                                  type="file" 
-                                  ref={fileInputRef} 
-                                  onChange={handleFileSelect} 
-                                  accept="image/*" 
-                                  className="hidden" 
-                                />
-                                <button 
-                                  onClick={() => fileInputRef.current.click()}
-                                  className={`p-3 rounded-lg border border-gray-300 text-gray-500 hover:text-[#6264a7] hover:bg-gray-50 transition-colors ${selectedFile ? 'text-[#6264a7] bg-blue-50 border-blue-200' : ''}`}
-                                  title="Attach Image"
-                                >
-                                  <FaPaperclip />
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
+                                <button onClick={() => fileInputRef.current.click()} className={`p-3 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 ${selectedFile ? 'text-[#6264a7] bg-blue-50 border-blue-200' : ''}`}><FaPaperclip /></button>
+                                <input className="flex-1 bg-[#f3f2f1] p-3 rounded-lg text-sm outline-none" placeholder="Reply to notice..." value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendReply()} />
+                                <button onClick={() => handleSendReply()} disabled={sendingReply || (!replyText.trim() && !selectedFile)} className={`p-3 rounded-lg flex items-center justify-center transition-all ${sendingReply || (!replyText.trim() && !selectedFile) ? 'bg-gray-200 text-gray-400' : 'bg-[#6264a7] text-white'}`}>
+                                    {sendingReply ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaPaperPlane />}
                                 </button>
-
-                                <div className="flex-1 bg-[#f3f2f1] border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-[#6264a7]/30 focus-within:border-[#6264a7] transition-all">
-                                    <input 
-                                        className="w-full p-3 bg-transparent outline-none text-sm text-gray-800 placeholder-gray-500"
-                                        placeholder="Type a new message..."
-                                        value={replyText}
-                                        onChange={(e) => setReplyText(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
-                                    />
-                                </div>
-                                <button 
-                                    onClick={() => handleSendReply()} 
-                                    disabled={sendingReply || (!replyText.trim() && !selectedFile)}
-                                    className={`p-3 rounded-lg flex items-center justify-center transition-all duration-200 min-w-[44px] ${
-                                        sendingReply || (!replyText.trim() && !selectedFile)
-                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                        : 'bg-[#6264a7] hover:bg-[#585a96] text-white shadow-sm hover:shadow'
-                                    }`}
-                                >
-                                    {sendingReply ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <FaPaperPlane className="text-sm" />
-                                    )}
-                                </button>
-                            </div>
-                            <div className="flex justify-between items-center mt-2 px-1">
-                                <span className="text-xs text-gray-500">
-                                    {activeNotice.replies?.length || 0} {activeNotice.replies?.length === 1 ? 'message' : 'messages'}
-                                </span>
-                                <span className="text-[10px] text-gray-400">
-                                    Press Enter to send
-                                </span>
                             </div>
                         </div>
                     </div>
@@ -720,30 +1009,252 @@ const NoticeList = () => {
         </div>
       )}
 
-      {/* ✅ LIGHTBOX / FULL SCREEN IMAGE POPUP */}
-      {previewImage && (
-        <div 
-          className="fixed inset-0 z-[150] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setPreviewImage(null)}
-        >
-          <button className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 backdrop-blur-sm">
-             <FaTimes size={24} />
-          </button>
-          <img 
-            src={previewImage} 
-            alt="Full Preview" 
-            className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()} 
-          />
+      {/* ============================================================== */}
+      {/* ✅ NEW: FULL SCREEN DIRECT EMPLOYEE CHAT (Teams Theme) */}
+      {/* ============================================================== */}
+      {isDirectChatOpen && (
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col animate-in fade-in duration-300 font-sans">
+            {/* Header */}
+            <div className="h-14 bg-[#464775] text-white flex items-center justify-between px-4 shrink-0 shadow-md z-20">
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                       <FaCommentDots />
+                   </div>
+                   <h2 className="font-bold text-lg">Employee Connect</h2>
+                </div>
+                <button onClick={() => setIsDirectChatOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors"><FaTimes size={20}/></button>
+            </div>
+
+            <div className="flex flex-1 overflow-hidden">
+                {/* Sidebar - Chat List OR Search Results */}
+                <div className="w-80 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
+                    <div className="p-3 border-b border-gray-200 bg-white">
+                        <div className="relative">
+                            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                            <input 
+                                className="w-full bg-gray-100 py-2 pl-9 pr-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#6264a7] transition-all"
+                                placeholder="Search new employee..."
+                                value={directSearchTerm}
+                                onChange={(e) => setDirectSearchTerm(e.target.value.toLowerCase())}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                        {directSearchTerm ? (
+                            // 🔍 SHOW SEARCH RESULTS
+                            <>
+                                <p className="px-2 py-1 text-xs font-bold text-gray-400 uppercase">Search Results</p>
+                                {employees
+                                    .filter(e => e._id !== currentUserId && (e.name.toLowerCase().includes(directSearchTerm) || e.employeeId.includes(directSearchTerm)))
+                                    .map(emp => (
+                                    <div 
+                                        key={emp._id} 
+                                        onClick={() => handleSelectUser(emp)}
+                                        className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition-all"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">
+                                            {emp.name.charAt(0)}
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <h4 className="text-sm font-bold text-gray-800 truncate">{emp.name}</h4>
+                                            <p className="text-xs text-gray-500 truncate">{emp.role || emp.employeeId}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </>
+                        ) : (
+                            // 💬 SHOW RECENT CHAT LIST (PERSISTED)
+                            <>
+                                {chatList.length > 0 ? (
+                                    chatList.map(emp => (
+                                        <div 
+                                            key={emp._id} 
+                                            onClick={() => handleSelectUser(emp)}
+                                            className={`relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${selectedChatUser?._id === emp._id ? 'bg-white shadow-sm border-l-4 border-[#6264a7]' : 'hover:bg-gray-200 border-l-4 border-transparent'}`}
+                                        >
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${selectedChatUser?._id === emp._id ? 'bg-[#6264a7] text-white' : 'bg-gray-300 text-gray-600'}`}>
+                                                {emp.name.charAt(0)}
+                                            </div>
+                                            <div className="overflow-hidden flex-1">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`text-sm font-bold truncate ${selectedChatUser?._id === emp._id ? 'text-[#6264a7]' : 'text-gray-800'}`}>{emp.name}</h4>
+                                                    {/* ✅ SIDEBAR UNREAD BUBBLE */}
+                                                    {emp.unreadCount > 0 && (
+                                                        <span className="bg-green-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                                                            {emp.unreadCount}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 truncate">{emp.role || emp.employeeId}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center p-6 text-gray-400 text-sm">
+                                        <p>No recent chats.</p>
+                                        <p className="text-xs mt-1">Search above to start a new conversation.</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Main Chat Area */}
+                <div className="flex-1 flex flex-col bg-white relative">
+                    {selectedChatUser ? (
+                        <>
+                            {/* Chat Header */}
+                            <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-[#6264a7] text-white flex items-center justify-center font-bold text-lg">
+                                        {selectedChatUser.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">{selectedChatUser.name}</h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                            <span className="text-xs text-gray-500">Available</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="p-2 text-[#6264a7] hover:bg-indigo-50 rounded-full"><FaPhone /></button>
+                                    <button className="p-2 text-[#6264a7] hover:bg-indigo-50 rounded-full"><FaVideo /></button>
+                                    <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full"><FaEllipsisH /></button>
+                                </div>
+                            </div>
+
+                            {/* Chat Messages */}
+                            <div className="flex-1 bg-[#f3f2f1] overflow-y-auto custom-scrollbar p-6 flex flex-col gap-4">
+                                {directMessages.length === 0 ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 opacity-60">
+                                        <FaCommentDots size={48} className="mb-2" />
+                                        <p>Start a conversation with {selectedChatUser.name}</p>
+                                    </div>
+                                ) : (
+                                    directMessages.map((msg, i) => {
+                                        // Determine if message is from "Me"
+                                        const isMe = (typeof msg.sender === 'object' ? msg.sender._id : msg.sender) === currentUserId;
+                                        const senderName = isMe ? "You" : (typeof msg.sender === 'object' ? msg.sender.name : selectedChatUser.name);
+
+                                        return (
+                                            <div key={i} className={`flex w-full group ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[65%]`}>
+                                                    {/* Sender Name Label */}
+                                                    <span className="text-[10px] font-bold text-gray-500 mb-1 px-1">
+                                                        {senderName}
+                                                    </span>
+                                                    
+                                                    {/* Message Bubble */}
+                                                    <div className="relative">
+                                                        <div className={`p-3 rounded-lg shadow-sm ${isMe ? 'bg-[#c7e0f4] text-gray-900 rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none'}`}>
+                                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                                            <div className="flex items-center justify-end gap-1 mt-1">
+                                                                <p className={`text-[10px] ${isMe ? 'text-blue-800/60' : 'text-gray-400'}`}>
+                                                                    {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                                </p>
+                                                                {/* ✅ READ RECEIPTS (TICKS) */}
+                                                                {isMe && !msg.isPending && (
+                                                                    <FaCheckDouble 
+                                                                        className={`text-[10px] ${msg.isRead ? 'text-green-600' : 'text-gray-400'}`} 
+                                                                        title={msg.isRead ? "Read" : "Delivered"}
+                                                                    />
+                                                                )}
+                                                                {isMe && msg.isPending && <span className="text-[9px] text-gray-400">(...)</span>}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 🔧 Edit/Delete Menu (Only for Sender) */}
+                                                        {isMe && !msg.isPending && (
+                                                            <>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === msg._id ? null : msg._id); }}
+                                                                    className="absolute -top-2 -left-3 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-gray-50"
+                                                                >
+                                                                    <FaEllipsisV size={10} />
+                                                                </button>
+                                                                
+                                                                {openMenuId === msg._id && (
+                                                                    <div className="absolute top-0 right-full mr-1 w-24 bg-white shadow-xl rounded-lg border border-gray-100 py-1 z-20 overflow-hidden animate-in slide-in-from-right-1 duration-200">
+                                                                        <button onClick={() => startEditing(msg)} className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 text-gray-700">
+                                                                            <FaPen className="text-blue-500" /> Edit
+                                                                        </button>
+                                                                        <button onClick={() => handleDeleteMessage(msg._id)} className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-red-600">
+                                                                            <FaTrash /> Delete
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                <div ref={directChatEndRef} />
+                            </div>
+
+                            {/* Input Area */}
+                            <div className="p-4 bg-white border-t border-gray-200">
+                                <div className={`flex items-end gap-2 bg-white border rounded-xl p-2 transition-all ${editingMessageId ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-300 focus-within:ring-2 focus-within:ring-[#6264a7] focus-within:border-transparent'}`}>
+                                    {editingMessageId ? (
+                                        <button onClick={() => { setEditingMessageId(null); setDirectMsgText(""); }} className="p-2 text-red-400 hover:text-red-600 text-xs font-bold whitespace-nowrap">Cancel Edit</button>
+                                    ) : (
+                                        <button className="p-2 text-gray-400 hover:text-[#6264a7]"><FaPaperclip /></button>
+                                    )}
+                                    
+                                    <textarea 
+                                        className="flex-1 max-h-32 min-h-[40px] p-2 text-sm outline-none resize-none"
+                                        placeholder={editingMessageId ? "Edit your message..." : "Type a new message..."}
+                                        value={directMsgText}
+                                        onChange={e => setDirectMsgText(e.target.value)}
+                                        onKeyDown={e => {
+                                            if(e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendDirectMessage();
+                                            }
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={handleSendDirectMessage}
+                                        disabled={!directMsgText.trim()}
+                                        className={`p-2 rounded-lg transition-colors ${!directMsgText.trim() ? 'text-gray-300' : (editingMessageId ? 'text-orange-500 hover:bg-orange-50' : 'text-[#6264a7] hover:bg-indigo-50')}`}
+                                    >
+                                        {editingMessageId ? <FaCheck size={20} /> : <FaPaperPlane size={20} />}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center bg-white text-gray-400">
+                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <FaUsers size={32} />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-600">Select an employee</h3>
+                            <p className="text-sm">Search and choose a colleague to start chatting</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
       )}
 
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      {/* LIGHTBOX */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[250] bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-4 right-4 text-white"><FaTimes size={24} /></button>
+          <img src={previewImage} className="max-w-full max-h-[90vh] rounded-lg shadow-2xl animate-in zoom-in-95" alt="prev" />
+        </div>
+      )}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );

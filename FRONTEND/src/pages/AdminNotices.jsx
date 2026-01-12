@@ -1,8 +1,8 @@
 // --- START OF FILE AdminNotices.jsx ---
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getAllNoticesForAdmin, addNotice, getEmployees, deleteNoticeById, updateNotice, sendAdminReplyWithImage } from "../api"; 
-import api from "../api"; 
+import { getAllNoticesForAdmin, addNotice, getEmployees, deleteNoticeById, updateNotice, sendAdminReplyWithImage } from "../api";
+import api from "../api";
 import Swal from 'sweetalert2';
 import {
   FaEdit, FaTrash, FaPlus, FaTimes, FaSearch, FaCheck,
@@ -56,7 +56,7 @@ const AdminNotices = () => {
   const DEFAULT_MEETING_LINK = "https://meet.google.com/tsn-vrih-zvx";
   const [isMeetingMode, setIsMeetingMode] = useState(false);
   const [meetingParams, setMeetingParams] = useState({ date: "", time: "" });
-  
+
   // ✅ NEW: Meeting Link State
   const [meetingLink, setMeetingLink] = useState(DEFAULT_MEETING_LINK);
   const [isLinkEditable, setIsLinkEditable] = useState(false);
@@ -72,7 +72,7 @@ const AdminNotices = () => {
   const [selectedChatEmployeeId, setSelectedChatEmployeeId] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
-  
+
   // ✅ Image Upload State
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -201,12 +201,12 @@ const AdminNotices = () => {
 
   const getUnassignedEmployees = () => {
     const assignedIds = new Set();
-    if(Array.isArray(groups)) {
-        groups.forEach(g => {
+    if (Array.isArray(groups)) {
+      groups.forEach(g => {
         if (Array.isArray(g.members)) {
-            g.members.forEach(m => assignedIds.add(String(m)));
+          g.members.forEach(m => assignedIds.add(String(m)));
         }
-        });
+      });
     }
     return employees.filter(e => !assignedIds.has(String(e._id)));
   };
@@ -339,8 +339,8 @@ const AdminNotices = () => {
       const uniqueEmployeeIds = new Set();
       repliesNotice.replies.forEach(r => {
         if (r.sentBy === 'Employee') {
-           const id = r.employeeId?._id || r.employeeId;
-           if (id) uniqueEmployeeIds.add(id);
+          const id = r.employeeId?._id || r.employeeId;
+          if (id) uniqueEmployeeIds.add(id);
         }
       });
 
@@ -390,7 +390,7 @@ const AdminNotices = () => {
         if (readState[storageKey] !== latestMsgId) {
           const newState = { ...readState, [storageKey]: latestMsgId };
           setReadState(newState);
-          saveReadStateToBackend(newState); 
+          saveReadStateToBackend(newState);
         }
       }
     }
@@ -422,22 +422,22 @@ const AdminNotices = () => {
     setIsMeetingMode(false); // Default to normal notice
     if (notice) {
       setEditingNoticeId(notice._id);
-      
+
       // ✅ CHECK IF IT'S A MEETING TO ENABLE EDIT MODE CORRECTLY
       const detectedLink = notice.description ? (notice.description.match(/(https?:\/\/[^\s]+)/) || [])[0] : null;
       const dateMatch = notice.description.match(/scheduled meeting\s+(\d{4}-\d{2}-\d{2})/i);
       const timeMatch = notice.description.match(/at\s+(\d{2}:\d{2})/i);
 
       if (detectedLink && dateMatch && timeMatch) {
-          setIsMeetingMode(true);
-          setMeetingParams({
-              date: dateMatch[1],
-              time: timeMatch[1]
-          });
-          setMeetingLink(detectedLink);
-          setIsLinkEditable(false);
+        setIsMeetingMode(true);
+        setMeetingParams({
+          date: dateMatch[1],
+          time: timeMatch[1]
+        });
+        setMeetingLink(detectedLink);
+        setIsLinkEditable(false);
       } else {
-          setIsMeetingMode(false);
+        setIsMeetingMode(false);
       }
 
       const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
@@ -481,7 +481,7 @@ const AdminNotices = () => {
 You are requested to join the scheduled meeting ${date || '{date}'} at ${time || '{time}'} as per the shared details. Please ensure you join on time and stay available for discussion.
 
 Meeting Link: ${link || '{link}'}`;
-    
+
     setNoticeData(prev => ({ ...prev, description: desc }));
   };
 
@@ -494,9 +494,9 @@ Meeting Link: ${link || '{link}'}`;
 
   // ✅ HANDLE LINK CHANGE
   const handleLinkChange = (e) => {
-      const newLink = e.target.value;
-      setMeetingLink(newLink);
-      updateMeetingDescription(meetingParams.date, meetingParams.time, newLink);
+    const newLink = e.target.value;
+    setMeetingLink(newLink);
+    updateMeetingDescription(meetingParams.date, meetingParams.time, newLink);
   }
 
   const closeModal = () => {
@@ -541,19 +541,19 @@ Meeting Link: ${link || '{link}'}`;
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // Validate Meeting Params
     if (isMeetingMode) {
-        if (!meetingParams.date || !meetingParams.time) {
-            Swal.fire("Error", "Please select both date and time for the meeting.", "error");
-            setIsSubmitting(false);
-            return;
-        }
-        if (!meetingLink) {
-            Swal.fire("Error", "Meeting link is required", "error");
-            setIsSubmitting(false);
-            return;
-        }
+      if (!meetingParams.date || !meetingParams.time) {
+        Swal.fire("Error", "Please select both date and time for the meeting.", "error");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!meetingLink) {
+        Swal.fire("Error", "Meeting link is required", "error");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -569,7 +569,7 @@ Meeting Link: ${link || '{link}'}`;
       // Ensure description is up to date for meetings
       let finalDescription = noticeData.description;
       if (isMeetingMode) {
-          finalDescription = `Dear Candidate,
+        finalDescription = `Dear Candidate,
 
 You are requested to join the scheduled meeting ${meetingParams.date} at ${meetingParams.time} as per the shared details. Please ensure you join on time and stay available for discussion.
 
@@ -606,20 +606,20 @@ Meeting Link: ${meetingLink}`;
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-        if (file.size > 5 * 1024 * 1024) { Swal.fire("Error", "File too large. Max 5MB.", "error"); return; }
-        setSelectedFile(file);
+      if (file.size > 5 * 1024 * 1024) { Swal.fire("Error", "File too large. Max 5MB.", "error"); return; }
+      setSelectedFile(file);
     }
   };
-  
+
   const clearSelectedFile = () => {
     setSelectedFile(null);
-    if(fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   // ✅ UPDATED ADMIN REPLY TO SUPPORT IMAGES WITH OPTIMISTIC UI & NO FLASH
   const handleAdminReply = async (manualText = null) => {
     const textToSend = manualText || replyText;
-    
+
     // Allow if either text OR file exists
     if ((!textToSend || !textToSend.trim()) && !selectedFile) return;
     if (!repliesNotice || !selectedChatEmployeeId) return;
@@ -627,81 +627,81 @@ Meeting Link: ${meetingLink}`;
     // 1. Create local preview URL for optimistic update
     let tempImageUrl = null;
     if (selectedFile) {
-        tempImageUrl = URL.createObjectURL(selectedFile);
-        // ✅ SAVE BLOB URL TO REF (To prevent flash later)
-        lastUploadedImageRef.current = { url: tempImageUrl, timestamp: Date.now() };
+      tempImageUrl = URL.createObjectURL(selectedFile);
+      // ✅ SAVE BLOB URL TO REF (To prevent flash later)
+      lastUploadedImageRef.current = { url: tempImageUrl, timestamp: Date.now() };
     }
 
     // 2. Create Optimistic Message Object
     const optimisticReply = {
-        _id: Date.now(),
-        message: textToSend,
-        image: tempImageUrl,
-        sentBy: 'Admin',
-        repliedAt: new Date().toISOString(),
-        // For 'ALL_EMPLOYEES' optimistic view, we don't need a specific ID to render it in the stream
-        // But for specific chat, we set it.
-        employeeId: selectedChatEmployeeId === 'ALL_EMPLOYEES' ? null : selectedChatEmployeeId,
-        isSending: true // ✅ Flag to show loading spinner
+      _id: Date.now(),
+      message: textToSend,
+      image: tempImageUrl,
+      sentBy: 'Admin',
+      repliedAt: new Date().toISOString(),
+      // For 'ALL_EMPLOYEES' optimistic view, we don't need a specific ID to render it in the stream
+      // But for specific chat, we set it.
+      employeeId: selectedChatEmployeeId === 'ALL_EMPLOYEES' ? null : selectedChatEmployeeId,
+      isSending: true // ✅ Flag to show loading spinner
     };
 
     // 3. Update Local State Immediately
     setRepliesNotice(prev => ({
-        ...prev,
-        replies: [...(prev.replies || []), optimisticReply]
+      ...prev,
+      replies: [...(prev.replies || []), optimisticReply]
     }));
 
     setReplyText("");
-    setSelectedFile(null); 
-    if(fileInputRef.current) fileInputRef.current.value = "";
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     setSendingReply(true); // ✅ Prevents fetchNotices from overwriting us
-    
+
     try {
       if (selectedChatEmployeeId === 'ALL_EMPLOYEES') {
         const uniqueEmployeeIds = [...new Set(repliesNotice.replies.map(r => r.employeeId?._id || r.employeeId))];
-        
+
         // Loop through all employees in chat
         const replyPromises = uniqueEmployeeIds.map(empId => {
           if (!empId) return Promise.resolve();
 
           if (selectedFile) {
-             const formData = new FormData();
-             formData.append("message", textToSend);
-             formData.append("targetEmployeeId", empId);
-             formData.append("image", selectedFile);
-             // We can pass the file object directly, but for ALL loop we might need to recreate formData or pass same
-             // Since formData can be reused in some browsers or recreated. 
-             // To be safe in loop:
-             const loopFormData = new FormData();
-             loopFormData.append("message", textToSend);
-             loopFormData.append("targetEmployeeId", empId);
-             loopFormData.append("image", selectedFile); // selectedFile is defined in scope
-             return sendAdminReplyWithImage(repliesNotice._id, loopFormData);
+            const formData = new FormData();
+            formData.append("message", textToSend);
+            formData.append("targetEmployeeId", empId);
+            formData.append("image", selectedFile);
+            // We can pass the file object directly, but for ALL loop we might need to recreate formData or pass same
+            // Since formData can be reused in some browsers or recreated. 
+            // To be safe in loop:
+            const loopFormData = new FormData();
+            loopFormData.append("message", textToSend);
+            loopFormData.append("targetEmployeeId", empId);
+            loopFormData.append("image", selectedFile); // selectedFile is defined in scope
+            return sendAdminReplyWithImage(repliesNotice._id, loopFormData);
           } else {
-             return api.post(`/api/notices/${repliesNotice._id}/admin-reply`, {
-                message: textToSend,
-                targetEmployeeId: empId
-             });
+            return api.post(`/api/notices/${repliesNotice._id}/admin-reply`, {
+              message: textToSend,
+              targetEmployeeId: empId
+            });
           }
         });
         await Promise.all(replyPromises);
       } else {
         // Single Employee Chat
         if (selectedFile) {
-             const formData = new FormData();
-             formData.append("message", textToSend);
-             formData.append("targetEmployeeId", selectedChatEmployeeId);
-             formData.append("image", selectedFile);
-             await sendAdminReplyWithImage(repliesNotice._id, formData);
+          const formData = new FormData();
+          formData.append("message", textToSend);
+          formData.append("targetEmployeeId", selectedChatEmployeeId);
+          formData.append("image", selectedFile);
+          await sendAdminReplyWithImage(repliesNotice._id, formData);
         } else {
-             await api.post(`/api/notices/${repliesNotice._id}/admin-reply`, {
-                message: textToSend,
-                targetEmployeeId: selectedChatEmployeeId
-             });
+          await api.post(`/api/notices/${repliesNotice._id}/admin-reply`, {
+            message: textToSend,
+            targetEmployeeId: selectedChatEmployeeId
+          });
         }
       }
-      
+
       // ✅ Fetch new data AFTER upload completes
       await fetchNotices();
 
@@ -932,8 +932,8 @@ Meeting Link: ${meetingLink}`;
               }
             }
             if (isMeeting) {
-                 sideBarColor = 'bg-gradient-to-b from-rose-500 to-pink-500';
-                 borderColor = 'border-rose-100';
+              sideBarColor = 'bg-gradient-to-b from-rose-500 to-pink-500';
+              borderColor = 'border-rose-100';
             }
 
             return (
@@ -943,8 +943,11 @@ Meeting Link: ${meetingLink}`;
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-slate-200">
+                          By: {notice.createdBy?.name || "System"} ({notice.createdBy?.employeeId || "Admin"})
+                        </span>
                         {isMeeting && (
-                            <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-rose-200"><FaVideo /> Meeting</span>
+                          <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-rose-200"><FaVideo /> Meeting</span>
                         )}
                         {isSpecific ? (
                           groupName ? (
@@ -978,14 +981,14 @@ Meeting Link: ${meetingLink}`;
                   <div className="mb-4">
                     <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-blue-700 transition-colors">{notice.title}</h3>
                     <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{notice.description}</p>
-                    
+
                     {/* ✅ SHOW JOIN BUTTON IF MEETING AND LINK EXISTS */}
                     {isMeeting && detectedLink && (
-                        <div className="mt-4">
-                            <a href={detectedLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all">
-                                <FaVideo /> Join Now
-                            </a>
-                        </div>
+                      <div className="mt-4">
+                        <a href={detectedLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all">
+                          <FaVideo /> Join Now
+                        </a>
+                      </div>
                     )}
                   </div>
                   <div className="pt-4 border-t border-slate-50 flex justify-end gap-2 opacity-100 sm:opacity-0 sm:translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"><button onClick={() => openModal(notice)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors shadow-sm"><FaEdit /> Edit</button><button onClick={() => handleDelete(notice._id)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm"><FaTrash /> Delete</button></div>
@@ -1037,7 +1040,7 @@ Meeting Link: ${meetingLink}`;
                   const lastMsg = data.messages[data.messages.length - 1];
                   const employee = findEmployeeByEmployeeId(empId);
                   const isWorking = employee ? isEmployeeWorking(employee.employeeId) : false;
-                  
+
                   // ✅ GET PROFILE PIC IF AVAILABLE
                   const profilePic = employee && employee.employeeId ? employeeImages[employee.employeeId] : null;
 
@@ -1045,22 +1048,22 @@ Meeting Link: ${meetingLink}`;
                     <div key={empId} onClick={() => handleChatSelection(empId)} className={`p-4 cursor-pointer border-b border-slate-200 flex items-center gap-3 hover:bg-white transition-colors relative ${selectedChatEmployeeId === empId ? 'bg-white border-l-4 border-l-indigo-600 shadow-sm' : ''}`}>
                       <div className="relative">
                         {/* ✅ SIDEBAR AVATAR UPDATE */}
-                        <div 
-                           className="w-12 h-12 rounded-full bg-white border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg shadow-sm overflow-hidden"
-                           onClick={(e) => {
-                             if (profilePic) {
-                               e.stopPropagation();
-                               setPreviewImage(profilePic);
-                             }
-                           }}
+                        <div
+                          className="w-12 h-12 rounded-full bg-white border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg shadow-sm overflow-hidden"
+                          onClick={(e) => {
+                            if (profilePic) {
+                              e.stopPropagation();
+                              setPreviewImage(profilePic);
+                            }
+                          }}
                         >
-                            {profilePic ? (
-                                <img src={profilePic} alt={data.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-zoom-in" />
-                            ) : (
-                                data.name.charAt(0)
-                            )}
+                          {profilePic ? (
+                            <img src={profilePic} alt={data.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-zoom-in" />
+                          ) : (
+                            data.name.charAt(0)
+                          )}
                         </div>
-                        
+
                         {data.hasUnread && selectedChatEmployeeId !== empId && <span className="absolute -top-1 -right-1 flex h-4 w-4 bg-red-500 rounded-full border-2 border-white"></span>}
                         {isWorking && <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>}
                       </div>
@@ -1138,10 +1141,10 @@ Meeting Link: ${meetingLink}`;
                       // prefer the local blob to prevent the "download flash" from the server URL.
                       const isLastMessage = i === displayMessages.length - 1;
                       if (isAdmin && isLastMessage && !msg.isSending && lastUploadedImageRef.current) {
-                          // Use Blob if timestamp is fresh (< 30 seconds)
-                          if (Date.now() - lastUploadedImageRef.current.timestamp < 30000) {
-                              imageSrc = lastUploadedImageRef.current.url;
-                          }
+                        // Use Blob if timestamp is fresh (< 30 seconds)
+                        if (Date.now() - lastUploadedImageRef.current.timestamp < 30000) {
+                          imageSrc = lastUploadedImageRef.current.url;
+                        }
                       }
 
                       return (
@@ -1154,20 +1157,20 @@ Meeting Link: ${meetingLink}`;
                               </div>
                             )}
 
-                             {/* ✅ DISPLAY IMAGE IF EXISTS + LOADING OVERLAY */}
-                             {imageSrc && (
+                            {/* ✅ DISPLAY IMAGE IF EXISTS + LOADING OVERLAY */}
+                            {imageSrc && (
                               <div className="mb-2 relative cursor-pointer" onClick={() => !msg.isSending && setPreviewImage(imageSrc)}>
-                                <img 
-                                  src={imageSrc} 
-                                  alt="attachment" 
+                                <img
+                                  src={imageSrc}
+                                  alt="attachment"
                                   className={`rounded-lg max-w-full max-h-48 object-cover border border-black/10 transition-opacity ${msg.isSending ? 'opacity-70' : 'hover:opacity-90'}`}
                                 />
-                                
+
                                 {/* ✅ SPINNER OVERLAY */}
                                 {msg.isSending && (
-                                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
-                                       <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                   </div>
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
+                                    <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -1176,7 +1179,7 @@ Meeting Link: ${meetingLink}`;
                             <div className={`text-[10px] mt-2 text-right ${isAdmin ? 'text-indigo-200' : 'text-slate-400'}`}>{formatDateTime(msg.repliedAt).time}</div>
                             {/* Hide delete button while sending */}
                             {!msg.isSending && (
-                                <button onClick={() => handleDeleteReply(repliesNotice._id, msg._id, msg.sentBy, msg.message, msg.repliedAt)} className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-black/10 ${isAdmin ? 'text-white' : 'text-slate-500'}`}><FaTrash size={10} /></button>
+                              <button onClick={() => handleDeleteReply(repliesNotice._id, msg._id, msg.sentBy, msg.message, msg.repliedAt)} className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-black/10 ${isAdmin ? 'text-white' : 'text-slate-500'}`}><FaTrash size={10} /></button>
                             )}
                           </div>
                         </div>
@@ -1187,20 +1190,20 @@ Meeting Link: ${meetingLink}`;
 
                   {/* Quick Replies & Input */}
                   <div className="p-4 bg-white border-t border-slate-200">
-                    
-                     {/* ✅ FILE PREVIEW ABOVE INPUT */}
-                     {selectedFile && (
-                        <div className="mb-2 p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                             <div className="flex items-center gap-3">
-                                 <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-10 h-10 object-cover rounded bg-white border" />
-                                 <div>
-                                     <p className="text-xs font-bold text-slate-700 truncate max-w-[200px]">{selectedFile.name}</p>
-                                     <p className="text-[10px] text-slate-500">{(selectedFile.size/1024).toFixed(1)} KB</p>
-                                 </div>
-                             </div>
-                             <button onClick={clearSelectedFile} className="text-slate-400 hover:text-red-500"><FaTimes /></button>
+
+                    {/* ✅ FILE PREVIEW ABOVE INPUT */}
+                    {selectedFile && (
+                      <div className="mb-2 p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-10 h-10 object-cover rounded bg-white border" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-700 truncate max-w-[200px]">{selectedFile.name}</p>
+                            <p className="text-[10px] text-slate-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                          </div>
                         </div>
-                     )}
+                        <button onClick={clearSelectedFile} className="text-slate-400 hover:text-red-500"><FaTimes /></button>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 overflow-x-auto pb-3 custom-scrollbar">
                       <div className="flex items-center gap-1 text-xs font-bold text-indigo-400 px-2 select-none"><FaRobot /> AI Suggestions:</div>
@@ -1233,18 +1236,18 @@ Meeting Link: ${meetingLink}`;
 
       {/* ✅ LIGHTBOX / FULL SCREEN IMAGE POPUP */}
       {previewImage && (
-        <div 
+        <div
           className="fixed inset-0 z-[130] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setPreviewImage(null)}
         >
           <button className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 backdrop-blur-sm">
-             <FaTimes size={24} />
+            <FaTimes size={24} />
           </button>
-          <img 
-            src={previewImage} 
-            alt="Full Preview" 
+          <img
+            src={previewImage}
+            alt="Full Preview"
             className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
@@ -1285,87 +1288,87 @@ Meeting Link: ${meetingLink}`;
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-300 overflow-hidden border border-gray-200/80">
             <div className={`px-6 py-4 bg-gradient-to-r text-white ${isMeetingMode ? 'from-indigo-600 to-indigo-700' : 'from-blue-500 to-blue-600'}`}>
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-inner">
-                            {isMeetingMode ? <FaVideo className="text-white" size={20} /> : <FaBullhorn className="text-white" size={32} />}
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold">{isMeetingMode ? 'Schedule Meeting' : (editingNoticeId ? 'Edit Announcement' : 'New Announcement')}</h2>
-                            <p className="text-sm text-white/80 mt-0.5">{isMeetingMode ? 'Set up a new virtual meeting' : (editingNoticeId ? 'Update announcement details' : 'Share updates with your team')}</p>
-                        </div>
-                    </div>
-                    <button onClick={closeModal} className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-200"><FaTimes size={18} /></button>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-inner">
+                    {isMeetingMode ? <FaVideo className="text-white" size={20} /> : <FaBullhorn className="text-white" size={32} />}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">{isMeetingMode ? 'Schedule Meeting' : (editingNoticeId ? 'Edit Announcement' : 'New Announcement')}</h2>
+                    <p className="text-sm text-white/80 mt-0.5">{isMeetingMode ? 'Set up a new virtual meeting' : (editingNoticeId ? 'Update announcement details' : 'Share updates with your team')}</p>
+                  </div>
                 </div>
+                <button onClick={closeModal} className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-200"><FaTimes size={18} /></button>
+              </div>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white">
               {/* Meeting Specific Inputs */}
               {isMeetingMode ? (
                 <>
                   <div className="flex gap-4">
-                      <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Date</label></div>
-                          <div className="relative">
-                              <input type="date" name="date" value={meetingParams.date} onChange={handleMeetingParamChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
-                          </div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Date</label></div>
+                      <div className="relative">
+                        <input type="date" name="date" value={meetingParams.date} onChange={handleMeetingParamChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
                       </div>
-                      <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Time</label></div>
-                          <div className="relative">
-                              <input type="time" name="time" value={meetingParams.time} onChange={handleMeetingParamChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
-                          </div>
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Time</label></div>
+                      <div className="relative">
+                        <input type="time" name="time" value={meetingParams.time} onChange={handleMeetingParamChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
                       </div>
+                    </div>
                   </div>
 
                   {/* ✅ MEETING LINK INPUT (With Change Option) */}
                   <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Meeting Link</label></div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><label className="text-xs font-semibold text-gray-700 uppercase">Meeting Link</label></div>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <FaLink className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={meetingLink}
+                          onChange={handleLinkChange}
+                          readOnly={!isLinkEditable}
+                          className={`w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40 ${!isLinkEditable ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
+                          required
+                        />
                       </div>
-                      <div className="flex gap-2">
-                          <div className="relative flex-1">
-                              <FaLink className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                              <input 
-                                type="text" 
-                                value={meetingLink} 
-                                onChange={handleLinkChange} 
-                                readOnly={!isLinkEditable}
-                                className={`w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40 ${!isLinkEditable ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`} 
-                                required 
-                              />
-                          </div>
-                          {!isLinkEditable && (
-                              <button type="button" onClick={() => setIsLinkEditable(true)} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold border border-indigo-200 hover:bg-indigo-100">
-                                  Change
-                              </button>
-                          )}
-                      </div>
-                      {/* Create New Link */}
-                      <div className="text-right">
-                          <a href="https://meet.google.com/landing" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1">
-                              <FaExternalLinkAlt /> Create New Link
-                          </a>
-                      </div>
+                      {!isLinkEditable && (
+                        <button type="button" onClick={() => setIsLinkEditable(true)} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold border border-indigo-200 hover:bg-indigo-100">
+                          Change
+                        </button>
+                      )}
+                    </div>
+                    {/* Create New Link */}
+                    <div className="text-right">
+                      <a href="https://meet.google.com/landing" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1">
+                        <FaExternalLinkAlt /> Create New Link
+                      </a>
+                    </div>
                   </div>
                 </>
               ) : (
                 <div className="space-y-1.5">
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</label></div>
-                    <input type="text" name="title" placeholder="Enter announcement title..." value={noticeData.title} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm" required autoFocus />
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</label></div>
+                  <input type="text" name="title" placeholder="Enter announcement title..." value={noticeData.title} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm" required autoFocus />
                 </div>
               )}
 
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</label></div>
-                <textarea 
-                    name="description" 
-                    placeholder="Write your details here..." 
-                    value={noticeData.description} 
-                    onChange={handleChange} 
-                
-                    className={`w-full border border-gray-300 rounded-lg px-4 py-3 text-sm h-32 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm ${isMeetingMode ? 'bg-gray-100 text-gray-600' : ''}`} 
-                    required 
+                <textarea
+                  name="description"
+                  placeholder="Write your details here..."
+                  value={noticeData.description}
+                  onChange={handleChange}
+
+                  className={`w-full border border-gray-300 rounded-lg px-4 py-3 text-sm h-32 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm ${isMeetingMode ? 'bg-gray-100 text-gray-600' : ''}`}
+                  required
                 />
               </div>
 
