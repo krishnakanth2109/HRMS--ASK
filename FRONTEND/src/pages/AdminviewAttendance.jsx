@@ -1029,7 +1029,17 @@ const handleMonthChange = (e) => {
         attendanceMap.set(key, r);
     });
 
-    const approvedOTCounts = overtimeData.reduce((acc, ot) => { if (ot.status === 'APPROVED') { acc[ot.employeeId] = (acc[ot.employeeId] || 0) + 1; } return acc; }, {});
+    // ✅ FIX: Filter Overtime requests by selected date range
+    const approvedOTCounts = overtimeData.reduce((acc, ot) => {
+        if (ot.status === 'APPROVED') {
+            // Check if OT date falls within summary start/end date
+            const otDateStr = normalizeDateStr(ot.date); // Assuming OT object has 'date' field
+            if (otDateStr >= summaryStartDate && otDateStr <= summaryEndDate) {
+                 acc[ot.employeeId] = (acc[ot.employeeId] || 0) + 1;
+            }
+        }
+        return acc;
+    }, {});
 
     // Iterate through ALL active employees
     const activeEmployees = allEmployees.filter(e => e.isActive !== false);

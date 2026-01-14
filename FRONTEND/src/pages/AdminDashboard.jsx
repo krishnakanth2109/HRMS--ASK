@@ -36,6 +36,11 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const [selectedDept, setSelectedDept] = useState("All");
+  
+  // --- NEW STATE FOR MONTHLY FILTER ---
+  const [viewMode, setViewMode] = useState("week"); // Options: 'week', 'month'
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // Format YYYY-MM
+
   const [currentWeek, setCurrentWeek] = useState(0); 
   const [weeklyAttendanceData, setWeeklyAttendanceData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
@@ -93,8 +98,29 @@ const AdminDashboard = () => {
     calculateTodayCounts();
   }, [activeEmployees, leaveRequests]);
 
-  // --- 3. Calculate Week Range ---
+  // --- 3. Calculate Date Range (Updated for Month Support) ---
   const weekDates = useMemo(() => {
+    const formatDate = (date) => {
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+    };
+
+    // Monthly View Logic
+    if (viewMode === 'month') {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const firstDay = new Date(year, month - 1, 1);
+      const lastDay = new Date(year, month, 0); // Last day of the month
+      lastDay.setHours(23, 59, 59, 999);
+
+      return {
+        start: formatDate(firstDay),
+        end: formatDate(lastDay),
+        startDateObj: firstDay,
+        endDateObj: lastDay
+      };
+    }
+
+    // Weekly View Logic (Existing)
     const today = new Date();
     today.setDate(today.getDate() + currentWeek * 7);
 
@@ -108,18 +134,13 @@ const AdminDashboard = () => {
     saturday.setDate(sunday.getDate() + 6);
     saturday.setHours(23, 59, 59, 999);
 
-    const formatDate = (date) => {
-      const offset = date.getTimezoneOffset() * 60000;
-      return new Date(date.getTime() - offset).toISOString().slice(0, 10);
-    };
-
     return {
       start: formatDate(sunday),
       end: formatDate(saturday),
       startDateObj: sunday,
       endDateObj: saturday
     };
-  }, [currentWeek]);
+  }, [currentWeek, viewMode, selectedMonth]);
 
   // --- 4. Fetch Attendance Data ---
   useEffect(() => {
@@ -129,7 +150,7 @@ const AdminDashboard = () => {
         const data = await getAttendanceByDateRange(weekDates.start, weekDates.end);
         setWeeklyAttendanceData(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.error("Error fetching weekly attendance:", error);
+        console.error("Error fetching attendance data:", error);
         setWeeklyAttendanceData([]);
       } finally {
         setLoadingGraph(false);
@@ -138,7 +159,7 @@ const AdminDashboard = () => {
     fetchWeeklyData();
   }, [weekDates]);
 
-  // --- 5. Process Data for Graph ---
+  // --- 5. Process Data for Graph (Updated for Dynamic Range) ---
   const weeklyChartData = useMemo(() => {
     const deptEmployees = activeEmployees.filter(e =>
       selectedDept === "All" || e.department === selectedDept
@@ -151,7 +172,11 @@ const AdminDashboard = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let i = 0; i < 7; i++) {
+    // Calculate number of days in the selected range (7 for week, 28-31 for month)
+    const timeDiff = weekDates.endDateObj.getTime() - weekDates.startDateObj.getTime();
+    const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 to include start date
+
+    for (let i = 0; i < dayDiff; i++) {
       const loopDate = new Date(startObj);
       loopDate.setDate(startObj.getDate() + i);
 
@@ -159,7 +184,11 @@ const AdminDashboard = () => {
 
       const offset = loopDate.getTimezoneOffset() * 60000;
       const dateStr = new Date(loopDate.getTime() - offset).toISOString().slice(0, 10);
-      const dayName = loopDate.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      // Short day name for week view, Date number for month view to save space
+      const dayName = viewMode === 'week' 
+        ? loopDate.toLocaleDateString('en-US', { weekday: 'short' })
+        : loopDate.getDate().toString(); 
 
       const presentSet = new Set();
 
@@ -186,7 +215,7 @@ const AdminDashboard = () => {
     }
 
     return data;
-  }, [weeklyAttendanceData, activeEmployees, selectedDept, weekDates]);
+  }, [weeklyAttendanceData, activeEmployees, selectedDept, weekDates, viewMode]);
 
   // --- 6. Process Employee Distribution Data ---
   const departmentData = useMemo(() => {
@@ -218,8 +247,8 @@ const AdminDashboard = () => {
       
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        
-        {/* 1. Today's Attendance Overview - FIXED COMPACT UI */}
+        {/* ... (Stat Cards UI Unchanged) ... */}
+        {/* 1. Today's Attendance Overview */}
         <div 
           className="bg-white rounded-xl shadow-md border-l-4 border-indigo-600 p-4 cursor-pointer hover:shadow-lg transition-all duration-200"
           onClick={() => navigate("/admin/today-overview")}
@@ -228,27 +257,20 @@ const AdminDashboard = () => {
              <h3 className="text-gray-700 font-bold text-base">Today's Attendance</h3>
              <FaClock className="text-indigo-500 w-4 h-4" />
           </div>
-
           <div className="grid grid-cols-3 gap-3">
-             {/* Present */}
              <div className="flex flex-col items-center justify-center bg-green-50 rounded-lg py-2 border border-green-100">
                 <span className="text-2xl font-bold text-green-600 leading-none">{todayCounts.present}</span>
                 <span className="text-xs font-semibold text-green-700 mt-1">Present</span>
              </div>
-             
-             {/* Absent */}
              <div className="flex flex-col items-center justify-center bg-red-50 rounded-lg py-2 border border-red-100">
                 <span className="text-2xl font-bold text-red-600 leading-none">{todayCounts.notLoggedIn}</span>
                 <span className="text-xs font-semibold text-red-700 mt-1">Absent</span>
              </div>
-
-             {/* Leave */}
              <div className="flex flex-col items-center justify-center bg-amber-50 rounded-lg py-2 border border-amber-100">
                 <span className="text-2xl font-bold text-amber-600 leading-none">{todayCounts.onLeave}</span>
                 <span className="text-xs font-semibold text-amber-700 mt-1">Leave</span>
              </div>
           </div>
-          
           <div className="mt-3 flex justify-end">
              <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1 hover:underline">
                Details <FaArrowRight className="w-2.5 h-2.5" />
@@ -296,37 +318,71 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Week Navigation & Filters */}
+      {/* Navigation & Filters (UPDATED) */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCurrentWeek(currentWeek - 1)}
-            className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
-            title="Previous Week"
+        
+        {/* Left Side: Type Selector & Date Navigation */}
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* View Mode Dropdown */}
+          <select 
+            value={viewMode} 
+            onChange={(e) => setViewMode(e.target.value)} 
+            className="border border-gray-300 px-3 py-2 rounded-lg font-medium text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
           >
-            <FaChevronLeft />
-          </button>
+            <option value="week">Weekly</option>
+            <option value="month">Monthly</option>
+          </select>
 
-          <span className="font-bold text-gray-800 text-lg w-64 text-center">
-            {formatWeekRange(weekDates.start, weekDates.end)}
-          </span>
+          {/* Conditional Rendering based on View Mode */}
+          {viewMode === 'week' ? (
+            // Weekly Navigation
+            <>
+              <button
+                onClick={() => setCurrentWeek(currentWeek - 1)}
+                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
+                title="Previous Week"
+              >
+                <FaChevronLeft />
+              </button>
 
-          <button
-            onClick={() => setCurrentWeek(currentWeek + 1)}
-            className={`p-2 rounded-lg transition ${isCurrentWeek ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
-            disabled={isCurrentWeek}
-            title="Next Week"
-          >
-            <FaChevronRight />
-          </button>
+              <span className="font-bold text-gray-800 text-base sm:text-lg min-w-[200px] text-center">
+                {formatWeekRange(weekDates.start, weekDates.end)}
+              </span>
 
-          {currentWeek !== 0 && (
-            <button onClick={() => setCurrentWeek(0)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition" title="Go to Current Week">
-              <FaSyncAlt />
-            </button>
+              <button
+                onClick={() => setCurrentWeek(currentWeek + 1)}
+                className={`p-2 rounded-lg transition ${isCurrentWeek ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+                disabled={isCurrentWeek}
+                title="Next Week"
+              >
+                <FaChevronRight />
+              </button>
+
+              {currentWeek !== 0 && (
+                <button onClick={() => setCurrentWeek(0)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition" title="Go to Current Week">
+                  <FaSyncAlt />
+                </button>
+              )}
+            </>
+          ) : (
+            // Monthly Navigation
+            <div className="flex items-center gap-2">
+              <input 
+                type="month" 
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                max={new Date().toISOString().slice(0, 7)}
+                className="border border-gray-300 px-3 py-2 rounded-lg font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+              <span className="text-xs text-gray-500 ml-1">
+                 ({formatWeekRange(weekDates.start, weekDates.end)})
+              </span>
+            </div>
           )}
         </div>
 
+        {/* Right Side: Department Filter */}
         <div className="w-full lg:w-auto">
           <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="border border-gray-300 px-4 py-2 rounded-lg w-full lg:w-64 font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="All">All Departments</option>
@@ -338,9 +394,11 @@ const AdminDashboard = () => {
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-        {/* Weekly Attendance Bar Chart */}
+        {/* Attendance Bar Chart (Updated Title) */}
         <div className="col-span-1 xl:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h3 className="text-gray-800 font-bold text-lg mb-6">Weekly Attendance</h3>
+          <h3 className="text-gray-800 font-bold text-lg mb-6">
+            {viewMode === 'week' ? "Weekly Attendance" : "Monthly Attendance"}
+          </h3>
           <div className="w-full h-80">
             {loadingGraph ? (
               <div className="flex items-center justify-center h-full text-gray-400">Loading Chart...</div>
@@ -358,8 +416,9 @@ const AdminDashboard = () => {
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
                     dy={10}
+                    interval={0} 
                   />
                   <YAxis
                     axisLine={false}
@@ -378,13 +437,13 @@ const AdminDashboard = () => {
                     dataKey="Present"
                     fill="#10b981"
                     radius={[4, 4, 0, 0]}
-                    barSize={20}
+                    barSize={viewMode === 'month' ? 10 : 20} // Thinner bars for month view
                   />
                   <Bar
                     dataKey="Absent"
                     fill="#ef4444"
                     radius={[4, 4, 0, 0]}
-                    barSize={20}
+                    barSize={viewMode === 'month' ? 10 : 20}
                   />
                 </BarChart>
               </ResponsiveContainer>

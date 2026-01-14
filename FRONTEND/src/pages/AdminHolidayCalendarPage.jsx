@@ -1,4 +1,3 @@
-
 // --- START OF FILE AdminHolidayCalendarPage.jsx ---
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Calendar from "react-calendar";
@@ -14,7 +13,8 @@ import {
   FaTimes,
   FaTrash,
   FaCalendarAlt,
-  FaBirthdayCake
+  FaBirthdayCake,
+  FaList
 } from "react-icons/fa";
 
 const AdminHolidayCalendarPage = () => {
@@ -33,8 +33,16 @@ const AdminHolidayCalendarPage = () => {
   const [activeDate, setActiveDate] = useState(new Date()); 
   const [isModalOpen, setIsModalOpen] = useState(false); 
   
+  // Cursors for month view
   const [birthdayCursor, setBirthdayCursor] = useState(new Date());
   const [holidayCursor, setHolidayCursor] = useState(new Date());
+
+  // Toggles for "Show All"
+  const [showAllHolidays, setShowAllHolidays] = useState(false);
+  const [showAllBirthdays, setShowAllBirthdays] = useState(false);
+
+  // --- NEW: Year Filter State ---
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const fileInputRef = useRef(null);
 
@@ -172,14 +180,33 @@ const AdminHolidayCalendarPage = () => {
     });
   };
 
-  const currentMonthBirthdays = birthdays.filter((b) => b.dob.getMonth() === birthdayCursor.getMonth());
-  currentMonthBirthdays.sort((a, b) => a.dob.getDate() - b.dob.getDate());
+  // --- FILTERING LOGIC ---
+  
+  // Birthdays
+  const displayedBirthdays = showAllBirthdays 
+    ? [...birthdays].sort((a, b) => a.dob.getMonth() - b.dob.getMonth() || a.dob.getDate() - b.dob.getDate())
+    : birthdays
+        .filter((b) => b.dob.getMonth() === birthdayCursor.getMonth())
+        .sort((a, b) => a.dob.getDate() - b.dob.getDate());
 
-  const currentMonthHolidays = holidays.filter((h) => {
-    const hDate = normalizeDate(h.startDate);
-    return hDate.getMonth() === holidayCursor.getMonth() && hDate.getFullYear() === holidayCursor.getFullYear();
-  });
-  currentMonthHolidays.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  // --- UPDATED: Holidays Filter Logic ---
+  // 1. Get unique years available in holidays + current year
+  const availableYears = [...new Set([
+    new Date().getFullYear(),
+    ...holidays.map(h => new Date(h.startDate).getFullYear())
+  ])].sort((a,b) => a - b);
+
+  // 2. Filter logic
+  const displayedHolidays = showAllHolidays
+    ? [...holidays]
+        .filter(h => new Date(h.startDate).getFullYear() === parseInt(selectedYear)) // Filter by selected year
+        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+    : holidays
+        .filter((h) => {
+          const hDate = normalizeDate(h.startDate);
+          return hDate.getMonth() === holidayCursor.getMonth() && hDate.getFullYear() === holidayCursor.getFullYear();
+        })
+        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 
 
   /* =========================================================
@@ -267,18 +294,51 @@ const AdminHolidayCalendarPage = () => {
           
           {/* --- LEFT SIDE: LISTS --- */}
           <div className="lg:col-span-6 space-y-6">
+            
+            {/* HOLIDAYS CONTAINER */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 bg-gradient-to-r from-emerald-500 to-teal-600 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2"><FaCalendarAlt /> <span className="font-bold">Holidays</span></div>
-                <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
-                  <button onClick={() => changeMonth(setHolidayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
-                  <span className="text-xs font-mono w-16 text-center">{holidayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
-                  <button onClick={() => changeMonth(setHolidayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                
+                <div className="flex items-center gap-2">
+                  
+                  {/* --- NEW: Year Dropdown (Only visible when Show All is active) --- */}
+                  {showAllHolidays && (
+                    <select 
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition text-white outline-none border-none cursor-pointer"
+                    >
+                      {availableYears.map(year => (
+                        <option key={year} value={year} className="text-slate-800 bg-white">
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Show All Toggle */}
+                  <button 
+                    onClick={() => setShowAllHolidays(!showAllHolidays)}
+                    className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition"
+                  >
+                    {showAllHolidays ? "View Month" : "View All"}
+                  </button>
+
+                  {/* Month Navigation (Only show if not showing all) */}
+                  {!showAllHolidays && (
+                    <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
+                      <button onClick={() => changeMonth(setHolidayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
+                      <span className="text-xs font-mono w-16 text-center">{holidayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
+                      <button onClick={() => changeMonth(setHolidayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                    </div>
+                  )}
                 </div>
               </div>
+
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
-                {currentMonthHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays</p> : 
-                  currentMonthHolidays.map(h => (
+                {displayedHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays {showAllHolidays ? `in ${selectedYear}` : "this month"}</p> : 
+                  displayedHolidays.map(h => (
                   <div key={h._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-md transition group">
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none">
@@ -295,18 +355,34 @@ const AdminHolidayCalendarPage = () => {
               </div>
             </div>
 
+            {/* BIRTHDAYS CONTAINER */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 bg-gradient-to-r from-orange-400 to-pink-500 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2"><FaBirthdayCake /> <span className="font-bold">Birthdays</span></div>
-                <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
-                  <button onClick={() => changeMonth(setBirthdayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
-                  <span className="text-xs font-mono w-16 text-center">{birthdayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
-                  <button onClick={() => changeMonth(setBirthdayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                
+                <div className="flex items-center gap-2">
+                  {/* Show All Toggle */}
+                  <button 
+                    onClick={() => setShowAllBirthdays(!showAllBirthdays)}
+                    className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition"
+                  >
+                    {showAllBirthdays ? "View Month" : "View All"}
+                  </button>
+
+                  {/* Month Navigation (Only show if not showing all) */}
+                  {!showAllBirthdays && (
+                    <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
+                      <button onClick={() => changeMonth(setBirthdayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
+                      <span className="text-xs font-mono w-16 text-center">{birthdayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
+                      <button onClick={() => changeMonth(setBirthdayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                    </div>
+                  )}
                 </div>
               </div>
+
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
-                {currentMonthBirthdays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No birthdays</p> :
-                  currentMonthBirthdays.map((b, i) => (
+                {displayedBirthdays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No birthdays {showAllBirthdays ? "found" : "this month"}</p> :
+                  displayedBirthdays.map((b, i) => (
                   <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition">
                     <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
                       {b.name.charAt(0)}

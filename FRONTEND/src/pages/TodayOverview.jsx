@@ -15,7 +15,6 @@ import {
   FaSearch,
   FaCalendarDay,
   FaTimes,
-  FaBell,
   FaArrowRight,
   FaEllipsisV,
   FaPhone,
@@ -27,11 +26,14 @@ import {
   FaComment,
   FaUserClock,
   FaExclamationCircle,
-  FaUserCheck
+  FaUserCheck,
+  FaList,
+  FaThLarge,
+  FaFilter
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Helper functions
+// --- Helper functions ---
 const getSecureUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("http:")) {
@@ -83,14 +85,14 @@ const LiveTimer = ({ startTime }) => {
   return (
     <div className="flex items-center gap-2">
       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-      <span className="font-mono font-medium text-green-700">
+      <span className="font-mono font-medium text-green-700 text-xs sm:text-sm">
         {timeStr}
       </span>
     </div>
   );
 };
 
-// Calculate login status (from AdminviewAttendance.jsx)
+// Calculate login status
 const calculateLoginStatus = (punchInTime, shiftData, apiStatus) => {
   if (!punchInTime) return { status: "--", isLate: false };
   
@@ -119,7 +121,8 @@ const calculateLoginStatus = (punchInTime, shiftData, apiStatus) => {
   return { status: "ON TIME", isLate: false };
 };
 
-// Login Status Badge Component
+// --- Components ---
+
 const LoginStatusBadge = ({ status }) => {
   const config = {
     "ON TIME": {
@@ -151,15 +154,14 @@ const LoginStatusBadge = ({ status }) => {
   const { label, icon, bg, border, text, dot } = config[status] || config["--"];
 
   return (
-    <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${bg} ${border} border ${text} font-medium text-xs`}>
-      <div className={`w-2 h-2 rounded-full ${dot} mr-2`}></div>
-      {icon && <span className="mr-1.5">{icon}</span>}
+    <div className={`inline-flex items-center px-2.5 py-1 rounded-full ${bg} ${border} border ${text} font-medium text-xs whitespace-nowrap`}>
+      <div className={`w-1.5 h-1.5 rounded-full ${dot} mr-1.5`}></div>
+      {icon && <span className="mr-1">{icon}</span>}
       {label}
     </div>
   );
 };
 
-// Status Badge Component
 const StatusBadge = ({ status }) => {
   const config = {
     WORKING: { 
@@ -207,15 +209,14 @@ const StatusBadge = ({ status }) => {
   const { label, icon, bg, border, text, dot } = config[status] || config.WORKING;
 
   return (
-    <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${bg} ${border} border ${text} font-medium text-xs`}>
-      <div className={`w-2 h-2 rounded-full ${dot} mr-2`}></div>
-      {icon && <span className="mr-1.5">{icon}</span>}
+    <div className={`inline-flex items-center px-2.5 py-1 rounded-full ${bg} ${border} border ${text} font-medium text-xs whitespace-nowrap`}>
+      <div className={`w-1.5 h-1.5 rounded-full ${dot} mr-1.5`}></div>
+      {icon && <span className="mr-1">{icon}</span>}
       {label}
     </div>
   );
 };
 
-// Stat Card Component
 const StatCard = ({ icon, title, value, color, onClick, category, isActive }) => {
   const colors = {
     WORKING: { 
@@ -257,7 +258,7 @@ const StatCard = ({ icon, title, value, color, onClick, category, isActive }) =>
       whileHover={{ scale: 1.03, y: -4 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`relative overflow-hidden rounded-xl p-6 cursor-pointer transition-all duration-300 ${
+      className={`relative overflow-hidden rounded-xl p-5 cursor-pointer transition-all duration-300 ${
         isActive ? 'ring-2 ring-offset-2' : ''
       } ${config.bg} border ${config.border} ${
         isActive ? `ring-${category === 'WORKING' ? 'blue' : category === 'COMPLETED' ? 'emerald' : category === 'NOT_LOGGED_IN' ? 'slate' : category === 'ON_LEAVE' ? 'purple' : 'amber'}-500/30` : ''
@@ -270,22 +271,15 @@ const StatCard = ({ icon, title, value, color, onClick, category, isActive }) =>
       <div className="relative z-10">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">{title}</p>
-            <p className="text-3xl font-semibold text-slate-900">
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-1">{title}</p>
+            <p className="text-2xl font-bold text-slate-900">
               {value}
             </p>
           </div>
-          <div className={`p-3 rounded-lg ${config.bg}`}>
+          <div className={`p-2.5 rounded-lg ${config.bg}`}>
             {React.cloneElement(icon, { 
-              className: `text-xl ${config.text}` 
+              className: `text-lg ${config.text}` 
             })}
-          </div>
-        </div>
-        
-        <div className="mt-6 pt-4 border-t border-slate-100">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500">View Details</span>
-            <FaArrowRight className={`text-sm ${config.text}`} />
           </div>
         </div>
       </div>
@@ -293,7 +287,6 @@ const StatCard = ({ icon, title, value, color, onClick, category, isActive }) =>
   );
 };
 
-// Call Modal Component
 const CallModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   if (!isOpen) return null;
 
@@ -391,7 +384,6 @@ const CallModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   );
 };
 
-// Message Modal Component
 const MessageModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   const [message, setMessage] = useState(`Hi ${employee?.employeeName || 'there'}, How are you?`);
 
@@ -485,19 +477,15 @@ const MessageModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   );
 };
 
-// Employee Card Component
 const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick }) => {
   const profilePic = employee.profilePic;
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setShowDropdown(false);
-    
     if (showDropdown) {
       window.addEventListener('click', handleClickOutside);
     }
-    
     return () => {
       window.removeEventListener('click', handleClickOutside);
     };
@@ -512,9 +500,9 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-slate-200 relative"
+      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-slate-200 relative flex flex-col h-full"
     >
-      <div className="p-4">
+      <div className="p-4 flex-grow">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div 
@@ -536,29 +524,25 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                   </div>
                 )}
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
             
-            <div>
-              <h3 className="font-semibold text-slate-900 text-base">{employee.employeeName}</h3>
+            <div className="overflow-hidden">
+              <h3 className="font-semibold text-slate-900 text-base truncate" title={employee.employeeName}>
+                {employee.employeeName}
+              </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <FaIdBadge className="text-slate-400 text-xs" />
                 <span className="text-xs text-slate-600 font-mono">{employee.employeeId}</span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <FaBuilding className="text-slate-400 text-xs" />
-                <span className="text-xs text-slate-600">{employee.department}</span>
+                <span className="text-xs text-slate-600 truncate" title={employee.department}>
+                  {employee.department}
+                </span>
               </div>
-              {employee.phoneNumber && (
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <FaPhoneAlt className="text-slate-400 text-xs" />
-                  <span className="text-xs text-blue-700 font-medium">{employee.phoneNumber}</span>
-                </div>
-              )}
             </div>
           </div>
           
-          {/* Dynamic Dropdown Logic */}
           <div className="relative">
             {employee.phoneNumber && (
               <>
@@ -647,7 +631,7 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
           {employee.isOnLeave && (
             <div className="bg-purple-50 rounded-md p-2.5 border border-purple-100">
               <div className="text-xs font-medium text-purple-800">{employee.leaveType}</div>
-              <div className="text-xs text-purple-700 mt-0.5">"{employee.reason}"</div>
+              <div className="text-xs text-purple-700 mt-0.5 line-clamp-1">"{employee.reason}"</div>
             </div>
           )}
         </div>
@@ -656,10 +640,120 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
   );
 };
 
-// Main Component
+// --- Table View Component ---
+const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-slate-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Employee
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Punch In / Out
+              </th>
+               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Duration / Notes
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-slate-200">
+            {data.map((employee, idx) => (
+              <tr key={employee.employeeId || idx} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div 
+                      className="flex-shrink-0 h-10 w-10 cursor-pointer"
+                      onClick={() => onImageClick(employee.profilePic)}
+                    >
+                      {employee.profilePic ? (
+                        <img className="h-10 w-10 rounded-full object-cover border border-slate-200" src={employee.profilePic} alt="" />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-medium">
+                          {(employee.employeeName || "U").charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-slate-900">{employee.employeeName}</div>
+                      <div className="text-xs text-slate-500">{employee.department} • {employee.employeeId}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex flex-col gap-1 items-start">
+                    <StatusBadge status={employee.category} />
+                    <LoginStatusBadge status={employee.loginStatus?.status || "--"} />
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {employee.punchIn ? (
+                    <div className="text-sm text-slate-700">
+                      <div className="font-medium text-emerald-700">
+                        In: {new Date(employee.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {employee.punchOut && (
+                        <div className="text-rose-700">
+                          Out: {new Date(employee.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-400">--</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                   {employee.category === 'WORKING' ? (
+                     <LiveTimer startTime={employee.punchIn} />
+                   ) : employee.isOnLeave ? (
+                     <div className="text-xs">
+                        <span className="font-medium text-purple-700 block">{employee.leaveType}</span>
+                        <span className="text-slate-500 truncate max-w-[150px] block" title={employee.reason}>"{employee.reason}"</span>
+                     </div>
+                   ) : (
+                     <span className="text-sm text-slate-400">--</span>
+                   )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  {employee.phoneNumber && (
+                    <div className="flex items-center justify-end gap-2">
+                       <button 
+                        onClick={() => onCallClick(employee)}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Call"
+                       >
+                         <FaPhoneAlt size={14} />
+                       </button>
+                       <button 
+                        onClick={() => onMessageClick(employee)}
+                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                        title="Message"
+                       >
+                         <FaComment size={14} />
+                       </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+
+// --- Main Component ---
 const TodayOverview = () => {
-  const todayISO = new Date().toISOString().split("T")[0];
-  
   // State
   const [attendanceData, setAttendanceData] = useState([]);
   const [leaveData, setLeaveData] = useState([]);
@@ -667,15 +761,18 @@ const TodayOverview = () => {
   const [shiftsMap, setShiftsMap] = useState({});
   const [employeeImages, setEmployeeImages] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  // Filters & UI State
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState("card"); // 'card' or 'table'
+  const [filterType, setFilterType] = useState("WORKING"); // Default "Working"
   const [departmentFilter, setDepartmentFilter] = useState("All");
+  
+  // Modals
+  const [previewImage, setPreviewImage] = useState(null);
   const [callModal, setCallModal] = useState({ isOpen: false, employee: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, employee: null });
   const [employeePhoneNumbers, setEmployeePhoneNumbers] = useState({});
-  const [showLateOnly, setShowLateOnly] = useState(false);
 
   // Optimized data fetch
   const fetchAllData = useCallback(async () => {
@@ -721,43 +818,29 @@ const TodayOverview = () => {
       
       const newImages = {};
       const newPhoneNumbers = {};
-      
-      // Process only first 20 employees initially (for performance)
       const employeesToProcess = allEmployees.slice(0, 20);
       
       await Promise.all(
         employeesToProcess.map(async (emp) => {
           const empId = emp.employeeId;
           if (!empId) return;
-          
           try {
             const res = await api.get(`/api/profile/${empId}`);
-            
             if (res?.data?.profilePhoto?.url) {
               newImages[empId] = getSecureUrl(res.data.profilePhoto.url);
             }
-            
             if (res?.data?.phone) {
               newPhoneNumbers[empId] = res.data.phone;
             }
-          } catch (err) {
-            // Silent fail
-          }
+          } catch (err) {}
         })
       );
       
-      if (Object.keys(newImages).length > 0) {
-        setEmployeeImages(prev => ({ ...prev, ...newImages }));
-      }
-      
-      if (Object.keys(newPhoneNumbers).length > 0) {
-        setEmployeePhoneNumbers(prev => ({ ...prev, ...newPhoneNumbers }));
-      }
+      if (Object.keys(newImages).length > 0) setEmployeeImages(prev => ({ ...prev, ...newImages }));
+      if (Object.keys(newPhoneNumbers).length > 0) setEmployeePhoneNumbers(prev => ({ ...prev, ...newPhoneNumbers }));
     };
     
-    if (allEmployees.length > 0) {
-      fetchEmployeeDetails();
-    }
+    if (allEmployees.length > 0) fetchEmployeeDetails();
   }, [allEmployees]);
 
   // Initial data fetch
@@ -765,7 +848,7 @@ const TodayOverview = () => {
     fetchAllData();
   }, []);
 
-  // 1. First, create the consolidated unfiltered data for everyone today
+  // 1. Consolidate Raw Data
   const allDailyData = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     const empNameMap = allEmployees.reduce((acc, emp) => {
@@ -773,7 +856,6 @@ const TodayOverview = () => {
       return acc;
     }, {});
 
-    // Process attendance with login status
     const attendanceWithDetails = attendanceData.map(item => {
       const shift = shiftsMap[item.employeeId];
       const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
@@ -784,8 +866,7 @@ const TodayOverview = () => {
         ...item,
         employeeName: realName,
         department,
-        category: !item.punchIn ? 'NOT_LOGGED_IN' : 
-                  (item.punchIn && !item.punchOut ? 'WORKING' : 'COMPLETED'),
+        category: !item.punchIn ? 'NOT_LOGGED_IN' : (item.punchIn && !item.punchOut ? 'WORKING' : 'COMPLETED'),
         isOnLeave: false,
         loginStatus,
         profilePic: employeeImages[item.employeeId],
@@ -793,12 +874,8 @@ const TodayOverview = () => {
       };
     });
 
-    // Get all active employee IDs
-    const activeEmployeeIds = new Set(
-      allEmployees.filter(e => e.isActive !== false).map(e => e.employeeId)
-    );
+    const activeEmployeeIds = new Set(allEmployees.filter(e => e.isActive !== false).map(e => e.employeeId));
 
-    // Get employees on leave today
     const onLeaveToday = leaveData.filter(leave => {
       if (leave.status !== 'Approved') return false;
       return today >= leave.from && today <= leave.to;
@@ -820,7 +897,6 @@ const TodayOverview = () => {
       };
     });
 
-    // Get employees not logged in
     const presentIds = new Set(attendanceData.map(att => att.employeeId));
     const onLeaveIds = new Set(onLeaveToday.map(l => l.employeeId));
     
@@ -845,7 +921,7 @@ const TodayOverview = () => {
     return [...attendanceWithDetails, ...onLeaveToday, ...notLoggedIn];
   }, [attendanceData, leaveData, allEmployees, shiftsMap, employeeImages, employeePhoneNumbers]);
 
-  // 2. Filter only by department (Used for Summary Stats)
+  // 2. Department Filter Data (Source for Stats)
   const departmentFilteredData = useMemo(() => {
     if (departmentFilter === "All") {
       return allDailyData;
@@ -853,15 +929,35 @@ const TodayOverview = () => {
     return allDailyData.filter(item => item.department === departmentFilter);
   }, [allDailyData, departmentFilter]);
 
-  // 3. Filter for Display (Late, Search, Category)
-  const processedData = useMemo(() => {
+  // 3. Calculate Stats (Counts) based on Department Data
+  const stats = useMemo(() => {
+    // This uses departmentFilteredData so counts don't go to zero when 'Late' or 'Working' is selected
+    const baseData = departmentFilteredData;
+    
+    return {
+      working: baseData.filter(item => item.category === 'WORKING').length,
+      completed: baseData.filter(item => item.category === 'COMPLETED').length,
+      notLoggedIn: baseData.filter(item => item.category === 'NOT_LOGGED_IN').length,
+      onLeave: baseData.filter(item => item.category === 'ON_LEAVE').length,
+      late: baseData.filter(item => item.loginStatus?.isLate === true).length,
+      total: baseData.length
+    };
+  }, [departmentFilteredData]);
+
+  // 4. Final Display Data (Filtered by Dropdown Selection + Search)
+  const finalDisplayData = useMemo(() => {
     let filtered = departmentFilteredData;
-    
-    // Apply late filter
-    if (showLateOnly) {
-      filtered = filtered.filter(item => item.loginStatus?.isLate === true);
+
+    // Apply Dropdown Filter
+    if (filterType !== 'ALL') {
+        if (filterType === 'LATE') {
+            filtered = filtered.filter(item => item.loginStatus?.isLate === true);
+        } else {
+            filtered = filtered.filter(item => item.category === filterType);
+        }
     }
-    
+
+    // Apply Search
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(item => 
@@ -871,37 +967,11 @@ const TodayOverview = () => {
         (item.phoneNumber && item.phoneNumber.includes(searchTerm))
       );
     }
-    
+
     return filtered;
-  }, [departmentFilteredData, showLateOnly, searchTerm]);
+  }, [departmentFilteredData, filterType, searchTerm]);
 
-  // Categorize data (based on displayed processedData for Top Tiles functionality)
-  const categorizedData = useMemo(() => {
-    const categories = {
-      WORKING: processedData.filter(item => item.category === 'WORKING'),
-      COMPLETED: processedData.filter(item => item.category === 'COMPLETED'),
-      NOT_LOGGED_IN: processedData.filter(item => item.category === 'NOT_LOGGED_IN'),
-      ON_LEAVE: processedData.filter(item => item.category === 'ON_LEAVE')
-    };
-    return categories;
-  }, [processedData]);
-
-  // Late employees count (based on processedData for Top Tiles)
-  const lateEmployeesCount = useMemo(() => {
-    return processedData.filter(item => item.loginStatus?.isLate === true).length;
-  }, [processedData]);
-
-  // Statistics for Top Tiles (Dynamic based on filter)
-  const stats = useMemo(() => ({
-    working: categorizedData.WORKING.length,
-    completed: categorizedData.COMPLETED.length,
-    notLoggedIn: categorizedData.NOT_LOGGED_IN.length,
-    onLeave: categorizedData.ON_LEAVE.length,
-    late: lateEmployeesCount,
-    total: processedData.length
-  }), [categorizedData, processedData, lateEmployeesCount]);
-
-  // 4. Calculate Summary Metrics (Based on departmentFilteredData, IGNORING Search/Late filters)
+  // Summary Metrics
   const summaryMetrics = useMemo(() => {
     const total = departmentFilteredData.length;
     const working = departmentFilteredData.filter(i => i.category === 'WORKING').length;
@@ -918,46 +988,28 @@ const TodayOverview = () => {
     };
   }, [departmentFilteredData]);
 
-  // Get unique departments
   const departments = useMemo(() => {
     const depts = allDailyData.map(item => item.department).filter(Boolean);
     return ['All', ...new Set(depts)];
   }, [allDailyData]);
 
-  // Get displayed data based on selection
-  const displayedData = useMemo(() => {
-    if (selectedCategory) {
-      return categorizedData[selectedCategory];
-    }
-    return processedData;
-  }, [selectedCategory, categorizedData, processedData]);
+  // Handlers
+  const handleCallClick = (employee) => setCallModal({ isOpen: true, employee });
+  const handleMessageClick = (employee) => setMessageModal({ isOpen: true, employee });
 
-  // Handle call button click
-  const handleCallClick = (employee) => {
-    setCallModal({ isOpen: true, employee });
-  };
-
-  // Handle message button click
-  const handleMessageClick = (employee) => {
-    setMessageModal({ isOpen: true, employee });
-  };
-
-  // Auto-refresh data every 3 minutes
+  // Auto-refresh
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchAllData();
-    }, 180000); // 3 minutes
-    
+    const interval = setInterval(() => fetchAllData(), 180000); // 3 min
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-<div className=" z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200">
+      <div className="z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200 ">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between h-20">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0 gap-4 sm:gap-0">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               <div className="p-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg shadow">
                 <FaCalendarDay className="text-white text-xl" />
               </div>
@@ -973,186 +1025,134 @@ const TodayOverview = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-2.5 mt-4 sm:mt-0">
-              {/* Search */}
-              <div className="relative">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto">
+              <div className="relative flex-grow sm:flex-grow-0">
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
                 <input
                   type="text"
-                  placeholder="Search employees..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-56 text-sm shadow-sm"
                 />
               </div>
               
-              {/* Refresh Button */}
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={fetchAllData}
                 disabled={loading}
-                className={`px-3.5 py-2.5 font-medium rounded-lg transition-all text-sm flex items-center gap-1.5 ${
+                className={`px-3.5 py-2.5 font-medium rounded-lg transition-all text-sm flex items-center gap-1.5 whitespace-nowrap ${
                   loading 
                     ? 'bg-slate-300 text-slate-700 cursor-not-allowed' 
                     : 'bg-slate-800 text-white hover:bg-slate-900'
                 }`}
               >
-                {loading ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Loading...
-                  </>
-                ) : (
-                  'Refresh'
-                )}
+                {loading ? 'Refreshing...' : 'Refresh'}
               </motion.button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Stats Grid */}
+        {/* Stats Grid - Counts won't reset to zero when filtering */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <StatCard
             icon={<FaClock />}
-            title="Currently Working"
+            title="Working"
             value={stats.working}
             category="WORKING"
-            isActive={selectedCategory === 'WORKING'}
-            onClick={() => {
-              setSelectedCategory(selectedCategory === 'WORKING' ? null : 'WORKING');
-              setShowLateOnly(false);
-            }}
+            isActive={filterType === 'WORKING'}
+            onClick={() => setFilterType('WORKING')}
           />
-          
           <StatCard
             icon={<FaCheckCircle />}
-            title="Shift Completed"
+            title="Completed"
             value={stats.completed}
             category="COMPLETED"
-            isActive={selectedCategory === 'COMPLETED'}
-            onClick={() => {
-              setSelectedCategory(selectedCategory === 'COMPLETED' ? null : 'COMPLETED');
-              setShowLateOnly(false);
-            }}
+            isActive={filterType === 'COMPLETED'}
+            onClick={() => setFilterType('COMPLETED')}
           />
-          
           <StatCard
             icon={<FaUserSlash />}
-            title="Not Logged In"
+            title="Not Logged"
             value={stats.notLoggedIn}
             category="NOT_LOGGED_IN"
-            isActive={selectedCategory === 'NOT_LOGGED_IN'}
-            onClick={() => {
-              setSelectedCategory(selectedCategory === 'NOT_LOGGED_IN' ? null : 'NOT_LOGGED_IN');
-              setShowLateOnly(false);
-            }}
+            isActive={filterType === 'NOT_LOGGED_IN'}
+            onClick={() => setFilterType('NOT_LOGGED_IN')}
           />
-          
           <StatCard
             icon={<FaCalendarAlt />}
-            title="On Leave Today"
+            title="On Leave"
             value={stats.onLeave}
             category="ON_LEAVE"
-            isActive={selectedCategory === 'ON_LEAVE'}
-            onClick={() => {
-              setSelectedCategory(selectedCategory === 'ON_LEAVE' ? null : 'ON_LEAVE');
-              setShowLateOnly(false);
-            }}
+            isActive={filterType === 'ON_LEAVE'}
+            onClick={() => setFilterType('ON_LEAVE')}
           />
-          
           <StatCard
             icon={<FaUserClock />}
-            title="Late Employees"
+            title="Late"
             value={stats.late}
             category="LATE"
-            isActive={showLateOnly}
-            onClick={() => {
-              setShowLateOnly(!showLateOnly);
-              setSelectedCategory(null);
-            }}
+            isActive={filterType === 'LATE'}
+            onClick={() => setFilterType('LATE')}
           />
         </div>
 
-        {/* Filters and Category Tabs */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => {
-                  setSelectedCategory(null);
-                  setShowLateOnly(false);
-                }}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  selectedCategory === null && !showLateOnly
-                    ? 'bg-slate-900 text-white shadow'
-                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
-                }`}
-              >
-                All Employees ({processedData.length})
-              </button>
-              
-              {['WORKING', 'COMPLETED', 'NOT_LOGGED_IN', 'ON_LEAVE'].map(category => (
-                <button
-                  key={category}
-                  onClick={() => {
-                    setSelectedCategory(selectedCategory === category ? null : category);
-                    setShowLateOnly(false);
-                  }}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-1.5 ${
-                    selectedCategory === category
-                      ? category === 'WORKING' 
-                        ? 'bg-blue-600 text-white shadow'
-                        : category === 'COMPLETED'
-                        ? 'bg-emerald-600 text-white shadow'
-                        : category === 'NOT_LOGGED_IN'
-                        ? 'bg-slate-600 text-white shadow'
-                        : 'bg-purple-600 text-white shadow'
-                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
-                  }`}
-                >
-                  {category === 'WORKING' ? 'Working' :
-                   category === 'COMPLETED' ? 'Completed' :
-                   category === 'NOT_LOGGED_IN' ? 'Not Logged' : 'On Leave'}
-                  <span className={`px-1.5 py-0.5 text-xs rounded ${
-                    selectedCategory === category
-                      ? 'bg-white/20'
-                      : category === 'WORKING' ? 'bg-blue-100 text-blue-700'
-                      : category === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
-                      : category === 'NOT_LOGGED_IN' ? 'bg-slate-100 text-slate-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    {categorizedData[category]?.length || 0}
-                  </span>
-                </button>
-              ))}
-              
-              {/* Late Employees Filter */}
-              <button
-                onClick={() => {
-                  setShowLateOnly(!showLateOnly);
-                  setSelectedCategory(null);
-                }}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-1.5 ${
-                  showLateOnly
-                    ? 'bg-amber-600 text-white shadow'
-                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
-                }`}
-              >
-                <FaUserClock className="text-xs" />
-                Late ({stats.late})
-              </button>
-            </div>
+        {/* Controls Bar */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             
+            {/* Filter Group */}
+            <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+              {/* Layout Dropdown */}
+              <div className="flex items-center gap-2">
+                 <span className="text-sm font-medium text-slate-700">Layout:</span>
+                 <div className="relative">
+                    <select
+                        value={viewMode}
+                        onChange={(e) => setViewMode(e.target.value)}
+                        className="appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 p-2.5 pr-8 cursor-pointer"
+                    >
+                        <option value="card">Cards View</option>
+                        <option value="table">Table View</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                         {viewMode === 'card' ? <FaThLarge className="text-slate-500 text-xs"/> : <FaList className="text-slate-500 text-xs"/>}
+                    </div>
+                 </div>
+              </div>
+
+              {/* Status Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700">Filter Status:</span>
+                <div className="relative">
+                    <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        className="appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 p-2.5 pr-8 cursor-pointer"
+                    >
+                        <option value="ALL">All Employees</option>
+                        <option value="WORKING">Working</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="NOT_LOGGED_IN">Not Logged</option>
+                        <option value="ON_LEAVE">On Leave</option>
+                        <option value="LATE">Late</option>
+                    </select>
+                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                         <FaFilter className="text-slate-500 text-xs"/>
+                    </div>
+                </div>
+              </div>
+            </div>
+
             {/* Department Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Department:</span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-sm font-medium text-slate-700">Dept:</span>
               <select
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-48 p-2.5"
               >
                 {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
@@ -1161,44 +1161,53 @@ const TodayOverview = () => {
             </div>
           </div>
           
-          <div className="text-sm text-slate-500">
-            Showing {displayedData.length} of {processedData.length} employees
-            {showLateOnly && ` • ${stats.late} late employees`}
+          <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+             <span>Showing <strong>{finalDisplayData.length}</strong> results</span>
+             <span>Department Total: {departmentFilteredData.length}</span>
           </div>
         </div>
 
-        {/* Employees Grid */}
-        {loading && processedData.length === 0 ? (
+        {/* Content Area (Card Grid or Table) */}
+        {loading && finalDisplayData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-slate-600 text-sm">Loading employee data...</p>
           </div>
-        ) : displayedData.length === 0 ? (
+        ) : finalDisplayData.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-20 h-20 bg-gradient-to-br from-slate-200 to-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaCalendarDay className="text-slate-400 text-2xl" />
             </div>
             <h3 className="text-lg font-semibold text-slate-700 mb-2">No employees found</h3>
-            <p className="text-slate-500 text-sm">Try changing your search or filters</p>
+            <p className="text-slate-500 text-sm">Try changing your filters</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {displayedData.map((employee, idx) => (
-              <EmployeeCard
-                key={employee.employeeId || idx}
-                employee={employee}
-                category={employee.category}
-                onImageClick={setPreviewImage}
-                onCallClick={handleCallClick}
-                onMessageClick={handleMessageClick}
-              />
-            ))}
-          </div>
+          viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {finalDisplayData.map((employee, idx) => (
+                <EmployeeCard
+                  key={employee.employeeId || idx}
+                  employee={employee}
+                  category={employee.category}
+                  onImageClick={setPreviewImage}
+                  onCallClick={handleCallClick}
+                  onMessageClick={handleMessageClick}
+                />
+              ))}
+            </div>
+          ) : (
+            <TableView 
+               data={finalDisplayData} 
+               onImageClick={setPreviewImage}
+               onCallClick={handleCallClick}
+               onMessageClick={handleMessageClick}
+            />
+          )
         )}
 
-        {/* Summary Stats */}
+        {/* Summary Footer */}
         <div className="mt-10 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Today's Summary</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Department Summary</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
               <div className="text-sm font-medium text-slate-500 mb-1">Attendance Rate</div>
@@ -1228,7 +1237,7 @@ const TodayOverview = () => {
             </div>
             
             <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-200">
-              <div className="text-sm font-medium text-slate-500 mb-1">Punctuality</div>
+              <div className="text-sm font-medium text-slate-500 mb-1">Punctuality Issues</div>
               <div className="text-2xl font-semibold text-amber-700">{summaryMetrics.late}</div>
               <div className="mt-1 text-xs text-slate-600">Late arrivals</div>
             </div>
@@ -1238,7 +1247,6 @@ const TodayOverview = () => {
 
       {/* Modals */}
       <AnimatePresence>
-        {/* Call Modal */}
         {callModal.isOpen && (
           <CallModal
             isOpen={callModal.isOpen}
@@ -1248,7 +1256,6 @@ const TodayOverview = () => {
           />
         )}
 
-        {/* Message Modal */}
         {messageModal.isOpen && (
           <MessageModal
             isOpen={messageModal.isOpen}
@@ -1258,7 +1265,6 @@ const TodayOverview = () => {
           />
         )}
 
-        {/* Image Preview Modal */}
         {previewImage && (
           <motion.div
             initial={{ opacity: 0 }}
