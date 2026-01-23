@@ -153,7 +153,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
         <div className="flex items-center gap-3">
           <div 
             className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-blue-700 font-bold border border-gray-300 overflow-hidden cursor-pointer flex-shrink-0"
-            onClick={() => navigate(`/employee/${emp.employeeId}/profile`)}
+            onClick={() => profilePic && onImageClick(profilePic)}
           >
             {profilePic ? (
               <img src={profilePic} alt={emp.name} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
@@ -237,7 +237,7 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
         <div className="flex items-center gap-3">
             <div 
               className="w-9 h-9 rounded-full bg-gray-400 flex items-center justify-center text-white font-bold border border-gray-500 overflow-hidden cursor-pointer flex-shrink-0 grayscale"
-              onClick={() => navigate(`/employee/${emp.employeeId}/profile`)}
+              onClick={() => profilePic && onImageClick(profilePic)}
             >
               {profilePic ? (
                 <img src={profilePic} alt={emp.name} className="w-full h-full object-cover" />
@@ -358,18 +358,327 @@ function DeactivationDetailsModal({ open, employee, onClose }) {
   );
 }
 
-// Overview Modal
+// ✅ Comprehensive Overview Modal (Restored from Code 1)
 function EmployeeOverviewModal({ open, employee, onClose }) {
-    if(!open || !employee) return null;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={onClose}>
-            <div className="bg-white p-8 rounded-lg shadow-2xl">
-                <h2 className="text-2xl font-bold mb-4">Overview: {employee.name}</h2>
-                <p>Overview details loaded here...</p>
-                <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded">Close</button>
-            </div>
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const lastDay = today.toISOString().split('T')[0];
+
+  const [attStartDate, setAttStartDate] = useState(firstDay);
+  const [attEndDate, setAttEndDate] = useState(lastDay);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [loadingAtt, setLoadingAtt] = useState(false);
+
+  // Leave State
+  const [leaveMonth, setLeaveMonth] = useState("All"); 
+  const [leaveData, setLeaveData] = useState([]);
+  const [leaveStats, setLeaveStats] = useState(null);
+  const [loadingLeave, setLoadingLeave] = useState(false);
+
+  // Fetch Data on Open or Filter Change
+  const fetchData = useCallback(async () => {
+    if (!employee || !open) return;
+
+    // 1. Fetch Attendance & Shifts
+    setLoadingAtt(true);
+    try {
+      const [allShiftsRes, attDataRes] = await Promise.all([
+        getAllShifts(),
+        getAttendanceByDateRange(attStartDate, attEndDate)
+      ]);
+      
+      const allShifts = Array.isArray(allShiftsRes) ? allShiftsRes : (allShiftsRes.data || []);
+      const attData = Array.isArray(attDataRes) ? attDataRes : (attDataRes.data || []);
+
+      const empShift = allShifts.find(s => s.employeeId === employee.employeeId);
+      const filteredAtt = attData.filter(a => a.employeeId === employee.employeeId);
+      
+      // Extract Admin Assigned Hours to Calculate Status Correctly
+      const adminFullDayHours = empShift?.fullDayHours || 9;
+      const adminHalfDayHours = empShift?.halfDayHours || 4.5;
+
+      // Process Attendance
+      const processedAtt = filteredAtt.map(item => {
+        return {
+          ...item,
+          shiftDuration: adminFullDayHours, // Display assigned hours
+          // Pass thresholds to getWorkedStatus
+          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
+          isLate: item.loginStatus === "LATE"
+        };
+      }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      setAttendanceData(processedAtt);
+    } catch (e) { console.error("Error fetching attendance overview", e); }
+    setLoadingAtt(false);
+
+    // 2. Fetch Leaves & Holidays
+    setLoadingLeave(true);
+    try {
+      const [leavesRes, holsRes] = await Promise.all([getLeaveRequests(), getHolidays()]);
+      
+      const leaves = Array.isArray(leavesRes) ? leavesRes : (leavesRes.data || []);
+      const hols = Array.isArray(holsRes) ? holsRes : (holsRes.data || []);
+
+      const normHolidays = hols.map(h => ({ ...h, start: normalize(h.startDate), end: normalize(h.endDate || h.startDate) }));
+
+      const empLeaves = leaves.filter(l => l.employeeId === employee.employeeId);
+      const filteredLeaves = empLeaves.filter(l => leaveMonth === "All" || isDateInMonth(l.from, leaveMonth) || isDateInMonth(l.to, leaveMonth));
+      
+      // Calculate Stats (Sandwich logic)
+      const approvedLeaves = empLeaves.filter(l => l.status === "Approved" && (leaveMonth === "All" || isDateInMonth(l.from, leaveMonth) || isDateInMonth(l.to, leaveMonth)));
+      
+      // Build Booked Map
+      const bookedMap = new Map();
+      approvedLeaves.forEach(l => {
+        let curr = new Date(l.from);
+        const end = new Date(l.to);
+        while (curr <= end) {
+          bookedMap.set(formatDate(curr), !l.halfDaySession); // true if full day
+          curr = addDays(curr, 1);
+        }
+      });
+
+      let sandwichDays = 0;
+      // Holiday Sandwich
+      normHolidays.forEach(h => {
+         if (leaveMonth !== "All" && !isDateInMonth(formatDate(h.start), leaveMonth)) return;
+         const prev = formatDate(addDays(h.start, -1));
+         const next = formatDate(addDays(h.end, 1));
+         if (bookedMap.get(prev) === true && bookedMap.get(next) === true) {
+            sandwichDays += calculateLeaveDays(h.start, h.end);
+         }
+      });
+      // Weekend Sandwich (Sat check)
+      for (const [dateStr, isFull] of bookedMap.entries()) {
+         if (!isFull) continue;
+         if (leaveMonth !== "All" && !isDateInMonth(dateStr, leaveMonth)) continue;
+         const d = new Date(dateStr);
+         if (d.getDay() === 6) { // Sat
+            const mon = formatDate(addDays(d, 2));
+            if (bookedMap.get(mon) === true) sandwichDays += 1; // Sun
+         }
+      }
+
+      const normalDays = approvedLeaves.reduce((acc, l) => acc + calculateLeaveDays(l.from, l.to), 0);
+      const totalUsed = normalDays + sandwichDays;
+      const credit = 1; 
+      
+      setLeaveStats({
+        totalUsed,
+        pending: Math.max(0, credit - totalUsed),
+        extra: Math.max(0, totalUsed - credit),
+        normalDays,
+        sandwichDays
+      });
+      
+      setLeaveData(filteredLeaves.sort((a,b) => new Date(b.from) - new Date(a.from)));
+
+    } catch (e) { console.error("Error fetching leave overview", e); }
+    setLoadingLeave(false);
+
+  }, [employee, open, attStartDate, attEndDate, leaveMonth]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (!open || !employee) return null;
+
+  // Exports
+  const exportAttendance = () => {
+    const data = attendanceData.map(a => ({
+      Date: new Date(a.date).toLocaleDateString(),
+      "Punch In": a.punchIn ? new Date(a.punchIn).toLocaleTimeString() : "-",
+      "Punch Out": a.punchOut ? new Date(a.punchOut).toLocaleTimeString() : "-",
+      "Assigned Hrs": formatDecimalHours(a.shiftDuration),
+      "Status": a.status,
+      "Worked Status": a.workedStatus,
+      "Duration": a.displayTime || "-"
+    }));
+    downloadExcelReport(data, `${employee.name}_Attendance.xlsx`);
+  };
+
+  const exportLeaves = () => {
+     const data = leaveData.map(l => ({
+        From: new Date(l.from).toLocaleDateString(),
+        To: new Date(l.to).toLocaleDateString(),
+        Type: l.leaveType,
+        Status: l.status,
+        Days: calculateLeaveDays(l.from, l.to)
+     }));
+     const csv = [
+        Object.keys(data[0] || {}).join(","),
+        ...data.map(row => Object.values(row).join(","))
+     ].join("\n");
+     saveAs(new Blob([csv], {type: "text/csv;charset=utf-8"}), `${employee.name}_Leaves.csv`);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-5 flex justify-between items-center text-white shrink-0">
+           <div>
+             <h2 className="text-2xl font-bold tracking-wide flex items-center gap-3">
+               <FaClipboardList className="text-teal-400"/> {employee.name} <span className="text-slate-400 font-normal text-lg">Overview</span>
+             </h2>
+             <p className="text-slate-400 text-sm mt-1 font-mono">{employee.employeeId} | {getCurrentDepartment(employee)}</p>
+           </div>
+           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition"><FaTimes size={24}/></button>
         </div>
-    )
+
+        <div className="overflow-y-auto p-6 space-y-8 flex-1 bg-slate-50">
+           
+           {/* === SECTION 1: ATTENDANCE === */}
+           <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><FaCalendarAlt className="text-blue-600"/> Attendance History</h3>
+                 <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center bg-slate-100 rounded-lg px-3 py-1 border">
+                       <span className="text-xs text-slate-500 mr-2 uppercase font-bold">From</span>
+                       <input type="date" value={attStartDate} onChange={e => setAttStartDate(e.target.value)} className="bg-transparent text-sm font-semibold outline-none text-slate-700"/>
+                    </div>
+                    <div className="flex items-center bg-slate-100 rounded-lg px-3 py-1 border">
+                       <span className="text-xs text-slate-500 mr-2 uppercase font-bold">To</span>
+                       <input type="date" value={attEndDate} onChange={e => setAttEndDate(e.target.value)} className="bg-transparent text-sm font-semibold outline-none text-slate-700"/>
+                    </div>
+                    <button onClick={exportAttendance} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-green-700 transition shadow-sm">
+                       <FaFileExcel /> Export
+                    </button>
+                 </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                 <table className="min-w-full text-sm">
+                    <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
+                       <tr>
+                          <th className="px-4 py-3 text-left">Date</th>
+                          <th className="px-4 py-3 text-left">Punch In</th>
+                          <th className="px-4 py-3 text-left">Punch Out</th>
+                          <th className="px-4 py-3 text-left">Assigned Hrs</th>
+                          <th className="px-4 py-3 text-left">Duration</th>
+                          <th className="px-4 py-3 text-left">Worked Status</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                       {loadingAtt ? (
+                          <tr><td colSpan="6" className="p-8 text-center text-slate-500">Loading attendance data...</td></tr>
+                       ) : attendanceData.length === 0 ? (
+                          <tr><td colSpan="6" className="p-8 text-center text-slate-500">No records found for this period.</td></tr>
+                       ) : (
+                          attendanceData.map((row, i) => (
+                             <tr key={i} className="hover:bg-slate-50 transition">
+                                <td className="px-4 py-3 font-medium text-slate-700">{new Date(row.date).toLocaleDateString()}</td>
+                                <td className="px-4 py-3 text-green-700 font-semibold">
+                                   {row.punchIn ? new Date(row.punchIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : <span className="text-slate-400">--</span>}
+                                   {row.isLate && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded">LATE</span>}
+                                </td>
+                                <td className="px-4 py-3 text-red-700 font-semibold">
+                                   {row.punchOut ? new Date(row.punchOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : <span className="text-slate-400">--</span>}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-slate-600">{formatDecimalHours(row.shiftDuration)}</td>
+                                <td className="px-4 py-3 font-mono text-slate-600">{row.displayTime || "-"}</td>
+                                <td className="px-4 py-3">
+                                   <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                      row.workedStatus === "Full Day" ? "bg-green-100 text-green-700" :
+                                      row.workedStatus.includes("Absent") ? "bg-red-100 text-red-700" :
+                                      "bg-yellow-100 text-yellow-700"
+                                   }`}>{row.workedStatus}</span>
+                                </td>
+                             </tr>
+                          ))
+                       )}
+                    </tbody>
+                 </table>
+              </div>
+           </section>
+
+           {/* DIVIDER */}
+           <hr className="border-slate-300 border-dashed" />
+
+           {/* === SECTION 2: LEAVE SUMMARY === */}
+           <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><FaClipboardList className="text-purple-600"/> Leave Summary</h3>
+                 <div className="flex items-center gap-3">
+                    <select value={leaveMonth} onChange={(e) => setLeaveMonth(e.target.value)} className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-purple-200">
+                       <option value="All">All Months</option>
+                       {Array.from({length: 12}, (_, i) => {
+                          const d = new Date(); d.setMonth(i);
+                          const val = `${d.getFullYear()}-${String(i+1).padStart(2, '0')}`;
+                          return <option key={val} value={val}>{d.toLocaleString('default', {month:'long'})} {d.getFullYear()}</option>
+                       })}
+                    </select>
+                    <button onClick={exportLeaves} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-purple-700 transition shadow-sm">
+                       <FaDownload /> CSV
+                    </button>
+                 </div>
+              </div>
+
+              {/* Leave Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                    <p className="text-xs font-bold text-blue-600 uppercase">Pending (Credit)</p>
+                    <p className="text-2xl font-bold text-slate-800">{leaveStats?.pending ?? "-"}</p>
+                 </div>
+                 <div className="bg-green-50 p-4 rounded-xl border border-green-100 text-center">
+                    <p className="text-xs font-bold text-green-600 uppercase">Total Used</p>
+                    <p className="text-2xl font-bold text-slate-800">{leaveStats?.totalUsed ?? "-"}</p>
+                 </div>
+                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 text-center">
+                    <p className="text-xs font-bold text-orange-600 uppercase">Extra (LOP)</p>
+                    <p className="text-2xl font-bold text-slate-800">{leaveStats?.extra ?? "-"}</p>
+                 </div>
+                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
+                    <p className="text-xs font-bold text-purple-600 uppercase">Sandwich Days</p>
+                    <p className="text-2xl font-bold text-slate-800">{leaveStats?.sandwichDays ?? "-"}</p>
+                 </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                 <table className="min-w-full text-sm">
+                    <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
+                       <tr>
+                          <th className="px-4 py-3 text-left">Applied Date</th>
+                          <th className="px-4 py-3 text-left">Period</th>
+                          <th className="px-4 py-3 text-left">Type</th>
+                          <th className="px-4 py-3 text-left">Reason</th>
+                          <th className="px-4 py-3 text-left">Status</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                       {loadingLeave ? (
+                          <tr><td colSpan="5" className="p-8 text-center text-slate-500">Loading leave data...</td></tr>
+                       ) : leaveData.length === 0 ? (
+                          <tr><td colSpan="5" className="p-8 text-center text-slate-500">No leave records found.</td></tr>
+                       ) : (
+                          leaveData.map((l, i) => (
+                             <tr key={i} className="hover:bg-slate-50 transition">
+                                <td className="px-4 py-3 text-slate-600">{new Date(l.requestDate || l.createdAt).toLocaleDateString()}</td>
+                                <td className="px-4 py-3 font-medium text-slate-800">
+                                   {new Date(l.from).toLocaleDateString()} <span className="text-slate-400">→</span> {new Date(l.to).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-3 text-slate-700">{l.leaveType}</td>
+                                <td className="px-4 py-3 text-slate-500 truncate max-w-xs">{l.reason || "-"}</td>
+                                <td className="px-4 py-3">
+                                   <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                      l.status === "Approved" ? "bg-green-100 text-green-700" :
+                                      l.status === "Rejected" ? "bg-red-100 text-red-700" :
+                                      "bg-yellow-100 text-yellow-700"
+                                   }`}>{l.status}</span>
+                                </td>
+                             </tr>
+                          ))
+                       )}
+                    </tbody>
+                 </table>
+              </div>
+           </section>
+
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ==========================================
@@ -530,4 +839,4 @@ const EmployeeManagement = () => {
 };
 
 export default EmployeeManagement;
-// --- END OF FILE EmployeeManagement.jsx ---
+// --- END OF FILE src/pages/EmployeeManagement.jsx ---
