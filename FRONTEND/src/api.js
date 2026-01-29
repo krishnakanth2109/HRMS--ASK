@@ -610,6 +610,9 @@ export const savePayrollRules = async (rulesData) => {
     throw error;
   }
 };
+// Add this export to your api/index.js file
+export const getEmployeePayroll = (employeeId, month) => 
+  api.get(`/api/payroll/record/${employeeId}?month=${month}`);
 
 
 export default api;

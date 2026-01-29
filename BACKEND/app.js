@@ -32,6 +32,7 @@ import meetingRoutes from "./routes/meetingRoutes.js";
 import rulesRoutes from './routes/rules.js';
 import chatRoutes from "./routes/chat.js";
 import payrollRoutes from './routes/payroll.js';
+import expenseRoutes from "./routes/expenseRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -146,6 +147,7 @@ app.use('/api/meetings', meetingRoutes);
 app.use('/api/rules', rulesRoutes);
 app.use("/api/chat", chatRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use("/api/expenses", expenseRoutes);
 // app.use("/api/companies", companyRoutes);
 
 
