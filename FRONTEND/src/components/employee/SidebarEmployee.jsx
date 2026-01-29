@@ -15,20 +15,29 @@ import {
 import { AuthContext } from "../../context/AuthContext";
 // Import API to fetch real DB data
 import api from "../../api";
+import { CalendarDays, ChartPie, MapPinHouse } from "lucide-react";
 
 const navLinks = [
   { to: "/employee/dashboard", label: "Dashboard", icon: <FaHome /> },
-  { to: "/employee/my-attendence", label: "Attendance", icon: <FaClock /> },
-  { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <FaClipboardList /> },
+  { to: "/employee/my-attendence", label: "Attendance", icon: <ChartPie /> },
+  { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <CalendarDays /> },
   { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />, isNotice: true },
   { to: "/employee/empovertime", label: "Request Overtime", icon: <FaClock /> },
   { to: "/employee/leave-management", label: "Leave Requests", icon: <FaClipboardList /> },
-  { to: "/employee/reuestworkmode", label: "Request WorkMode", icon: <FaClock /> },
-  {
-    to: "/employee/teams",
-    label: "My Teams",
+  { to: "/employee/reuestworkmode", label: "WorkMode Request", icon: <MapPinHouse /> },
+    { to: "/employee/payslip", label: "Pay-Slip", icon: <FaClipboardList />  },
+  // {
+  //   to: "/employee/teams",
+  //   label: "My Teams",
+  //   icon: <FaUsers />,
+  // },
+    {
+    to: "/employee/chatting",
+    label: "Connect with Employee",
     icon: <FaUsers />,
-  }
+  },
+   { to: "/employee/expense", label: "Add Expense", icon: <FaClipboardList />  },
+  
 
 ];
 

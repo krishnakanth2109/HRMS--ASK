@@ -73,6 +73,10 @@ import MeetingGenerator from "./pages/meeting";
 import TodayOverview from "./pages/TodayOverview";
 import EmployeeViewRules from "./EmployeePages/EmployeeViewRules";
 import AdminRulesPost from "./pages/AdminRulespost";
+import EmployeePayslip from "./EmployeePages/EmployeePayslip";
+import ConnectWithEmployee from "./EmployeePages/ConnectwithEmployee";
+import AddExpense from "./EmployeePages/AddExpense";
+import AdminExpenseDashboard from "./pages/AdminExpense";
 
 function App() {
   return (
@@ -147,6 +151,7 @@ function App() {
         <Route path="/admin/meeting" element={<MeetingGenerator />} />
         <Route path="/admin/today-overview" element={<TodayOverview />} />
           <Route path="/admin/rules" element={<AdminRulesPost />} />
+         <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}
@@ -171,8 +176,10 @@ function App() {
         <Route path="/employee/requestpunchout" element={<RequestPunchOut />} />
         <Route path="/employee/my-attendence" element={<EmployeeDailyAttendance />} />
         <Route path="/employee/new-attendence" element={<NewEmployeeAttendance />} />
-            <Route path="/employee/rules" element={<EmployeeViewRules />} />
-  
+        <Route path="/employee/rules" element={<EmployeeViewRules />} />
+        <Route path="/employee/payslip" element={<EmployeePayslip />} />
+        <Route path="/employee/chatting" element={<ConnectWithEmployee />} />
+        <Route path="/employee/expense" element={<AddExpense />} />
         <Route
           path="/employee/teams"
           element={<EmployeeTeamsPage />}
