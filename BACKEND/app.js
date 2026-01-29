@@ -32,6 +32,8 @@ import meetingRoutes from "./routes/meetingRoutes.js";
 import rulesRoutes from './routes/rules.js';
 import chatRoutes from "./routes/chat.js";
 import payrollRoutes from './routes/payroll.js';
+import companyRoutes from "./routes/companyRoutes.js";
+import messageRoutes from "./routes/messageRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -41,9 +43,11 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "https://hrms-420.netlify.app",    // Your Production Frontend
   "http://localhost:5173",           // Your Local Frontend
+  "http://localhost:3000",           // Alternative local frontend
   "https://hrms-ask.onrender.com",   // Your Self/Backend
-  "http://localhost:5000"  ,
-  "https://hrms-ask-1.onrender.com"          // Local Backend
+  "http://localhost:5000",
+  "https://hrms-ask-1.onrender.com", // Local Backend
+  "https://hrms-ask.vercel.app"      // Vercel Frontend
 ];
 
 // ===================================================================
@@ -90,11 +94,17 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        console.log("✅ No origin header (mobile/curl request allowed)");
+        return callback(null, true);
+      }
+      console.log(`🔍 Incoming origin: ${origin}`);
       if (allowedOrigins.indexOf(origin) === -1) {
+        console.log(`❌ Origin not allowed. Allowed origins: ${allowedOrigins.join(", ")}`);
         const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
         return callback(new Error(msg), false);
       }
+      console.log(`✅ Origin allowed: ${origin}`);
       return callback(null, true);
     },
     credentials: true,
@@ -115,7 +125,33 @@ app.use((req, res, next) => {
 // -------------------- DATABASE --------------------
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ Database Connected Successfully"))
+  .then(async () => {
+    console.log("✅ Database Connected Successfully");
+    
+    // Clean up old indexes that cause duplicate key errors
+    try {
+      const db = mongoose.connection.db;
+      const collection = db.collection("companies");
+      
+      // Use listIndexes for newer MongoDB driver versions
+      const indexes = await collection.listIndexes().toArray();
+      const indexNames = indexes.map(idx => idx.name);
+      
+      // Drop problematic indexes
+      const indexesToDrop = ["ownerEmail_1", "companyId_1"];
+      
+      for (const indexName of indexesToDrop) {
+        if (indexNames.includes(indexName)) {
+          await collection.dropIndex(indexName);
+          console.log(`✅ Dropped ${indexName} index from companies collection`);
+        }
+      }
+    } catch (err) {
+      if (!err.message.includes("index not found")) {
+        console.log("ℹ️  Index cleanup: ", err.message);
+      }
+    }
+  })
   .catch((err) => {
     console.error("❌ Database connection error:", err);
     process.exit(1);
@@ -149,9 +185,8 @@ app.use('/api/meetings', meetingRoutes);
 app.use('/api/rules', rulesRoutes);
 app.use("/api/chat", chatRoutes);
 app.use('/api/payroll', payrollRoutes);
-// app.use("/api/companies", companyRoutes);
-
-
+app.use('/api/companies', companyRoutes);
+app.use('/api/messages', messageRoutes);
 
 // -------------------- 404 Handler --------------------
 app.use("*", (req, res) => {
@@ -172,3 +207,4 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running with Socket.io on port ${PORT}`);
 });
+
