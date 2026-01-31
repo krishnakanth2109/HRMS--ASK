@@ -281,20 +281,41 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 /* ====================================================================================
-   ✅ NEW: EMPLOYEE REQUEST FOR LATE CORRECTION (Request On Time)
+   ✅ UPDATED: EMPLOYEE REQUEST FOR LATE CORRECTION (With 3 per month limit)
 ==================================================================================== */
 router.post('/request-correction', async (req, res) => {
     try {
         const { employeeId, date, time, reason } = req.body;
-        // User sends time as "HH:mm" (e.g. "09:00")
         
         let attendance = await Attendance.findOne({ employeeId });
         if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
 
+        // ✅ NEW: Monthly Limit Logic
+        const now = new Date();
+        const currentYearMonth = now.toISOString().slice(0, 7); // Result: "YYYY-MM" (e.g., "2026-01")
+
+        // Count how many days in the 'attendance' array for THIS month already have a request
+        const monthlyRequestCount = attendance.attendance.filter(day => 
+            day.date.startsWith(currentYearMonth) && 
+            day.lateCorrectionRequest?.hasRequest === true
+        ).length;
+
+        // Enforce the limit of 3
+        if (monthlyRequestCount >= 3) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Monthly limit reached. You can only submit 3 login correction requests per month." 
+            });
+        }
+
         let dayRecord = attendance.attendance.find(a => a.date === date);
         if (!dayRecord) return res.status(400).json({ message: "No attendance found for this date." });
+
+        // Check if a request already exists for this SPECIFIC day to avoid duplicates
+        if (dayRecord.lateCorrectionRequest?.hasRequest) {
+            return res.status(400).json({ message: "A request for this date has already been submitted." });
+        }
 
         // Construct Date object for requested time
         const requestedDateObj = new Date(`${date}T${time}:00`);
@@ -308,7 +329,10 @@ router.post('/request-correction', async (req, res) => {
         };
 
         await attendance.save();
-        res.json({ success: true, message: "Request sent to Admin." });
+        res.json({ 
+            success: true, 
+            message: `Request sent to Admin. (${monthlyRequestCount + 1}/3 used this month)` 
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
