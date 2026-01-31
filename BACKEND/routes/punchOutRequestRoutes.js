@@ -6,10 +6,29 @@ import Attendance from "../models/Attendance.js";
 
 const router = express.Router();
 
-// 1. Employee: Submit a Request
+// 1. Employee: Submit a Request (WITH 3 PER MONTH LIMIT)
 router.post("/create", async (req, res) => {
   try {
     const { employeeId, employeeName, originalDate, requestedPunchOut, reason } = req.body;
+
+    // ✅ NEW: Define the start and end of the current month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // ✅ NEW: Count existing requests made by this employee in the current month
+    const requestCount = await PunchOutRequest.countDocuments({
+      employeeId,
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+
+    // ✅ NEW: Enforce the limit of 3
+    if (requestCount >= 3) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Monthly limit reached. You can only submit 3 correction requests per month." 
+      });
+    }
 
     const newRequest = new PunchOutRequest({
       employeeId,
@@ -17,6 +36,7 @@ router.post("/create", async (req, res) => {
       originalDate,
       requestedPunchOut,
       reason,
+      // requestDate: now // Ensure your model tracks when the request was made
     });
 
     await newRequest.save();
