@@ -88,7 +88,9 @@ const DepartmentSettings = () => {
 
       const empList = Array.isArray(employeesData) ? employeesData : (employeesData?.data || []);
       const shiftList = Array.isArray(shiftsData) ? shiftsData : (shiftsData?.data || []);
+const activeEmployees = empList.filter(emp => emp.isActive === true);
 
+setEmployees(activeEmployees);
       setEmployees(empList);
       setShifts(shiftList);
 
