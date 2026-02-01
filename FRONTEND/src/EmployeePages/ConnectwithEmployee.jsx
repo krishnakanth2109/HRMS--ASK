@@ -7,7 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { 
   FaSearch, FaCircle, FaUsers, FaPaperPlane, FaSmile, FaSpinner, 
   FaEllipsisV, FaRegEdit, FaRegTrashAlt, FaTimes, FaComments,
-  FaPhone, FaVideo, FaEllipsisH, FaCheckDouble, FaCheck, FaEye,
+  FaEllipsisH, FaCheckDouble, FaCheck, FaEye,
   FaUserFriends, FaCommentDots, FaTrash, FaPen, FaChevronDown, FaChevronUp
 } from "react-icons/fa";
 
@@ -111,14 +111,27 @@ const ConnectWithEmployee = () => {
         )
       : chatList;
     
-    return [...list].sort((a, b) => new Date(b.lastMessageTime || 0) - new Date(a.lastMessageTime || 0));
+    // Sort by last message time (Newest on top)
+    return [...list].sort((a, b) => {
+        const timeA = new Date(a.lastMessageTime || 0).getTime();
+        const timeB = new Date(b.lastMessageTime || 0).getTime();
+        return timeB - timeA;
+    });
   }, [directSearchTerm, chatList, employees, currentUserId]);
 
   // ✅ FETCH CHAT LIST WITH UNREAD COUNTS
   const fetchChatList = useCallback(async () => {
     try {
       const { data } = await api.get("/api/chat/users");
-      setChatList(data || []);
+      
+      // Merge with existing list to prevent jumping if user is typing
+      setChatList(prevList => {
+         // If we have local optimistic updates that are newer than server, keep local
+         const merged = data || [];
+         
+         // Logic: If we are actively chatting with someone, ensure they stay at top if updated recently
+         return merged;
+      });
       
       // Calculate total unread
       const total = data.reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
@@ -191,19 +204,22 @@ const ConnectWithEmployee = () => {
     
     loadData();
     
+    // Polling - be careful not to override optimistic updates too aggressively
     pollRef.current = setInterval(() => {
       fetchChatList();
-      if (selectedChatUser && !isSwitchingUser) {
-        fetchDirectMessages(selectedChatUser, true);
+      // Only fetch history if we aren't currently sending/typing to avoid jitter
+      if (selectedChatUser && !isSwitchingUser && !sendingMessage) {
+        // Optional: You might want to disable this poll if it causes flicker
+        // fetchDirectMessages(selectedChatUser, true); 
       }
     }, 3000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchEmployees, fetchChatList, fetchDirectMessages, selectedChatUser, isSwitchingUser]);
+  }, [fetchEmployees, fetchChatList, fetchDirectMessages, selectedChatUser, isSwitchingUser, sendingMessage]);
 
-  // ✅ SEND MESSAGE
+  // ✅ SEND MESSAGE - UPDATED FOR NO FLICKER
   const handleSendMessage = useCallback(async () => {
     if (!directMsgText.trim() || !selectedChatUser || sendingMessage) return;
 
@@ -212,8 +228,9 @@ const ConnectWithEmployee = () => {
     setShowEmojiPicker(false);
     setSendingMessage(true);
 
-    // Optimistic update
-    const tempId = Date.now().toString();
+    const tempId = Date.now().toString(); // Temporary ID for optimistic UI
+
+    // 1. Optimistic Message Update
     const optimisticMsg = {
       _id: tempId,
       message: messageToSend,
@@ -227,37 +244,49 @@ const ConnectWithEmployee = () => {
 
     setDirectMessages(prev => [...prev, optimisticMsg]);
 
-    // Move user to top of list
+    // 2. Optimistic Sidebar Update (Instant move to top)
     setChatList(prev => {
+      // Remove user from current position and add to top with new details
       const filtered = prev.filter(u => u._id !== selectedChatUser._id);
-      return [{...selectedChatUser, lastMessage: messageToSend, lastMessageTime: new Date()}, ...filtered];
+      return [{
+          ...selectedChatUser, 
+          lastMessage: messageToSend, 
+          lastMessageTime: new Date().toISOString() // Ensure Date object or ISO string
+      }, ...filtered];
     });
 
     try {
       if (editingMessageId) {
+        // Edit Mode
         await api.put(`/api/chat/${editingMessageId}`, { message: messageToSend });
         setEditingMessageId(null);
-        setDirectMessages(prev => prev.filter(m => m._id !== tempId));
+        // For edits, we might need to re-fetch to ensure consistency
         fetchDirectMessages(selectedChatUser);
       } else {
-        await api.post('/api/chat/send', {
+        // Send Mode
+        const response = await api.post('/api/chat/send', {
           receiverId: selectedChatUser._id,
           message: messageToSend
         });
         
+        // 3. Update the optimistic message with success state (NO FETCH to avoid flicker)
         setDirectMessages(prev => 
           prev.map(msg => 
-            msg._id === tempId ? { ...msg, isSending: false } : msg
+            msg._id === tempId ? { 
+                ...msg, 
+                ...response.data, // If API returns the created message object
+                isSending: false,
+                isPending: false
+            } : msg
           )
         );
         
-        fetchDirectMessages(selectedChatUser, true);
+        toast.success("Message sent");
       }
-      
-      toast.success(editingMessageId ? "Message updated" : "Message sent");
     } catch (error) {
       console.error("Failed to send message:", error);
       toast.error("Failed to send message");
+      // Only remove if it failed
       setDirectMessages(prev => prev.filter(m => m._id !== tempId));
     } finally {
       setSendingMessage(false);
@@ -321,7 +350,8 @@ const ConnectWithEmployee = () => {
   }, [openMenuId]);
 
   return (
-    <div className="flex w-full h-screen bg-white font-sans">
+    // ✅ CHANGED h-screen TO calc(100vh - 4rem) to fit below navbar
+    <div className="flex w-full h-[calc(100vh-4rem)] bg-white font-sans mt-0">
       <Toaster 
         position="top-right" 
         toastOptions={{
@@ -407,9 +437,6 @@ const ConnectWithEmployee = () => {
                       }`}>
                         {emp.name?.charAt(0)}
                       </div>
-                      {/* <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                        emp.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                      }`}></div> */}
                     </div>
                     
                     <div className="flex-1 overflow-hidden min-w-0">
@@ -443,33 +470,24 @@ const ConnectWithEmployee = () => {
       <div className="flex-1 flex flex-col h-full bg-gray-50 relative">
         {selectedChatUser ? (
           <>
-            {/* FIXED Chat Header - Always Visible */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-30 flex-shrink-0">
+            {/* ✅ FIXED Chat Header - Always Visible (High Z-Index, Removed Buttons) */}
+            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-40 flex-shrink-0 relative">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-center rounded-full font-bold text-lg shadow-md">
                     {selectedChatUser.name?.charAt(0)}
                   </div>
-                  {/* <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div> */}
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-gray-900">{selectedChatUser.name}</h3>
                   <div className="flex items-center gap-2">
-                    {/* <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> */}
-                    {/* <span className="text-xs font-medium text-gray-500">
-                      {selectedChatUser.isOnline ? "Online • Active now" : "Last seen recently"}
-                    </span> */}
+                    {/* Status indicators if needed */}
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
-                <button className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-full transition-colors" title="Voice call">
-                  <FaPhone size={16} />
-                </button>
-                <button className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-full transition-colors" title="Video call">
-                  <FaVideo size={16} />
-                </button>
+                {/* REMOVED CALL AND VIDEO BUTTONS AS REQUESTED */}
                 <button className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
                   <FaEllipsisH size={16} />
                 </button>

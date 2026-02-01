@@ -744,5 +744,66 @@ export const getInbox = async () => {
     throw error;
   }
 };
+/* =============================================================================
+   EXPENSE MANAGEMENT
+============================================================================= */
+
+// Get all expenses (Admin)
+export const getAllExpenses = async () => {
+  try {
+    const response = await api.get("/api/expenses/all");
+    return response.data;
+  } catch (error) {
+    console.error("Get all expenses error:", error);
+    throw error;
+  }
+};
+
+// Get expenses for specific employee
+export const getEmployeeExpenses = async (employeeId) => {
+  try {
+    const response = await api.get(`/api/expenses/employee/${employeeId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get employee expenses error:", error);
+    throw error;
+  }
+};
+
+// Add new expense
+export const addExpense = async (formData) => {
+  try {
+    const response = await api.post("/api/expenses/add", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 60000, // 60 seconds for file upload
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Add expense error:", error);
+    throw error;
+  }
+};
+
+// Update expense status (Approve/Reject)
+export const updateExpenseStatus = async (expenseId, status) => {
+  try {
+    const response = await api.put(`/api/expenses/${expenseId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error("Update expense status error:", error);
+    throw error;
+  }
+};
+
+// Delete expense (Admin)
+export const deleteExpense = async (expenseId) => {
+  try {
+    const response = await api.delete(`/api/expenses/${expenseId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Delete expense error:", error);
+    throw error;
+  }
+};
 
 export default api;

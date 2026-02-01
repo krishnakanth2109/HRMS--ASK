@@ -91,6 +91,8 @@ router.post("/request", async (req, res) => {
           </table>
 
           <p style="margin-top: 20px;">Please login to the Admin Portal to approve or reject this request.</p>
+          <p>Regards,<br/>HRMS System</p>
+          
         </div>
       `;
 

@@ -1,15 +1,14 @@
 import React, { useState, useContext, useEffect } from 'react';
-import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Swal from 'sweetalert2';
+import { getEmployeeExpenses, addExpense } from '../api';
 import { 
   FaMoneyBillWave, 
   FaFileUpload, 
   FaPaperPlane, 
   FaHistory, 
   FaCalendarAlt, 
-  FaPaperclip, 
-  FaSearch,
+  FaPaperclip,
   FaPlus,
   FaTimes,
   FaCheckCircle,
@@ -53,9 +52,9 @@ const AddExpense = () => {
     if (!user || !user._id) return;
     
     try {
-      const res = await axios.get(`http://localhost:5000/api/expenses/employee/${user._id}`);
-      if (res.data.success) {
-        setExpenseHistory(res.data.data);
+      const res = await getEmployeeExpenses(user._id); // Use API function
+      if (res.success) {
+        setExpenseHistory(res.data);
       }
     } catch (err) {
       console.error("Error fetching history", err);
@@ -146,18 +145,10 @@ const AddExpense = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/api/expenses/add', data, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 60000, // 60 seconds timeout
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log('Upload Progress:', percentCompleted + '%');
-        }
-      });
+      // Use the API function instead of axios
+      const res = await addExpense(data);
 
-      if (res.data.success) {
+      if (res.success) {
         Swal.fire({
           icon: 'success',
           title: 'Submitted Successfully!',
@@ -270,9 +261,9 @@ const AddExpense = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 flex items-center gap-3">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-3 rounded-xl">
-                  <FaMoneyBillWave />
-                </div>
+
+                 
+          
                 My Expenses
               </h1>
               <p className="text-gray-500 mt-2">Track and manage your submitted expenses</p>
@@ -288,37 +279,42 @@ const AddExpense = () => {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-5 shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">Total Spent</p>
-                  <p className="text-3xl font-bold mt-1">₹{totalSpent.toLocaleString()}</p>
-                </div>
-                <FaMoneyBillWave size={32} className="opacity-50" />
-              </div>
-            </div>
+<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+  {/* Total Spent */}
+  <div className="bg-blue-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+    <div className="flex justify-between items-center">
+      <div>
+        <p className="text-sm font-medium text-blue-500">Total Spent</p>
+        <p className="text-3xl font-bold mt-1 text-gray-800">₹{totalSpent.toLocaleString()}</p>
+      </div>
+      <FaMoneyBillWave size={32} className="text-blue-300" />
+    </div>
+  </div>
 
-            <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl p-5 shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-yellow-100 text-sm font-medium">Pending</p>
-                  <p className="text-3xl font-bold mt-1">{pendingCount}</p>
-                </div>
-                <FaHourglassHalf size={32} className="opacity-50" />
-              </div>
-            </div>
+  {/* Pending */}
+  <div className="bg-yellow-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+    <div className="flex justify-between items-center">
+      <div>
+        <p className="text-sm font-medium text-yellow-500">Pending</p>
+        <p className="text-3xl font-bold mt-1 text-gray-800">{pendingCount}</p>
+      </div>
+      <FaHourglassHalf size={32} className="text-yellow-300" />
+    </div>
+  </div>
 
-            <div className="bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl p-5 shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Approved</p>
-                  <p className="text-3xl font-bold mt-1">{approvedCount}</p>
-                </div>
-                <FaCheckCircle size={32} className="opacity-50" />
-              </div>
-            </div>
-          </div>
+  {/* Approved */}
+  <div className="bg-green-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+    <div className="flex justify-between items-center">
+      <div>
+        <p className="text-sm font-medium text-green-500">Approved</p>
+        <p className="text-3xl font-bold mt-1 text-gray-800">{approvedCount}</p>
+      </div>
+      <FaCheckCircle size={32} className="text-green-300" />
+    </div>
+  </div>
+</div>
+
+
         </div>
 
         {/* EXPENSE HISTORY */}

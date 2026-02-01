@@ -158,12 +158,13 @@ const SidebarEmployee = () => {
           } md:translate-x-0`}
       >
         {/* Toggle Button for Desktop */}
-        <button
-          className="hidden md:block absolute top-4 -right-3 text-white text-sm bg-blue-800 border border-blue-600 rounded-full p-1.5 shadow-md z-50 hover:bg-blue-600 transition"
-          onClick={() => setCollapsed((v) => !v)}
-        >
-          {collapsed ? <FaBars /> : <FaTimes />}
-        </button>
+<button
+  className="hidden md:block absolute top-4 -right-0 text-white text-sm bg-blue-800 border border-blue-600 rounded-full p-1.5 shadow-md z-50 hover:bg-blue-600 transition"
+  onClick={() => setCollapsed((v) => !v)}
+>
+  {collapsed ? <FaBars /> : <FaTimes />}
+</button>
+
 
         {open && (
           <button
@@ -175,15 +176,20 @@ const SidebarEmployee = () => {
         )}
 
         {/* Header Section (Fixed at top of sidebar) */}
-        <div
-          className={`p-6 mb-2 flex items-center gap-1 mt-2 shrink-0 ${collapsed ? "justify-center" : ""
-            }`}
-        >
-          {!collapsed && <FaUser className="text-3xl" />}
-          {!collapsed && (
-            <span className="text-lg font-bold">Employee Panel</span>
-          )}
-        </div>
+   {/* Header Section */}
+<div
+  className={`p-4 flex items-center gap-1 shrink-0 relative ${collapsed ? "justify-center" : "justify-start"
+    }`}
+>
+  {/* Always show user icon */}
+  <FaUser className={`text-3xl cursor-pointer`} onClick={() => setOpen(true)} />
+
+  {/* Only show text when expanded */}
+  {!collapsed && open && (
+    <span className="text-lg font-bold ml-2">Employee Panel</span>
+  )}
+</div>
+
 
         {/* Navigation Links (Scrollable Area) */}
         <ul className="space-y-2 flex-1 overflow-y-auto sidebar-scroll px-4 pb-4">
