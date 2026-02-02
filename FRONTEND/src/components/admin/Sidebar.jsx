@@ -43,7 +43,7 @@ const navLinks = [
     icon: <FaUsers />,
     children: [
       { to: "/employees", label: "Employee Management", icon: <FaUsers /> },
-      { to: "/admin/groups", label: "Group Management", icon: <FaLayerGroup /> },
+      // { to: "/admin/groups", label: "Group Management", icon: <FaLayerGroup /> },
       { 
         to: "/attendance", 
         label: "Employees Attendance", 
