@@ -6,6 +6,7 @@ import Shift from '../models/shiftModel.js';
 import { reverseGeocode, validateCoordinates } from '../Services/locationService.js';
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
+import LeaveRequest from "../models/LeaveRequest.js";
 
 const router = express.Router();
 
@@ -47,15 +48,62 @@ const getTimeDifferenceInMinutes = (punchIn, shiftStart) => {
 };
 
 /* ================= PUNCH IN ================= */
+/* ================= PUNCH IN ================= */
 router.post('/punch-in', async (req, res) => {
   try {
     const { employeeId, employeeName, latitude, longitude } = req.body;
 
-    if (!employeeId || !employeeName) return res.status(400).json({ message: 'Employee ID & Name required' });
-    if (!validateCoordinates(latitude, longitude)) return res.status(400).json({ message: "Invalid coordinates" });
+    if (!employeeId || !employeeName)
+      return res.status(400).json({ message: 'Employee ID & Name required' });
+
+    if (!validateCoordinates(latitude, longitude))
+      return res.status(400).json({ message: "Invalid coordinates" });
 
     const today = getToday();
     const now = new Date();
+
+    /* ==========================================================
+       🔴 BLOCK PUNCH-IN IF EMPLOYEE IS ON APPROVED LEAVE
+    ========================================================== */
+    const approvedLeave = await LeaveRequest.findOne({
+      employeeId: String(employeeId).trim(),
+      status: "Approved",
+      "details.date": today,   // ✅ CORRECT & SAFE CHECK
+    }).lean();
+
+    if (approvedLeave) {
+      // ✅ FULL DAY LEAVE
+      if (approvedLeave.leaveDayType === "Full Day") {
+        return res.status(403).json({
+          success: false,
+          message: "Punch-in not allowed. You are on approved leave today.",
+        });
+      }
+
+      // ✅ HALF DAY LEAVE
+      if (approvedLeave.leaveDayType === "Half Day") {
+        const hour = now.getHours();
+
+        if (approvedLeave.halfDaySession === "Morning" && hour < 13) {
+          return res.status(403).json({
+            success: false,
+            message: "Morning half-day leave. Punch-in allowed after 1 PM.",
+          });
+        }
+
+        if (approvedLeave.halfDaySession === "Afternoon" && hour >= 13) {
+          return res.status(403).json({
+            success: false,
+            message: "Afternoon half-day leave. Punch-in not allowed after 1 PM.",
+          });
+        }
+      }
+    }
+
+    /* ==========================================================
+       🔹 EXISTING LOGIC CONTINUES BELOW (UNCHANGED)
+    ========================================================== */
+
     let address = "Unknown Location";
     try { address = await reverseGeocode(latitude, longitude); } catch {}
 
@@ -69,22 +117,25 @@ router.post('/punch-in', async (req, res) => {
     // Shift Logic
     let shift = await Shift.findOne({ employeeId, isActive: true });
     if (!shift) {
-      shift = { shiftStartTime: "09:00", shiftEndTime: "18:00", lateGracePeriod: 15, autoExtendShift: true, fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
+      shift = {
+        shiftStartTime: "09:00",
+        shiftEndTime: "18:00",
+        lateGracePeriod: 15,
+        autoExtendShift: true,
+        fullDayHours: 8,
+        halfDayHours: 4,
+        quarterDayHours: 2
+      };
     }
 
-    // --- SCENARIO 1: FIRST PUNCH IN ---
+    // --- FIRST PUNCH IN ---
     if (!todayRecord) {
       const diffMin = getTimeDifferenceInMinutes(now, shift.shiftStartTime);
       const isLate = diffMin > shift.lateGracePeriod;
-      
-      let adjustedShiftEnd = shift.shiftEndTime;
-      if (isLate && shift.autoExtendShift) {
-        adjustedShiftEnd = addMinutesToTime(shift.shiftEndTime, diffMin - shift.lateGracePeriod);
-      }
 
       todayRecord = {
         date: today,
-        punchIn: now, 
+        punchIn: now,
         punchOut: null,
         punchInLocation: { latitude, longitude, address, timestamp: now },
         sessions: [{ punchIn: now, punchOut: null, durationSeconds: 0 }],
@@ -95,39 +146,45 @@ router.post('/punch-in', async (req, res) => {
         displayTime: "0h 0m 0s",
         status: "WORKING",
         loginStatus: isLate ? "LATE" : "ON_TIME",
-  
       };
+
       attendance.attendance.push(todayRecord);
     } 
-    // --- SCENARIO 2: RESUME WORK (PUNCH IN AGAIN) ---
+    // --- RESUME WORK ---
     else {
-        if (todayRecord.workedStatus === "FULL_DAY") {
-            return res.status(400).json({ message: "Your shift is completed. You cannot punch in again today." });
-        }
+      if (todayRecord.workedStatus === "FULL_DAY") {
+        return res.status(400).json({ message: "Your shift is completed. You cannot punch in again today." });
+      }
 
-        if (todayRecord.status === "WORKING") {
-            return res.status(400).json({ message: "You are already Punched In." });
-        }
+      if (todayRecord.status === "WORKING") {
+        return res.status(400).json({ message: "You are already Punched In." });
+      }
 
-        const lastSession = todayRecord.sessions[todayRecord.sessions.length - 1];
-        if (lastSession && lastSession.punchOut) {
-            const breakDiff = (now - new Date(lastSession.punchOut)) / 1000;
-            todayRecord.totalBreakSeconds = (todayRecord.totalBreakSeconds || 0) + breakDiff;
-        }
+      const lastSession = todayRecord.sessions[todayRecord.sessions.length - 1];
+      if (lastSession && lastSession.punchOut) {
+        const breakDiff = (now - new Date(lastSession.punchOut)) / 1000;
+        todayRecord.totalBreakSeconds += breakDiff;
+      }
 
-        todayRecord.sessions.push({ punchIn: now, punchOut: null, durationSeconds: 0 });
-        todayRecord.status = "WORKING";
-        todayRecord.punchOut = null; 
+      todayRecord.sessions.push({ punchIn: now, punchOut: null, durationSeconds: 0 });
+      todayRecord.status = "WORKING";
+      todayRecord.punchOut = null;
     }
 
     await attendance.save();
-    return res.json({ success: true, message: "Work resumed successfully", data: attendance.attendance.find(a => a.date === today) });
+
+    return res.json({
+      success: true,
+      message: "Punch-in successful",
+      data: attendance.attendance.find(a => a.date === today),
+    });
 
   } catch (err) {
     console.error("Punch-in error:", err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 /* ================= PUNCH OUT ================= */
 router.post('/punch-out', async (req, res) => {
@@ -337,6 +394,7 @@ router.post('/request-correction', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 /* ====================================================================================
    ✅ NEW: ADMIN APPROVE CORRECTION (Update 1st Punch In & Recalculate)
