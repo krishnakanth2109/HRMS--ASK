@@ -47,30 +47,61 @@ export const changePassword = async (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ message: "Please provide your current and new password." });
   }
+  
   if (newPassword.length < 6) {
     return res.status(400).json({ message: "New password must be at least 6 characters long." });
   }
 
   try {
     let user = await Admin.findById(req.user.id).select("+password");
+    let isAdmin = true;
+    
     if (!user) {
-        user = await Employee.findById(req.user.id).select("+password");
+      user = await Employee.findById(req.user.id).select("+password");
+      isAdmin = false;
     }
 
     if (!user) {
-        return res.status(401).json({ message: "User not found." });
+      return res.status(401).json({ message: "User not found." });
     }
 
+    // Check current password
     if (!(await user.correctPassword(currentPassword, user.password))) {
       return res.status(401).json({ message: "Your current password is incorrect." });
     }
 
+    // **FIX 1: Update only the password field**
     user.password = newPassword;
-    await user.save();
+    
+    // **FIX 2: Use save with validation turned off for non-password fields**
+    // or update only the password field
+    
+    // Option A: Use save with options to validate only modified paths
+    await user.save({ validateModifiedOnly: true });
+    
+    // Option B: Or update directly without full validation
+    // if (isAdmin) {
+    //   await Admin.findByIdAndUpdate(req.user.id, { password: newPassword });
+    // } else {
+    //   await Employee.findByIdAndUpdate(req.user.id, { password: newPassword });
+    // }
 
     res.status(200).json({ status: "success", message: "Password changed successfully." });
   } catch (error) {
     console.error("CHANGE PASSWORD ERROR:", error);
-    res.status(500).json({ message: "An internal server error occurred." });
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: "Validation failed.",
+        details: messages.join(', ')
+      });
+    }
+    
+    res.status(500).json({ 
+      message: "An internal server error occurred.",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

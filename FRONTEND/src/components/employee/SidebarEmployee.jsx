@@ -1,15 +1,21 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect, useContext, useCallback, useRef } from "react";
 import {
-  FaHome,
-  FaClock,
-  FaClipboardList,
   FaBullhorn,
   FaUser,
   FaBars,
   FaTimes,
-  FaUsers
+  FaTachometerAlt,
+  FaUserCheck,
+  FaUmbrellaBeach,
+  FaHourglassHalf,
+  FaPlaneDeparture,
+  FaLaptopHouse,
+  FaMoneyCheckAlt,
+  FaUserFriends,
+  FaReceipt
 } from "react-icons/fa";
+
 
 // Import AuthContext to get current user details
 import { AuthContext } from "../../context/AuthContext";
@@ -18,25 +24,29 @@ import api from "../../api";
 import { CalendarDays, ChartPie, MapPinHouse } from "lucide-react";
 
 const navLinks = [
-  { to: "/employee/dashboard", label: "Dashboard", icon: <FaHome /> },
-  { to: "/employee/my-attendence", label: "Attendance", icon: <ChartPie /> },
-  { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <CalendarDays /> },
+  { to: "/employee/dashboard", label: "Dashboard", icon: <FaTachometerAlt /> },
+
+  { to: "/employee/my-attendence", label: "Attendance", icon: <FaUserCheck /> },
+
+  { to: "/employee/holiday-calendar", label: "Holiday Calendar", icon: <FaUmbrellaBeach /> },
+
   { to: "/employee/notices", label: "Notice Board", icon: <FaBullhorn />, isNotice: true },
-  { to: "/employee/empovertime", label: "Request Overtime", icon: <FaClock /> },
-  { to: "/employee/leave-management", label: "Leave Requests", icon: <FaClipboardList /> },
-  { to: "/employee/reuestworkmode", label: "WorkMode Request", icon: <MapPinHouse /> },
-  { to: "/employee/payslip", label: "Pay-Slip", icon: <FaClipboardList /> },
-  // {
-  //   to: "/employee/teams",
-  //   label: "My Teams",
-  //   icon: <FaUsers />,
-  // },
+
+  { to: "/employee/empovertime", label: "Request Overtime", icon: <FaHourglassHalf /> },
+
+  { to: "/employee/leave-management", label: "Leave Requests", icon: <FaPlaneDeparture /> },
+
+  { to: "/employee/reuestworkmode", label: "WorkMode Request", icon: <FaLaptopHouse /> },
+
+  { to: "/employee/payslip", label: "Pay-Slip", icon: <FaMoneyCheckAlt /> },
+
   {
     to: "/employee/chatting",
     label: "Connect with Employee",
-    icon: <FaUsers />,
+    icon: <FaUserFriends />,
   },
-  { to: "/employee/expense", label: "Add Expense", icon: <FaClipboardList /> },
+
+  { to: "/employee/expense", label: "Add Expense", icon: <FaReceipt /> }
 ];
 
 const SidebarEmployee = () => {
@@ -78,11 +88,18 @@ const SidebarEmployee = () => {
       const { data } = await api.get("/api/notices");
 
       const count = data.filter(notice => {
-        // 🔴 ADD THIS LINE: Skip system status notices so they don't show in the badge
-        if (notice.title === "__SYSTEM_READ_STATE__") return false;
+        // Skip system/config notices from badge count
+        if (!notice?.title) return false;
+        if (typeof notice.title === 'string' && notice.title.startsWith("__SYSTEM_")) return false;
+
+        // If recipients are specified, ensure current user is a target
+        if (Array.isArray(notice.recipients) && notice.recipients.length > 0) {
+          const currentId = (user?._id || user?.id);
+          if (!notice.recipients.includes(currentId)) return false;
+        }
 
         // Check if current user ID is present inside the readBy array
-        const isRead = notice.readBy && notice.readBy.some(record => {
+        const isRead = Array.isArray(notice.readBy) && notice.readBy.some(record => {
           const recordId = typeof record.employeeId === 'object'
             ? record.employeeId._id
             : record.employeeId;

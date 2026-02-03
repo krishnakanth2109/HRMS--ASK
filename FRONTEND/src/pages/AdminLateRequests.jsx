@@ -228,7 +228,7 @@ const AdminLateRequests = () => {
                 {/* Time Comparison Block */}
                 <div className="flex items-center justify-between bg-orange-50/50 p-3 rounded-xl border border-orange-100">
                     <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">Was</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">System Recognized</p>
                         <p className="text-red-500 font-mono font-bold text-lg line-through decoration-2 opacity-70">
                             {req.currentPunchIn 
                                 ? new Date(req.currentPunchIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
@@ -238,7 +238,7 @@ const AdminLateRequests = () => {
                     </div>
                     <div className="text-orange-300 text-xl font-light">➜</div>
                     <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">Change To</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">Requested Time</p>
                         <p className="text-green-600 font-mono font-bold text-xl bg-green-50 px-2 rounded">
                             {new Date(req.requestedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>

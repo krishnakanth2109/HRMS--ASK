@@ -3,21 +3,27 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FaTachometerAlt,
-  FaUsers,
-  FaCalendarCheck,
-  FaClipboardList,
-  FaChartPie,
-  FaBars,
-  FaCalendarAlt,
-  FaFileAlt,
-  FaConnectdevelop,
-  FaAngleDown,
-  FaAngleRight,
+  FaUsersCog,
+  FaUserTie,
   FaUserClock,
-  FaLayerGroup,
-  FaMapMarkerAlt,
-  FaTimes
+  FaCalendarCheck,
+  FaChartLine,
+  FaCheckDouble,
+  FaMoneyBillWave,
+  FaBullhorn,
+  FaCalendarAlt,
+  FaBusinessTime,
+  FaMapMarkedAlt,
+  FaUserPlus,
+  FaClock,
+  FaReceipt,
+  FaBars,
+  FaTimes,
+  FaAngleDown,
+  FaConnectdevelop,
+  FaAngleRight
 } from "react-icons/fa";
+
 import { io } from "socket.io-client";
 import { 
   getLeaveRequests, 
@@ -37,76 +43,78 @@ const SOCKET_URL =
 const navLinks = [
   { to: "/admin/dashboard", label: "Dashboard", icon: <FaTachometerAlt /> },
 
-  // --- GROUP: EMPLOYEES ---
+  // --- EMPLOYEES ---
   {
     label: "Employees",
-    icon: <FaUsers />,
+    icon: <FaUsersCog />, // workforce control
     children: [
-      { to: "/employees", label: "Employee Management", icon: <FaUsers /> },
-      // { to: "/admin/groups", label: "Group Management", icon: <FaLayerGroup /> },
-      { 
-        to: "/attendance", 
-        label: "Employees Attendance", 
+      { to: "/employees", label: "Employee Management", icon: <FaUserTie /> },
+      {
+        to: "/attendance",
+        label: "Employees Attendance",
         icon: <FaUserClock />,
-        isPunchOutRequests: true // ✅ For punch out requests count
+        isPunchOutRequests: true
       },
     ],
   },
 
-  // --- GROUP: LEAVES ---
+  // --- LEAVES ---
   {
     label: "Leaves",
     icon: <FaCalendarCheck />,
     children: [
-      { to: "/admin/leave-summary", label: "Leave Summary", icon: <FaChartPie /> },
+      { to: "/admin/leave-summary", label: "Leave Summary", icon: <FaChartLine /> },
       {
         to: "/admin/admin-Leavemanage",
         label: "Leave Approvals",
-        icon: <FaClipboardList />,
-        isLeave: true, // Badge Logic
+        icon: <FaCheckDouble />,
+        isLeave: true,
       },
     ],
   },
 
-  // --- OTHER LINKS ---
-  { to: "/admin/payroll", label: "Payroll", icon: <FaFileAlt /> },
+  // --- PAYROLL ---
+  { to: "/admin/payroll", label: "Payroll", icon: <FaMoneyBillWave /> },
 
-  { 
-    to: "/admin/notices", 
-    label: "Announcements", 
-    icon: <FaClipboardList />,
-    isNotice: true, // For notice badge
+  // --- ANNOUNCEMENTS ---
+  {
+    to: "/admin/notices",
+    label: "Announcements",
+    icon: <FaBullhorn />,
+    isNotice: true,
   },
+
   { to: "/admin/holiday-calendar", label: "Holiday Calendar", icon: <FaCalendarAlt /> },
 
-  // BADGE LINKS
+  // --- APPROVALS / REQUESTS ---
   {
     to: "/admin/admin-overtime",
     label: "Overtime Approval",
-    icon: <FaChartPie />,
+    icon: <FaBusinessTime />,
     isOvertime: true,
   },
-  { 
-    to: "/admin/shifttype", 
-    label: "Location Settings", 
-    icon: <FaMapMarkerAlt />,
-    isWorkModeRequests: true // ✅ For work mode requests count
+
+  {
+    to: "/admin/shifttype",
+    label: "Location Settings",
+    icon: <FaMapMarkedAlt />,
+    isWorkModeRequests: true
   },
 
-    { 
-    to: "/admin/settings", 
-    label: "Shift Management", 
-    icon:  <FaChartPie />,
-  
+  {
+    to: "/admin/settings",
+    label: "Shift Management",
+    icon: <FaUserPlus />,
   },
 
-  { 
-    to: "/admin/late-requests", 
-    label: "Late Login Requests", 
-    icon: <AlarmClockCheck />,
-    isLateRequests: true // ✅ For late login requests count
+  {
+    to: "/admin/late-requests",
+    label: "Late Login Requests",
+    icon: <FaClock />,
+    isLateRequests: true
   },
-  { to: "/admin/expense", label: "Expense Management", icon: <FaClipboardList /> },
+
+  { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
 ];
 
 // ✅ HELPER: Calculate unread notices using SERVER STATE
@@ -515,27 +523,43 @@ const Sidebar = () => {
     }
   };
 
-  const renderBadge = (link) => {
-    let count = 0;
-    if (link.isLeave) count = pendingLeaves;
-    else if (link.isOvertime) count = pendingOvertime;
-    else if (link.isPunchOutRequests) count = punchOutRequestsCount;
-    else if (link.isLateRequests) count = lateRequestsCount;
-    else if (link.isWorkModeRequests) count = workModeRequestsCount;
-    else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
+  const getBadgeCount = (link) => {
+  let count = 0;
 
-    if (count > 0) {
-      return (
-        <span className="relative flex items-center justify-center ml-auto">
-          <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full items-center justify-center">
-            {count > 9 ? "9+" : count}
-          </span>
+  if (link.isLeave) count = pendingLeaves;
+  else if (link.isOvertime) count = pendingOvertime;
+  else if (link.isPunchOutRequests) count = punchOutRequestsCount;
+  else if (link.isLateRequests) count = lateRequestsCount;
+  else if (link.isWorkModeRequests) count = workModeRequestsCount;
+  else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
+
+  return count;
+};
+
+const renderBadge = (link) => {
+  let count = 0;
+
+  // 🔹 IF PARENT (has children) → SUM child counts
+  if (link.children) {
+    count = link.children.reduce((sum, child) => sum + getBadgeCount(child), 0);
+  } else {
+    count = getBadgeCount(link);
+  }
+
+  if (count > 0) {
+    return (
+      <span className="relative flex items-center justify-center ml-auto">
+        <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-red-400 opacity-75"></span>
+        <span className="relative inline-flex bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full items-center justify-center">
+          {count > 9 ? "9+" : count}
         </span>
-      );
-    }
-    return null;
-  };
+      </span>
+    );
+  }
+
+  return null;
+};
+
 
   // -----------------------------
   // CALCULATE SIDEBAR CLASSES
@@ -608,16 +632,31 @@ const Sidebar = () => {
                 <li key={index} className="relative">
                   
                   {/* Parent Item */}
-                  <div 
-                    className={`flex items-center gap-4 px-4 py-2.5 rounded-lg text-base cursor-pointer border-l-4 border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200 ${collapsed && !isMobile ? "justify-center px-2" : "justify-between"}`}
-                    onClick={() => handleSubMenuClick(link.label)}
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <span className="text-xl w-5 flex justify-center shrink-0">{link.icon}</span>
-                      {(!collapsed || isMobile) && <span className="truncate">{link.label}</span>}
-                    </div>
-                    {(!collapsed || isMobile) && <span className="text-xs shrink-0">{isOpen ? <FaAngleDown /> : <FaAngleRight />}</span>}
-                  </div>
+                {/* Parent Item */}
+<div
+  onClick={() => handleSubMenuClick(link.label)}
+  className={`flex items-center gap-4 px-4 py-2.5 rounded-lg text-base cursor-pointer
+    ${activeMenu === link.label ? "bg-slate-800 text-indigo-400" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"}
+    ${collapsed && !isMobile ? "justify-center px-2" : ""}
+  `}
+>
+  <span className="text-xl w-5 flex justify-center shrink-0">{link.icon}</span>
+
+  {(!collapsed || isMobile) && (
+    <>
+      <span className="truncate flex-1">{link.label}</span>
+
+      {/* 🔥 Parent Badge */}
+      {renderBadge(link)}
+
+      {/* Arrow icon */}
+      <span className="ml-2">
+        {activeMenu === link.label ? <FaAngleDown /> : <FaAngleRight />}
+      </span>
+    </>
+  )}
+</div>
+
 
                   {/* Submenu with Smooth Transition */}
                   <ul className={`bg-slate-800/50 rounded-lg overflow-hidden transition-[max-height,opacity,margin] duration-500 ease-in-out ${(isOpen && (!collapsed || isMobile)) ? "max-h-[1000px] opacity-100 mt-1" : "max-h-0 opacity-0 mt-0"}`}>

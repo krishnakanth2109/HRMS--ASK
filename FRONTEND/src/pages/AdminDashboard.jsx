@@ -73,6 +73,8 @@ const AdminDashboard = () => {
   const [remoteWorkers, setRemoteWorkers] = useState([]);
   const [officeConfig, setOfficeConfig] = useState(null);
   const [isGlobalWFH, setIsGlobalWFH] = useState(false);
+  // Expand state for Working Remotely list
+  const [showAllRemote, setShowAllRemote] = useState(false);
 
   // --- 1. General Dashboard Stats ---
   const { statCards, activeEmployees, departmentList } = useMemo(
@@ -858,7 +860,7 @@ const AdminDashboard = () => {
           ) : remoteWorkers.length > 0 ? (
             <div>
               <div className="flex -space-x-3 mb-4">
-                {remoteWorkers.slice(0, 6).map((worker, index) => (
+                {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 6)).map((worker, index) => (
                   <div 
                     key={index}
                     className="relative group"
@@ -869,19 +871,36 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                 ))}
-                {remoteWorkers.length > 6 && (
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs ring-2 ring-white">
+                {!showAllRemote && remoteWorkers.length > 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllRemote(true)}
+                    className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs ring-2 ring-white hover:bg-gray-300"
+                    title="Show all"
+                  >
                     +{remoteWorkers.length - 6}
-                  </div>
+                  </button>
                 )}
               </div>
               <div className="space-y-2">
-                {remoteWorkers.slice(0, 3).map((worker, index) => (
+                {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 3)).map((worker, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                     <span className="font-medium text-sm">{worker.name}</span>
                     <span className="text-xs text-gray-500">{worker.department}</span>
                   </div>
                 ))}
+                {remoteWorkers.length > 3 && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRemote(v => !v)}
+                      className="w-full text-center text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded py-1 transition"
+                      title={showAllRemote ? "Show less" : "Show all"}
+                    >
+                      {showAllRemote ? "Show less" : `Show all (${remoteWorkers.length})`}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

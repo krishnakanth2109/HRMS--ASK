@@ -281,6 +281,8 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
           "Pay Period": `${periodStart} to ${periodEnd}`,
           "Total Days in Month": employee.totalDaysInMonth,
           "Worked Days": employee.workedDays,
+          "Week Off Days (Paid)": employee.weekOffDays,
+          "Holiday Days (Paid)": employee.holidayDays,
           "Per Day Salary": employee.perDaySalary,
           "Calculated Salary": employee.calculatedSalary,
           "Total Earnings": employee.breakdown.gross,
@@ -346,11 +348,11 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
              </tr>
              <tr>
                <td class="bg-light"><strong>Designation</strong></td><td>${employee.role}</td>
-               <td class="bg-light"><strong>Work Summary</strong></td><td>Full: ${employee.fullDays} | Half: ${employee.halfDays}</td>
+               <td class="bg-light"><strong>Work Summary</strong></td><td>Full: ${employee.fullDays} | Half: ${employee.halfDays} | WeekOff (rest): ${employee.weekOffDays} | Holidays (rest): ${employee.holidayDays}</td>
              </tr>
              <tr>
                <td class="bg-light"><strong>Total Days in Month</strong></td><td>${employee.totalDaysInMonth}</td>
-               <td class="bg-light"><strong>Worked Days</strong></td><td>${employee.workedDays}</td>
+               <td class="bg-light"><strong>Worked Days</strong></td><td>${employee.workedDays} + ${employee.weekOffDays} (WeekOff) + ${employee.holidayDays} (Hol) = ${employee.workedDays + employee.weekOffDays + employee.holidayDays}</td>
              </tr>
              <tr>
                <td class="bg-light"><strong>Per Day Salary</strong></td><td>${formatCurrency(employee.perDaySalary)}</td>
@@ -437,9 +439,11 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
              <div className="bg-gray-50 p-4 rounded-xl text-center border">
                 <p className="text-xs text-gray-500 font-bold uppercase">Work Summary</p>
-                <div className="flex justify-center gap-2 mt-1">
+                <div className="flex justify-center gap-1 mt-1 flex-wrap">
                     <span className="text-xs font-bold bg-green-200 text-green-800 px-2 py-1 rounded">Full: {employee.fullDays}</span>
                     <span className="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-1 rounded">Half: {employee.halfDays}</span>
+                    <span className="text-xs font-bold bg-blue-200 text-blue-800 px-2 py-1 rounded">Off: {employee.weekOffDays}</span>
+                    <span className="text-xs font-bold bg-emerald-200 text-emerald-800 px-2 py-1 rounded">Hol: {employee.holidayDays}</span>
                 </div>
              </div>
              <div className="bg-blue-50 p-4 rounded-xl text-center border border-blue-100">
@@ -463,14 +467,28 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
           {/* Calculation Breakdown */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
             <h4 className="font-bold text-blue-800 text-sm mb-3">📊 Salary Calculation Breakdown</h4>
+            {/* ✅ Week Off + Holiday badges */}
+            <div className="flex gap-2 mb-3 flex-wrap">
+              <span className="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                📅 Week Offs (rest): {employee.weekOffDays} days (paid)
+              </span>
+              <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200">
+                🎉 Holidays (rest): {employee.holidayDays} days (paid)
+              </span>
+              <span className="text-[11px] text-gray-500 px-2 py-0.5 rounded border border-gray-200 bg-gray-50 italic">
+                * If worked on off/holiday → counted in Worked Days only
+              </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="bg-white p-3 rounded border">
                 <p className="text-gray-600 text-xs">Gross Salary ÷ Total Days in Month</p>
                 <p className="font-bold text-gray-800">{formatCurrency(employee.breakdown.gross)} ÷ {employee.totalDaysInMonth} = {formatCurrency(employee.perDaySalary)}/day</p>
               </div>
               <div className="bg-white p-3 rounded border">
-                <p className="text-gray-600 text-xs">Worked Days × Per Day Salary</p>
-                <p className="font-bold text-gray-800">{employee.workedDays} × {formatCurrency(employee.perDaySalary)} = {formatCurrency(employee.calculatedSalary)}</p>
+                <p className="text-gray-600 text-xs">(Worked Days + Week Offs + Holidays) × Per Day Salary</p>
+                <p className="font-bold text-gray-800">
+                  ({employee.workedDays} + <span className="text-blue-600">{employee.weekOffDays}</span> + <span className="text-green-600">{employee.holidayDays}</span>) × {formatCurrency(employee.perDaySalary)} = {formatCurrency(employee.calculatedSalary)}
+                </p>
               </div>
               <div className="bg-white p-3 rounded border">
                 <p className="text-gray-600 text-xs">LOP Deduction ({employee.lopDays} days)</p>
@@ -740,7 +758,39 @@ const PayrollManagement = () => {
         const extraLeaves = Math.max(0, totalConsumed - monthlyCredit);
         const paidLeaveCredit = Math.min(totalConsumed, monthlyCredit);
 
-        leaveSummary[empId] = { totalLeaveDays, absentDays: absentCount, totalConsumed, extraLeaves, paidLeaveCredit };
+        // ✅ COUNT WEEK-OFF & HOLIDAY DAYS — NO DOUBLE COUNT
+        // Rule: if employee actually punched on a weekoff/holiday that day
+        //       → it already lives in att.workedDays, so do NOT count it again here.
+        //       Only count weekoff/holiday when the employee did NOT punch that day.
+        const todayNow = new Date();
+        todayNow.setHours(23, 59, 59, 999);
+
+        let weekOffCount = 0;
+        let holidayCount = 0;
+        for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
+            if (d > todayNow) break; // only count completed days up to today
+
+            const dateStr = formatDate(d);
+            const dayOfWeek = d.getDay();
+            const isHol = holidays.some(h => dateStr >= formatDate(h.start) && dateStr <= formatDate(h.end));
+            const isWeekOff = shift.weeklyOffDays.includes(dayOfWeek);
+
+            // skip normal working days — nothing to do here
+            if (!isHol && !isWeekOff) continue;
+
+            // Employee punched on this weekoff/holiday?
+            // → already counted as a worked day in attSummary, skip it here
+            if (attendancePunches.has(dateStr)) continue;
+
+            // Employee did NOT punch → count as paid weekoff or holiday
+            if (isHol) {
+                holidayCount++;
+            } else {
+                weekOffCount++;
+            }
+        }
+
+        leaveSummary[empId] = { totalLeaveDays, absentDays: absentCount, totalConsumed, extraLeaves, paidLeaveCredit, weekOffDays: weekOffCount, holidayDays: holidayCount };
     });
 
     return allEmployees.map(emp => {
@@ -777,11 +827,15 @@ const PayrollManagement = () => {
         // 2. Per Day Salary = Gross Salary / Total Days in Month
         const perDaySalary = monthlyTotal / totalDaysInMonth;
 
-        // 3. Worked Days
+        // 3. Worked Days (attendance punches + paid leave credit)
         const totalWorkedDays = att.workedDays + leaves.paidLeaveCredit;
 
-        // 4. Calculated Salary = Worked Days × Per Day Salary
-        const calculatedSalary = totalWorkedDays * perDaySalary;
+        // ✅ Week-off days & Holiday days (already counted up to today only)
+        const weekOffDays = leaves.weekOffDays || 0;
+        const holidayDays = leaves.holidayDays || 0;
+
+        // 4. Calculated Salary = (Worked Days + Week Offs + Holidays) × Per Day Salary
+        const calculatedSalary = (totalWorkedDays + weekOffDays + holidayDays) * perDaySalary;
 
         // 5. LOP Deduction
         const lopDeduction = leaves.extraLeaves * perDaySalary;
@@ -834,6 +888,8 @@ const PayrollManagement = () => {
             role: currentExp?.role || "N/A",
             totalDaysInMonth,
             workedDays: totalWorkedDays,
+            weekOffDays,
+            holidayDays,
             fullDays: att.fullDays,
             halfDays: att.halfDays,
             absentDays: leaves.absentDays,
@@ -893,6 +949,8 @@ const PayrollManagement = () => {
           "Name": emp.employeeName,
           "Total Days in Month": emp.totalDaysInMonth,
           "Worked Days": emp.workedDays,
+          "Week Off Days (Paid)": emp.weekOffDays,
+          "Holiday Days (Paid)": emp.holidayDays,
           "Per Day Salary": emp.perDaySalary.toFixed(2),
           "Calculated Salary": emp.calculatedSalary.toFixed(2),
           "Total Earnings": emp.breakdown.gross,

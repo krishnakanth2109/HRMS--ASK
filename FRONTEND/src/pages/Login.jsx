@@ -8,10 +8,9 @@ import {
   FaLock,
   FaEye,
   FaEyeSlash,
-  FaShieldAlt,
-  FaUserTie,
-  FaChartLine,
-  FaFingerprint
+    FaChartBar, 
+  FaUserShield,  
+  FaUsersCog 
 } from "react-icons/fa";
 
 const Login = () => {
@@ -223,22 +222,37 @@ const Login = () => {
           <br />
           
           <h1 className="text-5xl xl:text-6xl font-bold leading-tight bg-gradient-to-r from-white via-purple-100 to-purple-200 bg-clip-text text-transparent">
-            Elevate Your
-            <span className="block mt-2">Work Experience</span>
+            Empowering Your
+            <span className="block mt-2">Workforce,Every Day</span>
           </h1>
           
           <p className="mt-6 text-lg text-purple-100/90 max-w-md leading-relaxed">
-            Arah Info Tech HRMS delivers seamless workforce management with AI-powered insights, 
-            real-time analytics, and secure role-based access control.
+Arah Info Tech HRMS is a secure, intelligent platform designed to enhance productivity, ensure compliance, and provide real-time workforce intelligence—all in one seamless experience.
           </p>
 
           {/* Features grid */}
           <div className="mt-10 grid grid-cols-2 gap-4">
             {[
-              { icon: <FaChartLine />, title: "Real-time Analytics", desc: "Live dashboard" },
-              { icon: <FaFingerprint />, title: "Biometric Auth", desc: "Multi-factor" },
-              { icon: <FaShieldAlt />, title: "Bank-grade Security", desc: "256-bit encryption" },
-              { icon: <FaUserTie />, title: "Role Control", desc: "Granular access" }
+            { 
+    icon: <FaChartBar />, 
+    title: "Real-Time Workforce Analytics", 
+    desc: "Live workforce insights" 
+  },
+  { 
+    icon: <FaUserShield />, 
+    title: "Multi-Factor Authentication", 
+    desc: "Advanced identity verification" 
+  },
+  { 
+    icon: <FaLock />, 
+    title: "Enterprise-Level Data Security", 
+    desc: "End-to-end encryption" 
+  },
+  { 
+    icon: <FaUsersCog />, 
+    title: "Role-Based Access Control", 
+    desc: "Granular permission control" 
+  }
             ].map((feature, idx) => (
               <motion.div
                 key={idx}

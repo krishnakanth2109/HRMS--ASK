@@ -134,6 +134,8 @@ const EmployeeDashboard = () => {
   // ✅ NEW: Remote Workers & Leave Balance States
   const [remoteWorkers, setRemoteWorkers] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState({ available: 1, taken: 0 }); 
+  // Expand/collapse for Working Remotely names list
+  const [showAllRemoteEmp, setShowAllRemoteEmp] = useState(false); 
   
   // ✅ NEW: Full Holidays and Leaves for Graph Accuracy
   const [holidays, setHolidays] = useState([]);
@@ -1495,7 +1497,7 @@ const gradients = [
           <div className="w-full flex flex-col items-center pt-2">
             {/* Dynamic Avatar Stack */}
             <div className="flex -space-x-4 items-end justify-center py-4 min-h-[80px]">
-              {remoteWorkers.slice(0, 5).map((worker, i) => (
+              {(showAllRemoteEmp ? remoteWorkers : remoteWorkers.slice(0, 5)).map((worker, i) => (
                 <div 
                   key={i} 
                   /* CHANGED: using group/avatar to isolate hover events */
@@ -1523,14 +1525,50 @@ const gradients = [
               ))}
               
               {/* Overflow Counter */}
-              {remoteWorkers.length > 5 && (
-                <div className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer">
+              {!showAllRemoteEmp && remoteWorkers.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRemoteEmp(true)}
+                  className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer"
+                  aria-label={`Show all ${remoteWorkers.length} remote members`}
+                  title="Show all"
+                >
                    <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xs shadow-md">
                      +{remoteWorkers.length - 5}
                    </div>
-                </div>
+                </button>
+              )}
+              {showAllRemoteEmp && remoteWorkers.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRemoteEmp(false)}
+                  className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer"
+                  aria-label="Show less"
+                  title="Show less"
+                >
+                   <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xs shadow-md">
+                     −
+                   </div>
+                </button>
               )}
             </div>
+            {showAllRemoteEmp && (
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                {remoteWorkers.map((w, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100">
+                    <span className="text-sm font-semibold text-gray-700">{w.name}</span>
+                    <span className="text-[11px] text-gray-500">{w.department}</span>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setShowAllRemoteEmp(false)}
+                  className="col-span-full text-center text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded py-1"
+                >
+                  Show less
+                </button>
+              </div>
+            )}
             
             <p className="text-center text-xs text-gray-400 font-medium mt-2 bg-gray-50 px-3 py-1 rounded-full">
               <span className="text-indigo-600 font-bold">{remoteWorkers.length}</span> team members remote
