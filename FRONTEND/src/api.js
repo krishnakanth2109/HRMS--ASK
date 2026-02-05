@@ -806,4 +806,17 @@ export const deleteExpense = async (expenseId) => {
   }
 };
 
+// ✅ NEW: Get Request Limit for Employee
+export const getRequestLimit = (employeeId) => {
+  return api.get(`/api/attendance/request-limit/${employeeId}`);
+};
+
+// ✅ NEW: Set Request Limit for Employee (Admin Only)
+export const setRequestLimit = (employeeId, limit) => {
+  return api.post("/api/attendance/set-request-limit", {
+    employeeId,
+    limit
+  });
+};
+
 export default api;

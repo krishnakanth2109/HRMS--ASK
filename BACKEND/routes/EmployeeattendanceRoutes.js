@@ -396,95 +396,6 @@ router.post('/request-correction', async (req, res) => {
 });
 
 
-/* ====================================================================================
-   ✅ NEW: ADMIN APPROVE CORRECTION (Update 1st Punch In & Recalculate)
-==================================================================================== */
-router.post('/approve-correction', onlyAdmin, async (req, res) => {
-    try {
-        const { employeeId, date, status, adminComment } = req.body; 
-        // status: "APPROVED" or "REJECTED"
-
-        let attendance = await Attendance.findOne({ employeeId });
-        if (!attendance) return res.status(404).json({ message: "Record not found" });
-
-        let dayRecord = attendance.attendance.find(a => a.date === date);
-        if (!dayRecord || !dayRecord.lateCorrectionRequest?.hasRequest) {
-            return res.status(400).json({ message: "No pending request found." });
-        }
-
-        if (status === "REJECTED") {
-            dayRecord.lateCorrectionRequest.status = "REJECTED";
-            dayRecord.lateCorrectionRequest.adminComment = adminComment;
-        } 
-        else if (status === "APPROVED") {
-            const newPunchIn = new Date(dayRecord.lateCorrectionRequest.requestedTime);
-
-            // 1. Update Request Status
-            dayRecord.lateCorrectionRequest.status = "APPROVED";
-            dayRecord.lateCorrectionRequest.adminComment = adminComment;
-
-            // 2. Update First Session Punch In
-            if (dayRecord.sessions.length > 0) {
-                dayRecord.sessions[0].punchIn = newPunchIn;
-                
-                // Recalculate duration if punchOut exists
-                if (dayRecord.sessions[0].punchOut) {
-                    dayRecord.sessions[0].durationSeconds = (new Date(dayRecord.sessions[0].punchOut) - newPunchIn) / 1000;
-                }
-            }
-
-            // 3. Update Root Punch In
-            dayRecord.punchIn = newPunchIn;
-
-            // 4. Recalculate Login Status (Is it Late?)
-            let shift = await Shift.findOne({ employeeId });
-            // Fallback default
-            if (!shift) shift = { shiftStartTime: "09:00", lateGracePeriod: 15 };
-
-            const diffMin = getTimeDifferenceInMinutes(newPunchIn, shift.shiftStartTime);
-            
-            // If new time is within grace period, mark ON TIME
-            if (diffMin <= shift.lateGracePeriod) {
-                dayRecord.loginStatus = "ON_TIME";
-            } else {
-                dayRecord.loginStatus = "LATE";
-            }
-
-            // 5. Recalculate Total Worked Hours (Since start time changed)
-            let totalSeconds = 0;
-            dayRecord.sessions.forEach(sess => {
-                if(sess.punchIn && sess.punchOut) {
-                    totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
-                } else if (sess.punchIn && dayRecord.status === "WORKING") {
-                   // If currently working, we don't calculate total worked yet for saving, 
-                   // but standard flow usually only sums completed sessions or uses current time on frontend.
-                   // Here we just sum completed.
-                }
-            });
-            
-            // Only update worked hours if the session was completed, otherwise it stays partial until punchout
-            // But if shift is completed, update totals
-            if (dayRecord.status === "COMPLETED") {
-                const h = Math.floor(totalSeconds / 3600);
-                const m = Math.floor((totalSeconds % 3600) / 60);
-                const s = Math.floor(totalSeconds % 60);
-
-                dayRecord.workedHours = h;
-                dayRecord.workedMinutes = m;
-                dayRecord.workedSeconds = s;
-                dayRecord.displayTime = `${h}h ${m}m ${s}s`;
-            }
-        }
-
-        await attendance.save();
-        res.json({ success: true, message: `Request ${status.toLowerCase()} successfully.` });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/* ================= OTHER ROUTES ================= */
-
 
 router.get('/:employeeId', async (req, res) => {
   try {
@@ -499,6 +410,255 @@ router.get('/:employeeId', async (req, res) => {
     res.json({ success: true, data: sorted });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/request-limit/:employeeId", async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const attendanceRecord = await Attendance.findOne({ employeeId });
+    
+    if (!attendanceRecord) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const monthData = attendanceRecord.monthlyRequestLimits?.get(currentMonth) || { limit: 5, used: 0 };
+
+    res.json({
+      employeeId,
+      employeeName: attendanceRecord.employeeName,
+      monthlyRequestLimits: {
+        [currentMonth]: monthData
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching request limit:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// ✅ NEW: Set Request Limit for Employee (Admin Only)
+// In EmployeeattendanceRoutes.js, update the /set-request-limit route:
+
+// ✅ FIXED: Set Request Limit for Employee (Admin Only)
+router.post("/set-request-limit", async (req, res) => {
+  try {
+    const { employeeId, limit } = req.body;
+
+    if (!employeeId || limit === undefined) {
+      return res.status(400).json({ message: "Employee ID and limit are required" });
+    }
+
+    if (limit < 0 || limit > 100) {
+      return res.status(400).json({ message: "Limit must be between 0 and 100" });
+    }
+
+    const attendanceRecord = await Attendance.findOne({ employeeId });
+    
+    if (!attendanceRecord) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    // Initialize if doesn't exist
+    if (!attendanceRecord.monthlyRequestLimits) {
+      attendanceRecord.monthlyRequestLimits = new Map();
+    }
+
+    const currentData = attendanceRecord.monthlyRequestLimits.get(currentMonth) || { limit: 5, used: 0 };
+    
+    // Prevent setting limit below already used requests
+    if (limit < currentData.used) {
+      return res.status(400).json({ 
+        message: `Cannot set limit (${limit}) below already used requests (${currentData.used})` 
+      });
+    }
+
+    // Update only the limit, keep used count
+    attendanceRecord.monthlyRequestLimits.set(currentMonth, {
+      limit: parseInt(limit),
+      used: currentData.used
+    });
+
+    // FIX: Clean up attendance array to avoid validation errors
+    if (attendanceRecord.attendance && Array.isArray(attendanceRecord.attendance)) {
+      attendanceRecord.attendance = attendanceRecord.attendance.filter(day => {
+        // Remove any attendance records that are invalid
+        return day && day.date && typeof day.date === 'string';
+      });
+    }
+
+    // Use { validateBeforeSave: false } to skip validation on save
+    await attendanceRecord.save({ validateBeforeSave: false });
+
+    res.json({
+      message: "Request limit updated successfully",
+      employeeId,
+      month: currentMonth,
+      limit: parseInt(limit),
+      used: currentData.used
+    });
+  } catch (error) {
+    console.error("Error setting request limit:", error);
+    
+    // More specific error messages
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: "Validation error. Please check employee attendance data.",
+        details: Object.keys(error.errors).map(key => ({
+          field: key,
+          message: error.errors[key].message
+        }))
+      });
+    }
+    
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// ✅ UPDATED: Submit Late Correction Request (With Limit Check)
+router.post("/submit-late-correction", async (req, res) => {
+  try {
+    const { employeeId, date, requestedTime, reason } = req.body;
+
+    if (!employeeId || !date || !requestedTime || !reason) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const attendanceRecord = await Attendance.findOne({ employeeId });
+    if (!attendanceRecord) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const dayLog = attendanceRecord.attendance.find(a => a.date === date);
+    if (!dayLog) {
+      return res.status(404).json({ message: "Attendance record not found for this date" });
+    }
+
+    // ✅ CHECK: Request Limit
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthData = attendanceRecord.monthlyRequestLimits?.get(currentMonth) || { limit: 5, used: 0 };
+
+    if (monthData.used >= monthData.limit) {
+      return res.status(400).json({ 
+        message: `Monthly request limit reached (${monthData.limit}/${monthData.limit}). Please contact admin.`,
+        limitReached: true
+      });
+    }
+
+    // Check if already has pending or approved request
+    if (dayLog.lateCorrectionRequest?.hasRequest) {
+      if (dayLog.lateCorrectionRequest.status === "PENDING") {
+        return res.status(400).json({ message: "You already have a pending request for this date" });
+      }
+      if (dayLog.lateCorrectionRequest.status === "APPROVED") {
+        return res.status(400).json({ message: "A correction request for this date has already been approved" });
+      }
+    }
+
+    // Update request
+    dayLog.lateCorrectionRequest = {
+      hasRequest: true,
+      status: "PENDING",
+      requestedTime: new Date(requestedTime),
+      reason,
+      adminComment: null
+    };
+
+    // ✅ INCREMENT: Used Count
+    attendanceRecord.monthlyRequestLimits.set(currentMonth, {
+      limit: monthData.limit,
+      used: monthData.used + 1
+    });
+
+    await attendanceRecord.save();
+
+    res.json({ 
+      message: "Late correction request submitted successfully",
+      remainingRequests: monthData.limit - (monthData.used + 1)
+    });
+  } catch (error) {
+    console.error("Error submitting late correction:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// ✅ UPDATED: Approve/Reject Correction (Update Used Count on Rejection)
+router.post("/approve-correction", async (req, res) => {
+  try {
+    const { employeeId, date, status, adminComment } = req.body;
+
+    if (!employeeId || !date || !status) {
+      return res.status(400).json({ message: "Employee ID, date, and status are required" });
+    }
+
+    const attendanceRecord = await Attendance.findOne({ employeeId });
+    if (!attendanceRecord) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const dayLog = attendanceRecord.attendance.find(a => a.date === date);
+    if (!dayLog || !dayLog.lateCorrectionRequest?.hasRequest) {
+      return res.status(404).json({ message: "No correction request found" });
+    }
+
+    if (dayLog.lateCorrectionRequest.status !== "PENDING") {
+      return res.status(400).json({ message: "This request has already been processed" });
+    }
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthData = attendanceRecord.monthlyRequestLimits?.get(currentMonth) || { limit: 5, used: 0 };
+
+    if (status === "APPROVED") {
+      // Update punch in time and recalculate
+      const newPunchIn = new Date(dayLog.lateCorrectionRequest.requestedTime);
+      dayLog.punchIn = newPunchIn;
+      
+      // Update first session punch in if exists
+      if (dayLog.sessions && dayLog.sessions.length > 0) {
+        dayLog.sessions[0].punchIn = newPunchIn;
+        // Recalculate duration if punchOut exists
+        if (dayLog.sessions[0].punchOut) {
+          dayLog.sessions[0].durationSeconds = (new Date(dayLog.sessions[0].punchOut) - newPunchIn) / 1000;
+        }
+      }
+      
+      // Fetch actual shift settings
+      let shift = await Shift.findOne({ employeeId });
+      if (!shift) {
+        shift = { shiftStartTime: "09:00", lateGracePeriod: 15 }; // Fallback
+      }
+      
+      // Recalculate loginStatus using actual shift
+      const diffMin = getTimeDifferenceInMinutes(newPunchIn, shift.shiftStartTime);
+      dayLog.loginStatus = diffMin <= shift.lateGracePeriod ? "ON_TIME" : "LATE";
+      
+      dayLog.lateCorrectionRequest.status = "APPROVED";
+      dayLog.lateCorrectionRequest.adminComment = adminComment || "Approved";
+    } else if (status === "REJECTED") {
+      dayLog.lateCorrectionRequest.status = "REJECTED";
+      dayLog.lateCorrectionRequest.adminComment = adminComment || "Request denied";
+      
+      // ✅ DECREMENT: If rejected, give back the request count
+      if (monthData.used > 0) {
+        attendanceRecord.monthlyRequestLimits.set(currentMonth, {
+          limit: monthData.limit,
+          used: monthData.used - 1
+        });
+      }
+    }
+
+    await attendanceRecord.save();
+
+    res.json({ 
+      message: `Request ${status.toLowerCase()} successfully`,
+      newLoginStatus: dayLog.loginStatus
+    });
+  } catch (error) {
+    console.error("Error processing correction:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 

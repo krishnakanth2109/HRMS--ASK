@@ -408,7 +408,7 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
                   <input
                     type="email"
                     className="w-full bg-transparent outline-none text-sm text-gray-900 placeholder:text-gray-400 font-medium"
-                    placeholder="employee@arahinfotech.com"
+                    placeholder="Enter your email"
                     value={email}
                     required
                     onChange={(e) => setEmail(e.target.value)}

@@ -78,6 +78,16 @@ const AttendanceSchema = new mongoose.Schema({
   employeeId: { type: String, required: true, unique: true },
   employeeName: { type: String, required: true },
   attendance: [DailySchema],
+  
+  // ✅ NEW: Monthly Request Limit Tracking
+  monthlyRequestLimits: {
+    type: Map,
+    of: {
+      limit: { type: Number, default: 5 },
+      used: { type: Number, default: 0 }
+    },
+    default: {}
+  }
 });
 
 export default mongoose.model("Attendance", AttendanceSchema);

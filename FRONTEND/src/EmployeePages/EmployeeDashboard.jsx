@@ -61,7 +61,8 @@ import api, {
   deleteProfilePic,
   getShiftByEmployeeId,
   getHolidays, // ✅ ADDED: Needed for accurate stats
-  getLeaveRequestsForEmployee // ✅ ADDED: Needed for accurate stats
+  getLeaveRequestsForEmployee ,// ✅ ADDED: Needed for accurate stats
+  getRequestLimit  ,
 } from "../api";
 import { useNavigate, Link } from "react-router-dom"; // ✅ Added Link
 import ImageCropModal from "./ImageCropModal";
@@ -159,6 +160,8 @@ const EmployeeDashboard = () => {
   const [showLateReqModal, setShowLateReqModal] = useState(false);
   const [lateReqData, setLateReqData] = useState({ time: "", reason: "" });
   const [lateReqLoading, setLateReqLoading] = useState(false);
+  // ✅ NEW: Request Limit State
+const [requestLimit, setRequestLimit] = useState({ limit: 5, used: 0 });
 
   const dropdownRef = useRef(null);
   const breakDropdownRef = useRef(null);
@@ -396,6 +399,19 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // ✅ NEW: Load Request Limit
+const loadRequestLimit = useCallback(async (empId) => {
+  try {
+    const { data } = await api.get(`/api/attendance/request-limit/${empId}`);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthData = data.monthlyRequestLimits?.[currentMonth] || { limit: 5, used: 0 };
+    setRequestLimit(monthData);
+  } catch (err) {
+    console.error("Failed to load request limit", err);
+    setRequestLimit({ limit: 5, used: 0 });
+  }
+}, []);
+
   // ✅ NEW: Load Holidays and Leaves for Accurate Stats
   const loadHolidaysAndLeaves = useCallback(async (empId) => {
     try {
@@ -456,7 +472,26 @@ const EmployeeDashboard = () => {
       }
     }
   }, [attendance]);
+useEffect(() => {
+  const bootstrap = async () => {
+    if (user && user.employeeId) {
+      setLoading(true);
+      await Promise.all([
+        loadAttendance(user.employeeId),
+        loadShiftTimings(user.employeeId),
+        loadProfilePic(),
+        loadRequestLimit(user.employeeId), // ✅ ADD THIS LINE
+      ]);
+      setLoading(false);
 
+      fetchOptimizedTeamData(); 
+      loadHolidaysAndLeaves(user.employeeId);
+    } else { 
+      setLoading(false); 
+    }
+  };
+  bootstrap();
+}, [user, loadAttendance, loadShiftTimings, loadHolidaysAndLeaves, loadRequestLimit]); // ✅ ADD loadRequestLimit
   const loadProfilePic = async () => {
     try {
       const res = await getProfilePic();
@@ -727,42 +762,86 @@ const EmployeeDashboard = () => {
   };
 
   // ✅ UPDATED HANDLER: Convert Local Time to UTC before sending
-  const handleLateRequestSubmit = async (e) => {
-    e.preventDefault();
-    if (!lateReqData.time || !lateReqData.reason) {
-      Swal.fire("Error", "Please enter time and reason", "error");
-      return;
+ const handleLateRequestSubmit = async (e) => {
+  e.preventDefault();
+  
+  // ✅ CHECK: Limit before submission
+  if (requestLimit.limit - requestLimit.used <= 0) {
+    Swal.fire({
+      title: "Limit Reached",
+      text: `You have used all ${requestLimit.limit} late correction requests for this month.`,
+      icon: "warning",
+      confirmButtonColor: "#d33"
+    });
+    return;
+  }
+
+  setLateReqLoading(true);
+
+  try {
+    const { time, reason } = lateReqData;
+    
+    const todayDate = new Date().toISOString().split("T")[0];
+    const requestedDateTime = new Date(`${todayDate}T${time}:00`);
+
+    await api.post("/api/attendance/submit-late-correction", {
+      employeeId: user.employeeId,
+      date: todayDate,
+      requestedTime: requestedDateTime.toISOString(),
+      reason,
+    });
+
+    // ✅ REFRESH: Limit after successful submission
+    await loadRequestLimit(user.employeeId);
+
+    Swal.fire({
+      title: "Request Submitted!",
+      html: `Your late correction request has been sent to admin for approval.<br/>
+             <small class="text-gray-500">Remaining requests: ${requestLimit.limit - requestLimit.used - 1}</small>`,
+      icon: "success",
+      confirmButtonColor: "#10b981"
+    });
+
+    setShowLateReqModal(false);
+    setLateReqData({ time: "", reason: "" });
+    
+    // Reload attendance to show pending status
+    await loadAttendance(user.employeeId);
+    
+  } catch (err) {
+    const errorMsg = err.response?.data?.message || err.message;
+    
+    // ✅ HANDLE: Limit reached error from backend
+    if (err.response?.data?.limitReached) {
+      await loadRequestLimit(user.employeeId); // Refresh to show updated limit
     }
-    setLateReqLoading(true);
-    try {
-      // ✅ FIX: Create Date object from local time input
-      const localDateTime = new Date(`${todayIso}T${lateReqData.time}`);
+    
+    Swal.fire({
+      title: "Submission Failed",
+      text: errorMsg,
+      icon: "error",
+      confirmButtonColor: "#d33"
+    });
+  } finally {
+    setLateReqLoading(false);
+  }
+};
 
-      // Extract UTC Hours and Minutes
-      const utcHours = String(localDateTime.getUTCHours()).padStart(2, '0');
-      const utcMinutes = String(localDateTime.getUTCMinutes()).padStart(2, '0');
+const handleOpenLateRequestModal = () => {
+  const remaining = requestLimit.limit - requestLimit.used;
 
-      // Format as HH:mm in UTC
-      const utcTimeStr = `${utcHours}:${utcMinutes}`;
+  if (remaining <= 0) {
+    Swal.fire({
+      title: "Limit Reached",
+      text: `You have used all ${requestLimit.limit} late correction requests for this month. Please contact admin for further assistance.`,
+      icon: "warning",
+      confirmButtonColor: "#d33"
+    });
+    return; // 🛑 Stop here, do not open modal
+  }
 
-      const payload = {
-        employeeId: user.employeeId,
-        date: todayIso,
-        time: utcTimeStr, // ✅ Sending UTC time to server
-        reason: lateReqData.reason
-      };
-      await api.post('/api/attendance/request-correction', payload);
-      Swal.fire("Success", "Request for On-Time login sent to Admin.", "success");
-      setShowLateReqModal(false);
-      setLateReqData({ time: "", reason: "" });
-      await loadAttendance(user.employeeId);
-    } catch (error) {
-      const errMsg = error.response?.data?.message || error.message;
-      Swal.fire("Error", errMsg, "error");
-    } finally {
-      setLateReqLoading(false);
-    }
-  };
+  setShowLateReqModal(true); // ✅ Open modal only if limit exists
+};
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
@@ -885,12 +964,13 @@ const EmployeeDashboard = () => {
           <span className="text-xs text-red-600 font-semibold">Request Rejected</span>
         )}
         {/* ✅ Added: Request Button inside Table Cell if NO request is pending */}
-        {status === "LATE" && !isPending && !isRejected && (
+         {status === "LATE" && !isPending && !isRejected && (
           <button
-            onClick={() => setShowLateReqModal(true)}
+            onClick={handleOpenLateRequestModal} // 👈 1. Changed Function Here
             className="text-xs text-blue-600 hover:text-blue-800 underline font-semibold mt-1"
           >
-            Request On-Time Login
+             {/* 👈 2. Updated Text Here */}
+            Request On-Time Login ({requestLimit.limit - requestLimit.used} left)
           </button>
         )}
       </div>
@@ -1153,14 +1233,22 @@ const gradients = [
               <div className="flex gap-2 items-start flex-wrap justify-end">
 
                 {/* ✅ Request Correction Button */}
-                {showCorrectionBtn && (
-                  <button
-                    onClick={() => setShowLateReqModal(true)}
-                    className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg shadow-sm hover:bg-red-50 transition-all text-sm font-semibold animate-pulse-slow"
-                  >
-                    <FaPen size={12} /> Request on-time login
-                  </button>
-                )}
+              {showCorrectionBtn && (
+  <button
+    onClick={handleOpenLateRequestModal} // 👈 1. Changed Function Here
+    className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg shadow-sm hover:bg-red-50 transition-all text-sm font-semibold animate-pulse-slow"
+  >
+    <div className="flex flex-col items-start leading-tight">
+      <span className="flex items-center gap-2">
+        <FaPen size={12} /> Request on-time login
+      </span>
+      {/* 👈 2. Added Description Here */}
+      <span className="text-[10px] text-red-400 font-normal">
+        {requestLimit.limit - requestLimit.used} requests remaining
+      </span>
+    </div>
+  </button>
+)}
 
                 {todayLog?.sessions?.length > 0 && (
                   <div className="relative" ref={breakDropdownRef}>
@@ -1728,6 +1816,100 @@ const gradients = [
           </div>
         </div>
       )}
+
+      {showLateReqModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
+      <div className="bg-orange-600 px-6 py-4 flex justify-between items-center">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <FaRegClock /> Request On-Time Login
+        </h3>
+        <button onClick={() => setShowLateReqModal(false)} className="text-white hover:bg-orange-700 p-1 rounded">
+          <FaTimes />
+        </button>
+      </div>
+      <div className="p-6">
+        {/* ✅ NEW: Request Limit Display */}
+        <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-purple-700">Monthly Request Limit</span>
+            <span className="text-lg font-bold text-purple-900">
+              {requestLimit.limit - requestLimit.used} / {requestLimit.limit}
+            </span>
+          </div>
+          <div className="w-full bg-purple-200 rounded-full h-2">
+            <div 
+              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(((requestLimit.limit - requestLimit.used) / requestLimit.limit) * 100, 100)}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-purple-600 mt-1">
+            {requestLimit.limit - requestLimit.used === 0 ? (
+              <span className="text-red-600 font-bold">⚠️ No requests remaining this month</span>
+            ) : (
+              `${requestLimit.limit - requestLimit.used} request${requestLimit.limit - requestLimit.used !== 1 ? 's' : ''} remaining`
+            )}
+          </p>
+        </div>
+
+        <p className="text-sm text-gray-600 mb-4 bg-orange-50 border border-orange-200 p-2 rounded">
+          You are marked as <b>LATE</b>. If you arrived on time but missed punching in, or If you have a valid reason for the delay, Raise a correction request.
+        </p>
+        
+        <form onSubmit={handleLateRequestSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Today's Date</label>
+            <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 bg-gray-100">
+              <FaCalendarAlt className="text-gray-400 mr-2" />
+              <input type="text" value={formatDateDDMMYYYY(todayIso)} disabled className="bg-transparent outline-none w-full text-gray-500 cursor-not-allowed" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Actual Arrival Time</label>
+            <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 bg-white focus-within:ring-2 ring-orange-200 transition">
+              <FaRegClock className="text-gray-400 mr-2" />
+              <input
+                type="time"
+                value={lateReqData.time}
+                onChange={(e) => setLateReqData({ ...lateReqData, time: e.target.value })}
+                className="bg-transparent outline-none w-full text-gray-700"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Reason</label>
+            <textarea
+              value={lateReqData.reason}
+              onChange={(e) => setLateReqData({ ...lateReqData, reason: e.target.value })}
+              placeholder="Reason for late login..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-orange-200 h-24 resize-none transition"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button 
+              type="button" 
+              onClick={() => setShowLateReqModal(false)} 
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={lateReqLoading || (requestLimit.limit - requestLimit.used) === 0} 
+              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {lateReqLoading ? "Sending..." : 
+               (requestLimit.limit - requestLimit.used) === 0 ? "Limit Reached" : 
+               "Submit Request"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* ✅ NEW MODAL: Late Login Correction Request (Today) */}
       {showLateReqModal && (
