@@ -819,4 +819,19 @@ export const setRequestLimit = (employeeId, limit) => {
   });
 };
 
+// --- START OF FILE api.js ---
+// ... keep existing code ...
+
+// ✅ NEW: Work Status Correction APIs
+export const requestStatusCorrection = async (data) => 
+  (await api.post("/api/attendance/request-status-correction", data)).data;
+
+export const getAllStatusCorrectionRequests = async () => 
+  (await api.get("/api/attendance/admin/status-correction-requests")).data;
+
+export const approveStatusCorrection = async (data) => 
+  (await api.post("/api/attendance/approve-status-correction", data)).data;
+
+export const rejectStatusCorrection = async (data) => 
+  (await api.post("/api/attendance/reject-status-correction", data)).data;
 export default api;

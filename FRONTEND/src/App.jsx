@@ -77,6 +77,7 @@ import EmployeePayslip from "./EmployeePages/EmployeePayslip";
 import ConnectWithEmployee from "./EmployeePages/ConnectwithEmployee";
 import AddExpense from "./EmployeePages/AddExpense";
 import AdminExpenseDashboard from "./pages/AdminExpense";
+import AdminAttendanceRequests from "./pages/AdminAttendanceRequests";
 
 function App() {
   return (
@@ -152,6 +153,7 @@ function App() {
         <Route path="/admin/today-overview" element={<TodayOverview />} />
           <Route path="/admin/rules" element={<AdminRulesPost />} />
          <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
+         <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}

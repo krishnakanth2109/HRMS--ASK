@@ -71,7 +71,15 @@ const DailySchema = new mongoose.Schema({
 
   adminPunchOut: { type: Boolean, default: false },
   adminPunchOutBy: { type: String, default: null },
-  adminPunchOutTimestamp: { type: Date, default: null }
+  adminPunchOutTimestamp: { type: Date, default: null },
+
+   statusCorrectionRequest: {
+    hasRequest: { type: Boolean, default: false },
+    status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
+    requestedPunchOut: { type: Date, default: null }, // The new Punch Out time
+    reason: { type: String, default: null },
+    adminComment: { type: String, default: null }
+  },
 });
 
 const AttendanceSchema = new mongoose.Schema({

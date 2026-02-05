@@ -662,5 +662,180 @@ router.post("/approve-correction", async (req, res) => {
   }
 });
 
+// --- START OF FILE EmployeeattendanceRoutes.js ---
+// ... keep existing code ...
+
+/* ====================================================================================
+   ✅ NEW: WORK STATUS CORRECTION (Request Full Day for Half Day/Absent)
+==================================================================================== */
+
+// 1. Submit Request
+router.post('/request-status-correction', async (req, res) => {
+  try {
+    const { employeeId, date, requestedPunchOut, reason } = req.body;
+
+    const attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+
+    const dayRecord = attendance.attendance.find(a => a.date === date);
+    if (!dayRecord) return res.status(404).json({ message: "No attendance found for this date." });
+
+    if (!dayRecord.punchIn) {
+      return res.status(400).json({ message: "You can only request correction if you have punched in." });
+    }
+
+    // Check if request already exists
+    if (dayRecord.statusCorrectionRequest?.hasRequest && dayRecord.statusCorrectionRequest.status === 'PENDING') {
+      return res.status(400).json({ message: "A pending request already exists for this date." });
+    }
+
+    // Construct full date object for punch out
+    // Assuming requestedPunchOut is "HH:MM" string, combine with date
+    const combinedDate = new Date(`${date}T${requestedPunchOut}:00`);
+
+    dayRecord.statusCorrectionRequest = {
+      hasRequest: true,
+      status: "PENDING",
+      requestedPunchOut: combinedDate,
+      reason: reason
+    };
+
+    await attendance.save();
+    res.json({ success: true, message: "Status correction request submitted." });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Admin: Get All Pending Requests
+router.get('/admin/status-correction-requests', onlyAdmin, async (req, res) => {
+  try {
+    const records = await Attendance.find({
+      "attendance.statusCorrectionRequest.status": "PENDING"
+    });
+
+    let requests = [];
+    records.forEach(rec => {
+      rec.attendance.forEach(day => {
+        if (day.statusCorrectionRequest?.hasRequest && day.statusCorrectionRequest.status === "PENDING") {
+          requests.push({
+            employeeId: rec.employeeId,
+            employeeName: rec.employeeName,
+            date: day.date,
+            currentStatus: day.workedStatus,
+            punchIn: day.punchIn,
+            currentPunchOut: day.punchOut,
+            requestedPunchOut: day.statusCorrectionRequest.requestedPunchOut,
+            reason: day.statusCorrectionRequest.reason
+          });
+        }
+      });
+    });
+
+    res.json({ success: true, data: requests });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Admin: Approve Request
+router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
+  try {
+    const { employeeId, date, adminComment } = req.body;
+    
+    const attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Employee not found" });
+
+    const dayRecord = attendance.attendance.find(a => a.date === date);
+    if (!dayRecord) return res.status(404).json({ message: "Date record not found" });
+
+    const reqData = dayRecord.statusCorrectionRequest;
+    if (!reqData || !reqData.hasRequest) return res.status(400).json({ message: "No request found" });
+
+    // UPDATE LOGIC: Set Punch Out time to requested time
+    const newPunchOut = new Date(reqData.requestedPunchOut);
+    
+    // 1. Update Punch Out
+    dayRecord.punchOut = newPunchOut;
+    dayRecord.punchOutLocation = { address: "Admin Correction (Full Day Request)", timestamp: new Date() }; // Dummy location
+
+    // 2. Update Sessions (Fix the last session or create one)
+    if (dayRecord.sessions.length > 0) {
+      const lastSession = dayRecord.sessions[dayRecord.sessions.length - 1];
+      lastSession.punchOut = newPunchOut;
+      lastSession.durationSeconds = (new Date(lastSession.punchOut) - new Date(lastSession.punchIn)) / 1000;
+    }
+
+    // 3. Recalculate Total Time
+    let totalSeconds = 0;
+    dayRecord.sessions.forEach(sess => {
+        if(sess.punchIn && sess.punchOut) {
+            totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+        }
+    });
+
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+
+    dayRecord.workedHours = h;
+    dayRecord.workedMinutes = m;
+    dayRecord.workedSeconds = s;
+    dayRecord.displayTime = `${h}h ${m}m ${s}s`;
+
+    // 4. Force Status to Full Day (or calculate based on hours if you prefer strict logic)
+    // Since this is a manual "Request Full Day", we typically force it, 
+    // but calculating it ensures data integrity.
+    
+    let shift = await Shift.findOne({ employeeId });
+    if (!shift) shift = { fullDayHours: 8, halfDayHours: 4 };
+
+    // Recalculate status based on new hours
+    if (h >= shift.fullDayHours) {
+        dayRecord.workedStatus = "FULL_DAY";
+        dayRecord.attendanceCategory = "FULL_DAY";
+    } else {
+        // Fallback if the requested time still isn't enough, but usually admin checks this
+        dayRecord.workedStatus = h >= shift.halfDayHours ? "HALF_DAY" : "ABSENT";
+    }
+
+    dayRecord.status = "COMPLETED";
+
+    // 5. Update Request Status
+    dayRecord.statusCorrectionRequest.status = "APPROVED";
+    dayRecord.statusCorrectionRequest.adminComment = adminComment || "Approved";
+
+    await attendance.save();
+    res.json({ success: true, message: "Request approved and attendance updated." });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Admin: Reject Request
+router.post('/reject-status-correction', onlyAdmin, async (req, res) => {
+  try {
+    const { employeeId, date, adminComment } = req.body;
+    
+    const attendance = await Attendance.findOne({ employeeId });
+    const dayRecord = attendance.attendance.find(a => a.date === date);
+
+    if (dayRecord && dayRecord.statusCorrectionRequest) {
+      dayRecord.statusCorrectionRequest.status = "REJECTED";
+      dayRecord.statusCorrectionRequest.adminComment = adminComment || "Rejected";
+      await attendance.save();
+      res.json({ success: true, message: "Request rejected." });
+    } else {
+      res.status(404).json({ message: "Record not found" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 export default router;
 // --- END OF FILE EmployeeattendanceRoutes.js ---

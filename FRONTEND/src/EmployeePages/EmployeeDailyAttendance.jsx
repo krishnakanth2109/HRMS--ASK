@@ -6,7 +6,8 @@ import {
   getAttendanceForEmployee, 
   getShiftByEmployeeId, 
   getHolidays, 
-  getLeaveRequestsForEmployee 
+  getLeaveRequestsForEmployee,
+  requestStatusCorrection 
 } from "../api";
 
 // --- Import Chart.js and React wrapper ---
@@ -39,9 +40,11 @@ import {
   FaUmbrellaBeach,
   FaFileDownload,
   FaBriefcase,
-  FaListAlt, // Added for the Requests button
-  FaTimes, // Added for closing modal
-  FaCheckCircle // Added for Present icon
+  FaListAlt, 
+  FaTimes, 
+  FaCheckCircle,
+  FaEdit,
+  FaHistory // ✅ ADDED: Icon for history
 } from "react-icons/fa";
 
 // --- Register Chart.js components ---
@@ -112,17 +115,6 @@ const TableRowSkeleton = () => (
   </tr>
 );
 
-// Defined outside main component to avoid scope issues
-const StatCard = ({ icon, title, value, colorClass }) => (
-  <div className="flex-1 p-4 bg-white rounded-xl shadow-md flex items-center gap-4 transition-transform transform hover:scale-105 border border-gray-100">
-    <div className={`p-3 rounded-full ${colorClass}`}>{icon}</div>
-    <div>
-      <p className="text-xs text-gray-500 font-bold uppercase">{title}</p>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-    </div>
-  </div>
-);
-
 const BreakdownItem = ({ icon, title, value, color, bg }) => (
   <div className={`flex flex-col items-start p-4 rounded-xl ${bg} border border-transparent hover:border-${color}-200 transition-all duration-200`}>
     <div className={`text-2xl mb-2 ${color}`}>{icon}</div>
@@ -148,8 +140,15 @@ const EmployeeDailyAttendance = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'descending' });
   
-  // ✅ New State for Requests Modal
-  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  // Request Modals
+  const [showRequestsModal, setShowRequestsModal] = useState(false); // Late Requests
+  const [showCorrectionHistoryModal, setShowCorrectionHistoryModal] = useState(false); // ✅ NEW: Correction History
+
+  // Correction Submission Modal State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [correctionData, setCorrectionData] = useState({ date: "", punchIn: "", currentStatus: "" });
+  const [requestedPunchOut, setRequestedPunchOut] = useState("");
+  const [statusReason, setStatusReason] = useState("");
 
   // --- Fetch Data ---
   const loadData = useCallback(async (empId) => {
@@ -247,7 +246,7 @@ const EmployeeDailyAttendance = () => {
       let finalStatus = "Absent"; 
       let loginStatus = "--";
       let displayTime = "00:00";
-      let statusDetails = null; // To store Holiday Name or Leave Reason
+      let statusDetails = null;
 
       if (record && record.punchIn) {
         const end = record.punchOut ? new Date(record.punchOut) : new Date();
@@ -285,7 +284,8 @@ const EmployeeDailyAttendance = () => {
         status: record?.status || finalStatus.toUpperCase(),
         loginStatus,
         workedStatus: finalStatus,
-        details: statusDetails
+        details: statusDetails,
+        statusCorrectionRequest: record?.statusCorrectionRequest || { hasRequest: false }
       };
     });
   }, [selectedDate, attendance, shiftDetails, holidays, leaves]);
@@ -463,10 +463,10 @@ const EmployeeDailyAttendance = () => {
     const weekOffs = currentMonthData.filter(d => d.workedStatus === "Week Off").length;
     const holidaysCount = currentMonthData.filter(d => d.workedStatus === "Holiday").length;
     
-    // UPDATED: Working Days Logic
+    // Working Days Logic
     const workingDays = Math.max(0, currentMonthData.length - weekOffs - holidaysCount);
 
-    // Consolidated Absent Count (Regular Absent + Leaves)
+    // Consolidated Absent Count
     const absentTotal = stats.absent + stats.leave;
 
     return {
@@ -495,7 +495,9 @@ const EmployeeDailyAttendance = () => {
     return `Monthly Breakdown of ${monthName} ${selectedDate.getFullYear()}`;
   };
 
-  // ✅ MEMOIZED: Get Late Requests for Selected Period
+  // --- HISTORY LOGIC ---
+
+  // 1. Late Requests for Selected Period
   const lateRequestsHistory = useMemo(() => {
     const selectedMonth = selectedDate.getMonth();
     const selectedYear = selectedDate.getFullYear();
@@ -508,7 +510,15 @@ const EmployeeDailyAttendance = () => {
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [attendance, selectedDate]);
 
-  // --- Event Handlers (Defined BEFORE they are used in JSX) ---
+  // ✅ 2. Attendance Status Correction History (Full Day Requests)
+  const statusCorrectionHistory = useMemo(() => {
+    // Filter all attendance records where a request exists
+    return attendance.filter(record => 
+        record.statusCorrectionRequest?.hasRequest
+    ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [attendance]);
+
+  // --- Event Handlers ---
   
   const handleYearChange = (e) => {
     setSelectedDate(new Date(parseInt(e.target.value), selectedDate.getMonth()));
@@ -528,6 +538,39 @@ const EmployeeDailyAttendance = () => {
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return <FaSort className="text-gray-400" />;
     return sortConfig.direction === 'ascending' ? <FaSortUp className="text-blue-600" /> : <FaSortDown className="text-blue-600" />;
+  };
+
+  // Correction Modal
+  const openCorrectionModal = (record) => {
+    setCorrectionData({
+      date: toISODateString(record.date),
+      punchIn: record.punchIn,
+      currentStatus: record.workedStatus
+    });
+    setRequestedPunchOut("");
+    setStatusReason("");
+    setShowStatusModal(true);
+  };
+
+  // Submit Status Correction
+  const submitStatusCorrection = async () => {
+    if (!requestedPunchOut || !statusReason) {
+      alert("Please provide both time and reason.");
+      return;
+    }
+    try {
+      await requestStatusCorrection({
+        employeeId: user.employeeId,
+        date: correctionData.date,
+        requestedPunchOut: requestedPunchOut,
+        reason: statusReason
+      });
+      alert("Request submitted successfully!");
+      setShowStatusModal(false);
+      loadData(user.employeeId); // Reload data
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to submit request");
+    }
   };
 
   // --- Export Function ---
@@ -604,8 +647,16 @@ const EmployeeDailyAttendance = () => {
             </select>
           </div>
           
-          <div className="flex-grow md:text-right flex justify-end gap-3">
-             {/* ✅ Added View Requests Button */}
+          <div className="flex-grow md:text-right flex flex-col md:flex-row justify-end gap-3">
+             
+             {/* ✅ NEW: Attendance Correction Button */}
+             <button 
+                onClick={() => setShowCorrectionHistoryModal(true)}
+                className="inline-flex items-center gap-2 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors"
+             >
+                <FaHistory /> Attendance Correction
+             </button>
+
              <button 
                 onClick={() => setShowRequestsModal(true)}
                 className="inline-flex items-center gap-2 bg-white border border-orange-200 text-orange-600 hover:bg-orange-50 px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors"
@@ -624,72 +675,20 @@ const EmployeeDailyAttendance = () => {
 
         {/* Stats & Chart Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-          
-          {/* Summary Column - UPDATED DYNAMIC TITLE & CONTENT */}
           <div className="lg:col-span-2 p-6 bg-white rounded-xl shadow-md border border-gray-100">
             <h3 className="font-bold text-lg mb-4 text-gray-800 border-b pb-2">
               {getBreakdownTitle()}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-              
-              {/* Full Days (Kept) */}
-              <BreakdownItem 
-                icon={<FaBusinessTime />} 
-                title="Full Days" 
-                value={summaryStats.fullDays} 
-                color="text-green-600" 
-                bg="bg-green-50" 
-              />
-              
-              {/* Half Days (Kept) */}
-              <BreakdownItem 
-                icon={<FaStarHalfAlt />} 
-                title="Half Days" 
-                value={summaryStats.halfDays} 
-                color="text-yellow-600" 
-                bg="bg-yellow-50" 
-              />
-
-              {/* Present (New - replaced Working Days) */}
-               <BreakdownItem 
-                icon={<FaCheckCircle />} 
-                title="Present" 
-                value={summaryStats.presentDays} 
-                color="text-blue-600" 
-                bg="bg-blue-50" 
-              />
-              
-              {/* On Time (New - replaced Leaves) */}
-              <BreakdownItem 
-                icon={<FaUserClock />} 
-                title="On Time" 
-                value={summaryStats.onTimeCount} 
-                color="text-teal-600" 
-                bg="bg-teal-50" 
-              />
-
-              {/* Late Login (New - replaced Holidays) */}
-              <BreakdownItem 
-                icon={<FaExclamationTriangle />} 
-                title="Late Login" 
-                value={summaryStats.lateCount} 
-                color="text-red-600" 
-                bg="bg-red-50" 
-              />
-              
-              {/* Absent (Consolidated: Leave + Absent) */}
-              <BreakdownItem 
-                icon={<FaTimesCircle />} 
-                title="Absent" 
-                value={summaryStats.absentDays} 
-                color="text-rose-700" 
-                bg="bg-rose-50" 
-              />
-
+              <BreakdownItem icon={<FaBusinessTime />} title="Full Days" value={summaryStats.fullDays} color="text-green-600" bg="bg-green-50" />
+              <BreakdownItem icon={<FaStarHalfAlt />} title="Half Days" value={summaryStats.halfDays} color="text-yellow-600" bg="bg-yellow-50" />
+              <BreakdownItem icon={<FaCheckCircle />} title="Present" value={summaryStats.presentDays} color="text-blue-600" bg="bg-blue-50" />
+              <BreakdownItem icon={<FaUserClock />} title="On Time" value={summaryStats.onTimeCount} color="text-teal-600" bg="bg-teal-50" />
+              <BreakdownItem icon={<FaExclamationTriangle />} title="Late Login" value={summaryStats.lateCount} color="text-red-600" bg="bg-red-50" />
+              <BreakdownItem icon={<FaTimesCircle />} title="Absent" value={summaryStats.absentDays} color="text-rose-700" bg="bg-rose-50" />
             </div>
           </div>
 
-          {/* Graph Column */}
           <div className="lg:col-span-3 p-4 bg-white rounded-xl shadow-md border border-gray-100">
             <h3 className="font-semibold text-lg mb-2 text-gray-800">Yearly Overview - {selectedDate.getFullYear()}</h3>
             <div className="relative h-64">
@@ -697,8 +696,6 @@ const EmployeeDailyAttendance = () => {
             </div>
           </div>
         </div>
-
-
 
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100">
@@ -733,6 +730,11 @@ const EmployeeDailyAttendance = () => {
                     const isHoliday = a.workedStatus === 'Holiday';
                     const isWeekOff = a.workedStatus === 'Week Off';
                     const isHalfDay = a.workedStatus === 'Half Day';
+                    
+                    const canRequestFullDay = a.punchIn && (isAbsent || isHalfDay);
+                    const isPending = a.statusCorrectionRequest?.hasRequest && a.statusCorrectionRequest?.status === 'PENDING';
+                    const isRejected = a.statusCorrectionRequest?.hasRequest && a.statusCorrectionRequest?.status === 'REJECTED';
+                    const showButton = canRequestFullDay && (!a.statusCorrectionRequest?.hasRequest || isRejected);
 
                     let rowClass = "hover:bg-blue-50/50 transition-colors duration-200 border-b border-gray-100 last:border-b-0 ";
                     if (isAbsent) rowClass += "bg-red-50/30";
@@ -778,15 +780,34 @@ const EmployeeDailyAttendance = () => {
                         </td>
 
                         <td className="px-4 py-3 capitalize text-left whitespace-nowrap font-medium">
-                          {(() => {
-                            if (isAbsent) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600"><FaTimesCircle/> Absent</span>;
-                            if (isWeekOff) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600"><FaCouch/> Week Off</span>;
-                            if (isHoliday) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-600"><FaUmbrellaBeach/> Holiday</span>;
-                            if (isLeave) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600">On Leave</span>;
-                            if (isHalfDay) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700"><FaStarHalfAlt/> Half Day</span>;
-                            if (a.workedStatus === "Full Day") return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Full Day</span>;
-                            return <span className="text-gray-500 text-xs">{a.workedStatus}</span>;
-                          })()}
+                          <div className="flex flex-col items-start gap-1">
+                              {(() => {
+                                if (isAbsent) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600"><FaTimesCircle/> Absent</span>;
+                                if (isWeekOff) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600"><FaCouch/> Week Off</span>;
+                                if (isHoliday) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-600"><FaUmbrellaBeach/> Holiday</span>;
+                                if (isLeave) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600">On Leave</span>;
+                                if (isHalfDay) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700"><FaStarHalfAlt/> Half Day</span>;
+                                if (a.workedStatus === "Full Day") return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Full Day</span>;
+                                return <span className="text-gray-500 text-xs">{a.workedStatus}</span>;
+                              })()}
+
+                              {showButton && (
+                                <button 
+                                  onClick={() => openCorrectionModal(a)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1 mt-1 font-semibold"
+                                >
+                                  <FaEdit /> {isRejected ? "Retry Request" : "Request Full Day"}
+                                </button>
+                              )}
+
+                              {isPending && (
+                                <span className="text-xs text-orange-500 italic mt-1 font-semibold">Request Pending</span>
+                              )}
+
+                              {isRejected && !showButton && (
+                                  <span className="text-xs text-red-500 block">Request Rejected</span>
+                              )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -802,7 +823,7 @@ const EmployeeDailyAttendance = () => {
           </div>
         </div>
 
-        {/* ✅ LATE REQUESTS MODAL */}
+        {/* ✅ MODAL 1: LATE REQUESTS (Unchanged) */}
         {showRequestsModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-fade-in-down flex flex-col max-h-[80vh]">
@@ -868,6 +889,119 @@ const EmployeeDailyAttendance = () => {
                     </div>
                 </div>
             </div>
+        )}
+
+        {/* ✅ MODAL 2: ATTENDANCE CORRECTION HISTORY (Full Day Requests) */}
+        {showCorrectionHistoryModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-fade-in-down flex flex-col max-h-[80vh]">
+                    <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                        <div>
+                            <h3 className="text-lg font-bold flex items-center gap-2"><FaHistory /> Attendance Correction Requests</h3>
+                            <p className="text-xs text-blue-100 opacity-90 mt-1">History of full day status corrections</p>
+                        </div>
+                        <button onClick={() => setShowCorrectionHistoryModal(false)} className="hover:bg-blue-700 p-2 rounded-full transition"><FaTimes /></button>
+                    </div>
+                    
+                    <div className="p-0 overflow-auto flex-1">
+                        <table className="min-w-full text-sm text-left">
+                            <thead className="bg-gray-50 sticky top-0 shadow-sm z-10">
+                                <tr className="text-gray-600 uppercase">
+                                    <th className="px-6 py-3 font-semibold">Date</th>
+                                    <th className="px-6 py-3 font-semibold">Status</th>
+                                    <th className="px-6 py-3 font-semibold">Punched In</th>
+                                    <th className="px-6 py-3 font-semibold">Requested Punch Out</th>
+                                    <th className="px-6 py-3 font-semibold">Reason</th>
+                                    <th className="px-6 py-3 font-semibold">Admin Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {statusCorrectionHistory.length > 0 ? (
+                                    statusCorrectionHistory.map((req, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-medium text-gray-800">
+                                                {new Date(req.date).toLocaleDateString('en-GB')}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                                                    req.statusCorrectionRequest.status === "APPROVED" ? "bg-green-100 text-green-700 border-green-200" :
+                                                    req.statusCorrectionRequest.status === "REJECTED" ? "bg-red-100 text-red-700 border-red-200" :
+                                                    "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                                }`}>
+                                                    {req.statusCorrectionRequest.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500">
+                                                {req.punchIn ? new Date(req.punchIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "--:--"}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono text-blue-600 font-bold">
+                                                {new Date(req.statusCorrectionRequest.requestedPunchOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                            </td>
+                                            <td className="px-6 py-4 max-w-xs truncate" title={req.statusCorrectionRequest.reason}>
+                                                {req.statusCorrectionRequest.reason}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500 italic">
+                                                {req.statusCorrectionRequest.adminComment || "--"}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="6" className="text-center py-12 text-gray-400">
+                                            No correction requests found.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ✅ MODAL 3: SUBMIT CORRECTION REQUEST (Unchanged) */}
+        {showStatusModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fade-in-down overflow-hidden">
+                <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                   <h3 className="text-lg font-bold">Request Full Day</h3>
+                   <button onClick={() => setShowStatusModal(false)} className="hover:bg-blue-700 p-2 rounded-full transition"><FaTimes /></button>
+                </div>
+                <div className="p-6">
+                   <p className="text-sm text-gray-600 mb-4">
+                      You are currently marked as <span className="font-bold text-red-500">{correctionData.currentStatus}</span> for <span className="font-bold text-gray-800">{new Date(correctionData.date).toLocaleDateString()}</span>.
+                      Please provide your correct punch-out time to request a Full Day.
+                   </p>
+
+                   <div className="space-y-4">
+                      <div>
+                         <label className="block text-sm font-semibold text-gray-700 mb-1">Correct Punch Out Time</label>
+                         <input 
+                           type="time" 
+                           value={requestedPunchOut} 
+                           onChange={(e) => setRequestedPunchOut(e.target.value)}
+                           className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                         />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-semibold text-gray-700 mb-1">Reason</label>
+                         <textarea 
+                           rows="3"
+                           value={statusReason}
+                           onChange={(e) => setStatusReason(e.target.value)}
+                           placeholder="Why was the punch-out missed or incorrect?"
+                           className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                         ></textarea>
+                      </div>
+                   </div>
+
+                   <div className="mt-6 flex gap-3">
+                      <button onClick={() => setShowStatusModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold">Cancel</button>
+                      <button onClick={submitStatusCorrection} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold shadow-md">Submit Request</button>
+                   </div>
+                </div>
+             </div>
+          </div>
         )}
 
       </div>

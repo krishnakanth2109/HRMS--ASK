@@ -115,6 +115,7 @@ const navLinks = [
   },
 
   { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
+  { to: "/admin/attendance-requests", label: "Attendance Requests", icon: <FaConnectdevelop /> }
 ];
 
 // ✅ HELPER: Calculate unread notices using SERVER STATE
