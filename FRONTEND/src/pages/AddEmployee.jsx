@@ -143,24 +143,30 @@ const AddEmployee = () => {
   };
 
   // Handle Add Company
-  const handleAddCompany = async (e) => {
-    e.preventDefault();
+// In AddEmployee.jsx, update handleAddCompany function:
+const handleAddCompany = async (e) => {
+  e.preventDefault();
 
-    if (!newCompanyData.name.trim() || !newCompanyData.prefix.trim()) {
-      snackbar.show("Company name and prefix are required");
-      return;
-    }
+  if (!newCompanyData.name.trim() || !newCompanyData.prefix.trim()) {
+    snackbar.show("Company name and prefix are required");
+    return;
+  }
 
-    setAddingCompany(true);
-    try {
-      const response = await createCompany(newCompanyData);
-      snackbar.show("Company added successfully!");
-
+  setAddingCompany(true);
+  try {
+    const response = await createCompany(newCompanyData);
+    
+    // Check if response has data property
+    if (response && response.data) {
+      snackbar.show(response.data.message || "Company added successfully!");
+      
       // Add to companies list
-      setCompanies([...companies, response.data]);
+      setCompanies([...companies, response.data.data || response.data]);
 
       // Auto-select the new company
-      handleCompanyChange(response.data._id);
+      if (response.data.data?._id) {
+        handleCompanyChange(response.data.data._id);
+      }
 
       // Reset form and close modal
       setNewCompanyData({
@@ -176,13 +182,26 @@ const AddEmployee = () => {
         country: "",
       });
       setShowAddCompanyModal(false);
-    } catch (err) {
-      console.error("Error adding company:", err);
-      snackbar.show(err.response?.data?.message || "Error adding company");
-    } finally {
-      setAddingCompany(false);
     }
-  };
+  } catch (err) {
+    console.error("Error adding company:", err);
+    
+    // Show the actual error message from backend
+    const errorMsg = err.response?.data?.message || 
+                    err.response?.data?.error || 
+                    "Error adding company. Company may already exist.";
+    
+    snackbar.show(errorMsg);
+    
+    // If it's a duplicate error, suggest alternatives
+    if (errorMsg.includes("already exists")) {
+      console.log("Try a different name or prefix");
+      // You could auto-suggest here
+    }
+  } finally {
+    setAddingCompany(false);
+  }
+};
 
   // ✅ NEW: Handle Edit Click (Opens Modal with Data)
   const handleEditClick = (e, company) => {

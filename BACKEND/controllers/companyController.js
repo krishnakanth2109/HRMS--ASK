@@ -47,6 +47,7 @@ export const getCompanyById = async (req, res) => {
 };
 
 // ✅ CREATE NEW COMPANY
+// ✅ CREATE NEW COMPANY (Updated with better logging)
 export const createCompany = async (req, res) => {
   try {
     console.log("📝 Received company creation request:", req.body);
@@ -61,37 +62,53 @@ export const createCompany = async (req, res) => {
       });
     }
 
+    // Trim and uppercase
+    const trimmedName = name.trim();
+    const trimmedPrefix = prefix.toUpperCase().trim();
+    
+    console.log(`🔍 Checking for existing company with name: "${trimmedName}" or prefix: "${trimmedPrefix}"`);
+
     // Check if company already exists
     const existingCompany = await Company.findOne({
-      $or: [{ name: name.trim() }, { prefix: prefix.toUpperCase().trim() }],
+      $or: [{ name: trimmedName }, { prefix: trimmedPrefix }],
     });
 
     if (existingCompany) {
-      console.log("❌ Company already exists");
+      console.log("❌ Company already exists:", {
+        existingName: existingCompany.name,
+        existingPrefix: existingCompany.prefix,
+        foundBy: existingCompany.name === trimmedName ? "name" : "prefix"
+      });
       return res.status(400).json({
         success: false,
-        message: "Company with this name or prefix already exists",
+        message: `Company with ${existingCompany.name === trimmedName ? 'this name' : 'this prefix'} already exists`,
+        existingData: {
+          name: existingCompany.name,
+          prefix: existingCompany.prefix
+        }
       });
     }
 
+    console.log("✅ No existing company found. Creating new company...");
+    
     const newCompany = new Company({
-      name: name.trim(),
-      prefix: prefix.toUpperCase().trim(),
-      description,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      zipCode,
-      country,
-      registrationNumber,
-      website,
+      name: trimmedName,
+      prefix: trimmedPrefix,
+      description: description || "",
+      email: email || "",
+      phone: phone || "",
+      address: address || "",
+      city: city || "",
+      state: state || "",
+      zipCode: zipCode || "",
+      country: country || "",
+      registrationNumber: registrationNumber || "",
+      website: website || "",
       employeeCount: 0,
     });
 
     await newCompany.save();
-    console.log("✅ Company created successfully:", newCompany._id);
+    console.log("✅ Company created successfully with ID:", newCompany._id);
 
     res.status(201).json({
       success: true,
@@ -100,9 +117,29 @@ export const createCompany = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error creating company:", error);
+    
+    // Handle MongoDB duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Duplicate key error - Company with this name or prefix already exists",
+        error: error.message,
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', '),
+        error: error.message,
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Error creating company",
+      message: "Internal server error",
       error: error.message,
     });
   }

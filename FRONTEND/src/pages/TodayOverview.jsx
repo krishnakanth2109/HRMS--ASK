@@ -594,7 +594,8 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                       }}
                       className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
                     >
-                      <FaPhone className="text-xs" /> Call
+                      <FaPhone className="text-xs" />
+                      Call
                     </button>
                     <button
                       onClick={() => {
@@ -603,7 +604,8 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                       }}
                       className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
                     >
-                      <FaEnvelope className="text-xs" /> Message
+                      <FaEnvelope className="text-xs" />
+                      Message
                     </button>
                   </div>
                 </motion.div>
@@ -682,6 +684,9 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Duration / Notes
               </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Phone
+              </th>
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -744,6 +749,18 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                      <span className="text-sm text-slate-400">--</span>
                    )}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-slate-700">
+                    {employee.phoneNumber ? (
+                      <div className="flex items-center gap-1">
+                        <FaPhone className="text-slate-500 text-xs" />
+                        <span className="font-mono">{employee.phoneNumber}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">No phone</span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {/* ✅ FIXED: REMOVED CHECK FOR PHONE NUMBER */}
                     <div className="flex items-center justify-end gap-2">
@@ -793,7 +810,6 @@ const TodayOverview = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [callModal, setCallModal] = useState({ isOpen: false, employee: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, employee: null });
-  const [employeePhoneNumbers, setEmployeePhoneNumbers] = useState({});
 
   // Optimized data fetch
   const fetchAllData = useCallback(async () => {
@@ -832,13 +848,12 @@ const TodayOverview = () => {
     }
   }, [loading]);
 
-  // Fetch employee details
+  // Fetch employee details (images only)
   useEffect(() => {
     const fetchEmployeeDetails = async () => {
       if (allEmployees.length === 0) return;
       
       const newImages = {};
-      const newPhoneNumbers = {};
       const employeesToProcess = allEmployees.slice(0, 20);
       
       await Promise.all(
@@ -850,15 +865,11 @@ const TodayOverview = () => {
             if (res?.data?.profilePhoto?.url) {
               newImages[empId] = getSecureUrl(res.data.profilePhoto.url);
             }
-            if (res?.data?.phone) {
-              newPhoneNumbers[empId] = res.data.phone;
-            }
           } catch (err) {}
         })
       );
       
       if (Object.keys(newImages).length > 0) setEmployeeImages(prev => ({ ...prev, ...newImages }));
-      if (Object.keys(newPhoneNumbers).length > 0) setEmployeePhoneNumbers(prev => ({ ...prev, ...newPhoneNumbers }));
     };
     
     if (allEmployees.length > 0) fetchEmployeeDetails();
@@ -877,11 +888,20 @@ const TodayOverview = () => {
       return acc;
     }, {});
 
+    // Get phone numbers from allEmployees
+    const empPhoneMap = allEmployees.reduce((acc, emp) => {
+      if (emp.employeeId && emp.phone) {
+        acc[emp.employeeId] = emp.phone;
+      }
+      return acc;
+    }, {});
+
     const attendanceWithDetails = attendanceData.map(item => {
       const shift = shiftsMap[item.employeeId];
       const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
       const department = allEmployees.find(e => e.employeeId === item.employeeId)?.experienceDetails?.[0]?.department || 'Unassigned';
       const loginStatus = calculateLoginStatus(item.punchIn, shift, item.loginStatus);
+      const phoneNumber = empPhoneMap[item.employeeId] || null;
       
       return {
         ...item,
@@ -891,7 +911,7 @@ const TodayOverview = () => {
         isOnLeave: false,
         loginStatus,
         profilePic: employeeImages[item.employeeId],
-        phoneNumber: employeePhoneNumbers[item.employeeId] || null
+        phoneNumber
       };
     });
 
@@ -902,6 +922,8 @@ const TodayOverview = () => {
       return today >= leave.from && today <= leave.to;
     }).map(leave => {
       const emp = allEmployees.find(e => e.employeeId === leave.employeeId);
+      const phoneNumber = empPhoneMap[leave.employeeId] || null;
+      
       return {
         employeeId: leave.employeeId,
         employeeName: empNameMap[leave.employeeId] || leave.employeeName || leave.employeeId,
@@ -914,7 +936,7 @@ const TodayOverview = () => {
         punchOut: null,
         loginStatus: { status: "--", isLate: false },
         profilePic: employeeImages[leave.employeeId],
-        phoneNumber: employeePhoneNumbers[leave.employeeId] || null
+        phoneNumber
       };
     });
 
@@ -925,6 +947,8 @@ const TodayOverview = () => {
       .filter(id => !presentIds.has(id) && !onLeaveIds.has(id))
       .map(id => {
         const emp = allEmployees.find(e => e.employeeId === id);
+        const phoneNumber = empPhoneMap[id] || null;
+        
         return {
           employeeId: id,
           employeeName: empNameMap[id] || id,
@@ -935,12 +959,12 @@ const TodayOverview = () => {
           punchOut: null,
           loginStatus: { status: "--", isLate: false },
           profilePic: employeeImages[id],
-          phoneNumber: employeePhoneNumbers[id] || null
+          phoneNumber
         };
       });
 
     return [...attendanceWithDetails, ...onLeaveToday, ...notLoggedIn];
-  }, [attendanceData, leaveData, allEmployees, shiftsMap, employeeImages, employeePhoneNumbers]);
+  }, [attendanceData, leaveData, allEmployees, shiftsMap, employeeImages]);
 
   // 2. Department Filter Data (Source for Stats)
   const departmentFilteredData = useMemo(() => {
@@ -1273,7 +1297,7 @@ const TodayOverview = () => {
             isOpen={callModal.isOpen}
             onClose={() => setCallModal({ isOpen: false, employee: null })}
             employee={callModal.employee}
-            phoneNumber={employeePhoneNumbers[callModal.employee?.employeeId]}
+            phoneNumber={callModal.employee?.phoneNumber}
           />
         )}
 
@@ -1282,7 +1306,7 @@ const TodayOverview = () => {
             isOpen={messageModal.isOpen}
             onClose={() => setMessageModal({ isOpen: false, employee: null })}
             employee={messageModal.employee}
-            phoneNumber={employeePhoneNumbers[messageModal.employee?.employeeId]}
+            phoneNumber={messageModal.employee?.phoneNumber}
           />
         )}
 

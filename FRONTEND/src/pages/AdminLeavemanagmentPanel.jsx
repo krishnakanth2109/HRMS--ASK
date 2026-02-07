@@ -19,7 +19,8 @@ import {
   FaCheck,
   FaTimes,
   FaInfoCircle,
-  FaUserTie
+  FaUserTie,
+  FaClock
 } from "react-icons/fa";
 import { useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -53,6 +54,20 @@ const formatDate = (dateStr) => {
   return `${day}-${month}-${year}`;
 };
 
+// ✅ New Helper: Date & Time format for "Applied On"
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
+};
 
 const AdminLeavePanel = () => {
   const location = useLocation();
@@ -329,7 +344,10 @@ const AdminLeavePanel = () => {
             <thead className="bg-slate-50 text-slate-600 uppercase font-bold text-xs sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="p-5 tracking-wide">Name</th>
-                <th className="p-5 tracking-wide">Dept</th>
+                {/* INCREASED SIZE FOR DEPT */}
+                <th className="p-5 tracking-wide min-w-[150px]">Dept</th>
+                {/* NEW COLUMN: APPLIED ON */}
+                <th className="p-5 tracking-wide whitespace-nowrap">Applied On</th>
                 <th className="p-5 tracking-wide">From</th>
                 <th className="p-5 tracking-wide">To</th>
                 <th className="p-5 tracking-wide text-center">Duration</th>
@@ -368,10 +386,20 @@ const AdminLeavePanel = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-5">
+                      
+                      {/* UPDATED DEPT: Whitespace nowrap to prevent cut off */}
+                      <td className="p-5 whitespace-nowrap">
                         <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-semibold text-xs border border-slate-200">
                           {lv.department}
                         </span>
+                      </td>
+
+                      {/* NEW DATA CELL: APPLIED ON */}
+                      <td className="p-5 whitespace-nowrap text-xs text-slate-500 font-medium">
+                        <div className="flex items-center gap-1.5">
+                            <FaClock className="text-indigo-300" />
+                            {formatDateTime(lv.createdAt || lv.appliedDate)}
+                        </div>
                       </td>
 
                       <td className="p-5 whitespace-nowrap font-medium text-slate-600">
@@ -380,7 +408,6 @@ const AdminLeavePanel = () => {
                       <td className="p-5 whitespace-nowrap font-medium text-slate-600">
                         {formatDate(lv.to)}
                       </td>
-
 
                       {/* ✅ DAYS: FIXED LINE BREAK ISSUE */}
                       <td className="p-5 text-center">
@@ -452,10 +479,10 @@ const AdminLeavePanel = () => {
                       </td>
                     </tr>
 
-                    {/* EXPANDABLE ROW */}
+                    {/* EXPANDABLE ROW - Increased colSpan to 10 */}
                     {showMoreId === lv._id && (
                       <tr className="bg-slate-50/50">
-                        <td colSpan="9" className="p-6 border-t border-b border-indigo-100 relative">
+                        <td colSpan="10" className="p-6 border-t border-b border-indigo-100 relative">
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
                           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                             <h4 className="font-bold text-sm mb-4 text-slate-800 flex items-center gap-2">
@@ -489,7 +516,8 @@ const AdminLeavePanel = () => {
 
               {filteredRequests.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="p-12 text-center text-slate-400 flex flex-col items-center justify-center w-full">
+                  {/* Increased colSpan to 10 */}
+                  <td colSpan="10" className="p-12 text-center text-slate-400 flex flex-col items-center justify-center w-full">
                     <div className="bg-slate-100 p-4 rounded-full mb-3 text-slate-300">
                       <FaSearch size={32} />
                     </div>
