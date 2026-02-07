@@ -700,6 +700,13 @@ const AdminLocationSettings = () => {
       <CategoryModal isOpen={showCategoryModal} onClose={() => setShowCategoryModal(false)} onSave={handleSaveCategory} allEmployees={employees} />
       <ExceptionsModal isOpen={showExceptionsModal} onClose={() => setShowExceptionsModal(false)} employees={employees} />
       <AddMemberModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} onAdd={handleAddMembersToCategory} allEmployees={employees} activeCategory={activeCategory} />
+        <ScheduleModal
+  isOpen={scheduleModalOpen}
+  onClose={() => setScheduleModalOpen(false)}
+  employee={editingEmployee}
+  onSave={handleSaveSchedule}
+/>
+
 
     </div>
   );

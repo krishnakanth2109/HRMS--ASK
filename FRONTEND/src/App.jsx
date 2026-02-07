@@ -81,6 +81,7 @@ import AdminAttendanceRequests from "./pages/AdminAttendanceRequests";
 import PunchOutRequests from "./pages/PunchOutRequests";
 import WorkModeRequests from "./pages/WorkModeRequests";
 import EmployeeOnboarding from "./pages/EmployeeOnboarding";
+import OnboardingEmailForm from "./pages/InviteEmployee";
 
 function App() {
   return (
@@ -160,6 +161,7 @@ function App() {
          <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
          <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
          <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
+         <Route path="/admin/onboarding-email" element={<OnboardingEmailForm />} />
        
       </Route>
 

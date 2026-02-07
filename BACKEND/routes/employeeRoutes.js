@@ -1,4 +1,5 @@
-﻿
+﻿// --- START OF FILE employeeRoutes.js ---
+
 import express from "express";
 import Employee from "../models/employeeModel.js";
 import Company from "../models/CompanyModel.js";
@@ -8,11 +9,10 @@ import { upload } from "../config/cloudinary.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import nodemailer from "nodemailer";
-import bcrypt from "bcrypt"; // ✅ REQUIRED for password reset
+import bcrypt from "bcrypt"; 
 
 const router = express.Router();
 
-// ✅ SETUP EMAIL TRANSPORTER AT THE TOP
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: process.env.SMTP_PORT || 465,
@@ -33,7 +33,6 @@ router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
-    // Return the Cloudinary URL (or local path)
     res.status(200).json({ url: req.file.path });
   } catch (error) {
     console.error("Upload error:", error);
@@ -51,25 +50,49 @@ router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
 router.post("/", protect, onlyAdmin, async (req, res) => {
   try {
 
-    // ✅ USE COMPANY'S employeeCount COUNTER (ensures ID consistency)
+    // ✅ CHECK FOR COMPANY
     if (req.body.company) {
-      // Find the company to get the prefix
       const company = await Company.findById(req.body.company);
 
       if (!company) {
         return res.status(404).json({ error: "Company not found" });
       }
 
-      // ✅ RE-COUNT ACTUAL EMPLOYEES to ensure ID accuracy
-      const currentCount = await Employee.countDocuments({ company: req.body.company });
+      // ✅ LOGIC: MANUAL ID vs AUTO-GEN ID
+      if (req.body.employeeId && req.body.employeeId.trim() !== "") {
+        // --- MANUAL ID CASE ---
+        
+        // 1. Check for duplicates
+        const existingEmp = await Employee.findOne({ employeeId: req.body.employeeId.trim() });
+        if (existingEmp) {
+          return res.status(400).json({ 
+            error: "Employee ID already exists. Please choose a different one.", 
+            field: "employeeId" 
+          });
+        }
+        
+        // 2. Use the provided manual ID (ensure trimmed)
+        req.body.employeeId = req.body.employeeId.trim();
 
-      // Generate employee ID: prefix + (count + 1) with zero padding
-      const paddedCount = String(currentCount + 1).padStart(2, "0");
-      req.body.employeeId = `${company.prefix}${paddedCount}`;
+        // 3. Still update company count for statistics/next-gen reference
+        const currentCount = await Employee.countDocuments({ company: req.body.company });
+        company.employeeCount = currentCount + 1;
+        await company.save();
 
-      // Update company count to be consistent (optional but good for sync)
-      company.employeeCount = currentCount + 1;
-      await company.save();
+      } else {
+        // --- AUTO-GENERATE CASE (If ID is empty or missing) ---
+        
+        // 1. Count actual employees
+        const currentCount = await Employee.countDocuments({ company: req.body.company });
+
+        // 2. Generate: Prefix + (Count + 1) padded
+        const paddedCount = String(currentCount + 1).padStart(2, "0");
+        req.body.employeeId = `${company.prefix}${paddedCount}`;
+
+        // 3. Update company count
+        company.employeeCount = currentCount + 1;
+        await company.save();
+      }
     } 
 
     const employee = new Employee(req.body);
@@ -120,13 +143,9 @@ router.get("/:id", protect, async (req, res) => {
 // UPDATE employee
 router.put("/:id", protect, async (req, res) => {
   try {
-    // 1. Check if user is Admin
     const isAdmin = req.user.role === "admin";
-
-    // 2. Check if user is updating their OWN profile
     const isSelf = req.user.employeeId === req.params.id;
 
-    // 3. If not admin and not self, reject
     if (!isAdmin && !isSelf) {
       return res.status(403).json({ message: "Not authorized to update this profile" });
     }
@@ -148,7 +167,6 @@ router.put("/:id", protect, async (req, res) => {
 // DELETE employee → ADMIN ONLY
 router.delete("/:id", protect, onlyAdmin, async (req, res) => {
   try {
-    // 1. Find the employee to be deleted
     const employeeToDelete = await Employee.findOne({ employeeId: req.params.id });
 
     if (!employeeToDelete) {
@@ -158,47 +176,38 @@ router.delete("/:id", protect, onlyAdmin, async (req, res) => {
     const companyId = employeeToDelete.company;
     const deletedId = employeeToDelete.employeeId;
 
-    // 2. Find the company to get the prefix (essential for parsing IDs)
     const company = await Company.findById(companyId);
     if (!company) {
-      // If company doesn't exist, just delete the employee (fallback)
       await Employee.findOneAndDelete({ employeeId: req.params.id });
       return res.status(200).json({ message: "Employee deleted (Company not found, IDs not shifted)" });
     }
 
-    // 3. Extract the numeric part of the deleted employee's ID
     const prefixLength = company.prefix.length;
     const deletedNumber = parseInt(deletedId.slice(prefixLength), 10);
 
     if (isNaN(deletedNumber)) {
-      // Fallback if ID format is unexpected
       await Employee.findOneAndDelete({ employeeId: req.params.id });
       return res.status(200).json({ message: "Employee deleted (ID format invalid for shifting)" });
     }
 
-    // 4. Delete the employee
     await Employee.findOneAndDelete({ employeeId: req.params.id });
 
-    // 5. Find all remaining employees of this company
     const siblings = await Employee.find({ company: companyId });
 
-    // 6. Iterate and shift IDs for those with number > deletedNumber
     const updatePromises = siblings.map(async (emp) => {
       const currentNum = parseInt(emp.employeeId.slice(prefixLength), 10);
 
       if (!isNaN(currentNum) && currentNum > deletedNumber) {
         const newNum = currentNum - 1;
-        // Pad with 0 to match existing format (2 digits minimum)
         const newId = `${company.prefix}${String(newNum).padStart(2, "0")}`;
 
         emp.employeeId = newId;
-        return emp.save(); // Save the updated employee
+        return emp.save(); 
       }
     });
 
     await Promise.all(updatePromises);
 
-    // 7. Decrement the company's employeeCount
     if (company.employeeCount > 0) {
       company.employeeCount -= 1;
       await company.save();
@@ -306,10 +315,8 @@ router.post("/idle-activity", protect, async (req, res) => {
  🚀 3. PUBLIC ONBOARDING (No Auth Required)
 =================================================================
 =========== */
-// employeeRoutes.js - Update the /onboard route
 router.post("/onboard", async (req, res) => {
   try {
-    // 1. Validate Company existence
     if (!req.body.company) {
       return res.status(400).json({ error: "Company selection is required" });
     }
@@ -319,7 +326,6 @@ router.post("/onboard", async (req, res) => {
       return res.status(404).json({ error: "Selected company not found" });
     }
 
-    // 2. Generate Employee ID with retry logic to avoid duplicates
     let employeeId;
     let attempts = 0;
     const maxAttempts = 5;
@@ -329,30 +335,25 @@ router.post("/onboard", async (req, res) => {
       const paddedCount = String(currentCount + 1).padStart(2, "0");
       employeeId = `${company.prefix}${paddedCount}`;
       
-      // Check if this ID already exists
       const existingEmployee = await Employee.findOne({ employeeId });
       if (!existingEmployee) {
-        break; // ID is unique, proceed
+        break; 
       }
       
       attempts++;
       if (attempts === maxAttempts) {
-        // Fallback: use timestamp to ensure uniqueness
         const timestamp = Date.now().toString().slice(-3);
         employeeId = `${company.prefix}${paddedCount}_${timestamp}`;
       }
     }
 
-    // 3. Set default fields for new onboarders
     req.body.employeeId = employeeId;
-    req.body.role = "employee"; // Force role to employee
+    req.body.role = "employee"; 
     req.body.isActive = true;
     
-    // 4. Create Employee
     const employee = new Employee(req.body);
     const result = await employee.save();
     
-    // Update company count
     company.employeeCount = await Employee.countDocuments({ company: req.body.company });
     await company.save();
     
@@ -380,28 +381,24 @@ router.post("/onboard", async (req, res) => {
 });
 
 
-// --- 2. ROUTE: SEND OTP (Add this before the onboard route) ---
+// ROUTE: SEND OTP
 router.post("/send-onboarding-otp", async (req, res) => {
   try {
     const { email } = req.body;
     
-    // Check if email already exists in Employee DB
     const existingUser = await Employee.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already registered. Please login." });
     }
 
-    // Generate 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Save to OTP Collection (Upsert: update if exists, insert if not)
     await Otp.findOneAndUpdate(
       { email },
       { otp: otpCode, createdAt: new Date() },
       { upsert: true, new: true }
     );
 
-    // Send Email
     await transporter.sendMail({
       from: `"HRMS Team" <${process.env.SMTP_USER}>`,
       to: email,
@@ -425,16 +422,14 @@ router.post("/send-onboarding-otp", async (req, res) => {
 
 /* ==============================================================
 ==============
- 🔑 4. PASSWORD RESET ROUTES (Using same Otp Model)
+ 🔑 4. PASSWORD RESET ROUTES
 =================================================================
 =========== */
 
-// 1. Send OTP for Forgot Password
 router.post("/forgot-password-otp", async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Check if employee exists
     const employee = await Employee.findOne({ email });
     if (!employee) {
       return res.status(404).json({ message: "Email not found in our records." });
@@ -442,7 +437,6 @@ router.post("/forgot-password-otp", async (req, res) => {
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Reusing the same OTP Model logic as Onboarding
     await Otp.findOneAndUpdate(
       { email },
       { otp: otpCode, createdAt: new Date() },
@@ -470,7 +464,6 @@ router.post("/forgot-password-otp", async (req, res) => {
   }
 });
 
-// 2. Verify OTP
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -486,7 +479,6 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
-// 3. Reset Password
 router.post("/reset-password", async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -496,7 +488,6 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP. Please try again." });
     }
 
-    // ✅ This requires 'bcrypt' imported at the top
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
@@ -515,25 +506,11 @@ router.post("/reset-password", async (req, res) => {
 });
 
 /* ==============================================================
-   EXISTING ROUTES (Upload, CRUD, etc...)
-   ... (Keep your existing File Upload, Create, Get, Update, Delete routes here) ...
+   CHANGE PASSWORD WITH OTP (PROTECTED / LOGGED IN)
 ================================================================= */
 
-// ... [Keep File Upload Route] ...
-// ... [Keep Employee CRUD Routes] ...
-// ... [Keep Idle Activity Route] ...
-// ... [Keep Onboarding Routes] ...
-// ... [Keep Forgot Password Routes] ...
-
-
-/* ==============================================================
-   ✅ NEW: CHANGE PASSWORD WITH OTP (PROTECTED / LOGGED IN)
-================================================================= */
-
-// 1. Send OTP to the Logged-In User
 router.post("/change-password-otp", protect, async (req, res) => {
   try {
-    // Get email from the logged-in user's token
     const email = req.user.email;
 
     if (!email) {
@@ -542,14 +519,12 @@ router.post("/change-password-otp", protect, async (req, res) => {
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Save/Update OTP
     await Otp.findOneAndUpdate(
       { email },
       { otp: otpCode, createdAt: new Date() },
       { upsert: true, new: true }
     );
 
-    // Send Email
     await transporter.sendMail({
       from: `"HRMS Security" <${process.env.SMTP_USER}>`,
       to: email,
@@ -571,29 +546,24 @@ router.post("/change-password-otp", protect, async (req, res) => {
   }
 });
 
-// 2. Verify OTP and Update Password
 router.post("/change-password-verify", protect, async (req, res) => {
   try {
     const { otp, newPassword } = req.body;
-    const email = req.user.email; // From Token
+    const email = req.user.email; 
 
-    // 1. Verify OTP
     const validOtp = await Otp.findOne({ email, otp });
     if (!validOtp) {
       return res.status(400).json({ message: "Invalid or expired OTP." });
     }
 
-    // 2. Hash New Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // 3. Update Employee Password
     await Employee.findOneAndUpdate(
       { email },
       { password: hashedPassword }
     );
 
-    // 4. Delete OTP
     await Otp.deleteOne({ email });
 
     res.status(200).json({ message: "Password updated successfully." });
@@ -605,4 +575,3 @@ router.post("/change-password-verify", protect, async (req, res) => {
 
 
 export default router;
-// --- START OF FILE src/pages/ForgotPassword.jsx ---

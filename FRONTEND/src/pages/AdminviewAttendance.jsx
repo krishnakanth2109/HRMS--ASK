@@ -50,6 +50,25 @@ const formatDecimalHours = (decimalHours) => {
   return `${hours}h ${minutes}m`;
 };
 
+// ✅ ADD THESE HELPER FUNCTIONS FOR ROLE/DEPARTMENT
+const getCurrentDepartment = (employee) => {
+  if (employee.currentDepartment) return employee.currentDepartment;
+  if (employee && Array.isArray(employee.experienceDetails)) {
+    const currentExp = employee.experienceDetails.find(exp => exp.lastWorkingDate === "Present");
+    return currentExp?.department || "N/A";
+  }
+  return "N/A";
+};
+
+const getCurrentRole = (employee) => {
+  if (employee.currentRole) return employee.currentRole;
+  if (employee && Array.isArray(employee.experienceDetails)) {
+    const currentExp = employee.experienceDetails.find(exp => exp.lastWorkingDate === "Present");
+    return currentExp?.role || "N/A";
+  }
+  return "N/A";
+};
+
 const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDayThreshold) => {
   const statusUpper = (apiStatus || "").toUpperCase();
 
@@ -530,54 +549,126 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
 };
 
 // ✅ UPDATED: Include employeeImages prop
-const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages }) => {
+// ✅ UPDATED: Include employeeImages prop and show role/department
+// ✅ UPDATED: StatusListModal with conditional columns based on title
+const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, allEmployees }) => {
   if (!isOpen) return null;
+  
+  // Create a map for quick employee data lookup
+  const employeeInfoMap = useMemo(() => {
+    const map = {};
+    allEmployees.forEach(emp => {
+      map[emp.employeeId] = {
+        name: emp.name,
+        role: getCurrentRole(emp),
+      };
+    });
+    return map;
+  }, [allEmployees]);
+
+  // Check if this is the "Login Required" modal
+  const isLoginRequired = title === "Login Required";
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
-          <div><h3 className="text-xl font-bold text-slate-800">{title}</h3><p className="text-sm text-slate-500 font-semibold">{employees.length} Employees</p></div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2"><FaTimes size={20} /></button>
+          <div>
+            <h3 className="text-xl font-bold text-slate-800">{title}</h3>
+            <p className="text-sm text-slate-500 font-semibold">{employees.length} Employees</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2">
+            <FaTimes size={20} />
+          </button>
         </div>
         <div className="p-5 overflow-y-auto">
-          {employees.length > 0 ? (<ul className="divide-y divide-slate-200">{employees.map((emp, index) => {
-             // Get image
-             const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
-
-             return (
-              <li key={emp.employeeId || index} className="py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {/* ✅ UPDATED: Profile Picture */}
-                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">
-                        {profilePic ? (
-                            <img src={profilePic} alt={emp.name || emp.employeeName} className="w-full h-full object-cover" />
-                        ) : (
-                            (emp.name || emp.employeeName || "U").charAt(0)
+          {employees.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Employee</th>
+                    <th className="px-4 py-3 text-left">Role</th>
+                    {/* Conditionally show Login Status column */}
+                    {!isLoginRequired && <th className="px-4 py-3 text-left">Login Status</th>}
+                    {/* Conditionally show Worked Status column */}
+                    {!isLoginRequired && <th className="px-4 py-3 text-left">Worked Status</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {employees.map((emp, index) => {
+                    const employeeInfo = employeeInfoMap[emp.employeeId] || {};
+                    const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
+                    
+                    return (
+                      <tr key={emp.employeeId || index} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {/* Profile Picture */}
+                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">
+                              {profilePic ? (
+                                <img src={profilePic} alt={emp.name || emp.employeeName} className="w-full h-full object-cover" />
+                              ) : (
+                                (emp.name || emp.employeeName || "U").charAt(0)
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-800">{emp.name || emp.employeeName || employeeInfo.name}</p>
+                              <p className="text-xs text-slate-500 font-mono">{emp.employeeId}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-medium text-slate-700 bg-blue-50 px-2 py-1 rounded">
+                            {employeeInfo.role || "N/A"}
+                          </span>
+                        </td>
+                        {/* Conditionally show Login Status cell */}
+                        {!isLoginRequired && (
+                          <td className="px-4 py-3">
+                            {emp.displayLoginStatus && (
+                              <span className={`text-xs px-3 py-1 rounded-full font-bold ${
+                                emp.displayLoginStatus === 'LATE' 
+                                  ? 'bg-red-100 text-red-700 border border-red-200' 
+                                  : 'bg-green-100 text-green-700 border border-green-200'
+                              }`}>
+                                {emp.displayLoginStatus}
+                              </span>
+                            )}
+                          </td>
                         )}
-                    </div>
-                    <div><p className="font-semibold text-slate-800">{emp.name || emp.employeeName}</p><p className="text-sm text-slate-500 font-mono">{emp.employeeId}</p></div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                    {emp.displayLoginStatus && <span className={`text-xs px-2 py-1 rounded-full ${emp.displayLoginStatus === 'LATE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{emp.displayLoginStatus}</span>}
-                    {emp.workedStatus && (
-                         <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                            emp.workedStatus === 'Full Day' ? 'bg-green-100 text-green-800' :
-                            emp.workedStatus === 'Half Day' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                        }`}>
-                            {emp.workedStatus}
-                        </span>
-                    )}
-                </div>
-            </li>
-             );
-          })}</ul>) : (<p className="text-center text-slate-500 py-8">No employees in this category.</p>)}
+                        {/* Conditionally show Worked Status cell */}
+                        {!isLoginRequired && (
+                          <td className="px-4 py-3">
+                            {emp.workedStatus && (
+                              <span className={`text-xs px-3 py-1 rounded-full font-bold ${
+                                emp.workedStatus === 'Full Day' 
+                                  ? 'bg-green-100 text-green-800 border border-green-200' :
+                                emp.workedStatus === 'Half Day' 
+                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                                emp.workedStatus.includes('Absent') 
+                                  ? 'bg-red-100 text-red-800 border border-red-200' :
+                                  'bg-slate-100 text-slate-800 border border-slate-200'
+                              }`}>
+                                {emp.workedStatus}
+                              </span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-center text-slate-500 py-8">No employees in this category.</p>
+          )}
         </div>
       </div>
     </div>
   );
 };
-
 const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange, setItemsPerPage }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -706,6 +797,8 @@ const [summaryStartDate, setSummaryStartDate] = useState(() => {
         fetchImages();
     }
   }, [allEmployees]);
+
+
 
 
   const handleAdminPunchOut = async (employeeId, punchOutTime, location, dateOfRecord) => {
@@ -963,11 +1056,11 @@ const handleMonthChange = (e) => {
       setIsModalOpen(true); 
   };
   
-  const handleOpenStatusModal = (type) => {
-      if (type === 'WORKING') setStatusListModal({ isOpen: true, title: "Currently Working", employees: dailyStats.workingList });
-      else if (type === 'COMPLETED') setStatusListModal({ isOpen: true, title: "Shift Completed", employees: dailyStats.completedList });
-      else if (type === 'ABSENT' && startDate === endDate) setStatusListModal({ isOpen: true, title: "Login Required", employees: absentEmployees });
-  };
+const handleOpenStatusModal = (type) => {
+    if (type === 'WORKING') setStatusListModal({ isOpen: true, title: "Currently Working", employees: dailyStats.workingList });
+    else if (type === 'COMPLETED') setStatusListModal({ isOpen: true, title: "Shift Completed", employees: dailyStats.completedList });
+    else if (type === 'ABSENT' && startDate === endDate) setStatusListModal({ isOpen: true, title: "Login Required", employees: absentEmployees });
+};
 
   const StatCard = ({ icon, title, value, colorClass, onClick }) => (
     <div className={`relative flex-1 p-5 bg-white rounded-xl shadow-md flex items-center gap-5 border-l-4 ${colorClass} ${onClick ? 'cursor-pointer hover:bg-slate-50' : ''}`} onClick={onClick}>
@@ -1280,13 +1373,14 @@ const handleMonthChange = (e) => {
           employeeImages={employeeImages} // Pass images prop
       />
       
-      <StatusListModal 
-          isOpen={statusListModal.isOpen} 
-          onClose={() => setStatusListModal({ ...statusListModal, isOpen: false })} 
-          title={statusListModal.title} 
-          employees={statusListModal.employees} 
-          employeeImages={employeeImages} // Pass images prop
-      />
+<StatusListModal 
+    isOpen={statusListModal.isOpen} 
+    onClose={() => setStatusListModal({ ...statusListModal, isOpen: false })} 
+    title={statusListModal.title} 
+    employees={statusListModal.employees} 
+    employeeImages={employeeImages}
+    allEmployees={allEmployees} // Add this prop
+/>
       
       <AdminPunchOutModal isOpen={punchOutModal.isOpen} onClose={() => setPunchOutModal({ isOpen: false, employee: null })} employee={punchOutModal.employee} onPunchOut={handleAdminPunchOut} />
       

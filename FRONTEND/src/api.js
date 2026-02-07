@@ -907,5 +907,13 @@ export const changePasswordWithOtp = async (otp, newPassword) => {
     throw error.response ? error.response.data : new Error("Network Error");
   }
 };
-
+// Add this at the bottom of api.js
+export const sendOnboardingLink = async (data) => {
+  try {
+    const response = await api.post("/api/employees/send-onboarding-link", data);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
 export default api;﻿// --- START OF FILE: routes/employeeRoutes.js ---

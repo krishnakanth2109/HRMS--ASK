@@ -799,18 +799,46 @@ const EmployeeManagement = () => {
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
-            <div className="flex gap-3 mt-3">
-              <button onClick={() => downloadExcelReport(activeEmployees, "Active_Emp.xlsx")} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm text-sm font-semibold flex items-center gap-2"><FaDownload /> Active List</button>
-              <button onClick={() => downloadExcelReport(inactiveEmployees, "Inactive_Emp.xlsx")} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm text-sm font-semibold flex items-center gap-2"><FaDownload /> Inactive List</button>
-            </div>
-          </div>
-          <button onClick={() => navigate("/employees/add")} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105">
-            <FaUser /> Add Employee
-          </button>
-        </div>
+  <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+  
+  {/* LEFT SIDE */}
+  <div>
+    <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
+    <div className="flex gap-3 mt-3">
+      <button
+        onClick={() => downloadExcelReport(activeEmployees, "Active_Emp.xlsx")}
+        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm text-sm font-semibold flex items-center gap-2"
+      >
+        <FaDownload /> Active List
+      </button>
+      <button
+        onClick={() => downloadExcelReport(inactiveEmployees, "Inactive_Emp.xlsx")}
+        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm text-sm font-semibold flex items-center gap-2"
+      >
+        <FaDownload /> Inactive List
+      </button>
+    </div>
+  </div>
+
+  {/* RIGHT SIDE BUTTON GROUP */}
+  <div className="flex gap-4">
+    <button
+      onClick={() => navigate("/admin/onboarding-email")}
+      className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105"
+    >
+      <FaUser /> Send Onboarding Link
+    </button>
+
+    <button
+      onClick={() => navigate("/employees/add")}
+      className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105"
+    >
+      <FaUser /> Add Employee
+    </button>
+  </div>
+
+</div>
+
 
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <input type="text" placeholder="Search employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />

@@ -6,7 +6,7 @@ import {
   FaUser, FaEnvelope, FaBuilding, FaIdBadge, FaPhone, FaMapMarkerAlt,
   FaCalendarAlt, FaBriefcase, FaMoneyBill, FaBirthdayCake, FaFlag,
   FaHeartbeat, FaUniversity, FaCreditCard, FaCodeBranch,
-  FaEye, FaEyeSlash, FaPlus, FaTimes, FaTrash, FaEdit // ✅ Added FaEdit
+  FaEye, FaEyeSlash, FaPlus, FaTimes, FaTrash, FaEdit
 } from "react-icons/fa";
 // ✅ IMPORT THE CENTRALIZED API FUNCTIONS
 import { 
@@ -14,7 +14,7 @@ import {
   addEmployee, 
   getAllCompanies, 
   createCompany, 
-  updateCompany, // ✅ Added updateCompany
+  updateCompany, 
   getNextEmployeeId, 
   deleteCompany 
 } from "../api";
@@ -51,7 +51,7 @@ const AddEmployee = () => {
   });
   const [addingCompany, setAddingCompany] = useState(false);
 
-  // ✅ NEW: Company Modal State (Edit)
+  // Company Modal State (Edit)
   const [showEditCompanyModal, setShowEditCompanyModal] = useState(false);
   const [editCompanyData, setEditCompanyData] = useState({
     _id: "",
@@ -143,69 +143,47 @@ const AddEmployee = () => {
   };
 
   // Handle Add Company
-// In AddEmployee.jsx, update handleAddCompany function:
-const handleAddCompany = async (e) => {
-  e.preventDefault();
+  const handleAddCompany = async (e) => {
+    e.preventDefault();
 
-  if (!newCompanyData.name.trim() || !newCompanyData.prefix.trim()) {
-    snackbar.show("Company name and prefix are required");
-    return;
-  }
+    if (!newCompanyData.name.trim() || !newCompanyData.prefix.trim()) {
+      snackbar.show("Company name and prefix are required");
+      return;
+    }
 
-  setAddingCompany(true);
-  try {
-    const response = await createCompany(newCompanyData);
-    
-    // Check if response has data property
-    if (response && response.data) {
-      snackbar.show(response.data.message || "Company added successfully!");
+    setAddingCompany(true);
+    try {
+      const response = await createCompany(newCompanyData);
       
-      // Add to companies list
-      setCompanies([...companies, response.data.data || response.data]);
+      if (response && response.data) {
+        snackbar.show(response.data.message || "Company added successfully!");
+        
+        setCompanies([...companies, response.data.data || response.data]);
 
-      // Auto-select the new company
-      if (response.data.data?._id) {
-        handleCompanyChange(response.data.data._id);
+        if (response.data.data?._id) {
+          handleCompanyChange(response.data.data._id);
+        }
+
+        setNewCompanyData({
+          name: "", prefix: "", description: "", email: "", phone: "",
+          address: "", city: "", state: "", zipCode: "", country: "",
+        });
+        setShowAddCompanyModal(false);
       }
-
-      // Reset form and close modal
-      setNewCompanyData({
-        name: "",
-        prefix: "",
-        description: "",
-        email: "",
-        phone: "",
-        address: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "",
-      });
-      setShowAddCompanyModal(false);
+    } catch (err) {
+      console.error("Error adding company:", err);
+      const errorMsg = err.response?.data?.message || 
+                      err.response?.data?.error || 
+                      "Error adding company. Company may already exist.";
+      snackbar.show(errorMsg);
+    } finally {
+      setAddingCompany(false);
     }
-  } catch (err) {
-    console.error("Error adding company:", err);
-    
-    // Show the actual error message from backend
-    const errorMsg = err.response?.data?.message || 
-                    err.response?.data?.error || 
-                    "Error adding company. Company may already exist.";
-    
-    snackbar.show(errorMsg);
-    
-    // If it's a duplicate error, suggest alternatives
-    if (errorMsg.includes("already exists")) {
-      console.log("Try a different name or prefix");
-      // You could auto-suggest here
-    }
-  } finally {
-    setAddingCompany(false);
-  }
-};
+  };
 
-  // ✅ NEW: Handle Edit Click (Opens Modal with Data)
+  // Handle Edit Click
   const handleEditClick = (e, company) => {
-    e.stopPropagation(); // Prevent dropdown selection
+    e.stopPropagation(); 
     setEditCompanyData({
       _id: company._id,
       name: company.name,
@@ -213,8 +191,8 @@ const handleAddCompany = async (e) => {
       description: company.description || "",
       email: company.email || "",
       phone: company.phone || "",
-      address: company.officeLocation?.address || "", // Assuming structure matches backend
-      city: company.city || "", // Add if specific field exists
+      address: company.officeLocation?.address || "", 
+      city: company.city || "", 
       state: company.state || "",
       zipCode: company.zipCode || "",
       country: company.country || ""
@@ -222,7 +200,7 @@ const handleAddCompany = async (e) => {
     setShowEditCompanyModal(true);
   };
 
-  // ✅ NEW: Handle Update Company
+  // Handle Update Company
   const handleUpdateCompany = async (e) => {
     e.preventDefault();
 
@@ -236,13 +214,11 @@ const handleAddCompany = async (e) => {
       const response = await updateCompany(editCompanyData._id, editCompanyData);
       snackbar.show("Company updated successfully!");
 
-      // Update local state
       const updatedList = companies.map(c => 
         c._id === editCompanyData._id ? response.data : c
       );
       setCompanies(updatedList);
 
-      // If the edited company was currently selected in the form, update form display
       if (formData.company === editCompanyData._id) {
         setFormData(prev => ({
           ...prev,
@@ -262,16 +238,14 @@ const handleAddCompany = async (e) => {
 
   // Handle Delete Company
   const handleDeleteCompany = async (e, companyId, companyName) => {
-    e.stopPropagation(); // Prevent closing dropdown
+    e.stopPropagation(); 
     if (window.confirm(`Permanently delete "${companyName}" from the database? This cannot be undone.`)) {
       try {
         await deleteCompany(companyId);
         snackbar.show(`Company "${companyName}" deleted successfully`);
 
-        // Remove from local state
         setCompanies(prev => prev.filter(c => c._id !== companyId));
 
-        // If the deleted company was selected, clear selection
         if (formData.company === companyId) {
           setFormData(prev => ({
             ...prev,
@@ -352,9 +326,10 @@ const handleAddCompany = async (e) => {
 
     if (formData.bankDetails.ifsc && formData.bankDetails.ifsc.length !== 11) return "IFSC Code must be exactly 11 characters.";
 
+    // Only validate uniqueness if not modifying an existing one (though here we are only adding)
     if (formData.employeeId.trim()) {
       const exists = employees.some(emp => emp.employeeId === formData.employeeId.trim());
-      if (exists) return "Employee ID already exists.";
+      if (exists) return "Employee ID already exists. Please change manual ID.";
     }
     return "";
   };
@@ -373,7 +348,7 @@ const handleAddCompany = async (e) => {
       company: formData.company,
       companyName: formData.companyName,
       companyPrefix: formData.companyPrefix,
-      employeeId: formData.employeeId,
+      employeeId: formData.employeeId, // Will be manual or auto-gen
       name: formData.name,
       email: formData.email,
       password: formData.password,
@@ -479,7 +454,7 @@ const handleAddCompany = async (e) => {
                           </span>
                           
                           <div className="flex gap-2">
-                             {/* ✅ NEW: Edit Button */}
+                             {/* Edit Button */}
                              <button
                               type="button"
                               onClick={(e) => handleEditClick(e, company)}
@@ -523,12 +498,17 @@ const handleAddCompany = async (e) => {
               <>
                 <div className="relative">
                   <FaIdBadge className="absolute left-3 top-4 text-gray-400" />
-                  <label className="absolute left-10 text-xs text-gray-500 font-medium top-1.5">Generated Employee ID</label>
+                  <label className="absolute left-10 text-xs text-gray-500 font-medium top-1.5">
+                    Employee ID (Auto or Manual)
+                  </label>
+                  {/* ✅ CHANGED: Removed readOnly, added name and onChange for manual edit */}
                   <input
                     type="text"
+                    name="employeeId"
                     value={formData.employeeId}
-                    readOnly
-                    className="w-full pl-10 pr-4 pt-5 pb-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-semibold"
+                    onChange={handleChange}
+                    placeholder="Enter manual ID or use Auto-generated"
+                    className="w-full pl-10 pr-4 pt-5 pb-2 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-400 outline-none"
                   />
                 </div>
               </>
@@ -741,7 +721,7 @@ const handleAddCompany = async (e) => {
         </div>
       )}
 
-      {/* ✅ NEW: EDIT COMPANY MODAL */}
+      {/* EDIT COMPANY MODAL */}
       {showEditCompanyModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 overflow-y-auto max-h-[90vh]">
