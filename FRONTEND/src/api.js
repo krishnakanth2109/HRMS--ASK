@@ -848,5 +848,12 @@ export const publicOnboard = async (employeeData) => {
     throw error.response ? error.response.data : new Error("Network Error");
   }
 };
-
+export const sendOnboardingOtp = async (email) => {
+  try {
+    const response = await api.post("/api/employees/send-onboarding-otp", { email });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
 export default api;

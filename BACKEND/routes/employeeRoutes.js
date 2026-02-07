@@ -7,7 +7,8 @@ import Notification from "../models/notificationModel.js";
 import { upload } from "../config/cloudinary.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
-
+import nodemailer from "nodemailer";
+import Otp from "../models/OtpModel.js"; // Import the new model
 const router = express.Router();
 
 /* ==============================================================
@@ -372,6 +373,124 @@ router.post("/onboard", async (req, res) => {
       error: "Onboarding failed. Please contact HR.",
       details: err.message 
     });
+  }
+});
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: process.env.SMTP_PORT || 465,
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// --- 2. ROUTE: SEND OTP (Add this before the onboard route) ---
+router.post("/send-onboarding-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Check if email already exists in Employee DB
+    const existingUser = await Employee.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered. Please login." });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save to OTP Collection (Upsert: update if exists, insert if not)
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp: otpCode, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send Email
+    await transporter.sendMail({
+      from: `"HRMS Team" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Verify your Account Registration",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Email Verification</h2>
+          <p>You are about to submit your employee onboarding details.</p>
+          <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
+          <p>This code expires in 5 minutes.</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({ message: "OTP sent to email." });
+  } catch (error) {
+    console.error("OTP Error:", error);
+    res.status(500).json({ error: "Failed to send email." });
+  }
+});
+
+// --- 3. UPDATE: ONBOARDING ROUTE (Add Verification Logic) ---
+router.post("/onboard", async (req, res) => {
+  try {
+    // EXTRACT OTP FROM BODY
+    const { otp, ...employeeData } = req.body;
+
+    // 1. VERIFY OTP
+    if (!otp) {
+      return res.status(400).json({ error: "OTP is required." });
+    }
+
+    const validOtp = await Otp.findOne({ email: employeeData.email, otp });
+    if (!validOtp) {
+      return res.status(400).json({ error: "Invalid or expired OTP." });
+    }
+
+    // 2. PROCEED WITH EXISTING ONBOARDING LOGIC
+    if (!employeeData.company) {
+      return res.status(400).json({ error: "Company selection is required" });
+    }
+
+    const company = await Company.findById(employeeData.company);
+    if (!company) {
+      return res.status(404).json({ error: "Selected company not found" });
+    }
+
+    // ... (Your existing ID generation logic here) ...
+    let employeeId;
+    let attempts = 0;
+    const maxAttempts = 5;
+    while (attempts < maxAttempts) {
+      const currentCount = await Employee.countDocuments({ company: employeeData.company });
+      const paddedCount = String(currentCount + 1).padStart(2, "0");
+      employeeId = `${company.prefix}${paddedCount}`;
+      const existingEmployee = await Employee.findOne({ employeeId });
+      if (!existingEmployee) break;
+      attempts++;
+    }
+
+    employeeData.employeeId = employeeId;
+    employeeData.role = "employee";
+    employeeData.isActive = true;
+
+    const employee = new Employee(employeeData);
+    const result = await employee.save();
+
+    // Update company count
+    company.employeeCount = await Employee.countDocuments({ company: employeeData.company });
+    await company.save();
+
+    // DELETE OTP AFTER SUCCESS
+    await Otp.deleteOne({ email: employeeData.email });
+
+    res.status(201).json({ 
+      message: "Onboarding successful", 
+      employeeId: result.employeeId,
+      employee: result 
+    });
+
+  } catch (err) {
+    console.error("❌ Onboarding error:", err);
+    // ... error handling
+    res.status(500).json({ error: err.message });
   }
 });
 
