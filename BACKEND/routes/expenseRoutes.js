@@ -283,4 +283,53 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/* ==============================================================
+==============
+ 🚀 3. PUBLIC ONBOARDING (No Auth Required)
+=================================================================
+=========== */
+router.post("/onboard", async (req, res) => {
+  try {
+    // 1. Validate Company existence
+    if (!req.body.company) {
+      return res.status(400).json({ error: "Company selection is required" });
+    }
+
+    const company = await Company.findById(req.body.company);
+    if (!company) {
+      return res.status(404).json({ error: "Selected company not found" });
+    }
+
+    // 2. Generate Employee ID
+    const currentCount = await Employee.countDocuments({ company: req.body.company });
+    const paddedCount = String(currentCount + 1).padStart(2, "0");
+    req.body.employeeId = `${company.prefix}${paddedCount}`;
+
+    // Update company count
+    company.employeeCount = currentCount + 1;
+    await company.save();
+
+    // 3. Set default fields
+    req.body.role = "employee";
+    req.body.isActive = true;
+    
+    // 4. Create Employee
+    const employee = new Employee(req.body);
+    const result = await employee.save();
+    
+    res.status(201).json({ message: "Onboarding successful", employeeId: result.employeeId });
+
+  } catch (err) {
+    console.error("❌ Onboarding error:", err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({
+        error: `Duplicate value entered for ${field}.`,
+        field: field
+      });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

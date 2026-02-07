@@ -21,14 +21,18 @@ import {
   FaTimes,
   FaAngleDown,
   FaConnectdevelop,
-  FaAngleRight
+  FaAngleRight,
+  FaClipboardList,
+FaSignOutAlt,
+FaUserCheck,
 } from "react-icons/fa";
 
 import { io } from "socket.io-client";
 import { 
   getLeaveRequests, 
   getAllOvertimeRequests, 
-  getAllNoticesForAdmin
+  getAllNoticesForAdmin,
+  getAllStatusCorrectionRequests // ADDED: Import for attendance requests
 } from "../../api";
 import { AlarmClockCheck } from "lucide-react";
 import api from "../../api";
@@ -41,42 +45,44 @@ const SOCKET_URL =
 
 // REORGANIZED NAV LINKS WITH GROUPS
 const navLinks = [
+  // ⭐ OVERVIEW
   { to: "/admin/dashboard", label: "Dashboard", icon: <FaTachometerAlt /> },
 
-  // --- EMPLOYEES ---
+  // 👥 WORKFORCE MANAGEMENT
   {
-    label: "Employees",
-    icon: <FaUsersCog />, // workforce control
-    children: [
-      { to: "/employees", label: "Employee Management", icon: <FaUserTie /> },
-      {
-        to: "/attendance",
-        label: "Employees Attendance",
-        icon: <FaUserClock />,
-        isPunchOutRequests: true
-      },
-    ],
+    to: "/employees",
+    label: "Employee Management",
+    icon: <FaUserTie />,
+  },
+  {
+    to: "/attendance",
+    label: "Employees Attendance",
+    icon: <FaUserClock />,
+  },
+  {
+    to: "/admin/settings",
+    label: "Shift Management",
+    icon: <FaUserPlus />,
+  },
+  {
+    to: "/admin/shifttype",
+    label: "Location Settings",
+    icon: <FaMapMarkedAlt />,
   },
 
-  // --- LEAVES ---
+  // 🗓️ LEAVE & CALENDAR
   {
-    label: "Leaves",
-    icon: <FaCalendarCheck />,
-    children: [
-      { to: "/admin/leave-summary", label: "Leave Summary", icon: <FaChartLine /> },
-      {
-        to: "/admin/admin-Leavemanage",
-        label: "Leave Approvals",
-        icon: <FaCheckDouble />,
-        isLeave: true,
-      },
-    ],
+    to: "/admin/leave-summary",
+    label: "Leave Summary",
+    icon: <FaChartLine />,
   },
+  { to: "/admin/holiday-calendar", label: "Holiday Calendar", icon: <FaCalendarAlt /> },
 
-  // --- PAYROLL ---
+  // 💰 FINANCE
   { to: "/admin/payroll", label: "Payroll", icon: <FaMoneyBillWave /> },
+  { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
 
-  // --- ANNOUNCEMENTS ---
+  // 📢 COMMUNICATION
   {
     to: "/admin/notices",
     label: "Announcements",
@@ -84,39 +90,50 @@ const navLinks = [
     isNotice: true,
   },
 
-  { to: "/admin/holiday-calendar", label: "Holiday Calendar", icon: <FaCalendarAlt /> },
-
-  // --- APPROVALS / REQUESTS ---
+  // 📥 EMPLOYEE REQUESTS
   {
-    to: "/admin/admin-overtime",
-    label: "Overtime Approval",
-    icon: <FaBusinessTime />,
-    isOvertime: true,
+    label: "Employee Requests",
+    icon: <FaClipboardList />,
+    children: [
+      {
+        to: "/admin/admin-Leavemanage",
+        label: "Leave Requests",
+        icon: <FaCheckDouble />,
+        isLeave: true,
+      },
+      {
+        to: "/admin/punchout-requests",
+        label: "Punch Out Requests",
+        icon: <FaSignOutAlt />,
+        isPunchOutRequests: true,
+      },
+      {
+        to: "/admin/late-requests",
+        label: "Late Login Requests",
+        icon: <FaClock />,
+        isLateRequests: true,
+      },
+      {
+        to: "/admin/workmode-requests",
+        label: "Work Mode Requests",
+        icon: <FaMapMarkedAlt />,
+        isWorkModeRequests: true,
+      },
+      {
+        to: "/admin/admin-overtime",
+        label: "Overtime Requests",
+        icon: <FaBusinessTime />,
+        isOvertime: true,
+      },
+      {
+        to: "/admin/attendance-requests",
+        label: "Attendance Requests",
+        icon: <FaUserCheck />,
+      },
+    ],
   },
-
-  {
-    to: "/admin/shifttype",
-    label: "Location Settings",
-    icon: <FaMapMarkedAlt />,
-    isWorkModeRequests: true
-  },
-
-  {
-    to: "/admin/settings",
-    label: "Shift Management",
-    icon: <FaUserPlus />,
-  },
-
-  {
-    to: "/admin/late-requests",
-    label: "Late Login Requests",
-    icon: <FaClock />,
-    isLateRequests: true
-  },
-
-  { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
-  { to: "/admin/attendance-requests", label: "Attendance Requests", icon: <FaConnectdevelop /> }
 ];
+
 
 // ✅ HELPER: Calculate unread notices using SERVER STATE
 const calculateUnreadNotices = (notices, readState) => {
@@ -173,6 +190,7 @@ const Sidebar = () => {
   const [punchOutRequestsCount, setPunchOutRequestsCount] = useState(0);
   const [lateRequestsCount, setLateRequestsCount] = useState(0);
   const [workModeRequestsCount, setWorkModeRequestsCount] = useState(0);
+  const [attendanceRequestsCount, setAttendanceRequestsCount] = useState(0); // ADDED: Attendance requests count
   
   const [socket, setSocket] = useState(null);
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
@@ -184,6 +202,7 @@ const Sidebar = () => {
   const prevPunchOutRequests = useRef(0);
   const prevLateRequests = useRef(0);
   const prevWorkModeRequests = useRef(0);
+  const prevAttendanceRequestsCount = useRef(0); // ADDED: Previous attendance requests count ref
   const prevUnreadNoticeCount = useRef(0);
 
   const isOnNoticesPage = useRef(false);
@@ -333,6 +352,20 @@ const Sidebar = () => {
   }, []);
 
   // -----------------------------
+  // ✅ FETCH ATTENDANCE REQUESTS (ADDED)
+  // -----------------------------
+  const fetchAttendanceRequests = useCallback(async () => {
+    try {
+      const data = await getAllStatusCorrectionRequests();
+      // Count all requests since AdminAttendanceRequests.jsx shows all pending requests
+      const pendingCount = (data.data || []).length;
+      setAttendanceRequestsCount(pendingCount);
+    } catch (error) {
+      console.error("Error fetching attendance requests:", error);
+    }
+  }, []);
+
+  // -----------------------------
   // ✅ FETCH OVERTIME REQUESTS
   // -----------------------------
   const fetchOvertimeRequests = useCallback(async () => {
@@ -377,6 +410,9 @@ const Sidebar = () => {
     if (workModeRequestsCount > prevWorkModeRequests.current) playNotificationSound("generic");
     prevWorkModeRequests.current = workModeRequestsCount;
 
+    if (attendanceRequestsCount > prevAttendanceRequestsCount.current) playNotificationSound("generic"); // ADDED
+    prevAttendanceRequestsCount.current = attendanceRequestsCount; // ADDED
+
     if (unreadNoticeCount > prevUnreadNoticeCount.current &&
       unreadNoticeCount > hasPlayedSoundForCurrentCount.current) {
       playNotificationSound("notice");
@@ -391,7 +427,8 @@ const Sidebar = () => {
     pendingOvertime, 
     punchOutRequestsCount, 
     lateRequestsCount, 
-    workModeRequestsCount, 
+    workModeRequestsCount,
+    attendanceRequestsCount, // ADDED
     unreadNoticeCount, 
     playNotificationSound
   ]);
@@ -421,6 +458,7 @@ const Sidebar = () => {
       await fetchPunchOutRequests();
       await fetchLateRequests();
       await fetchWorkModeRequests();
+      await fetchAttendanceRequests(); // ADDED
       await fetchAndCalculateUnreadNotices();
     };
     
@@ -433,6 +471,7 @@ const Sidebar = () => {
     fetchPunchOutRequests,
     fetchLateRequests,
     fetchWorkModeRequests,
+    fetchAttendanceRequests, // ADDED
     fetchAndCalculateUnreadNotices
   ]);
 
@@ -470,6 +509,8 @@ const Sidebar = () => {
     socket.on("latecorrection:updated", fetchLateRequests);
     socket.on("workmoderequest:new", fetchWorkModeRequests);
     socket.on("workmoderequest:updated", fetchWorkModeRequests);
+    socket.on("attendancecorrection:new", fetchAttendanceRequests); // ADDED
+    socket.on("attendancecorrection:updated", fetchAttendanceRequests); // ADDED
 
     const handleNewReply = (data) => {
       if (data.sentBy === 'Employee') {
@@ -496,6 +537,8 @@ const Sidebar = () => {
       socket.off("latecorrection:updated", fetchLateRequests);
       socket.off("workmoderequest:new", fetchWorkModeRequests); 
       socket.off("workmoderequest:updated", fetchWorkModeRequests);
+      socket.off("attendancecorrection:new", fetchAttendanceRequests); // ADDED
+      socket.off("attendancecorrection:updated", fetchAttendanceRequests); // ADDED
       socket.off("notice:reply:new", handleNewReply);
       socket.off("notice:updated", handleNoticeUpdate);
     };
@@ -505,7 +548,8 @@ const Sidebar = () => {
     fetchOvertimeRequests, 
     fetchPunchOutRequests, 
     fetchLateRequests, 
-    fetchWorkModeRequests, 
+    fetchWorkModeRequests,
+    fetchAttendanceRequests, // ADDED
     fetchAndCalculateUnreadNotices
   ]);
 
@@ -525,41 +569,42 @@ const Sidebar = () => {
   };
 
   const getBadgeCount = (link) => {
-  let count = 0;
+    let count = 0;
 
-  if (link.isLeave) count = pendingLeaves;
-  else if (link.isOvertime) count = pendingOvertime;
-  else if (link.isPunchOutRequests) count = punchOutRequestsCount;
-  else if (link.isLateRequests) count = lateRequestsCount;
-  else if (link.isWorkModeRequests) count = workModeRequestsCount;
-  else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
+    if (link.isLeave) count = pendingLeaves;
+    else if (link.isOvertime) count = pendingOvertime;
+    else if (link.isPunchOutRequests) count = punchOutRequestsCount;
+    else if (link.isLateRequests) count = lateRequestsCount;
+    else if (link.isWorkModeRequests) count = workModeRequestsCount;
+    else if (link.to === "/admin/attendance-requests") count = attendanceRequestsCount; // ADDED
+    else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
 
-  return count;
-};
+    return count;
+  };
 
-const renderBadge = (link) => {
-  let count = 0;
+  const renderBadge = (link) => {
+    let count = 0;
 
-  // 🔹 IF PARENT (has children) → SUM child counts
-  if (link.children) {
-    count = link.children.reduce((sum, child) => sum + getBadgeCount(child), 0);
-  } else {
-    count = getBadgeCount(link);
-  }
+    // 🔹 IF PARENT (has children) → SUM child counts
+    if (link.children) {
+      count = link.children.reduce((sum, child) => sum + getBadgeCount(child), 0);
+    } else {
+      count = getBadgeCount(link);
+    }
 
-  if (count > 0) {
-    return (
-      <span className="relative flex items-center justify-center ml-auto">
-        <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-red-400 opacity-75"></span>
-        <span className="relative inline-flex bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full items-center justify-center">
-          {count > 9 ? "9+" : count}
+    if (count > 0) {
+      return (
+        <span className="relative flex items-center justify-center ml-auto">
+          <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full items-center justify-center">
+            {count > 9 ? "9+" : count}
+          </span>
         </span>
-      </span>
-    );
-  }
+      );
+    }
 
-  return null;
-};
+    return null;
+  };
 
 
   // -----------------------------
@@ -633,39 +678,54 @@ const renderBadge = (link) => {
                 <li key={index} className="relative">
                   
                   {/* Parent Item */}
-                {/* Parent Item */}
-<div
-  onClick={() => handleSubMenuClick(link.label)}
-  className={`flex items-center gap-4 px-4 py-2.5 rounded-lg text-base cursor-pointer
-    ${activeMenu === link.label ? "bg-slate-800 text-indigo-400" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"}
-    ${collapsed && !isMobile ? "justify-center px-2" : ""}
-  `}
->
-  <span className="text-xl w-5 flex justify-center shrink-0">{link.icon}</span>
+                  <div
+                    onClick={() => handleSubMenuClick(link.label)}
+                    className={`flex items-center gap-4 px-4 py-2.5 rounded-lg text-base cursor-pointer
+                      ${activeMenu === link.label ? "bg-slate-800 text-indigo-400" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"}
+                      ${collapsed && !isMobile ? "justify-center px-2" : ""}
+                    `}
+                  >
+                    <span className="text-xl w-5 flex justify-center shrink-0">{link.icon}</span>
 
-  {(!collapsed || isMobile) && (
-    <>
-      <span className="truncate flex-1">{link.label}</span>
+                    {(!collapsed || isMobile) && (
+                      <>
+                        <span className="truncate flex-1">{link.label}</span>
 
-      {/* 🔥 Parent Badge */}
-      {renderBadge(link)}
+                        {/* 🔥 Parent Badge */}
+                        {renderBadge(link)}
 
-      {/* Arrow icon */}
-      <span className="ml-2">
-        {activeMenu === link.label ? <FaAngleDown /> : <FaAngleRight />}
-      </span>
-    </>
-  )}
-</div>
-
+                        {/* Arrow icon */}
+                        <span className="ml-2">
+                          {activeMenu === link.label ? <FaAngleDown /> : <FaAngleRight />}
+                        </span>
+                      </>
+                    )}
+                  </div>
 
                   {/* Submenu with Smooth Transition */}
                   <ul className={`bg-slate-800/50 rounded-lg overflow-hidden transition-[max-height,opacity,margin] duration-500 ease-in-out ${(isOpen && (!collapsed || isMobile)) ? "max-h-[1000px] opacity-100 mt-1" : "max-h-0 opacity-0 mt-0"}`}>
                     {link.children.map((child) => (
                       <li key={child.to}>
-                        {/* Note: Clicking a child inside keeps the menu open (Standard router behavior, doesn't reset state) */}
-                        <NavLink to={child.to} className={({ isActive }) => `flex items-center gap-3 pl-12 pr-4 py-2 text-sm transition-colors ${isActive ? "text-indigo-400 font-semibold" : "text-slate-400 hover:text-slate-200"}`}>
-                          <span className="flex-1 truncate" title={child.label}>{child.label}</span>{renderBadge(child)}
+                        <NavLink
+                          to={child.to}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 pl-12 pr-4 py-2 text-sm transition-colors ${
+                              isActive ? "text-indigo-400 font-semibold" : "text-slate-400 hover:text-slate-200"
+                            }`
+                          }
+                        >
+                          {/* ✅ CHILD ICON */}
+                          <span className="text-base w-4 flex justify-center shrink-0">
+                            {child.icon}
+                          </span>
+
+                          {/* LABEL */}
+                          <span className="flex-1 truncate" title={child.label}>
+                            {child.label}
+                          </span>
+
+                          {/* BADGE */}
+                          {renderBadge(child)}
                         </NavLink>
                       </li>
                     ))}

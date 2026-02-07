@@ -78,6 +78,9 @@ import ConnectWithEmployee from "./EmployeePages/ConnectwithEmployee";
 import AddExpense from "./EmployeePages/AddExpense";
 import AdminExpenseDashboard from "./pages/AdminExpense";
 import AdminAttendanceRequests from "./pages/AdminAttendanceRequests";
+import PunchOutRequests from "./pages/PunchOutRequests";
+import WorkModeRequests from "./pages/WorkModeRequests";
+import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 
 function App() {
   return (
@@ -85,6 +88,7 @@ function App() {
       {/* Public route */}
       <Route path="/" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/employee-onboarding" element={<EmployeeOnboarding />} />
 
       {/* ------------------ ADMIN ROUTES ------------------ */}
       <Route
@@ -154,6 +158,9 @@ function App() {
           <Route path="/admin/rules" element={<AdminRulesPost />} />
          <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
          <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
+         <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
+         <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
+       
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}

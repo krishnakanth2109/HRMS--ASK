@@ -297,6 +297,84 @@ router.post("/idle-activity", protect, async (req, res) => {
   }
 });
 
+/* ==============================================================
+==============
+ 🚀 3. PUBLIC ONBOARDING (No Auth Required)
+=================================================================
+=========== */
+// employeeRoutes.js - Update the /onboard route
+router.post("/onboard", async (req, res) => {
+  try {
+    // 1. Validate Company existence
+    if (!req.body.company) {
+      return res.status(400).json({ error: "Company selection is required" });
+    }
+
+    const company = await Company.findById(req.body.company);
+    if (!company) {
+      return res.status(404).json({ error: "Selected company not found" });
+    }
+
+    // 2. Generate Employee ID with retry logic to avoid duplicates
+    let employeeId;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (attempts < maxAttempts) {
+      const currentCount = await Employee.countDocuments({ company: req.body.company });
+      const paddedCount = String(currentCount + 1).padStart(2, "0");
+      employeeId = `${company.prefix}${paddedCount}`;
+      
+      // Check if this ID already exists
+      const existingEmployee = await Employee.findOne({ employeeId });
+      if (!existingEmployee) {
+        break; // ID is unique, proceed
+      }
+      
+      attempts++;
+      if (attempts === maxAttempts) {
+        // Fallback: use timestamp to ensure uniqueness
+        const timestamp = Date.now().toString().slice(-3);
+        employeeId = `${company.prefix}${paddedCount}_${timestamp}`;
+      }
+    }
+
+    // 3. Set default fields for new onboarders
+    req.body.employeeId = employeeId;
+    req.body.role = "employee"; // Force role to employee
+    req.body.isActive = true;
+    
+    // 4. Create Employee
+    const employee = new Employee(req.body);
+    const result = await employee.save();
+    
+    // Update company count
+    company.employeeCount = await Employee.countDocuments({ company: req.body.company });
+    await company.save();
+    
+    res.status(201).json({ 
+      message: "Onboarding successful", 
+      employeeId: result.employeeId,
+      employee: result 
+    });
+
+  } catch (err) {
+    console.error("❌ Onboarding error:", err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({
+        error: `Duplicate value entered for ${field}. Please try again.`,
+        field: field,
+        details: "The system detected a duplicate entry. Please refresh and try again."
+      });
+    }
+    res.status(500).json({ 
+      error: "Onboarding failed. Please contact HR.",
+      details: err.message 
+    });
+  }
+});
+
 export default router;
 
 // --- END OF FILE routes/employeeRoutes.js ---

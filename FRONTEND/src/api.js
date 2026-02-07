@@ -8,6 +8,7 @@ const baseURL =
     ? import.meta.env.VITE_API_URL_PRODUCTION
     : import.meta.env.VITE_API_URL_DEVELOPMENT || "http://localhost:5000";
 
+
 // Debug logs
 console.log("🔧 Environment Mode:", import.meta.env.MODE);
 console.log("🌐 API Base URL:", baseURL);
@@ -834,4 +835,18 @@ export const approveStatusCorrection = async (data) =>
 
 export const rejectStatusCorrection = async (data) => 
   (await api.post("/api/attendance/reject-status-correction", data)).data;
+
+// api.js - Update the publicOnboard function
+// api.js - Update the publicOnboard function
+export const publicOnboard = async (employeeData) => {
+  try {
+    // ✅ FIX: Use the correct endpoint with /api prefix
+    const response = await api.post("/api/employees/onboard", employeeData);
+    return response.data;
+  } catch (error) {
+    // Throw the specific error message from the backend
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+
 export default api;

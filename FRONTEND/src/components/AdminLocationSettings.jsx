@@ -7,7 +7,6 @@ import {
   FaLaptopHouse, FaBuilding, FaSearch, FaLayerGroup, 
   FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes,
   FaUserMinus, FaListAlt, FaUserPlus, FaCheck, FaCalendarAlt, FaClock, FaEdit,
-  FaEnvelopeOpenText, FaCheckCircle, FaTimesCircle,
   FaLocationArrow
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
@@ -189,149 +188,6 @@ const ScheduleModal = ({ isOpen, onClose, employee, onSave }) => {
   );
 };
 
-// 2. Pending Requests Modal (UPDATED WITH CORRECT ENDPOINTS)
-const PendingRequestsModal = ({ isOpen, onClose, onRequestAction, onRefresh }) => {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) fetchRequests();
-  }, [isOpen]);
-
-  const fetchRequests = async () => {
-    setLoading(true);
-    try {
-      // ✅ FIX: Changed from /api/work-mode/all-requests to /api/admin/requests
-      const { data } = await api.get("/api/admin/requests");
-      setRequests(data);
-    } catch (err) { 
-      console.error("Error fetching requests:", err); 
-    } finally { 
-      setLoading(false); 
-    }
-  };
-
-  const handleAction = async (requestId, action) => {
-    try {
-      // ✅ FIX: Changed endpoint to /api/admin/requests/action
-      await api.put("/api/admin/requests/action", { requestId, action });
-      Swal.fire("Success", `Request ${action}`, "success");
-      fetchRequests(); // Refresh list to update status
-      onRefresh(); // Refresh main employee list
-    } catch (err) {
-      Swal.fire("Error", "Action failed", "error");
-    }
-  };
-
-  const handleDelete = async (requestId) => {
-    Swal.fire({
-      title: "Delete Request?",
-      text: "This action cannot be undone.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      confirmButtonText: "Yes, delete it!"
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          // ✅ FIX: Changed endpoint to /api/admin/requests/:id
-          await api.delete(`/api/admin/requests/${requestId}`);
-          Swal.fire("Deleted!", "Request has been deleted.", "success");
-          fetchRequests();
-        } catch (err) {
-          Swal.fire("Error", "Delete failed", "error");
-        }
-      }
-    });
-  };
-
-  const getFormattedDays = (days) => {
-    const daysMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    if (!days || days.length === 0) return "No days selected";
-    return days.sort((a,b)=>a-b).map(d => daysMap[d]).join(", ");
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-4xl shadow-2xl h-[80vh] flex flex-col border border-gray-100">
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <div>
-              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FaEnvelopeOpenText className="text-blue-600"/> Manage Requests</h3>
-              <p className="text-sm text-gray-500">Approve, reject, or delete employee work mode requests.</p>
-            </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-red-500"><FaTimes size={20}/></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4">
-           {loading ? <div className="text-center text-gray-500 py-10">Loading...</div> : requests.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-full text-gray-400">
-               <FaCheckCircle size={40} className="mb-2 opacity-20"/>
-               <p>No requests found.</p>
-             </div>
-           ) : (
-             <div className="grid grid-cols-1 gap-4">
-                {requests.map(req => (
-                  <div key={req._id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-start md:items-center relative">
-                     <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                           <div>
-                             <h4 className="font-bold text-gray-800">{req.employeeName}</h4>
-                             <p className="text-xs text-gray-500">{req.employeeId} • {req.department}</p>
-                           </div>
-                           <div className="flex flex-col items-end gap-1">
-                             <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded uppercase">{req.requestType}</span>
-                             {req.status === 'Approved' && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded flex items-center gap-1"><FaCheckCircle/> Approved</span>}
-                             {req.status === 'Rejected' && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded flex items-center gap-1"><FaTimesCircle/> Rejected</span>}
-                           </div>
-                        </div>
-                        
-                        <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
-                           <div>
-                             <span className="text-gray-500 text-xs font-bold block">REQUESTED MODE</span>
-                             <span className={`font-bold ${req.requestedMode === 'WFH' ? 'text-green-600' : 'text-blue-600'}`}>
-                               {req.requestedMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
-                             </span>
-                           </div>
-                           <div>
-                             <span className="text-gray-500 text-xs font-bold block">DURATION / DAYS</span>
-                             <span className="text-gray-700 font-medium">
-                               {req.requestType === "Temporary" && `${new Date(req.fromDate).toLocaleDateString()} to ${new Date(req.toDate).toLocaleDateString()}`}
-                               {req.requestType === "Recurring" && getFormattedDays(req.recurringDays)}
-                               {req.requestType === "Permanent" && "Indefinite"}
-                             </span>
-                           </div>
-                        </div>
-                        <div className="mt-2 bg-gray-50 p-2 rounded text-xs text-gray-600 italic border-l-2 border-gray-300">
-                           "{req.reason}"
-                        </div>
-                     </div>
-                     
-                     <div className="flex flex-col gap-2">
-                        {req.status === 'Pending' && (
-                          <div className="flex gap-2">
-                            <button onClick={() => handleAction(req._id, "Approved")} className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
-                              <FaCheckCircle/> Approve
-                            </button>
-                            <button onClick={() => handleAction(req._id, "Rejected")} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition">
-                              <FaTimesCircle/> Reject
-                            </button>
-                          </div>
-                        )}
-                        <button onClick={() => handleDelete(req._id)} className="text-gray-400 hover:text-red-500 text-sm flex items-center justify-end gap-1 px-3 py-1 hover:bg-red-50 rounded transition mt-1">
-                           <FaTrash/> Delete
-                        </button>
-                     </div>
-                  </div>
-                ))}
-             </div>
-           )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // 3. Bulk Update Modal
 const BulkModeModal = ({ isOpen, onClose, onSave, selectedCount }) => {
@@ -486,7 +342,7 @@ const AdminLocationSettings = () => {
   const [activeCategory, setActiveCategory] = useState("All"); 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState([]);
-  const [pendingCount, setPendingCount] = useState(0); // Added pending count state
+
   
   // Modals
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -496,8 +352,7 @@ const AdminLocationSettings = () => {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   
-  // New Requests Modal State
-  const [showRequestsModal, setShowRequestsModal] = useState(false);
+
 
   // Map
   const [showMap, setShowMap] = useState(false);
@@ -509,7 +364,7 @@ const AdminLocationSettings = () => {
   useEffect(() => { 
     fetchSettings(); 
     fetchEmployees(); 
-    fetchPendingCount(); // Fetch count on mount
+  
   }, []);
 
   const fetchSettings = async () => {
@@ -540,22 +395,9 @@ const AdminLocationSettings = () => {
     } catch (error) { Swal.fire("Error", "Failed to load employees", "error"); } finally { setLoadingEmployees(false); }
   };
 
-  // Added function to fetch pending requests count
-  const fetchPendingCount = async () => {
-    try {
-      const { data } = await api.get("/api/admin/requests");
-      const pending = data.filter(req => req.status === 'Pending');
-      setPendingCount(pending.length);
-    } catch (error) {
-      console.error("Error fetching pending count:", error);
-    }
-  };
+
 
   // Wrapper to refresh all data (employees and pending count)
-  const handleRefreshData = () => {
-    fetchEmployees();
-    fetchPendingCount();
-  };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) return Swal.fire("Error", "Geolocation not supported", "error");
@@ -816,26 +658,7 @@ const AdminLocationSettings = () => {
                     <div><h2 className="text-xl font-bold text-gray-800">Work Mode Management</h2><p className="text-sm text-gray-500">Manage individual exceptions and categories.</p></div>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    {/* NEW BUTTON FOR REQUESTS WITH BADGE */}
-<button
-  onClick={() => setShowRequestsModal(true)}
-  className="relative bg-blue-600 text-white border border-blue-600 px-3 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-blue-700 transition text-sm shadow-md"
->
-  <FaEnvelopeOpenText />
-  <span>Requests</span>
 
-  {pendingCount > 0 && (
-    <>
-      {/* Ping animation */}
-      <span className="absolute -top-2 -right-2 inline-flex h-5 w-5 rounded-full bg-red-500 opacity-75 animate-ping"></span>
-
-      {/* Actual count */}
-      <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-white">
-        {pendingCount > 9 ? "9+" : pendingCount}
-      </span>
-    </>
-  )}
-</button>
 
                     <button onClick={() => setShowExceptionsModal(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-3 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-orange-100 transition text-sm"><FaListAlt /> View Exceptions</button>
                     <button onClick={() => setShowCategoryModal(true)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-blue-700 shadow-sm transition transform active:scale-95 text-sm"><FaPlus /> Create Category</button>
@@ -877,8 +700,7 @@ const AdminLocationSettings = () => {
       <CategoryModal isOpen={showCategoryModal} onClose={() => setShowCategoryModal(false)} onSave={handleSaveCategory} allEmployees={employees} />
       <ExceptionsModal isOpen={showExceptionsModal} onClose={() => setShowExceptionsModal(false)} employees={employees} />
       <AddMemberModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} onAdd={handleAddMembersToCategory} allEmployees={employees} activeCategory={activeCategory} />
-      <ScheduleModal isOpen={scheduleModalOpen} onClose={() => setScheduleModalOpen(false)} employee={editingEmployee} onSave={handleSaveSchedule} />
-      <PendingRequestsModal isOpen={showRequestsModal} onClose={() => setShowRequestsModal(false)} onRequestAction={() => {}} onRefresh={handleRefreshData} />
+
     </div>
   );
 };

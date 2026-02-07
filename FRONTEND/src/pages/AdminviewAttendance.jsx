@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
 import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api"; 
-import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, FaBell, FaCheck, FaBan, FaTrash, FaHistory } from "react-icons/fa";
+import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, } from "react-icons/fa";
 import { toBlob } from 'html-to-image'; 
 
 // ==========================================
@@ -179,119 +179,6 @@ const LiveTimer = ({ startTime }) => {
 
   return <span className="text-blue-600 font-mono font-bold animate-pulse">{timeStr}</span>;
 };
-
-// ==========================================
-// ✅ REQUEST APPROVAL MODAL
-// ==========================================
-const RequestApprovalModal = ({ isOpen, onClose, requests, onAction, onDelete }) => {
-  if (!isOpen) return null;
-
-  const sortedRequests = [...requests].sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col animate-fadeIn" onClick={e => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-600 rounded-full text-blue-600">
-              <FaBell size={20} />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-slate-800">Punch Out Requests</h3>
-              <p className="text-sm text-slate-500">{requests.filter(r => r.status === 'Pending').length} Pending Review</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2 hover:bg-slate-100 rounded-full transition-colors"><FaTimes size={20} /></button>
-        </div>
-        
-        {/* Body */}
-        <div className="p-6 overflow-y-auto bg-slate-50">
-          {sortedRequests.length === 0 ? (
-            <div className="text-center py-16 flex flex-col items-center justify-center text-slate-500">
-                <FaCheckCircle className="text-4xl text-green-300 mb-4" />
-                <p className="font-medium">No requests found.</p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xs tracking-wider">
-                  <tr>
-                    <th className="px-6 py-4">Employee</th>
-                    <th className="px-6 py-4">Shift Date</th>
-                    <th className="px-6 py-4">Requested Time</th>
-                    <th className="px-6 py-4">Reason</th>
-                    <th className="px-6 py-4 text-center">Status / Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedRequests.map((req) => (
-                    <tr key={req._id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-800">{req.employeeName}</div>
-                        <div className="text-xs text-slate-500 font-mono mt-0.5">{req.employeeId}</div>
-                      </td>
-                      {/* ✅ DD/MM/YYYY */}
-                      <td className="px-6 py-4 text-slate-600 font-medium">
-                        {formatDateDMY(req.originalDate)}
-                      </td>
-                      <td className="px-6 py-4">
-                         <span className="bg-blue-50 text-blue-700 py-1 px-3 rounded-md font-mono font-semibold">
-                            {new Date(req.requestedPunchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 italic">"{req.reason}"</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-3">
-                          {req.status === 'Approved' ? (
-                            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-bold shadow-sm">
-                                <FaCheckCircle /> Approved
-                            </span>
-                          ) : req.status === 'Rejected' ? (
-                            <span className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm font-bold shadow-sm">
-                                <FaBan /> Rejected
-                            </span>
-                          ) : (
-                            <>
-                              <button 
-                                onClick={() => onAction(req._id, 'Approved', req)}
-                                className="w-9 h-9 flex items-center justify-center bg-green-100 text-green-600 rounded-lg hover:bg-green-500 hover:text-white transition-all shadow-sm hover:shadow-md"
-                                title="Approve Request"
-                              >
-                                <FaCheck />
-                              </button>
-                              <button 
-                                onClick={() => onAction(req._id, 'Rejected', req)}
-                                className="w-9 h-9 flex items-center justify-center bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm hover:shadow-md"
-                                title="Reject Request"
-                              >
-                                <FaTimes />
-                              </button>
-                            </>
-                          )}
-                           {/* DELETE BUTTON */}
-                           <button 
-                                onClick={() => onDelete(req._id)}
-                                className="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-600 hover:text-white transition-all shadow-sm ml-2"
-                                title="Delete Request"
-                           >
-                                <FaTrash size={12} />
-                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ==========================================
 // SUB-COMPONENTS (MODALS & PAGINATION)
 // ==========================================
@@ -740,9 +627,6 @@ const [summaryStartDate, setSummaryStartDate] = useState(() => {
   const [summaryItemsPerPage, setSummaryItemsPerPage] = useState(10);
   const [punchOutModal, setPunchOutModal] = useState({ isOpen: false, employee: null });
 
-  const [punchOutRequests, setPunchOutRequests] = useState([]);
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-
   const [dailySearchTerm, setDailySearchTerm] = useState("");
   const [summarySearchTerm, setSummarySearchTerm] = useState("");
 
@@ -790,14 +674,7 @@ const [summaryStartDate, setSummaryStartDate] = useState(() => {
     try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data : []); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); } 
   }, []);
 
-  const fetchPunchOutRequests = useCallback(async () => {
-    try {
-      const response = await api.get('/api/punchoutreq/all'); 
-      setPunchOutRequests(response.data);
-    } catch (error) {
-      console.error("Error fetching requests", error);
-    }
-  }, []);
+
 
   // ✅ NEW: Fetch Images for all employees
   useEffect(() => {
@@ -830,99 +707,6 @@ const [summaryStartDate, setSummaryStartDate] = useState(() => {
     }
   }, [allEmployees]);
 
-
-  const handleRequestAction = async (requestId, status, request) => {
-    try {
-      if (status === 'Approved') {
-        if (!request) { alert("Request details not found!"); return; }
-        
-        const targetDate = normalizeDateStr(request.originalDate);
-        
-        const attendanceRecord = rawDailyData.find(record => 
-          record.employeeId === request.employeeId && 
-          normalizeDateStr(record.date) === targetDate
-        );
-
-        if (!attendanceRecord || !attendanceRecord.punchIn) {
-          const confirmAnyway = window.confirm(
-            `Attendance record for ${request.employeeName} on ${new Date(targetDate).toLocaleDateString()} was not found in the currently loaded Daily Log.\n\n` +
-            `This might be because your Date Filter doesn't cover this date.\n\n` +
-            `Do you want to force the punch-out anyway?`
-          );
-          if (!confirmAnyway) return;
-        } else if (attendanceRecord.punchOut) {
-          alert(`Employee ${request.employeeName} has already punched OUT on ${new Date(targetDate).toLocaleDateString()}`);
-          return;
-        }
-
-        const adminLocation = await getCurrentLocation();
-
-        let punchOutSuccessful = false;
-        try {
-          const response = await api.post(`/api/attendance/admin-punch-out`, {
-            employeeId: request.employeeId,
-            punchOutTime: request.requestedPunchOut,
-            latitude: adminLocation.latitude, 
-            longitude: adminLocation.longitude, 
-            adminId: 'Admin',
-            date: targetDate
-          });
-
-          if (response.status === 200 || response.status === 201 || response.data?.success) {
-            punchOutSuccessful = true;
-          } else {
-             throw new Error(response.data?.message || "Punch out request completed but indicated failure.");
-          }
-        } catch (punchOutError) {
-          const errMsg = punchOutError.response?.data?.message || punchOutError.message;
-          alert(`Punch Out Failed: ${errMsg}`);
-          console.error("Punch out error:", punchOutError);
-          return; 
-        }
-
-        if (punchOutSuccessful) {
-            try {
-                await api.post('/api/punchoutreq/action', { requestId, status });
-                
-                setPunchOutRequests((prev) => 
-                   prev.map((req) => req._id === requestId ? { ...req, status: 'Approved' } : req)
-                );
-
-            } catch (statusError) {
-                console.warn("Punch out successful, but failed to update Request Status:", statusError);
-            }
-
-            alert(`✅ Request Approved! Employee ${request.employeeName} punched out successfully.`);
-            
-            fetchDailyData(startDate, endDate);
-            fetchSummaryData(summaryStartDate, summaryEndDate);
-        }
-
-      } else {
-        await api.post('/api/punchoutreq/action', { requestId, status });
-        
-        setPunchOutRequests((prev) => 
-             prev.map((req) => req._id === requestId ? { ...req, status: 'Rejected' } : req)
-        );
-
-        alert(`Request ${status} Successfully`);
-      }
-    } catch (error) {
-      alert("Action failed: " + (error.response?.data?.message || error.message));
-      console.error("Request action error:", error);
-    }
-  };
-
-  const handleDeleteRequest = async (requestId) => {
-    if (!window.confirm("Are you sure you want to delete this request permanently?")) return;
-    try {
-        await api.delete(`/api/punchoutreq/delete/${requestId}`);
-        setPunchOutRequests((prev) => prev.filter(req => req._id !== requestId));
-        alert("Request deleted successfully");
-    } catch (error) {
-        alert("Delete failed: " + (error.response?.data?.message || error.message));
-    }
-  };
 
   const handleAdminPunchOut = async (employeeId, punchOutTime, location, dateOfRecord) => {
     try {
@@ -967,7 +751,7 @@ const handleMonthChange = (e) => {
       setSummaryEndDate(endStr);
   }
 };
-  useEffect(() => { fetchShifts(); fetchHolidays(); fetchDailyData(startDate, endDate); fetchPunchOutRequests(); }, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays, fetchPunchOutRequests]);
+  useEffect(() => { fetchShifts(); fetchHolidays(); fetchDailyData(startDate, endDate);}, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays]);
   useEffect(() => { fetchAllEmployees(); fetchSummaryData(summaryStartDate, summaryEndDate); fetchOvertimeData(); }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees]);
 
   const empNameMap = useMemo(() => {
@@ -1246,19 +1030,7 @@ const handleMonthChange = (e) => {
                     <button onClick={exportDailyLogToExcel} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-transform active:scale-95">
                         <FaFileExcel/><span>Export</span>
                     </button>
-                    
-                    <button 
-                        onClick={() => setIsRequestModalOpen(true)} 
-                        className="relative flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-transform active:scale-95"
-                    >
-                        <FaBell /> 
-                        <span>Punch Out Requests</span>
-                        {punchOutRequests.filter(r => r.status === 'Pending').length > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white shadow-sm">
-                                {punchOutRequests.filter(r => r.status === 'Pending').length}
-                            </span>
-                        )}
-                    </button>
+               
                 </div>
             </div>
           </div>
@@ -1518,14 +1290,7 @@ const handleMonthChange = (e) => {
       
       <AdminPunchOutModal isOpen={punchOutModal.isOpen} onClose={() => setPunchOutModal({ isOpen: false, employee: null })} employee={punchOutModal.employee} onPunchOut={handleAdminPunchOut} />
       
-      {/* ✅ NEW: Request Approval Modal with Delete Function */}
-      <RequestApprovalModal 
-            isOpen={isRequestModalOpen} 
-            onClose={() => setIsRequestModalOpen(false)} 
-            requests={punchOutRequests} 
-            onAction={handleRequestAction}
-            onDelete={handleDeleteRequest} 
-      />
+    
 
       {/* ✅ LIGHTBOX / FULL SCREEN IMAGE POPUP */}
       {previewImage && (
