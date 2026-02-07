@@ -1,20 +1,31 @@
-﻿// --- START OF FILE: routes/employeeRoutes.js ---
-
+﻿
 import express from "express";
 import Employee from "../models/employeeModel.js";
 import Company from "../models/CompanyModel.js";
 import Notification from "../models/notificationModel.js";
+import Otp from "../models/OtpModel.js"; 
 import { upload } from "../config/cloudinary.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import nodemailer from "nodemailer";
-import Otp from "../models/OtpModel.js"; // Import the new model
+import bcrypt from "bcrypt"; // ✅ REQUIRED for password reset
+
 const router = express.Router();
+
+// ✅ SETUP EMAIL TRANSPORTER AT THE TOP
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: process.env.SMTP_PORT || 465,
+  secure: true, 
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 /* ==============================================================
 ==============
  📁 1. FILE UPLOAD ROUTE
- ✅ FIX: Removed 'onlyAdmin' so regular employees can upload documents
 =================================================================
 =========== */
 router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
@@ -41,7 +52,6 @@ router.post("/", protect, onlyAdmin, async (req, res) => {
   try {
 
     // ✅ USE COMPANY'S employeeCount COUNTER (ensures ID consistency)
-    // ✅ USE COMPANY'S employeeCount COUNTER (ensures ID consistency)
     if (req.body.company) {
       // Find the company to get the prefix
       const company = await Company.findById(req.body.company);
@@ -60,11 +70,7 @@ router.post("/", protect, onlyAdmin, async (req, res) => {
       // Update company count to be consistent (optional but good for sync)
       company.employeeCount = currentCount + 1;
       await company.save();
-    } else {
-      // Fallback for unexpected cases where company is missing but creation proceeds?
-      // Ideally should fail if company is required. The model likely requires it.
-      // Assuming the model validation handles "required: true" for company.
-    }
+    } 
 
     const employee = new Employee(req.body);
     const result = await employee.save();
@@ -112,14 +118,12 @@ router.get("/:id", protect, async (req, res) => {
 });
 
 // UPDATE employee
-// ✅ FIX: Allow Admin OR the Employee themselves to update the profile
 router.put("/:id", protect, async (req, res) => {
   try {
     // 1. Check if user is Admin
     const isAdmin = req.user.role === "admin";
 
     // 2. Check if user is updating their OWN profile
-    // (Ensure req.user.employeeId is populated by your protect middleware)
     const isSelf = req.user.employeeId === req.params.id;
 
     // 3. If not admin and not self, reject
@@ -163,7 +167,6 @@ router.delete("/:id", protect, onlyAdmin, async (req, res) => {
     }
 
     // 3. Extract the numeric part of the deleted employee's ID
-    // Assuming ID format is PREFIX + Number (e.g., VAG01)
     const prefixLength = company.prefix.length;
     const deletedNumber = parseInt(deletedId.slice(prefixLength), 10);
 
@@ -375,15 +378,7 @@ router.post("/onboard", async (req, res) => {
     });
   }
 });
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: process.env.SMTP_PORT || 465,
-  secure: true, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+
 
 // --- 2. ROUTE: SEND OTP (Add this before the onboard route) ---
 router.post("/send-onboarding-otp", async (req, res) => {
@@ -428,72 +423,186 @@ router.post("/send-onboarding-otp", async (req, res) => {
   }
 });
 
-// --- 3. UPDATE: ONBOARDING ROUTE (Add Verification Logic) ---
-router.post("/onboard", async (req, res) => {
+/* ==============================================================
+==============
+ 🔑 4. PASSWORD RESET ROUTES (Using same Otp Model)
+=================================================================
+=========== */
+
+// 1. Send OTP for Forgot Password
+router.post("/forgot-password-otp", async (req, res) => {
   try {
-    // EXTRACT OTP FROM BODY
-    const { otp, ...employeeData } = req.body;
+    const { email } = req.body;
 
-    // 1. VERIFY OTP
-    if (!otp) {
-      return res.status(400).json({ error: "OTP is required." });
+    // Check if employee exists
+    const employee = await Employee.findOne({ email });
+    if (!employee) {
+      return res.status(404).json({ message: "Email not found in our records." });
     }
 
-    const validOtp = await Otp.findOne({ email: employeeData.email, otp });
-    if (!validOtp) {
-      return res.status(400).json({ error: "Invalid or expired OTP." });
-    }
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 2. PROCEED WITH EXISTING ONBOARDING LOGIC
-    if (!employeeData.company) {
-      return res.status(400).json({ error: "Company selection is required" });
-    }
+    // Reusing the same OTP Model logic as Onboarding
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp: otpCode, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
 
-    const company = await Company.findById(employeeData.company);
-    if (!company) {
-      return res.status(404).json({ error: "Selected company not found" });
-    }
-
-    // ... (Your existing ID generation logic here) ...
-    let employeeId;
-    let attempts = 0;
-    const maxAttempts = 5;
-    while (attempts < maxAttempts) {
-      const currentCount = await Employee.countDocuments({ company: employeeData.company });
-      const paddedCount = String(currentCount + 1).padStart(2, "0");
-      employeeId = `${company.prefix}${paddedCount}`;
-      const existingEmployee = await Employee.findOne({ employeeId });
-      if (!existingEmployee) break;
-      attempts++;
-    }
-
-    employeeData.employeeId = employeeId;
-    employeeData.role = "employee";
-    employeeData.isActive = true;
-
-    const employee = new Employee(employeeData);
-    const result = await employee.save();
-
-    // Update company count
-    company.employeeCount = await Employee.countDocuments({ company: employeeData.company });
-    await company.save();
-
-    // DELETE OTP AFTER SUCCESS
-    await Otp.deleteOne({ email: employeeData.email });
-
-    res.status(201).json({ 
-      message: "Onboarding successful", 
-      employeeId: result.employeeId,
-      employee: result 
+    await transporter.sendMail({
+      from: `"HRMS Support" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Password Reset Request",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Password Reset</h2>
+          <p>We received a request to reset your password.</p>
+          <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626;">${otpCode}</strong></p>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>
+      `,
     });
 
-  } catch (err) {
-    console.error("❌ Onboarding error:", err);
-    // ... error handling
-    res.status(500).json({ error: err.message });
+    res.status(200).json({ message: "OTP sent to your email." });
+  } catch (error) {
+    console.error("Forgot Password OTP Error:", error);
+    res.status(500).json({ error: "Failed to send OTP." });
   }
 });
 
-export default router;
+// 2. Verify OTP
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const validOtp = await Otp.findOne({ email, otp });
+    
+    if (!validOtp) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
 
-// --- END OF FILE routes/employeeRoutes.js ---
+    res.status(200).json({ message: "OTP verified successfully." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Reset Password
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const validOtp = await Otp.findOne({ email, otp });
+    if (!validOtp) {
+      return res.status(400).json({ message: "Invalid or expired OTP. Please try again." });
+    }
+
+    // ✅ This requires 'bcrypt' imported at the top
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await Employee.findOneAndUpdate(
+      { email },
+      { password: hashedPassword }
+    );
+
+    await Otp.deleteOne({ email });
+
+    res.status(200).json({ message: "Password has been reset successfully. Please login." });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res.status(500).json({ error: "Failed to reset password." });
+  }
+});
+
+/* ==============================================================
+   EXISTING ROUTES (Upload, CRUD, etc...)
+   ... (Keep your existing File Upload, Create, Get, Update, Delete routes here) ...
+================================================================= */
+
+// ... [Keep File Upload Route] ...
+// ... [Keep Employee CRUD Routes] ...
+// ... [Keep Idle Activity Route] ...
+// ... [Keep Onboarding Routes] ...
+// ... [Keep Forgot Password Routes] ...
+
+
+/* ==============================================================
+   ✅ NEW: CHANGE PASSWORD WITH OTP (PROTECTED / LOGGED IN)
+================================================================= */
+
+// 1. Send OTP to the Logged-In User
+router.post("/change-password-otp", protect, async (req, res) => {
+  try {
+    // Get email from the logged-in user's token
+    const email = req.user.email;
+
+    if (!email) {
+      return res.status(400).json({ message: "User email not found." });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save/Update OTP
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp: otpCode, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send Email
+    await transporter.sendMail({
+      from: `"HRMS Security" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Change Password Verification",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Security Verification</h2>
+          <p>You requested to change your password.</p>
+          <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
+          <p>If you did not make this request, please contact admin immediately.</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({ message: "OTP sent to your registered email." });
+  } catch (error) {
+    console.error("Change Password OTP Error:", error);
+    res.status(500).json({ error: "Failed to send OTP." });
+  }
+});
+
+// 2. Verify OTP and Update Password
+router.post("/change-password-verify", protect, async (req, res) => {
+  try {
+    const { otp, newPassword } = req.body;
+    const email = req.user.email; // From Token
+
+    // 1. Verify OTP
+    const validOtp = await Otp.findOne({ email, otp });
+    if (!validOtp) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
+
+    // 2. Hash New Password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 3. Update Employee Password
+    await Employee.findOneAndUpdate(
+      { email },
+      { password: hashedPassword }
+    );
+
+    // 4. Delete OTP
+    await Otp.deleteOne({ email });
+
+    res.status(200).json({ message: "Password updated successfully." });
+  } catch (error) {
+    console.error("Change Password Verify Error:", error);
+    res.status(500).json({ error: "Failed to update password." });
+  }
+});
+
+
+export default router;
+// --- START OF FILE src/pages/ForgotPassword.jsx ---

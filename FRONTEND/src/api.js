@@ -1,4 +1,4 @@
-// --- START OF FILE api.js ---
+// --- START OF FILE src/utils/api.js ---
 
 import axios from "axios";
 
@@ -489,11 +489,6 @@ export const updateEmployeeWorkMode = async (employeeId, mode) => {
 };
 
 
-
-
-
-
-
 /* =============================================================================
    GROUP MANAGEMENT
 ============================================================================= */
@@ -820,8 +815,6 @@ export const setRequestLimit = (employeeId, limit) => {
   });
 };
 
-// --- START OF FILE api.js ---
-// ... keep existing code ...
 
 // ✅ NEW: Work Status Correction APIs
 export const requestStatusCorrection = async (data) => 
@@ -856,4 +849,63 @@ export const sendOnboardingOtp = async (email) => {
     throw error.response ? error.response.data : new Error("Network Error");
   }
 };
-export default api;
+
+
+/* =============================================================================
+   ✅ ADDED: FORGOT PASSWORD APIs (AT THE BOTTOM TO PREVENT DELETION)
+============================================================================= */
+
+export const sendForgotPasswordOtp = async (email) => {
+  try {
+    // This calls the backend route: /api/employees/forgot-password-otp
+    const response = await api.post("/api/employees/forgot-password-otp", { email });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+
+export const verifyForgotPasswordOtp = async (email, otp) => {
+  try {
+    const response = await api.post("/api/employees/verify-otp", { email, otp });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+
+export const resetUserPassword = async (email, otp, newPassword) => {
+  try {
+    const response = await api.post("/api/employees/reset-password", {
+      email,
+      otp,
+      newPassword
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+export const sendChangePasswordOtp = async () => {
+  try {
+    const response = await api.post("/api/employees/change-password-otp");
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+
+// Verify OTP and set new password
+export const changePasswordWithOtp = async (otp, newPassword) => {
+  try {
+    const response = await api.post("/api/employees/change-password-verify", {
+      otp,
+      newPassword
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Network Error");
+  }
+};
+
+export default api;﻿// --- START OF FILE: routes/employeeRoutes.js ---

@@ -46,7 +46,8 @@ const allowedOrigins = [
   "https://hrms-ask.onrender.com",
   "http://localhost:5000",
   "https://hrms-ask-1.onrender.com",
-  "https://hrms-ask.vercel.app"
+  "https://hrms-ask.vercel.app",
+  "https://hrms-ask-1jx6.onrender.com"
 ];
 
 // -------------------- SOCKET.IO --------------------
