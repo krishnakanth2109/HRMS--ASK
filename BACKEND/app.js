@@ -40,7 +40,7 @@ const server = http.createServer(app);
 
 // -------------------- CORS ORIGINS --------------------
 const allowedOrigins = [
-  "https://hrms-420.netlify.app",
+  "https://hrms-420.netlify.app",j
   "http://localhost:5173",
   "http://localhost:3000",
   "https://hrms-ask.onrender.com",
