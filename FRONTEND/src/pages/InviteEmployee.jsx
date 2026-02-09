@@ -1,240 +1,365 @@
-import React, { useState } from 'react';
-import { Send, Link, Mail, Copy, Users, Clock, CheckCircle, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-// Assuming your centralized api is in ../utils/api
-import api from '../api'; 
+import React, { useState, useEffect } from 'react';
+import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote } from 'lucide-react';
+import { getAllCompanies } from '../api';
+import api from '../api';
 
 const SendOnboardingForm = () => {
   const [activeTab, setActiveTab] = useState('single');
-  const [formData, setFormData] = useState({
-    recipientEmail: '',
-    recipientName: '',
-    recipientList: '',
-    emailSubject: 'Complete Your Onboarding Form',
-    emailMessage: `Hello!
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
 
-Please complete your onboarding form using the link below:
+  // Configuration States
+  const [emailSubject, setEmailSubject] = useState('Welcome to [Company Name] – Complete Your Onboarding Process');
+  const [formLink, setFormLink] = useState(`https://hrms-420.netlify.app/employee-onboarding`);
+  const [emailMessage, setEmailMessage] = useState(`Dear [NAME],
+
+We are pleased to welcome you to [COMPANY].
+
+Congratulations on your appointment as [ROLE] ([EMPLOYMENT_TYPE]) in the [DEPT] department. We are excited to have you join our team and look forward to your contributions.
+
+As part of the onboarding process, please complete your employee profile using the link below:
 
 [ONBOARDING_LINK]
 
-This form is required for your employment setup.
+The information provided will help us set up your official records, system access, and other employment formalities.
 
-Best regards,
-HR Team`,
-    formLink: `https://hrms-420.netlify.app/employee-onboarding`, // Dynamic link to your onboarding page
-    expiryDate: '',
-    sendReminders: false,
-    reminderFrequency: 'weekly',
-    allowMultipleSubmissions: false,
-    trackResponses: true,
-    notifyOnCompletion: true
-  });
+Kindly complete the form at your earliest convenience. If you have any questions or need assistance, please contact the HR team.
 
-  const [copied, setCopied] = useState(false);
+We look forward to working with you.
+
+Warm regards,  
+HR Team  
+[COMPANY]`);
+
+  const [singleData, setSingleData] = useState({ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' });
+  const [bulkRows, setBulkRows] = useState([{ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' }]);
   const [sending, setSending] = useState(false);
-  const [sentEmails, setSentEmails] = useState([]);
+  const [sentHistory, setSentHistory] = useState([]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+  useEffect(() => {
+    fetchCompanies();
+    fetchHistory();
+  }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const response = await getAllCompanies();
+      setCompanies(Array.isArray(response.data) ? response.data : response);
+    } catch (error) { console.error(error); } finally { setLoadingCompanies(false); }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(formData.formLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const fetchHistory = async () => {
+    try {
+      const response = await api.get('/api/invited-employees/history');
+      setSentHistory(response.data.data);
+    } catch (error) { console.error("History fetch error", error); }
   };
 
-  const generateEmailContent = () => {
-    return formData.emailMessage.replace('[ONBOARDING_LINK]', formData.formLink);
+  const getSelectedCompanyName = () => {
+    const comp = companies.find(c => c._id === selectedCompany);
+    return comp ? comp.name : "[COMPANY NAME]";
   };
 
-  // --- API CALL: SEND SINGLE ---
+  const parseMessage = (msg, user) => {
+    return msg
+      .replace(/\[NAME\]/g, user.name || 'Employee')
+      .replace(/\[ROLE\]/g, user.role || 'Team Member')
+      .replace(/\[DEPT\]/g, user.department || 'General')
+      .replace(/\[EMPLOYMENT_TYPE\]/g, user.employmentType || 'Full Time')
+      .replace(/\[COMPANY\]/g, getSelectedCompanyName())
+      .replace(/\[ONBOARDING_LINK\]/g, formLink);
+  };
+  const parseSubject = () => {
+    return emailSubject.replace(/\[Company Name\]/g, getSelectedCompanyName());
+  };
+
+
   const handleSendSingle = async (e) => {
     e.preventDefault();
+    if (!selectedCompany) return alert('Please select a company first');
     setSending(true);
-    
     try {
+      await api.post('/api/invited-employees/invite', { ...singleData, companyId: selectedCompany });
+
       await api.post('/api/mail/send-onboarding', {
-        recipientEmail: formData.recipientEmail,
-        emailSubject: formData.emailSubject,
-        emailMessage: formData.emailMessage,
-        formLink: formData.formLink
+        recipientEmail: singleData.email,
+        emailSubject: parseSubject(),
+        emailMessage: parseMessage(emailMessage, singleData),
+        formLink: formLink
       });
 
-      const newEmail = {
-        id: Date.now(),
-        email: formData.recipientEmail,
-        name: formData.recipientName || 'Employee',
-        status: 'sent',
-        sentAt: new Date().toLocaleTimeString(),
-        link: formData.formLink
-      };
-      
-      setSentEmails(prev => [newEmail, ...prev]);
-      alert(`Onboarding link sent to ${formData.recipientEmail}`);
-      setFormData(prev => ({ ...prev, recipientEmail: '', recipientName: '' }));
-    } catch (error) {
-      console.error(error);
-      alert("Failed to send email. Check console for details.");
-    } finally {
-      setSending(false);
-    }
+      setSingleData({ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' });
+      fetchHistory();
+      alert("Invitation sent successfully!");
+    } catch (error) { alert(error.response?.data?.error || "Error"); } finally { setSending(false); }
   };
 
-  // --- API CALL: SEND BULK ---
   const handleSendBulk = async (e) => {
     e.preventDefault();
+    if (!selectedCompany) return alert('Select Company');
+    const validRows = bulkRows.filter(r => r.email && r.email.includes('@'));
     setSending(true);
-    
     try {
-      const response = await api.post('/api/mail/send-onboarding', {
-        recipientList: formData.recipientList,
-        emailSubject: formData.emailSubject,
-        emailMessage: formData.emailMessage,
-        formLink: formData.formLink
-      });
-
-      const emails = formData.recipientList.split(/[\n,;]/).filter(e => e.includes('@'));
-      const newEntries = emails.map(email => ({
-        id: Math.random(),
-        email: email.trim(),
-        name: email.split('@')[0],
-        status: 'sent',
-        sentAt: new Date().toLocaleTimeString()
-      }));
-
-      setSentEmails(prev => [...newEntries, ...prev]);
-      alert(response.data.message);
-      setFormData(prev => ({ ...prev, recipientList: '' }));
-    } catch (error) {
-      alert("Bulk send failed.");
-    } finally {
-      setSending(false);
-    }
+      await api.post('/api/invited-employees/invite-bulk', { employees: validRows, companyId: selectedCompany });
+      for (let emp of validRows) {
+        await api.post('/api/mail/send-onboarding', {
+          recipientEmail: emp.email,
+          emailSubject: parseSubject(),
+          emailMessage: parseMessage(emailMessage, emp),
+          formLink: formLink
+        });
+      }
+      setBulkRows([{ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' }]);
+      fetchHistory();
+      alert("Bulk emails sent!");
+    } catch (error) { console.error(error); } finally { setSending(false); }
   };
 
-  const handleResend = async (emailObj) => {
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure? This will permanently delete the invitation record from the database.")) return;
     try {
-      await api.post('/api/mail/send-onboarding', {
-        recipientEmail: emailObj.email,
-        emailSubject: formData.emailSubject,
-        emailMessage: formData.emailMessage,
-        formLink: formData.formLink
-      });
-      alert(`Resent to ${emailObj.email}`);
-    } catch (error) {
-      alert("Resend failed.");
-    }
+      await api.delete(`/api/invited-employees/${id}`);
+      setSentHistory(prev => prev.filter(item => item._id !== id));
+    } catch (error) { alert("Delete failed"); }
   };
 
-  const handleRevoke = (emailId) => {
-    setSentEmails(prev => prev.map(e => e.id === emailId ? { ...e, status: 'revoked' } : e));
+  const addBulkRow = () => setBulkRows([...bulkRows, { email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' }]);
+  const updateBulkRow = (index, field, value) => {
+    const updated = [...bulkRows];
+    updated[index][field] = value;
+    setBulkRows(updated);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Send Onboarding Form</h1>
-          <p className="text-gray-600">Share your onboarding form link via email with new hires.</p>
-        </div>
+    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans antialiased text-slate-800">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            
-            {/* LINK CARD */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <Link className="w-5 h-5 text-blue-600 mr-2" />
-                  <h2 className="text-lg font-semibold">Onboarding Form Link</h2>
+        {/* LEFT COLUMN: SETUP & FORM */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+              <UserPlus className="text-blue-600" size={32} /> Invite Employee to Onboarding Process
+            </h1>
+          </div>
+
+          {/* 1. CONFIGURATION CARD */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 mb-4 text-blue-600 font-bold uppercase text-xs tracking-widest">
+              <Mail size={16} /> Email Customization
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 ml-1">Subject Line</label>
+                <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 ml-1">Onboarding Link</label>
+                <input value={formLink} onChange={e => setFormLink(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 ml-1">Email Body</label>
+              <textarea rows="4" value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" />
+              <p className="text-[10px] text-slate-400 mt-1 italic">Available tags: [NAME], [COMPANY], [ROLE], [DEPT], [EMPLOYMENT_TYPE], [ONBOARDING_LINK]</p>
+            </div>
+          </div>
+
+          {/* 2. COMPANY & TAB SELECTOR */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2"><Building2 size={14} /> Target Company</label>
+              <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)} className="w-full p-3 bg-blue-50/50 border border-blue-100 rounded-xl font-semibold text-blue-700 outline-none">
+                <option value="">Choose Company...</option>
+                {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="bg-slate-200/50 p-1.5 rounded-2xl flex gap-1">
+              <button onClick={() => setActiveTab('single')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Single</button>
+              <button onClick={() => setActiveTab('bulk')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'bulk' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bulk Invite</button>
+            </div>
+          </div>
+
+          {/* 3. INPUT FORM */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5"><Send size={80} /></div>
+
+            {activeTab === 'single' ? (
+              <form onSubmit={handleSendSingle} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Full Name</label>
+                    <input placeholder="John Doe" required value={singleData.name} onChange={e => setSingleData({ ...singleData, name: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Email Address</label>
+                    <input placeholder="john@company.com" type="email" required value={singleData.email} onChange={e => setSingleData({ ...singleData, email: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Designation / Role</label>
+                    <input placeholder="Project Manager" required value={singleData.role} onChange={e => setSingleData({ ...singleData, role: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Department</label>
+                    <select value={singleData.department} onChange={e => setSingleData({ ...singleData, department: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-white">
+                      <option value="IT">IT Department</option>
+                      <option value="NON-IT">NON-IT Department</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Employment Type</label>
+                    <select required value={singleData.employmentType} onChange={e => setSingleData({ ...singleData, employmentType: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-white">
+                      <option value="">Select Type...</option>
+                      <option value="FULL TIME">FULL TIME</option>
+                      <option value="INTERN">INTERN</option>
+                      <option value="CONTRACT">CONTRACT</option>
+                    </select>
+                  </div>
+                  {singleData.employmentType && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Monthly Salary</label>
+                      <input type="number" placeholder="Enter Amount" required value={singleData.salary} onChange={e => setSingleData({ ...singleData, salary: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                    </div>
+                  )}
                 </div>
-                <button onClick={copyToClipboard} className={`flex items-center px-3 py-1.5 text-sm rounded-lg transition ${copied ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
-                  {copied ? <CheckCircle className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                  {copied ? "Copied!" : "Copy Link"}
+                <button disabled={sending || !selectedCompany} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:bg-slate-300 flex items-center justify-center gap-2">
+                  {sending ? <RefreshCw className="animate-spin" /> : <Send size={18} />}
+                  {sending ? "Processing..." : `Send Invitation to ${singleData.name || 'Employee'}`}
                 </button>
-              </div>
-              <input 
-                type="text" 
-                value={formData.formLink} 
-                onChange={(e) => setFormData(prev => ({...prev, formLink: e.target.value}))}
-                className="w-full px-4 py-2 border rounded-lg bg-gray-50 mb-4" 
-              />
-            </div>
-
-            {/* RECIPIENTS CARD */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex border-b mb-6">
-                <button onClick={() => setActiveTab('single')} className={`px-4 py-2 ${activeTab === 'single' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>Single</button>
-                <button onClick={() => setActiveTab('multiple')} className={`px-4 py-2 ${activeTab === 'multiple' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>Multiple</button>
-              </div>
-
-              {activeTab === 'single' ? (
-                <form onSubmit={handleSendSingle} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" name="recipientName" placeholder="Name" value={formData.recipientName} onChange={handleChange} className="p-2 border rounded" />
-                    <input type="email" name="recipientEmail" placeholder="Email Address" value={formData.recipientEmail} onChange={handleChange} className="p-2 border rounded" required />
-                  </div>
-                  <button type="submit" disabled={sending} className="bg-blue-600 text-white px-6 py-2 rounded flex items-center disabled:bg-blue-300">
-                    {sending ? <RefreshCw className="animate-spin mr-2" /> : <Send className="mr-2" />} Send Link
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSendBulk} className="space-y-4">
-                  <textarea name="recipientList" rows="5" placeholder="Enter emails separated by commas..." value={formData.recipientList} onChange={handleChange} className="w-full p-2 border rounded" required />
-                  <button type="submit" disabled={sending} className="bg-blue-600 text-white px-6 py-2 rounded disabled:bg-blue-300">
-                    {sending ? "Sending..." : "Send to All Recipients"}
-                  </button>
-                </form>
-              )}
-            </div>
-
-            {/* TEMPLATE CARD */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-               <h2 className="text-lg font-semibold mb-4">Email Template</h2>
-               <label className="block text-sm mb-1">Subject</label>
-               <input type="text" name="emailSubject" value={formData.emailSubject} onChange={handleChange} className="w-full p-2 border rounded mb-4" />
-               <label className="block text-sm mb-1">Message</label>
-               <textarea name="emailMessage" rows="6" value={formData.emailMessage} onChange={handleChange} className="w-full p-2 border rounded" />
-               <div className="mt-4 p-4 bg-gray-50 rounded border">
-                 <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Live Preview</p>
-                 <div className="whitespace-pre-wrap text-sm text-gray-700">{generateEmailContent()}</div>
-               </div>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: SENT LOG */}
-          <div className="space-y-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="font-semibold mb-4">Sent History ({sentEmails.length})</h2>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {sentEmails.length === 0 && <p className="text-gray-400 text-sm italic">No history yet.</p>}
-                {sentEmails.map(email => (
-                  <div key={email.id} className="p-3 border rounded-lg text-sm">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-bold">{email.name}</p>
-                        <p className="text-gray-500 text-xs">{email.email}</p>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                  {bulkRows.map((row, idx) => (
+                    <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
+                      <div className="flex-1 min-w-[120px]">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Name</label>
+                        <input placeholder="Name" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.name} onChange={e => updateBulkRow(idx, 'name', e.target.value)} />
                       </div>
-                      <span className={`text-[10px] uppercase font-bold px-1 rounded ${email.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {email.status}
-                      </span>
+                      <div className="flex-[1.2] min-w-[150px]">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Email</label>
+                        <input placeholder="Email" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.email} onChange={e => updateBulkRow(idx, 'email', e.target.value)} />
+                      </div>
+                      <div className="flex-1 min-w-[100px]">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Role</label>
+                        <input placeholder="Role" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.role} onChange={e => updateBulkRow(idx, 'role', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Dept</label>
+                        <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.department} onChange={e => updateBulkRow(idx, 'department', e.target.value)}>
+                          <option value="IT">IT</option>
+                          <option value="NON-IT">NON-IT</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Type</label>
+                        <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.employmentType} onChange={e => updateBulkRow(idx, 'employmentType', e.target.value)}>
+                          <option value="">Type</option>
+                          <option value="FULL TIME">FT</option>
+                          <option value="INTERN">INT</option>
+                          <option value="CONTRACT">CON</option>
+                        </select>
+                      </div>
+                      {row.employmentType && (
+                        <div className="w-20">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Sal</label>
+                          <input type="number" placeholder="Amt" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.salary} onChange={e => updateBulkRow(idx, 'salary', e.target.value)} />
+                        </div>
+                      )}
+                      <button onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== idx))} className="mb-1 p-2 text-slate-300 hover:text-red-500 transition-colors">
+                        <X size={18} />
+                      </button>
                     </div>
-                    <div className="mt-2 flex gap-2">
-                      <button onClick={() => handleResend(email)} className="text-blue-600 flex items-center"><RefreshCw size={12} className="mr-1"/> Resend</button>
-                      <button onClick={() => handleRevoke(email.id)} className="text-red-500 flex items-center"><Trash2 size={12} className="mr-1"/> Revoke</button>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={addBulkRow} className="flex-1 py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 font-bold hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 transition-all flex items-center justify-center gap-2">
+                    <Plus size={18} /> Add Employee Row
+                  </button>
+                  <button onClick={handleSendBulk} disabled={sending || !selectedCompany} className="flex-[2] py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-xl disabled:bg-slate-300">
+                    {sending ? "Blasting Emails..." : `Confirm & Send ${bulkRows.length} Invitations`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: REAL-TIME HISTORY */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[calc(100vh-100px)] sticky top-8">
+            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h2 className="font-black text-xl flex items-center gap-2 italic tracking-tighter"><History size={20} />Onboarding Logs</h2>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Employees Onboarding Status</p>
+              </div>
+              <button onClick={fetchHistory} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-all">
+                <RefreshCw size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50">
+              {sentHistory.length === 0 && (
+                <div className="text-center py-20">
+                  <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300"><History size={32} /></div>
+                  <p className="text-slate-400 text-sm font-medium">No invitations found in database.</p>
+                </div>
+              )}
+              {sentHistory.map((item) => (
+                <div key={item._id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-900 truncate">{item.name || 'Unnamed Employee'}</h4>
+                      <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium"><Mail size={10} /> {item.email}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
+                        item.status === 'revoked' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                      {item.status}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                      <Building2 size={12} className="text-blue-500" /> {item.company?.name || 'Unknown Company'}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                      <Briefcase size={12} /> {item.role} • <span className="text-blue-600">{item.department}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                      <span>{item.employmentType || 'FT'}</span>
+                      {item.salary && <span className="text-green-600 ml-2 flex items-center gap-1"><Banknote size={10} /> {item.salary}</span>}
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(item.invitedAt).toLocaleDateString()}</span>
+                    <button
+                      onClick={() => handleDelete(item._id)}
+                      className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                      title="Delete Permanently"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 bg-white border-t border-slate-100 text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">
+              Total Invitations: {sentHistory.length}
             </div>
           </div>
-
         </div>
+
       </div>
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+      `}</style>
     </div>
   );
 };

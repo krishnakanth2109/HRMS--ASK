@@ -1181,14 +1181,35 @@ const gradients = [
 
       {/* Profile Section */}
       <div className="flex flex-col md:flex-row items-center bg-gradient-to-r from-blue-100 to-blue-50 rounded-2xl shadow-lg p-6 mb-8 gap-6 relative">
-        <div className="relative group">
-          <img src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} alt="Profile" className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover" />
-          <div className="absolute bottom-1 right-1 flex gap-1">
-            <label htmlFor="profile-upload" className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 ${uploadingImage ? "opacity-50" : ""}`}> {uploadingImage ? <div className="animate-spin">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />} </label>
-            {profileImage && (<button onClick={handleDeleteProfilePic} className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"> <FaTrash size={14} /> </button>)}
-          </div>
-          <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
-        </div>
+<div className="flex flex-col items-center">
+  {/* Profile Image */}
+  <img 
+    src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} 
+    alt="Profile" 
+    className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover relative z-0" 
+  />
+  
+  {/* Action Buttons - Attached to bottom edge */}
+  <div className="flex justify-center gap-2 -mt-5 relative z-10"> 
+    <label 
+      htmlFor="profile-upload" 
+      className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg border-2 border-white ${uploadingImage ? "opacity-50" : ""}`}
+    > 
+      {uploadingImage ? <div className="animate-spin text-sm">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />} 
+    </label>
+
+    {profileImage && (
+      <button 
+        onClick={handleDeleteProfilePic} 
+        className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg border-2 border-white"
+      > 
+        <FaTrash size={14} /> 
+      </button>
+    )}
+  </div>
+  
+  <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
+</div>
 
         <div className="flex-1 w-full">
           <div className="flex justify-between items-start w-full">

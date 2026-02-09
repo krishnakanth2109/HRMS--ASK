@@ -51,12 +51,12 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const [selectedDept, setSelectedDept] = useState("All");
-  
+
   // --- NEW STATE FOR MONTHLY FILTER ---
   const [viewMode, setViewMode] = useState("week"); // Options: 'week', 'month'
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // Format YYYY-MM
 
-  const [currentWeek, setCurrentWeek] = useState(0); 
+  const [currentWeek, setCurrentWeek] = useState(0);
   const [weeklyAttendanceData, setWeeklyAttendanceData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
 
@@ -68,7 +68,8 @@ const AdminDashboard = () => {
 
   // ✅ NEW STATES FOR TEAM DATA
   const [loadingTeamData, setLoadingTeamData] = useState(false);
-  const [todaysBirthdays, setTodaysBirthdays] = useState([]);
+  const [monthlyBirthdays, setMonthlyBirthdays] = useState([]);
+
   const [onLeaveToday, setOnLeaveToday] = useState([]);
   const [remoteWorkers, setRemoteWorkers] = useState([]);
   const [officeConfig, setOfficeConfig] = useState(null);
@@ -150,22 +151,37 @@ const AdminDashboard = () => {
       setOfficeConfig(configData);
       setIsGlobalWFH(configData?.globalWorkMode === 'WFH');
 
-      // --- LOGIC 1: BIRTHDAYS ---
-      const today = new Date();
-      const todayMonth = today.getMonth() + 1;
-      const todayDate = today.getDate();
+      // --- LOGIC 1: UPCOMING BIRTHDAYS THIS MONTH ---
+ // --- LOGIC 1: UPCOMING BIRTHDAYS THIS MONTH (ACTIVE EMPLOYEES ONLY) ---
+const today = new Date();
+const currentMonth = today.getMonth();
+const todayDate = today.getDate();
 
-      const birthdays = allEmployees.filter(emp => {
-        if (!emp.personalDetails?.dob) return false;
-        const dob = new Date(emp.personalDetails.dob);
-        return (dob.getMonth() + 1) === todayMonth && dob.getDate() === todayDate;
-      }).map(emp => ({
-        name: emp.name,
-        employeeId: emp.employeeId,
-        department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
-        role: emp.role || emp.experienceDetails?.[0]?.role || "N/A"
-      }));
-      setTodaysBirthdays(birthdays);
+const birthdays = allEmployees
+  .filter(emp => {
+    // ✅ ADD THIS CHECK: Only include active employees (isActive !== false)
+    if (emp.isActive === false) return false;
+    if (!emp.personalDetails?.dob) return false;
+
+    const dob = new Date(emp.personalDetails.dob);
+    return dob.getMonth() === currentMonth && dob.getDate() >= todayDate;
+  })
+  .map(emp => {
+    const dob = new Date(emp.personalDetails.dob);
+    return {
+      name: emp.name,
+      employeeId: emp.employeeId,
+      department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
+      role: emp.role || emp.experienceDetails?.[0]?.role || "N/A",
+      dobDay: dob.getDate(),
+      dobMonth: dob.getMonth()
+    };
+  })
+  // Sort by upcoming date
+  .sort((a, b) => a.dobDay - b.dobDay);
+
+setMonthlyBirthdays(birthdays);
+
 
       // --- LOGIC 2: ON LEAVE TODAY ---
       const employeeMap = new Map();
@@ -178,7 +194,7 @@ const AdminDashboard = () => {
         });
       });
 
-      const todayStart = new Date(); 
+      const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       const todayLeaves = allLeaves.filter(leave => {
@@ -194,27 +210,27 @@ const AdminDashboard = () => {
         const empDetails = employeeMap.get(leave.employeeId) || {
           name: leave.employeeName || "Unknown",
           employeeId: leave.employeeId,
-          department: "N/A", 
+          department: "N/A",
           role: "N/A"
         };
-        return { 
-          ...empDetails, 
-          leaveType: leave.leaveType || "Casual", 
-          leaveReason: leave.reason 
+        return {
+          ...empDetails,
+          leaveType: leave.leaveType || "Casual",
+          leaveReason: leave.reason
         };
       });
-      
+
       // Unique leaves
       setOnLeaveToday(Array.from(new Map(onLeave.map(item => [item.employeeId, item])).values()));
 
       // --- LOGIC 3: REMOTE WORKERS ---
       const currentGlobalMode = configData.globalWorkMode || 'WFO';
       const currentDay = today.getDay();
-      
+
       let remoteList = [];
       empModes.forEach(emp => {
         const basicInfo = employeeMap.get(emp.employeeId);
-        if(!basicInfo) return;
+        if (!basicInfo) return;
 
         let effectiveMode = currentGlobalMode;
         if (emp.ruleType === "Permanent") {
@@ -337,9 +353,9 @@ const AdminDashboard = () => {
 
       const offset = loopDate.getTimezoneOffset() * 60000;
       const dateStr = new Date(loopDate.getTime() - offset).toISOString().slice(0, 10);
-      
+
       // Short day name for week view, Date number for month view to save space
-      const dayName = viewMode === 'week' 
+      const dayName = viewMode === 'week'
         ? loopDate.toLocaleDateString('en-US', { weekday: 'short' })
         : loopDate.getDate().toString();
 
@@ -482,42 +498,42 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 font-sans text-gray-800">
-      
+
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        
+
         {/* 1. Today's Attendance Overview */}
-        <div 
+        <div
           className="bg-white rounded-xl shadow-md p-4 cursor-pointer hover:shadow-lg transition-all duration-200 border border-blue-700 border-l-4"
           onClick={() => navigate("/admin/today-overview")}
         >
           <div className="flex justify-between items-center mb-3">
-             <h3 className="text-gray-700 font-bold text-base">Today's Attendance</h3>
-             <FaClock className="text-blue-500 w-5 h-5" />
+            <h3 className="text-gray-700 font-bold text-base">Today's Attendance</h3>
+            <FaClock className="text-blue-500 w-5 h-5" />
           </div>
           <div className="grid grid-cols-3 gap-3">
-             <div className="flex flex-col items-center justify-center bg-green-50 rounded-lg py-2 border border-green-100">
-                <span className="text-2xl font-bold text-green-600 leading-none">{todayCounts.present}</span>
-                <span className="text-xs font-semibold text-green-700 mt-1">Present</span>
-             </div>
-             <div className="flex flex-col items-center justify-center bg-red-50 rounded-lg py-2 border border-red-100">
-                <span className="text-2xl font-bold text-red-600 leading-none">{todayCounts.notLoggedIn}</span>
-                <span className="text-xs font-semibold text-red-700 mt-1">Absent</span>
-             </div>
-             <div className="flex flex-col items-center justify-center bg-amber-50 rounded-lg py-2 border border-amber-100">
-                <span className="text-2xl font-bold text-amber-600 leading-none">{todayCounts.onLeave}</span>
-                <span className="text-xs font-semibold text-amber-700 mt-1">Leave</span>
-             </div>
+            <div className="flex flex-col items-center justify-center bg-green-50 rounded-lg py-2 border border-green-100">
+              <span className="text-2xl font-bold text-green-600 leading-none">{todayCounts.present}</span>
+              <span className="text-xs font-semibold text-green-700 mt-1">Present</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-red-50 rounded-lg py-2 border border-red-100">
+              <span className="text-2xl font-bold text-red-600 leading-none">{todayCounts.notLoggedIn}</span>
+              <span className="text-xs font-semibold text-red-700 mt-1">Absent</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-amber-50 rounded-lg py-2 border border-amber-100">
+              <span className="text-2xl font-bold text-amber-600 leading-none">{todayCounts.onLeave}</span>
+              <span className="text-xs font-semibold text-amber-700 mt-1">Leave</span>
+            </div>
           </div>
           <div className="mt-3 flex justify-end">
-             <span className="text-[10px] font-bold text-blue-500 flex items-center gap-1 hover:underline">
-               Details <FaArrowRight className="w-2.5 h-2.5" />
-             </span>
+            <span className="text-[10px] font-bold text-blue-500 flex items-center gap-1 hover:underline">
+              Details <FaArrowRight className="w-2.5 h-2.5" />
+            </span>
           </div>
         </div>
 
         {/* 2. Total Employees - Added Border Left */}
-        <div 
+        <div
           className="bg-white rounded-xl shadow-md border border-pink-500 border-l-4 border-blue-600 p-5 cursor-pointer hover:shadow-lg transition-all flex items-center justify-between"
           onClick={() => navigate("/employees")}
         >
@@ -531,11 +547,11 @@ const AdminDashboard = () => {
         </div>
 
         {/* 3. Leave Approvals - Added Border Left */}
-        <div 
+        <div
           className="bg-white rounded-xl shadow-md border border-gray-100 border-l-4 border-purple-600 p-5 cursor-pointer hover:shadow-lg transition-all flex items-center justify-between"
           onClick={() => navigate("/admin/admin-Leavemanage", { state: { defaultStatus: "Pending" } })}
         >
-           <div>
+          <div>
             <p className="text-gray-500 text-sm font-semibold mb-1">Leave Request</p>
             <h3 className="text-3xl font-extrabold text-gray-800">{statCards.pendingLeaves}</h3>
           </div>
@@ -546,7 +562,7 @@ const AdminDashboard = () => {
 
         {/* 4. Departments - Added Border Left */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 border-l-4 border-orange-600 p-5 flex items-center justify-between">
-           <div>
+          <div>
             <p className="text-gray-500 text-sm font-semibold mb-1">Departments</p>
             <h3 className="text-3xl font-extrabold text-gray-800">{statCards.totalDepartments}</h3>
           </div>
@@ -558,14 +574,14 @@ const AdminDashboard = () => {
 
       {/* Navigation & Filters (UPDATED) */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
-        
+
         {/* Left Side: Type Selector & Date Navigation */}
         <div className="flex flex-wrap items-center gap-3">
-          
+
           {/* View Mode Dropdown */}
-          <select 
-            value={viewMode} 
-            onChange={(e) => setViewMode(e.target.value)} 
+          <select
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
             className="border border-gray-300 px-3 py-2 rounded-lg font-medium text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
           >
             <option value="week">Weekly</option>
@@ -606,15 +622,15 @@ const AdminDashboard = () => {
           ) : (
             // Monthly Navigation
             <div className="flex items-center gap-2">
-              <input 
-                type="month" 
+              <input
+                type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 max={new Date().toISOString().slice(0, 7)}
                 className="border border-gray-300 px-3 py-2 rounded-lg font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none"
               />
               <span className="text-xs text-gray-500 ml-1">
-                 ({formatWeekRange(weekDates.start, weekDates.end)})
+                ({formatWeekRange(weekDates.start, weekDates.end)})
               </span>
             </div>
           )}
@@ -704,16 +720,16 @@ const AdminDashboard = () => {
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
                   <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
+                  <YAxis
+                    dataKey="name"
+                    type="category"
                     width={100}
                     tick={{ fill: '#4b5563', fontSize: 12, fontWeight: 500 }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip 
-                    cursor={{fill: 'transparent'}}
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                   />
                   <Bar dataKey="employees" barSize={20} radius={[0, 4, 4, 0]}>
@@ -730,7 +746,7 @@ const AdminDashboard = () => {
 
       {/* ✅ NEW TEAM OVERVIEW SECTION */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* 🎂 Today's Birthdays */}
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -738,39 +754,52 @@ const AdminDashboard = () => {
               <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
                 <FaBirthdayCake className="text-xl" />
               </div>
-              <h3 className="font-bold text-gray-800">Today's Birthdays</h3>
+              <h3 className="font-bold text-gray-800">Upcoming Birthdays</h3>
+
             </div>
             <span className="bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full">
-              {todaysBirthdays.length}
+              {monthlyBirthdays.length}
+
             </span>
           </div>
-          
+
           {loadingTeamData ? (
             <div className="flex items-center justify-center h-24">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
             </div>
-          ) : todaysBirthdays.length > 0 ? (
+          ) : monthlyBirthdays.length > 0 ? (
+
             <div className="space-y-3">
-              {todaysBirthdays.slice(0, 5).map((person, index) => (
+              {monthlyBirthdays.slice(0, 5).map((person, index) => (
+
                 <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-pink-500 flex items-center justify-center text-white font-bold">
                     {person.name.charAt(0)}
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-gray-800">{person.name}</p>
-                    <p className="text-xs text-gray-500">{person.department} • {person.role}</p>
+                    <p className="text-xs text-gray-500">
+                      {person.department} • {person.role}
+                    </p>
+                    <p className="text-xs font-semibold text-orange-600">
+                      🎂 {person.dobDay}/{person.dobMonth + 1}
+
+                    </p>
+
                   </div>
                 </div>
               ))}
-              {todaysBirthdays.length > 5 && (
+              {monthlyBirthdays.length > 5 && (
                 <p className="text-center text-sm text-gray-500 mt-2">
-                  +{todaysBirthdays.length - 5} more birthdays today
+                  +{monthlyBirthdays.length - 5} more birthdays this month
                 </p>
               )}
+
             </div>
           ) : (
             <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <p className="text-gray-400">No birthdays today</p>
+              No upcoming birthdays this month
+
             </div>
           )}
         </div>
@@ -788,7 +817,7 @@ const AdminDashboard = () => {
               {onLeaveToday.length}
             </span>
           </div>
-          
+
           {loadingTeamData ? (
             <div className="flex items-center justify-center h-24">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -844,7 +873,7 @@ const AdminDashboard = () => {
               )}
             </div>
           </div>
-          
+
           {loadingTeamData ? (
             <div className="flex items-center justify-center h-24">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
@@ -861,7 +890,7 @@ const AdminDashboard = () => {
             <div>
               <div className="flex -space-x-3 mb-4">
                 {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 6)).map((worker, index) => (
-                  <div 
+                  <div
                     key={index}
                     className="relative group"
                     title={`${worker.name} (${worker.department})`}
@@ -922,7 +951,7 @@ const AdminDashboard = () => {
           </div>
           <p className="text-sm text-gray-500">Navigate to frequently used admin sections</p>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action, index) => (
             <button

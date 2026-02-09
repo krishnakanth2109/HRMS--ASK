@@ -34,6 +34,8 @@ import messageRoutes from "./routes/messageRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import payrollRoutes from "./routes/payroll.js";
 import mailRoutes from "./routes/mailRoutes.js"; // Import the new route
+import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
+
 // -------------------- APP SETUP --------------------
 const app = express();
 const server = http.createServer(app);
@@ -159,6 +161,9 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/mail", mailRoutes);
+app.use("/api/invited-employees", invitedEmployeeRoutes);
+
+
 // -------------------- 404 --------------------
 app.use("*", (req, res) => {
   res.status(404).json({ success: false, message: "API route not found" });

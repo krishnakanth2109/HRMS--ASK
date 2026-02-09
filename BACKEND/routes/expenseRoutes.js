@@ -1,5 +1,7 @@
 import express from 'express';
 import Expense from '../models/Expense.js';
+import Employee from "../models/employeeModel.js"; // Added missing import
+import Company from "../models/CompanyModel.js";   // Added missing import
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
@@ -24,7 +26,6 @@ const storage = new CloudinaryStorage({
       folder: 'expense-receipts',
       allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
       resource_type: 'auto',
-      // Remove transformation for faster upload - do it client-side or async
       public_id: `receipt_${Date.now()}_${Math.random().toString(36).substring(7)}`,
     };
   }
@@ -46,52 +47,33 @@ const upload = multer({
   }
 });
 
+/* ==============================================================
+==============
+ 📁 1. EXPENSE MANAGEMENT ROUTES
+=================================================================
+=========== */
+
 // --- POST Route: Add Expense ---
 router.post('/add', (req, res) => {
   upload.single('receipt')(req, res, async (err) => {
-    // Handle multer errors
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'File too large. Maximum size is 5MB.' 
-        });
+        return res.status(400).json({ success: false, message: 'File too large. Maximum size is 5MB.' });
       }
-      return res.status(400).json({ 
-        success: false, 
-        message: `Upload error: ${err.message}` 
-      });
+      return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
     } else if (err) {
-      return res.status(400).json({ 
-        success: false, 
-        message: err.message 
-      });
+      return res.status(400).json({ success: false, message: err.message });
     }
 
     try {
-      const { 
-        category, 
-        amount, 
-        date, 
-        description, 
-        employeeId,
-        employeeCustomId, 
-        employeeName 
-      } = req.body;
+      const { category, amount, date, description, employeeId, employeeCustomId, employeeName } = req.body;
 
-      // Validate required fields
       if (!employeeId || !employeeCustomId || !employeeName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee information is required'
-        });
+        return res.status(400).json({ success: false, message: 'Employee information is required' });
       }
 
       if (!category || !amount || !date) {
-        return res.status(400).json({
-          success: false,
-          message: 'Category, amount, and date are required'
-        });
+        return res.status(400).json({ success: false, message: 'Category, amount, and date are required' });
       }
 
       const newExpense = new Expense({
@@ -105,33 +87,17 @@ router.post('/add', (req, res) => {
         receiptUrl: req.file ? req.file.path : null,
         receiptPublicId: req.file ? req.file.filename : null,
         status: 'Pending'
-        // actionDate will be set when approved/rejected
       });
 
       const savedExpense = await newExpense.save();
-
-      res.status(201).json({
-        success: true,
-        message: 'Expense submitted successfully.',
-        data: savedExpense
-      });
+      res.status(201).json({ success: true, message: 'Expense submitted successfully.', data: savedExpense });
 
     } catch (error) {
       console.error('Error adding expense:', error);
-      
-      // If we uploaded a file but DB save failed, delete it from Cloudinary
       if (req.file && req.file.filename) {
-        try {
-          await cloudinary.uploader.destroy(req.file.filename);
-        } catch (deleteError) {
-          console.error('Error deleting orphaned file:', deleteError);
-        }
+        try { await cloudinary.uploader.destroy(req.file.filename); } catch (deleteError) { console.error('Error deleting orphaned file:', deleteError); }
       }
-      
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server Error: ' + error.message 
-      });
+      res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
     }
   });
 });
@@ -140,195 +106,142 @@ router.post('/add', (req, res) => {
 router.get('/employee/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-
-    if (!employeeId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Employee ID is required' 
-      });
-    }
-
-    // Find expenses matching the ID, sort by newest date first
-    const expenses = await Expense.find({ employeeId })
-      .sort({ date: -1 });
-
-    res.status(200).json({
-      success: true,
-      count: expenses.length,
-      data: expenses
-    });
-
+    if (!employeeId) return res.status(400).json({ success: false, message: 'Employee ID is required' });
+    const expenses = await Expense.find({ employeeId }).sort({ date: -1 });
+    res.status(200).json({ success: true, count: expenses.length, data: expenses });
   } catch (error) {
-    console.error('Error fetching expenses:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error: ' + error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
   }
 });
 
-// --- ADMIN ROUTE: Get ALL Expenses (sorted by Pending first, then Date) ---
+// --- ADMIN ROUTE: Get ALL Expenses ---
 router.get('/all', async (req, res) => {
   try {
-    // Fetch all expenses
-    const expenses = await Expense.find().sort({ 
-      status: 1,
-      date: -1 
-    });
-
-    // Custom sort to force 'Pending' to the top
+    const expenses = await Expense.find().sort({ status: 1, date: -1 });
     const sortedExpenses = expenses.sort((a, b) => {
       if (a.status === 'Pending' && b.status !== 'Pending') return -1;
       if (a.status !== 'Pending' && b.status === 'Pending') return 1;
       return new Date(b.date) - new Date(a.date);
     });
-
-    res.status(200).json({ 
-      success: true, 
-      count: sortedExpenses.length,
-      data: sortedExpenses 
-    });
+    res.status(200).json({ success: true, count: sortedExpenses.length, data: sortedExpenses });
   } catch (error) {
-    console.error('Error fetching all expenses:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error: ' + error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
   }
 });
 
-// --- ADMIN ROUTE: Update Expense Status (Approve/Reject) ---
+// --- ADMIN ROUTE: Update Expense Status ---
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     if (!['Approved', 'Rejected'].includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid status. Must be "Approved" or "Rejected"' 
-      });
+      return res.status(400).json({ success: false, message: 'Invalid status.' });
     }
-
-    const updateData = { 
-      status: status,
-      actionDate: new Date() // Set action date when status changes
-    };
-
-    const updatedExpense = await Expense.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
-
-    if (!updatedExpense) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Expense not found' 
-      });
-    }
-
-    res.status(200).json({ 
-      success: true, 
-      message: `Expense marked as ${status}`, 
-      data: updatedExpense 
-    });
-
+    const updatedExpense = await Expense.findByIdAndUpdate(id, { status: status, actionDate: new Date() }, { new: true });
+    if (!updatedExpense) return res.status(404).json({ success: false, message: 'Expense not found' });
+    res.status(200).json({ success: true, message: `Expense marked as ${status}`, data: updatedExpense });
   } catch (error) {
-    console.error('Error updating status:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error: ' + error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
   }
 });
 
-// --- DELETE Route: Delete an Expense (Optional - Admin only) ---
+// --- DELETE Route: Delete an Expense ---
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
     const expense = await Expense.findById(id);
-
-    if (!expense) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Expense not found' 
-      });
-    }
-
-    // Delete receipt from Cloudinary if it exists
+    if (!expense) return res.status(404).json({ success: false, message: 'Expense not found' });
     if (expense.receiptPublicId) {
-      try {
-        await cloudinary.uploader.destroy(expense.receiptPublicId);
-      } catch (cloudinaryError) {
-        console.error('Error deleting file from Cloudinary:', cloudinaryError);
-        // Continue with expense deletion even if Cloudinary deletion fails
-      }
+      try { await cloudinary.uploader.destroy(expense.receiptPublicId); } catch (e) {}
     }
-
     await Expense.findByIdAndDelete(id);
-
-    res.status(200).json({ 
-      success: true, 
-      message: 'Expense deleted successfully' 
-    });
-
+    res.status(200).json({ success: true, message: 'Expense deleted successfully' });
   } catch (error) {
-    console.error('Error deleting expense:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error: ' + error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
   }
 });
 
 /* ==============================================================
 ==============
- 🚀 3. PUBLIC ONBOARDING (No Auth Required)
+ 🚀 2. PUBLIC ONBOARDING (Updated to structure experienceDetails)
 =================================================================
 =========== */
+
 router.post("/onboard", async (req, res) => {
   try {
+    const { 
+      company: companyId, 
+      currentRole, 
+      currentDepartment, 
+      currentSalary, 
+      joiningDate, 
+      employmentType,
+      ...otherDetails 
+    } = req.body;
+
     // 1. Validate Company existence
-    if (!req.body.company) {
+    if (!companyId) {
       return res.status(400).json({ error: "Company selection is required" });
     }
 
-    const company = await Company.findById(req.body.company);
+    const company = await Company.findById(companyId);
     if (!company) {
       return res.status(404).json({ error: "Selected company not found" });
     }
 
-    // 2. Generate Employee ID
-    const currentCount = await Employee.countDocuments({ company: req.body.company });
+    // 2. Generate Employee ID (Prefix + padded count)
+    const currentCount = await Employee.countDocuments({ company: companyId });
     const paddedCount = String(currentCount + 1).padStart(2, "0");
-    req.body.employeeId = `${company.prefix}${paddedCount}`;
+    const generatedId = `${company.prefix}${paddedCount}`;
 
-    // Update company count
-    company.employeeCount = currentCount + 1;
+    // 3. Structure Experience Details exactly like AddEmployee
+    const experienceEntry = {
+      company: company.name,
+      role: currentRole,
+      department: currentDepartment,
+      years: 0,
+      joiningDate: joiningDate,
+      lastWorkingDate: "Present",
+      salary: Number(currentSalary) || 0,
+      employmentType: employmentType || "Full-Time",
+    };
+
+    // 4. Create Employee Object with structured array
+    const employeeData = {
+      ...otherDetails,
+      employeeId: generatedId,
+      company: companyId,
+      companyName: company.name,
+      companyPrefix: company.prefix,
+      role: "employee",
+      isActive: true,
+      status: "Active",
+      experienceDetails: [experienceEntry] // Put the mapped fields inside the array
+    };
+
+    const employee = new Employee(employeeData);
+    const result = await employee.save();
+
+    // 5. Update Company Employee Count
+    company.employeeCount = await Employee.countDocuments({ company: companyId });
     await company.save();
 
-    // 3. Set default fields
-    req.body.role = "employee";
-    req.body.isActive = true;
-    
-    // 4. Create Employee
-    const employee = new Employee(req.body);
-    const result = await employee.save();
-    
-    res.status(201).json({ message: "Onboarding successful", employeeId: result.employeeId });
+    res.status(201).json({ 
+      message: "Onboarding successful", 
+      employeeId: result.employeeId,
+      employee: result 
+    });
 
   } catch (err) {
     console.error("❌ Onboarding error:", err);
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       return res.status(400).json({
-        error: `Duplicate value entered for ${field}.`,
+        error: `Duplicate value entered for ${field}. Please try again.`,
         field: field
       });
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Onboarding failed: " + err.message });
   }
 });
 

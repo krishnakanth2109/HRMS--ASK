@@ -826,7 +826,7 @@ const EmployeeManagement = () => {
       onClick={() => navigate("/admin/onboarding-email")}
       className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105"
     >
-      <FaUser /> Send Onboarding Link
+      <FaUser />Onboarding Invitation
     </button>
 
     <button
