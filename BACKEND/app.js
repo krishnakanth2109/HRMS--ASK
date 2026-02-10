@@ -61,11 +61,13 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true,
   },
+  // Optimization: Allow WebSocket transport explicitly for faster connections
+  transports: ['websocket', 'polling'], 
   pingTimeout: 60000,
   pingInterval: 25000,
 });
 
-// Make io and userSocketMap available to routes
+// Make io and userSocketMap available to routes (Critical for api/chat routes)
 app.set("io", io);
 app.set("userSocketMap", userSocketMap);
 
@@ -98,7 +100,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle sending messages
+  // Handle sending messages (Socket-only approach)
+  // Note: The new chat.js route also handles emission via API
   socket.on("send_message", (messageData) => {
     const { receiverId, message, sender } = messageData;
     const receiverSocketId = userSocketMap.get(receiverId?.toString());
@@ -230,7 +233,12 @@ app.use((req, res, next) => {
 
 // -------------------- DATABASE --------------------
 mongoose
-  .connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
+  .connect(process.env.MONGO_URI, { 
+    serverSelectionTimeoutMS: 10000,
+    // Optimization: Connection Pooling for Production
+    maxPoolSize: 10, 
+    minPoolSize: 2
+  })
   .then(async () => {
     console.log("✅ MongoDB Connected");
 

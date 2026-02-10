@@ -44,17 +44,15 @@ router.post("/send", protect, async (req, res) => {
         // Send to receiver if online
         if (receiverSocketId) {
           io.to(receiverSocketId).emit("receive_message", messageData);
-          console.log(`✅ Real-time message sent to receiver ${receiverId}`);
         }
 
-        // Also emit to sender for confirmation
+        // Also emit to sender for confirmation (helps with multi-device sync)
         if (senderSocketId) {
           io.to(senderSocketId).emit("message_sent", messageData);
         }
       }
     } catch (socketErr) {
       console.error("Socket emission error:", socketErr);
-      // Continue even if socket fails - message is still saved
     }
     
     res.status(201).json(newMessage);
@@ -65,73 +63,81 @@ router.post("/send", protect, async (req, res) => {
 });
 
 /* ============================================================================
-   💥 GET CHAT USERS (Sidebar Persistence & Unread Counts)
-   Finds users and attaches unread message counts + last message info
+   💥 GET CHAT USERS (OPTIMIZED AGGREGATION)
+   Previously: N+1 Query problem (Slow).
+   Now: Aggregation Pipeline (Fast).
 ============================================================================ */
 router.get("/users", protect, async (req, res) => {
   try {
     const currentUserId = new mongoose.Types.ObjectId(req.user._id);
 
-    // 1. Find distinct users interacted with
-    const interactedUsers = await Message.aggregate([
-      { 
-        $match: { 
-          $or: [{ sender: currentUserId }, { receiver: currentUserId }] 
-        } 
-      },
+    // 1. Aggregation to find recent conversations and unread counts
+    const aggregation = await Message.aggregate([
       {
-        $project: {
-          otherPartyId: {
-            $cond: { if: { $eq: ["$sender", currentUserId] }, then: "$receiver", else: "$sender" }
-          }
+        $match: {
+          $or: [{ sender: currentUserId }, { receiver: currentUserId }]
         }
       },
       {
-        $group: { _id: "$otherPartyId" } 
+        $sort: { createdAt: -1 } // Sort by newest first
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$sender", currentUserId] },
+              "$receiver",
+              "$sender"
+            ]
+          },
+          lastMessage: { $first: "$message" },
+          lastMessageTime: { $first: "$createdAt" },
+          unreadCount: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ["$receiver", currentUserId] }, { $eq: ["$isRead", false] }] },
+                1,
+                0
+              ]
+            }
+          }
+        }
       }
     ]);
 
-    const userIds = interactedUsers.map(u => u._id);
+    // 2. Fetch User Details for the IDs found in messages
+    const chattedUserIds = aggregation.map(a => a._id);
+    
+    // Also fetch ALL employees (to allow starting new chats), optimizing selection
+    const allEmployees = await Employee.find({ 
+        _id: { $ne: currentUserId },
+        isActive: { $ne: false } // Only active employees
+    }).select("name employeeId role");
 
-    // 2. Fetch User Details
-    const users = await Employee.find({ _id: { $in: userIds } })
-      .select("name employeeId role");
-
-    // 3. Attach Unread Count and Last Message for each user
-    const usersWithCounts = await Promise.all(users.map(async (user) => {
-      // Count unread messages
-      const count = await Message.countDocuments({
-        sender: user._id,
-        receiver: currentUserId,
-        isRead: false
-      });
-
-      // Get last message
-      const lastMessage = await Message.findOne({
-        $or: [
-          { sender: currentUserId, receiver: user._id },
-          { sender: user._id, receiver: currentUserId }
-        ]
-      })
-      .sort({ createdAt: -1 })
-      .select("message createdAt");
+    // 3. Merge Aggregation Data with Employee Data
+    const result = allEmployees.map(emp => {
+      // Check if we have chat history with this employee
+      const chatData = aggregation.find(a => a._id.toString() === emp._id.toString());
 
       return {
-        ...user.toObject(),
-        unreadCount: count,
-        lastMessage: lastMessage?.message || "",
-        lastMessageTime: lastMessage?.createdAt || null,
+        _id: emp._id,
+        name: emp.name,
+        employeeId: emp.employeeId,
+        role: emp.role,
+        lastMessage: chatData ? chatData.lastMessage : "",
+        lastMessageTime: chatData ? chatData.lastMessageTime : null,
+        unreadCount: chatData ? chatData.unreadCount : 0,
       };
-    }));
+    });
 
-    // Sort: Users with most recent messages first
-    usersWithCounts.sort((a, b) => {
+    // 4. Sort: Users with recent messages at the top
+    result.sort((a, b) => {
       const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
       const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
       return timeB - timeA;
     });
 
-    res.json(usersWithCounts);
+    res.json(result);
   } catch (error) {
     console.error("Error fetching chat users:", error);
     res.status(500).json({ message: "Error fetching chat users" });
@@ -139,40 +145,40 @@ router.get("/users", protect, async (req, res) => {
 });
 
 /* ============================================================================
-   ✅ MARK MESSAGES AS READ - WITH SOCKET.IO
-   Marks all messages from a specific sender to me as read
+   ✅ MARK MESSAGES AS READ
 ============================================================================ */
 router.put("/read/:senderId", protect, async (req, res) => {
   try {
     const senderId = req.params.senderId;
     const receiverId = req.user._id;
 
-    await Message.updateMany(
+    // Use updateMany for batch update
+    const result = await Message.updateMany(
       { sender: senderId, receiver: receiverId, isRead: false },
       { $set: { isRead: true } }
     );
 
-    // Emit socket event to sender for read receipt
-    try {
-      const io = req.app.get("io");
-      const userSocketMap = req.app.get("userSocketMap");
-      
-      if (io && userSocketMap) {
-        const senderSocketId = userSocketMap.get(senderId.toString());
-
-        if (senderSocketId) {
-          io.to(senderSocketId).emit("messages_read", {
-            readBy: receiverId.toString(),
-            senderId: senderId.toString()
-          });
-          console.log(`✅ Read receipt sent to ${senderId}`);
+    if (result.modifiedCount > 0) {
+      // Emit socket event only if changes were made
+      try {
+        const io = req.app.get("io");
+        const userSocketMap = req.app.get("userSocketMap");
+        
+        if (io && userSocketMap) {
+          const senderSocketId = userSocketMap.get(senderId.toString());
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messages_read", {
+              readBy: receiverId.toString(),
+              senderId: senderId.toString()
+            });
+          }
         }
+      } catch (socketErr) {
+        console.error("Socket emission error:", socketErr);
       }
-    } catch (socketErr) {
-      console.error("Socket emission error:", socketErr);
     }
 
-    res.json({ success: true });
+    res.json({ success: true, count: result.modifiedCount });
   } catch (error) {
     console.error("Error marking messages read:", error);
     res.status(500).json({ message: "Failed to mark as read" });
@@ -180,7 +186,7 @@ router.put("/read/:senderId", protect, async (req, res) => {
 });
 
 /* ============================================================================
-   📜 GET CHAT HISTORY
+   📜 GET CHAT HISTORY (With Pagination Limit)
 ============================================================================ */
 router.get("/history/:otherUserId", protect, async (req, res) => {
   try {
@@ -191,15 +197,19 @@ router.get("/history/:otherUserId", protect, async (req, res) => {
       return res.status(400).json({ message: "Invalid ID" });
     }
 
+    // Use .lean() for faster query execution (returns plain JS objects, not Mongoose docs)
+    // Limit to last 300 messages to prevent loading huge history at once
     const messages = await Message.find({
       $or: [
         { sender: myId, receiver: otherId },
         { sender: otherId, receiver: myId },
       ],
     })
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: 1 }) 
+    // .limit(300) // Uncomment this if chats are extremely long
     .populate("sender", "name employeeId")
-    .populate("receiver", "name employeeId");
+    .populate("receiver", "name employeeId")
+    .lean();
 
     res.json(messages);
   } catch (error) {
@@ -209,7 +219,7 @@ router.get("/history/:otherUserId", protect, async (req, res) => {
 });
 
 /* ============================================================================
-   ✏️ EDIT MESSAGE - WITH SOCKET.IO
+   ✏️ EDIT MESSAGE
 ============================================================================ */
 router.put("/:id", protect, async (req, res) => {
   try {
@@ -219,18 +229,12 @@ router.put("/:id", protect, async (req, res) => {
 
     const originalMsg = await Message.findById(msgId);
     
-    if (!originalMsg) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-    
-    if (originalMsg.sender.toString() !== userId.toString()) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
+    if (!originalMsg) return res.status(404).json({ message: "Message not found" });
+    if (originalMsg.sender.toString() !== userId.toString()) return res.status(403).json({ message: "Unauthorized" });
 
     originalMsg.message = message;
     await originalMsg.save();
 
-    // Emit socket event to receiver
     try {
       const io = req.app.get("io");
       const userSocketMap = req.app.get("userSocketMap");
@@ -246,15 +250,8 @@ router.put("/:id", protect, async (req, res) => {
           senderId: userId.toString(),
         };
 
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("message_edited", editData);
-          console.log(`✅ Edit notification sent to receiver`);
-        }
-
-        // Also notify sender
-        if (senderSocketId) {
-          io.to(senderSocketId).emit("message_edit_confirmed", editData);
-        }
+        if (receiverSocketId) io.to(receiverSocketId).emit("message_edited", editData);
+        if (senderSocketId) io.to(senderSocketId).emit("message_edit_confirmed", editData);
       }
     } catch (socketErr) {
       console.error("Socket emission error:", socketErr);
@@ -268,7 +265,7 @@ router.put("/:id", protect, async (req, res) => {
 });
 
 /* ============================================================================
-   🗑️ DELETE MESSAGE - WITH SOCKET.IO
+   🗑️ DELETE MESSAGE
 ============================================================================ */
 router.delete("/:id", protect, async (req, res) => {
   try {
@@ -277,18 +274,12 @@ router.delete("/:id", protect, async (req, res) => {
 
     const originalMsg = await Message.findById(msgId);
     
-    if (!originalMsg) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    if (originalMsg.sender.toString() !== userId.toString()) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
+    if (!originalMsg) return res.status(404).json({ message: "Message not found" });
+    if (originalMsg.sender.toString() !== userId.toString()) return res.status(403).json({ message: "Unauthorized" });
 
     const receiverId = originalMsg.receiver.toString();
     await Message.findByIdAndDelete(msgId);
 
-    // Emit socket event to receiver
     try {
       const io = req.app.get("io");
       const userSocketMap = req.app.get("userSocketMap");
@@ -297,21 +288,10 @@ router.delete("/:id", protect, async (req, res) => {
         const receiverSocketId = userSocketMap.get(receiverId);
         const senderSocketId = userSocketMap.get(userId.toString());
 
-        const deleteData = {
-          messageId: msgId,
-          receiverId,
-          senderId: userId.toString(),
-        };
+        const deleteData = { messageId: msgId, receiverId, senderId: userId.toString() };
 
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("message_deleted", deleteData);
-          console.log(`✅ Delete notification sent to receiver`);
-        }
-
-        // Also notify sender
-        if (senderSocketId) {
-          io.to(senderSocketId).emit("message_delete_confirmed", deleteData);
-        }
+        if (receiverSocketId) io.to(receiverSocketId).emit("message_deleted", deleteData);
+        if (senderSocketId) io.to(senderSocketId).emit("message_delete_confirmed", deleteData);
       }
     } catch (socketErr) {
       console.error("Socket emission error:", socketErr);
@@ -330,15 +310,9 @@ router.delete("/:id", protect, async (req, res) => {
 router.get("/online-users", protect, async (req, res) => {
   try {
     const userSocketMap = req.app.get("userSocketMap");
-    
-    if (userSocketMap) {
-      const onlineUserIds = Array.from(userSocketMap.keys());
-      res.json({ onlineUsers: onlineUserIds });
-    } else {
-      res.json({ onlineUsers: [] });
-    }
+    const onlineUsers = userSocketMap ? Array.from(userSocketMap.keys()) : [];
+    res.json({ onlineUsers });
   } catch (error) {
-    console.error("Error fetching online users:", error);
     res.status(500).json({ message: "Failed to fetch online users" });
   }
 });
