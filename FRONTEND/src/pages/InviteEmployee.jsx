@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote } from 'lucide-react';
+import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote  ,
+   CheckCircle, 
+  Clock, FileText } from 'lucide-react';
 import { getAllCompanies } from '../api';
 import api from '../api';
 
@@ -210,9 +212,9 @@ HR Team
                     <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Employment Type</label>
                     <select required value={singleData.employmentType} onChange={e => setSingleData({ ...singleData, employmentType: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-white">
                       <option value="">Select Type...</option>
-                      <option value="FULL TIME">FULL TIME</option>
-                      <option value="INTERN">INTERN</option>
-                      <option value="CONTRACT">CONTRACT</option>
+                      <option value="Full-time">Full-time</option>
+                      <option value="Intern">Intern</option>
+                      <option value="Contract">Contract</option>
                     </select>
                   </div>
                   {singleData.employmentType && (
@@ -305,45 +307,79 @@ HR Team
                   <p className="text-slate-400 text-sm font-medium">No invitations found in database.</p>
                 </div>
               )}
-              {sentHistory.map((item) => (
-                <div key={item._id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h4 className="font-bold text-slate-900 truncate">{item.name || 'Unnamed Employee'}</h4>
-                      <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium"><Mail size={10} /> {item.email}</p>
-                    </div>
-                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
-                        item.status === 'revoked' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                      {item.status}
-                    </span>
-                  </div>
+         {sentHistory.map((item) => (
+  <div key={item._id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
+    <div className="flex justify-between items-start mb-2">
+      <div className="flex-1">
+        <h4 className="font-bold text-slate-900 truncate">{item.name || 'Unnamed Employee'}</h4>
+        <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+          <Mail size={10} /> {item.email}
+        </p>
+      </div>
+      <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${
+        item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
+        item.status === 'revoked' ? 'bg-orange-100 text-orange-700' :
+        'bg-blue-100 text-blue-700'
+      }`}>
+        {item.status}
+      </span>
+    </div>
 
-                  <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                      <Building2 size={12} className="text-blue-500" /> {item.company?.name || 'Unknown Company'}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                      <Briefcase size={12} /> {item.role} • <span className="text-blue-600">{item.department}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                      <span>{item.employmentType || 'FT'}</span>
-                      {item.salary && <span className="text-green-600 ml-2 flex items-center gap-1"><Banknote size={10} /> {item.salary}</span>}
-                    </div>
-                  </div>
+    <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
+      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+        <Building2 size={12} className="text-blue-500" /> 
+        {item.company?.name || 'Unknown Company'}
+      </div>
+      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+        <Briefcase size={12} /> {item.role} • <span className="text-blue-600">{item.department}</span>
+      </div>
+      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+        <span>{item.employmentType || 'FT'}</span>
+        {item.salary && (
+          <span className="text-green-600 ml-2 flex items-center gap-1">
+            <Banknote size={10} /> {item.salary}
+          </span>
+        )}
+      </div>
+      
+      {/* NEW: Display policy status and dates */}
+  {/* NEW: Display policy status and dates */}
+<div className="flex items-center gap-2 text-[10px] font-bold mt-2 pt-2 border-t border-slate-200">
+  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] ${
+    item.policyStatus === 'accepted' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
+  }`}>
+    {item.policyStatus === 'accepted' ? <CheckCircle size={8} /> : <FileText size={8} />}
+    Policy: {item.policyStatus || 'not accepted'}
+  </span>
+  {item.onboardedAt && (
+    <span className="text-slate-500 flex items-center gap-1">
+      <CheckCircle size={8} />
+      Onboarded: {new Date(item.onboardedAt).toLocaleDateString()}
+    </span>
+  )}
+  {item.policyAcceptedAt && (
+    <span className="text-slate-500 flex items-center gap-1">
+      <Clock size={8} />
+      Policy: {new Date(item.policyAcceptedAt).toLocaleDateString()}
+    </span>
+  )}
+</div>
+    </div>
 
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(item.invitedAt).toLocaleDateString()}</span>
-                    <button
-                      onClick={() => handleDelete(item._id)}
-                      className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                      title="Delete Permanently"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+    <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+      <span className="text-[9px] font-bold text-slate-400 uppercase">
+        Invited: {new Date(item.invitedAt).toLocaleDateString()}
+      </span>
+      <button
+        onClick={() => handleDelete(item._id)}
+        className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+        title="Delete Permanently"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  </div>
+))}
             </div>
 
             <div className="p-4 bg-white border-t border-slate-100 text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">

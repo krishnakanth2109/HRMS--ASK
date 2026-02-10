@@ -80,6 +80,7 @@ const navLinks = [
 
   // 💰 FINANCE
   { to: "/admin/payroll", label: "Payroll", icon: <FaMoneyBillWave /> },
+  { to: "/admin/payrollcandidates", label: "Payroll Candidates", icon: <FaUserCheck /> },
   { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
 
   // 📢 COMMUNICATION
@@ -109,8 +110,8 @@ const navLinks = [
       },
       {
         to: "/admin/late-requests",
-        label: "Late Login Requests",
-        icon: <FaClock />,
+        label: "Attendance Adjustment",
+        icon:  <FaUserCheck />,
         isLateRequests: true,
       },
       {
@@ -124,12 +125,7 @@ const navLinks = [
         label: "Overtime Requests",
         icon: <FaBusinessTime />,
         isOvertime: true,
-      },
-      {
-        to: "/admin/attendance-requests",
-        label: "Attendance Requests",
-        icon: <FaUserCheck />,
-      },
+      }
     ],
   },
 ];

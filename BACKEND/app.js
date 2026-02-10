@@ -35,6 +35,8 @@ import expenseRoutes from "./routes/expenseRoutes.js";
 import payrollRoutes from "./routes/payroll.js";
 import mailRoutes from "./routes/mailRoutes.js"; // Import the new route
 import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
+import payrollcandidatesRoutes from "./routes/payrollcandidatesRoutes.js";
+
 
 // -------------------- APP SETUP --------------------
 const app = express();
@@ -162,6 +164,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/mail", mailRoutes);
 app.use("/api/invited-employees", invitedEmployeeRoutes);
+app.use('/api/payroll', payrollcandidatesRoutes);
 
 
 // -------------------- 404 --------------------

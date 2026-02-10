@@ -1,8 +1,21 @@
 import express from 'express';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
 import InvitedEmployee from '../models/Invitedemployee.js'; // Adjust path as needed
 import Company from '../models/CompanyModel.js'; // Adjust path as needed
 
 const router = express.Router();
+
+// --- CLOUDINARY CONFIG ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// --- MULTER CONFIG (Memory Storage) ---
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // --- INVITE SINGLE EMPLOYEE ---
 router.post('/invite', async (req, res) => {
@@ -287,6 +300,50 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to delete record' });
+  }
+});
+
+router.post('/complete-onboarding', upload.single('signature'), async (req, res) => {
+  // --- ADD THESE LOGS ---
+  console.log("--- ONBOARDING ATTEMPT ---");
+  console.log("Received Email:", req.body.email);
+  console.log("File Received:", req.file ? "YES" : "NO");
+
+  try {
+    const { email } = req.body;
+    
+    // Normalize the email
+    const searchEmail = email ? email.toLowerCase().trim() : "";
+
+    // 1. First, just check if the employee exists at all without updating
+    const checkUser = await InvitedEmployee.findOne({ email: searchEmail });
+    console.log("Database Lookup Result:", checkUser ? "FOUND" : "NOT FOUND");
+
+    if (!checkUser) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Employee with email ${searchEmail} not found in database.` 
+      });
+    }
+
+    // 2. Proceed with Cloudinary...
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    const cldRes = await cloudinary.uploader.upload(dataURI, { folder: "hrms_signatures" });
+
+    // 3. Update
+    checkUser.signatureUrl = cldRes.secure_url;
+    checkUser.policyStatus = 'accepted';
+    checkUser.policyAcceptedAt = new Date();
+    checkUser.status = 'onboarded';
+    checkUser.onboardedAt = new Date();
+    await checkUser.save();
+
+    res.status(200).json({ success: true, message: 'Onboarding completed successfully' });
+
+  } catch (error) {
+    console.error("Backend Error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

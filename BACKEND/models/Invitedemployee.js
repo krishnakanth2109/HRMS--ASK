@@ -33,7 +33,15 @@ const invitedEmployeeSchema = new mongoose.Schema({
   },
   onboardedAt: {
     type: Date
-  }
+  },
+  signatureUrl: { type: String }, 
+  policyStatus: { 
+    type: String, 
+    enum: ['accepted', 'not accepted'], 
+    default: 'not accepted' 
+  },
+  policyAcceptedAt: { type: Date },
+  
 }, {
   timestamps: true
 }

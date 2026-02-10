@@ -82,6 +82,7 @@ import PunchOutRequests from "./pages/PunchOutRequests";
 import WorkModeRequests from "./pages/WorkModeRequests";
 import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 import OnboardingEmailForm from "./pages/InviteEmployee";
+import PayrollManagement from "./pages/PayrollManagement";
 
 function App() {
   return (
@@ -162,6 +163,7 @@ function App() {
          <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
          <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
          <Route path="/admin/onboarding-email" element={<OnboardingEmailForm />} />
+          <Route path="/admin/payrollcandidates" element={<PayrollManagement />} />
        
       </Route>
 

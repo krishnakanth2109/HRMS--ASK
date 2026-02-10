@@ -14,8 +14,10 @@ import {
   FaCalendarAlt,
   FaUsers,
   FaUser,
-  FaEdit
+  FaEdit,
+  FaSync
 } from "react-icons/fa";
+import AdminAttendanceRequests from "./AdminAttendanceRequests"; // ✅ ADD THIS IMPORT
 
 const AdminLateRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -27,7 +29,7 @@ const AdminLateRequests = () => {
     startDate: "",
     endDate: ""
   });
-  const [requestType, setRequestType] = useState("PENDING"); // "PENDING" or "LIMITS"
+  const [requestType, setRequestType] = useState("PENDING"); 
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showBulkLimitModal, setShowBulkLimitModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -42,6 +44,22 @@ const AdminLateRequests = () => {
     newLimit: 5
   });
   const [bulkLimitValue, setBulkLimitValue] = useState(5);
+
+  // ✅ ADDED: State for attendance status correction count
+  const [statusCorrectionCount, setStatusCorrectionCount] = useState(0);
+
+  // ✅ NEW: Fast fetch for the status correction badge count
+  const fetchStatusCorrectionCount = useCallback(async () => {
+    try {
+      const response = await api.get("/api/attendance/correction-requests");
+      // Handle different possible API response structures
+      const allData = Array.isArray(response.data) ? response.data : (response.data.data || []);
+      const pendingCount = allData.filter(req => req.status === "PENDING" || req.status === "pending").length;
+      setStatusCorrectionCount(pendingCount);
+    } catch (err) {
+      console.error("Error fetching status correction count:", err);
+    }
+  }, []);
 
   // ✅ Fast Fetch: Only fetch pending requests initially
   const fetchPendingRequests = useCallback(async () => {
@@ -180,10 +198,11 @@ const AdminLateRequests = () => {
     }
   };
 
-  // Initial Load - Only load pending requests
+  // Initial Load
   useEffect(() => {
     fetchPendingRequests();
-  }, [fetchPendingRequests]);
+    fetchStatusCorrectionCount(); // ✅ Load count immediately
+  }, [fetchPendingRequests, fetchStatusCorrectionCount]);
 
   // ✅ OPTIMIZED: Memoize filtering
   const filteredRequests = useMemo(() => {
@@ -337,9 +356,6 @@ const AdminLateRequests = () => {
       Swal.fire("Error", errMsg, "error");
     }
   };
-
-  // ✅ NEW: Bulk Update Request Limits
-// In the bulkUpdateRequestLimits function, update the error handling:
 
 // ✅ UPDATED: Bulk Update Request Limits with better error handling
 const bulkUpdateRequestLimits = async () => {
@@ -546,97 +562,143 @@ const bulkUpdateRequestLimits = async () => {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-               <FaUserClock className="text-orange-600" /> Late Login Requests Management
+               <FaUserClock className="text-orange-600" /> Employees Attendece Status Correction Requests
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-               Manage all late login correction requests and employee request limits.
+               Manage all late login requests, employee request limits and attendance status correction requests.
             </p>
         </div>
         <div className="flex gap-2">
           <button 
             onClick={() => {
-              setRequestType("LIMITS");
-              fetchEmployeeLimits();
-            }} 
-            className="text-sm bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm font-medium flex items-center gap-2"
-          >
-            <FaUsers /> View Limits
-          </button>
-          <button 
-            onClick={() => {
               setRequestType("PENDING");
               fetchPendingRequests();
             }} 
-            className="text-sm bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm font-medium"
+            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium ${
+              requestType === "PENDING" 
+                ? "bg-orange-600 text-white" 
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+            }`}
           >
-            View Pending
+            Late Login
+          </button>
+          <button 
+            onClick={() => {
+              setRequestType("LIMITS");
+              fetchEmployeeLimits();
+            }} 
+            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center gap-2 ${
+              requestType === "LIMITS" 
+                ? "bg-purple-600 text-white" 
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <FaUsers /> Limits
+          </button>
+          
+          {/* ✅ UPDATED: Attendance Status Correction Button with Blinking Count Badge */}
+          <button 
+            onClick={() => {
+                setRequestType("ATTENDANCE_STATUS");
+                fetchStatusCorrectionCount();
+            }}
+            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center gap-2 relative ${
+              requestType === "ATTENDANCE_STATUS" 
+                ? "bg-blue-600 text-white" 
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <FaSync /> Attendence Status Correction
+            {statusCorrectionCount > 0 && (
+                <span className="absolute -top-2 -right-2 flex h-6 w-6">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-6 w-6 bg-red-600 border-2 border-white text-white items-center justify-center text-[11px] font-bold">
+                        {statusCorrectionCount}
+                    </span>
+                </span>
+            )}
           </button>
         </div>
       </div>
 
-      {/* Search and Filters Bar - FIXED ALIGNMENT */}
-      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {/* Search Input - Takes 5 columns */}
-          <div className="md:col-span-5 relative">
-            <FaSearch className="absolute left-3 top-3 text-gray-400" />
-            <input 
-                type="text" 
-                placeholder="Search by Employee Name, ID, or Reason..." 
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-            />
-          </div>
-          
-          {/* Date Range Inputs - Takes 5 columns */}
-          <div className="md:col-span-5 grid grid-cols-2 gap-3">
-            <div className="relative">
-              <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="date"
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+      {/* Search and Filters Bar - Only show for PENDING and LIMITS tabs */}
+      {requestType !== "ATTENDANCE_STATUS" && (
+        <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            {/* Search Input - Takes 5 columns */}
+            <div className="md:col-span-5 relative">
+              <FaSearch className="absolute left-3 top-3 text-gray-400" />
+              <input 
+                  type="text" 
+                  placeholder="Search by Employee Name, ID, or Reason..." 
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
               />
             </div>
-            <div className="relative">
-              <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="date"
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
-              />
+            
+            {/* Date Range Inputs - Takes 5 columns */}
+            <div className="md:col-span-5 grid grid-cols-2 gap-3">
+              <div className="relative">
+                <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="date"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+                />
+              </div>
+              <div className="relative">
+                <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="date"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Action Buttons - Takes 2 columns */}
-          <div className="md:col-span-2 flex gap-2">
-            {requestType === "LIMITS" && (
+            {/* Action Buttons - Takes 2 columns */}
+            <div className="md:col-span-2 flex gap-2">
+              {requestType === "LIMITS" && (
+                <button
+                  onClick={() => setShowBulkLimitModal(true)}
+                  className="flex-1 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm font-medium"
+                  disabled={selectedEmployees.length === 0}
+                >
+                  <FaCog /> Bulk ({selectedEmployees.length})
+                </button>
+              )}
               <button
-                onClick={() => setShowBulkLimitModal(true)}
-                className="flex-1 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm font-medium"
-                disabled={selectedEmployees.length === 0}
+                onClick={() => {
+                  setFilterText("");
+                  setDateRange({ startDate: "", endDate: "" });
+                }}
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition flex items-center justify-center gap-2 text-sm"
               >
-                <FaCog /> Bulk ({selectedEmployees.length})
+                <FaFilter /> Clear
               </button>
-            )}
-            <button
-              onClick={() => {
-                setFilterText("");
-                setDateRange({ startDate: "", endDate: "" });
-              }}
-              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition flex items-center justify-center gap-2 text-sm"
-            >
-              <FaFilter /> Clear
-            </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Content Area */}
-      {loading && requestType === "PENDING" ? (
+      {requestType === "ATTENDANCE_STATUS" ? (
+        /* ✅ RENDER IMPORTED COMPONENT */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-100">
+            <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+              <FaSync className="text-blue-600" />
+              Attendance Status Correction Management
+            </h3>
+          </div>
+          <div className="p-1">
+            <AdminAttendanceRequests />
+          </div>
+        </div>
+      ) : loading && requestType === "PENDING" ? (
         <div className="flex flex-col justify-center items-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-orange-600"></div>
           <p className="mt-4 text-gray-500 font-medium">Loading pending requests...</p>
