@@ -33,7 +33,7 @@ import companyRoutes from "./routes/companyRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import payrollRoutes from "./routes/payroll.js";
-import mailRoutes from "./routes/mailRoutes.js"; // Import the new route
+import mailRoutes from "./routes/mailRoutes.js";
 import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
 import payrollcandidatesRoutes from "./routes/payrollcandidatesRoutes.js";
 
@@ -54,8 +54,8 @@ const allowedOrigins = [
   "https://hrms-ask-1jx6.onrender.com"
 ];
 
-// -------------------- SOCKET.IO --------------------
-const userSocketMap = new Map();
+// -------------------- SOCKET.IO FOR REAL-TIME CHAT --------------------
+const userSocketMap = new Map(); // userId -> socketId mapping
 
 const io = new Server(server, {
   cors: {
@@ -63,21 +63,148 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true,
   },
+  // Optimization: Allow WebSocket transport explicitly for faster connections
+  transports: ['websocket', 'polling'], 
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
+// Make io and userSocketMap available to routes (Critical for api/chat routes)
 app.set("io", io);
 app.set("userSocketMap", userSocketMap);
 
+// Socket.IO Connection Handler
 io.on("connection", (socket) => {
-  console.log("🔥 User connected:", socket.id);
+  console.log("✅ User connected:", socket.id);
 
-  socket.on("register", (userId) => {
-    if (userId) userSocketMap.set(userId.toString(), socket.id);
+  // Handle user authentication and registration
+  socket.on("authenticate", (userId) => {
+    if (userId) {
+      userSocketMap.set(userId.toString(), socket.id);
+      socket.userId = userId.toString();
+      console.log(`🔐 User ${userId} authenticated with socket ${socket.id}`);
+      
+      // Notify user they're connected
+      socket.emit("authenticated", { userId, socketId: socket.id });
+      
+      // Broadcast online status to all users
+      io.emit("user_online", { userId: userId.toString() });
+    }
   });
 
+  // Legacy support for 'register' event
+  socket.on("register", (userId) => {
+    if (userId) {
+      userSocketMap.set(userId.toString(), socket.id);
+      socket.userId = userId.toString();
+      console.log(`🔐 User ${userId} registered with socket ${socket.id}`);
+      io.emit("user_online", { userId: userId.toString() });
+    }
+  });
+
+  // Handle sending messages (Socket-only approach)
+  // Note: The new chat.js route also handles emission via API
+  socket.on("send_message", (messageData) => {
+    const { receiverId, message, sender } = messageData;
+    const receiverSocketId = userSocketMap.get(receiverId?.toString());
+
+    console.log(`📨 Message from ${sender?._id || sender} to ${receiverId}`);
+
+    // Send to receiver if they're online
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("receive_message", messageData);
+      console.log(`✅ Message delivered to ${receiverId}`);
+    } else {
+      console.log(`⚠️ Receiver ${receiverId} is offline`);
+    }
+
+    // Send confirmation back to sender
+    socket.emit("message_sent", messageData);
+  });
+
+  // Handle message read status
+  socket.on("mark_as_read", ({ senderId, receiverId }) => {
+    const senderSocketId = userSocketMap.get(senderId?.toString());
+    
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messages_read", { 
+        readBy: receiverId?.toString(),
+        senderId: senderId?.toString()
+      });
+      console.log(`✅ Read receipt sent to ${senderId}`);
+    }
+  });
+
+  // Handle typing indicator
+  socket.on("typing_start", ({ receiverId, senderId, senderName }) => {
+    const receiverSocketId = userSocketMap.get(receiverId?.toString());
+    
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("user_typing", { 
+        userId: senderId?.toString(),
+        userName: senderName 
+      });
+    }
+  });
+
+  socket.on("typing_stop", ({ receiverId, senderId }) => {
+    const receiverSocketId = userSocketMap.get(receiverId?.toString());
+    
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("user_stopped_typing", { 
+        userId: senderId?.toString()
+      });
+    }
+  });
+
+  // Handle message edit
+  socket.on("edit_message", (editData) => {
+    const { receiverId, messageId, newMessage, senderId } = editData;
+    const receiverSocketId = userSocketMap.get(receiverId?.toString());
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("message_edited", editData);
+      console.log(`✅ Edit notification sent to ${receiverId}`);
+    }
+
+    // Send confirmation back to sender
+    socket.emit("message_edit_confirmed", editData);
+  });
+
+  // Handle message delete
+  socket.on("delete_message", (deleteData) => {
+    const { receiverId, messageId } = deleteData;
+    const receiverSocketId = userSocketMap.get(receiverId?.toString());
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("message_deleted", deleteData);
+      console.log(`✅ Delete notification sent to ${receiverId}`);
+    }
+
+    // Send confirmation back to sender
+    socket.emit("message_delete_confirmed", deleteData);
+  });
+
+  // Handle disconnection
   socket.on("disconnect", () => {
-    for (let [userId, socketId] of userSocketMap.entries()) {
-      if (socketId === socket.id) userSocketMap.delete(userId);
+    console.log("❌ User disconnected:", socket.id);
+    
+    if (socket.userId) {
+      userSocketMap.delete(socket.userId);
+      
+      // Broadcast offline status
+      io.emit("user_offline", { userId: socket.userId });
+      console.log(`👋 User ${socket.userId} went offline`);
+    } else {
+      // Fallback: remove by socket.id
+      for (let [userId, socketId] of userSocketMap.entries()) {
+        if (socketId === socket.id) {
+          userSocketMap.delete(userId);
+          io.emit("user_offline", { userId });
+          console.log(`👋 User ${userId} went offline`);
+          break;
+        }
+      }
     }
   });
 });
@@ -108,7 +235,12 @@ app.use((req, res, next) => {
 
 // -------------------- DATABASE --------------------
 mongoose
-  .connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
+  .connect(process.env.MONGO_URI, { 
+    serverSelectionTimeoutMS: 10000,
+    // Optimization: Connection Pooling for Production
+    maxPoolSize: 10, 
+    minPoolSize: 2
+  })
   .then(async () => {
     console.log("✅ MongoDB Connected");
 
@@ -166,7 +298,6 @@ app.use("/api/mail", mailRoutes);
 app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
 
-
 // -------------------- 404 --------------------
 app.use("*", (req, res) => {
   res.status(404).json({ success: false, message: "API route not found" });
@@ -183,4 +314,5 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔌 Socket.IO server initialized for real-time chat`);
 });
