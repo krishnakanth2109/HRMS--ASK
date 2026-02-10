@@ -4,12 +4,15 @@ import api, { getEmployees } from "../api";
 import { motion } from "framer-motion";
 import EmojiPicker from 'emoji-picker-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { io } from 'socket.io-client';
 import { 
   FaSearch, FaCircle, FaUsers, FaPaperPlane, FaSmile, FaSpinner, 
   FaEllipsisV, FaRegEdit, FaRegTrashAlt, FaTimes, FaComments,
   FaEllipsisH, FaCheckDouble, FaCheck, FaEye,
   FaUserFriends, FaCommentDots, FaTrash, FaPen, FaChevronDown, FaChevronUp
 } from "react-icons/fa";
+
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const ConnectWithEmployee = () => {
   const { user } = useContext(AuthContext);
@@ -23,6 +26,8 @@ const ConnectWithEmployee = () => {
   const [directMsgText, setDirectMsgText] = useState("");
   const [directSearchTerm, setDirectSearchTerm] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [typingUsers, setTypingUsers] = useState(new Set());
 
   // Message states
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -39,9 +44,163 @@ const ConnectWithEmployee = () => {
   const directChatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const sidebarContainerRef = useRef(null);
-  const pollRef = useRef(null);
+  const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
-  // ✅ FIX SCROLL: Auto-scroll to bottom when new messages arrive
+  // ✅ SOCKET.IO INITIALIZATION
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    // Initialize socket connection
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+    });
+
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('✅ Socket connected:', socket.id);
+      // Authenticate user with socket
+      socket.emit('authenticate', currentUserId);
+    });
+
+    socket.on('authenticated', (data) => {
+      console.log('🔐 Socket authenticated:', data);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+    });
+
+    // Listen for incoming messages
+    socket.on('receive_message', (messageData) => {
+      console.log('📨 Received message:', messageData);
+      
+      // Add message to chat if it's from the currently selected user
+      if (selectedChatUser && 
+          (messageData.sender._id === selectedChatUser._id || 
+           messageData.sender === selectedChatUser._id)) {
+        setDirectMessages(prev => [...prev, messageData]);
+        
+        // Auto-mark as read since chat is open
+        markMessagesAsRead(messageData.sender._id || messageData.sender);
+      } else {
+        // Update unread count for other users
+        setChatList(prev => prev.map(u => 
+          (u._id === messageData.sender._id || u._id === messageData.sender)
+            ? { ...u, unreadCount: (u.unreadCount || 0) + 1, lastMessage: messageData.message, lastMessageTime: messageData.createdAt }
+            : u
+        ));
+        setTotalUnreadCount(prev => prev + 1);
+      }
+      
+      // Update chat list with latest message
+      setChatList(prev => {
+        const senderId = messageData.sender._id || messageData.sender;
+        const filtered = prev.filter(u => u._id !== senderId);
+        const sender = prev.find(u => u._id === senderId) || { 
+          _id: senderId, 
+          name: messageData.sender.name 
+        };
+        
+        return [{
+          ...sender,
+          lastMessage: messageData.message,
+          lastMessageTime: messageData.createdAt
+        }, ...filtered];
+      });
+
+      // Play notification sound
+      playNotificationSound();
+    });
+
+    socket.on('message_sent', (messageData) => {
+      console.log('✅ Message sent confirmation:', messageData);
+    });
+
+    socket.on('messages_read', ({ readBy, senderId }) => {
+      console.log('✅ Messages read by:', readBy);
+      
+      // Update messages to show as read
+      setDirectMessages(prev => prev.map(msg => {
+        if (msg.sender._id === currentUserId || msg.sender === currentUserId) {
+          return { ...msg, isRead: true };
+        }
+        return msg;
+      }));
+    });
+
+    socket.on('message_edited', ({ messageId, newMessage }) => {
+      console.log('✏️ Message edited:', messageId);
+      
+      setDirectMessages(prev => prev.map(msg => 
+        msg._id === messageId ? { ...msg, message: newMessage } : msg
+      ));
+    });
+
+    socket.on('message_deleted', ({ messageId }) => {
+      console.log('🗑️ Message deleted:', messageId);
+      
+      setDirectMessages(prev => prev.filter(msg => msg._id !== messageId));
+    });
+
+    socket.on('user_online', ({ userId }) => {
+      console.log('🟢 User online:', userId);
+      setOnlineUsers(prev => new Set([...prev, userId]));
+    });
+
+    socket.on('user_offline', ({ userId }) => {
+      console.log('⚫ User offline:', userId);
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    });
+
+    socket.on('user_typing', ({ userId, userName }) => {
+      console.log('⌨️ User typing:', userName);
+      if (selectedChatUser && userId === selectedChatUser._id) {
+        setTypingUsers(prev => new Set([...prev, userId]));
+      }
+    });
+
+    socket.on('user_stopped_typing', ({ userId }) => {
+      console.log('⏸️ User stopped typing:', userId);
+      setTypingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [currentUserId, selectedChatUser]);
+
+  // ✅ Play notification sound
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/notification.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log("Audio play failed:", err));
+    } catch (err) {
+      console.log("Notification sound error:", err);
+    }
+  };
+
+  // ✅ Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (!isChatLoading && !isSwitchingUser && directChatEndRef.current) {
       setTimeout(() => {
@@ -49,6 +208,36 @@ const ConnectWithEmployee = () => {
       }, 100);
     }
   }, [directMessages, isChatLoading, isSwitchingUser]);
+
+  // ✅ Handle typing indicator
+  const handleTyping = useCallback((text) => {
+    setDirectMsgText(text);
+    
+    if (!selectedChatUser || !socketRef.current) return;
+    
+    if (text.trim()) {
+      socketRef.current.emit('typing_start', { 
+        receiverId: selectedChatUser._id, 
+        senderId: currentUserId, 
+        senderName: user?.name 
+      });
+      
+      // Auto-stop typing after 3 seconds
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current.emit('typing_stop', { 
+          receiverId: selectedChatUser._id, 
+          senderId: currentUserId 
+        });
+      }, 3000);
+    } else {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      socketRef.current.emit('typing_stop', { 
+        receiverId: selectedChatUser._id, 
+        senderId: currentUserId 
+      });
+    }
+  }, [selectedChatUser, currentUserId, user]);
 
   // ✅ Handle user switching
   const handleUserSwitch = useCallback(async (emp) => {
@@ -60,17 +249,13 @@ const ConnectWithEmployee = () => {
     setEditingMessageId(null);
     setDirectMsgText("");
     setOpenMenuId(null);
+    setTypingUsers(new Set());
     
-    // Clear current messages while loading new ones
     setDirectMessages([]);
     
-    // Mark messages as read when opening chat
     await markMessagesAsRead(emp._id);
-    
-    // Fetch messages for the selected user
     await fetchDirectMessages(emp, false);
     
-    // Optimistically add to chat list if not present
     setChatList(prev => {
       if (prev.find(u => u._id === emp._id)) return prev;
       return [emp, ...prev];
@@ -111,29 +296,19 @@ const ConnectWithEmployee = () => {
         )
       : chatList;
     
-    // Sort by last message time (Newest on top)
     return [...list].sort((a, b) => {
-        const timeA = new Date(a.lastMessageTime || 0).getTime();
-        const timeB = new Date(b.lastMessageTime || 0).getTime();
-        return timeB - timeA;
+      const timeA = new Date(a.lastMessageTime || 0).getTime();
+      const timeB = new Date(b.lastMessageTime || 0).getTime();
+      return timeB - timeA;
     });
   }, [directSearchTerm, chatList, employees, currentUserId]);
 
-  // ✅ FETCH CHAT LIST WITH UNREAD COUNTS
+  // ✅ FETCH CHAT LIST
   const fetchChatList = useCallback(async () => {
     try {
       const { data } = await api.get("/api/chat/users");
+      setChatList(data || []);
       
-      // Merge with existing list to prevent jumping if user is typing
-      setChatList(prevList => {
-         // If we have local optimistic updates that are newer than server, keep local
-         const merged = data || [];
-         
-         // Logic: If we are actively chatting with someone, ensure they stay at top if updated recently
-         return merged;
-      });
-      
-      // Calculate total unread
       const total = data.reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
       setTotalUnreadCount(total);
     } catch (err) {
@@ -155,7 +330,7 @@ const ConnectWithEmployee = () => {
 
   // ✅ FETCH DIRECT MESSAGES
   const fetchDirectMessages = useCallback(async (userToFetch, isSilent = true) => {
-    if (!userToFetch || document.visibilityState === 'hidden') return;
+    if (!userToFetch) return;
     
     if (!isSilent) {
       setIsChatLoading(true);
@@ -195,31 +370,28 @@ const ConnectWithEmployee = () => {
     }
   }, [chatList, currentUserId]);
 
+  // ✅ FETCH ONLINE USERS
+  const fetchOnlineUsers = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/chat/online-users");
+      setOnlineUsers(new Set(data.onlineUsers || []));
+    } catch (err) {
+      console.error("Failed to fetch online users:", err);
+    }
+  }, []);
+
   // ✅ INITIAL DATA LOADING
   useEffect(() => {
     const loadData = async () => {
       await fetchEmployees();
       await fetchChatList();
+      await fetchOnlineUsers();
     };
     
     loadData();
-    
-    // Polling - be careful not to override optimistic updates too aggressively
-    pollRef.current = setInterval(() => {
-      fetchChatList();
-      // Only fetch history if we aren't currently sending/typing to avoid jitter
-      if (selectedChatUser && !isSwitchingUser && !sendingMessage) {
-        // Optional: You might want to disable this poll if it causes flicker
-        // fetchDirectMessages(selectedChatUser, true); 
-      }
-    }, 3000);
+  }, [fetchEmployees, fetchChatList, fetchOnlineUsers]);
 
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [fetchEmployees, fetchChatList, fetchDirectMessages, selectedChatUser, isSwitchingUser, sendingMessage]);
-
-  // ✅ SEND MESSAGE - UPDATED FOR NO FLICKER
+  // ✅ SEND MESSAGE - WITH SOCKET.IO
   const handleSendMessage = useCallback(async () => {
     if (!directMsgText.trim() || !selectedChatUser || sendingMessage) return;
 
@@ -228,9 +400,17 @@ const ConnectWithEmployee = () => {
     setShowEmojiPicker(false);
     setSendingMessage(true);
 
-    const tempId = Date.now().toString(); // Temporary ID for optimistic UI
+    // Stop typing indicator
+    if (socketRef.current) {
+      socketRef.current.emit('typing_stop', { 
+        receiverId: selectedChatUser._id, 
+        senderId: currentUserId 
+      });
+    }
 
-    // 1. Optimistic Message Update
+    const tempId = `temp_${Date.now()}`;
+
+    // Optimistic UI update
     const optimisticMsg = {
       _id: tempId,
       message: messageToSend,
@@ -244,14 +424,13 @@ const ConnectWithEmployee = () => {
 
     setDirectMessages(prev => [...prev, optimisticMsg]);
 
-    // 2. Optimistic Sidebar Update (Instant move to top)
+    // Update sidebar
     setChatList(prev => {
-      // Remove user from current position and add to top with new details
       const filtered = prev.filter(u => u._id !== selectedChatUser._id);
       return [{
-          ...selectedChatUser, 
-          lastMessage: messageToSend, 
-          lastMessageTime: new Date().toISOString() // Ensure Date object or ISO string
+        ...selectedChatUser, 
+        lastMessage: messageToSend, 
+        lastMessageTime: new Date().toISOString()
       }, ...filtered];
     });
 
@@ -260,33 +439,30 @@ const ConnectWithEmployee = () => {
         // Edit Mode
         await api.put(`/api/chat/${editingMessageId}`, { message: messageToSend });
         setEditingMessageId(null);
-        // For edits, we might need to re-fetch to ensure consistency
         fetchDirectMessages(selectedChatUser);
       } else {
-        // Send Mode
+        // Send Mode - Backend will emit socket event
         const response = await api.post('/api/chat/send', {
           receiverId: selectedChatUser._id,
           message: messageToSend
         });
         
-        // 3. Update the optimistic message with success state (NO FETCH to avoid flicker)
+        // Replace optimistic message with real one
         setDirectMessages(prev => 
           prev.map(msg => 
             msg._id === tempId ? { 
-                ...msg, 
-                ...response.data, // If API returns the created message object
-                isSending: false,
-                isPending: false
+              ...response.data,
+              isSending: false,
+              isPending: false
             } : msg
           )
         );
         
-        toast.success("Message sent");
+        toast.success("Message sent", { duration: 1000 });
       }
     } catch (error) {
       console.error("Failed to send message:", error);
       toast.error("Failed to send message");
-      // Only remove if it failed
       setDirectMessages(prev => prev.filter(m => m._id !== tempId));
     } finally {
       setSendingMessage(false);
@@ -338,7 +514,7 @@ const ConnectWithEmployee = () => {
     }
   }, [handleSendMessage, editingMessageId, showEmojiPicker]);
 
-  // ✅ CLOSE MENUS WHEN CLICKING ELSEWHERE
+  // ✅ CLOSE MENUS
   useEffect(() => {
     const handleClickOutside = () => setOpenMenuId(null);
     if (openMenuId) {
@@ -349,8 +525,10 @@ const ConnectWithEmployee = () => {
     };
   }, [openMenuId]);
 
+  // Check if user is online
+  const isUserOnline = (userId) => onlineUsers.has(userId);
+
   return (
-    // ✅ CHANGED h-screen TO calc(100vh - 4rem) to fit below navbar
     <div className="flex w-full h-[calc(100vh-4rem)] bg-white font-sans mt-0">
       <Toaster 
         position="top-right" 
@@ -364,9 +542,9 @@ const ConnectWithEmployee = () => {
         }}
       />
 
-      {/* ✅ SIDEBAR WITH FIXED HEADER */}
+      {/* SIDEBAR */}
       <div className="w-80 flex flex-col border-r border-gray-200 bg-white h-full">
-        {/* FIXED Sidebar Header - Always Visible */}
+        {/* Sidebar Header */}
         <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -375,7 +553,9 @@ const ConnectWithEmployee = () => {
               </div>
               <div>
                 <h2 className="font-bold text-lg">Employee Connect</h2>
-                <p className="text-blue-100 text-xs opacity-80">Chat with colleagues</p>
+                <p className="text-blue-100 text-xs opacity-80">
+                  {onlineUsers.size} online
+                </p>
               </div>
             </div>
             {totalUnreadCount > 0 && (
@@ -396,7 +576,7 @@ const ConnectWithEmployee = () => {
           </div>
         </div>
 
-        {/* Scrollable Contacts List */}
+        {/* Contacts List */}
         <div 
           ref={sidebarContainerRef}
           className="flex-1 overflow-y-auto"
@@ -418,6 +598,7 @@ const ConnectWithEmployee = () => {
               displayList.map((emp) => {
                 const isActive = selectedChatUser?._id === emp._id;
                 const unreadCount = emp.unreadCount || 0;
+                const online = isUserOnline(emp._id);
                 
                 return (
                   <div 
@@ -437,6 +618,9 @@ const ConnectWithEmployee = () => {
                       }`}>
                         {emp.name?.charAt(0)}
                       </div>
+                      {online && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      )}
                     </div>
                     
                     <div className="flex-1 overflow-hidden min-w-0">
@@ -466,35 +650,43 @@ const ConnectWithEmployee = () => {
         </div>
       </div>
 
-      {/* ✅ CHAT AREA WITH PROPER LAYOUT */}
+      {/* CHAT AREA */}
       <div className="flex-1 flex flex-col h-full bg-gray-50 relative">
         {selectedChatUser ? (
           <>
-            {/* ✅ FIXED Chat Header - Always Visible (High Z-Index, Removed Buttons) */}
+            {/* Chat Header */}
             <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-40 flex-shrink-0 relative">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-center rounded-full font-bold text-lg shadow-md">
                     {selectedChatUser.name?.charAt(0)}
                   </div>
+                  {isUserOnline(selectedChatUser._id) && (
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-gray-900">{selectedChatUser.name}</h3>
                   <div className="flex items-center gap-2">
-                    {/* Status indicators if needed */}
+                    {typingUsers.has(selectedChatUser._id) ? (
+                      <span className="text-xs text-blue-600 font-medium">typing...</span>
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        {isUserOnline(selectedChatUser._id) ? "🟢 Online" : "⚫ Offline"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
-                {/* REMOVED CALL AND VIDEO BUTTONS AS REQUESTED */}
                 <button className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
                   <FaEllipsisH size={16} />
                 </button>
               </div>
             </header>
 
-            {/* SCROLLABLE MESSAGES AREA - Between Header and Input */}
+            {/* Messages Area */}
             <div 
               ref={chatContainerRef}
               className="flex-1 overflow-y-auto bg-gray-50"
@@ -505,9 +697,6 @@ const ConnectWithEmployee = () => {
                   <FaSpinner className="text-blue-600 animate-spin mb-3" size={30} />
                   <p className="text-sm font-semibold text-gray-700">
                     {isSwitchingUser ? "Switching conversation..." : "Loading messages..."}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Please wait while we fetch your conversation
                   </p>
                 </div>
               ) : directMessages.length === 0 ? (
@@ -540,14 +729,12 @@ const ConnectWithEmployee = () => {
                           >
                             <div className={`max-w-[70%] group relative ${isMe ? "ml-auto" : ""}`}>
                               <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                                {/* Sender name */}
                                 {!isMe && (
                                   <span className="text-xs font-semibold text-gray-600 mb-1 px-2">
                                     {msg.sender?.name || selectedChatUser.name}
                                   </span>
                                 )}
                                 
-                                {/* Message bubble */}
                                 <div className="relative">
                                   <div className={`px-4 py-3 rounded-2xl shadow-sm ${
                                     isMe 
@@ -558,7 +745,6 @@ const ConnectWithEmployee = () => {
                                       {msg.message}
                                     </p>
                                     
-                                    {/* Message time and status */}
                                     <div className={`flex items-center justify-end gap-2 mt-2 ${
                                       isMe ? "text-blue-100" : "text-gray-500"
                                     }`}>
@@ -566,7 +752,6 @@ const ConnectWithEmployee = () => {
                                         {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                       </span>
                                       
-                                      {/* Message status indicators */}
                                       {isMe && (
                                         <>
                                           {isPending ? (
@@ -582,7 +767,6 @@ const ConnectWithEmployee = () => {
                                     </div>
                                   </div>
                                   
-                                  {/* Edit/Delete menu (only for sender's messages) */}
                                   {isMe && !isPending && (
                                     <>
                                       <button
@@ -595,7 +779,6 @@ const ConnectWithEmployee = () => {
                                         <FaEllipsisV size={10} />
                                       </button>
                                       
-                                      {/* Dropdown menu */}
                                       {isMenuOpen && (
                                         <div className={`absolute ${isMe ? "left-0" : "right-0"} top-6 bg-white border border-gray-100 shadow-xl rounded-lg py-1.5 z-50 w-32 overflow-hidden animate-in fade-in zoom-in duration-200`}>
                                           <button
@@ -627,7 +810,7 @@ const ConnectWithEmployee = () => {
               )}
             </div>
 
-            {/* FIXED MESSAGE INPUT AREA - Always at Bottom */}
+            {/* Message Input */}
             <footer className="p-4 bg-white border-t border-gray-200 shadow-lg flex-shrink-0">
               {editingMessageId && (
                 <div className="max-w-4xl mx-auto mb-3 flex items-center justify-between bg-blue-50 px-4 py-2.5 rounded-xl border border-blue-100 animate-in slide-in-from-top duration-300">
@@ -652,7 +835,6 @@ const ConnectWithEmployee = () => {
               )}
               
               <div className="max-w-4xl mx-auto flex items-end gap-3 bg-gray-100 border border-transparent rounded-2xl p-3 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all duration-300">
-                {/* Emoji picker */}
                 <div className="relative">
                   {showEmojiPicker && (
                     <div className="absolute bottom-16 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-200 animate-in fade-in zoom-in duration-200">
@@ -678,18 +860,16 @@ const ConnectWithEmployee = () => {
                   </button>
                 </div>
                 
-                {/* Text input */}
                 <textarea
                   className="flex-1 bg-transparent outline-none resize-none text-sm py-2.5 px-3 text-gray-800 font-medium placeholder:text-gray-400 min-h-[44px] max-h-32"
                   rows={1}
                   placeholder="Type your message here..."
                   value={directMsgText}
-                  onChange={(e) => setDirectMsgText(e.target.value)}
+                  onChange={(e) => handleTyping(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={sendingMessage || isSwitchingUser || isChatLoading}
                 />
                 
-                {/* Send button */}
                 <button
                   onClick={handleSendMessage}
                   disabled={!directMsgText.trim() || sendingMessage || isSwitchingUser || isChatLoading}
@@ -711,7 +891,6 @@ const ConnectWithEmployee = () => {
             </footer>
           </>
         ) : (
-          // Empty state when no user selected
           <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -725,7 +904,6 @@ const ConnectWithEmployee = () => {
               <h3 className="text-xl font-bold text-gray-800 mb-2">Connect with your team</h3>
               <p className="text-sm text-gray-600 mb-6">
                 Select a colleague from the sidebar to start a secure, real-time conversation.
-                Chat privately, share updates, and collaborate seamlessly.
               </p>
               
               <div className="grid grid-cols-2 gap-3 text-left">
@@ -739,19 +917,19 @@ const ConnectWithEmployee = () => {
                   <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
                     <FaCheck className="text-green-600" size={10} />
                   </div>
+                  <span>Online status</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                    <FaCheck className="text-green-600" size={10} />
+                  </div>
+                  <span>Typing indicators</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                    <FaCheck className="text-green-600" size={10} />
+                  </div>
                   <span>Read receipts</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                    <FaCheck className="text-green-600" size={10} />
-                  </div>
-                  <span>Edit & delete messages</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                    <FaCheck className="text-green-600" size={10} />
-                  </div>
-                  <span>Unread message counts</span>
                 </div>
               </div>
             </motion.div>
@@ -759,9 +937,7 @@ const ConnectWithEmployee = () => {
         )}
       </div>
 
-      {/* CUSTOM STYLES */}
       <style>{`
-        /* Custom scrollbar styling */
         .overflow-y-auto::-webkit-scrollbar {
           width: 6px;
         }
@@ -780,12 +956,10 @@ const ConnectWithEmployee = () => {
           background: #94a3b8;
         }
         
-        /* Ensure proper scrolling in flex containers */
         .flex-1 {
           min-height: 0;
         }
         
-        /* Animation classes */
         .animate-in {
           animation: animateIn 0.2s ease-out;
         }
