@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// Import the functions we added to your api.js
+import { 
+    getPayrollCandidates, 
+    managePayrollCandidate, 
+    deletePayrollCandidate 
+} from '../api'; 
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
@@ -32,8 +37,9 @@ const PayrollPage = () => {
     const loadCandidates = async () => {
         try {
             setIsTableLoading(true);
-            const res = await axios.get('http://localhost:5000/api/payroll/all');
-            setCandidates(res.data);
+            // ✅ Updated: Using api.js function instead of local axios
+            const data = await getPayrollCandidates();
+            setCandidates(data);
         } catch (err) { 
             console.error("Error fetching", err);
             Swal.fire({
@@ -108,11 +114,8 @@ const PayrollPage = () => {
         if (files.aadhaarDoc) data.append('aadhaarDoc', files.aadhaarDoc);
 
         try {
-            const url = editId 
-                ? `http://localhost:5000/api/payroll/manage/${editId}` 
-                : `http://localhost:5000/api/payroll/manage`;
-            
-            await axios.post(url, data);
+            // ✅ Updated: Using api.js function (handles live URL and edit logic)
+            await managePayrollCandidate(data, editId);
             
             // Close Swal and show success message
             Swal.close();
@@ -173,7 +176,8 @@ const PayrollPage = () => {
                     }
                 });
                 
-                await axios.delete(`http://localhost:5000/api/payroll/${id}`);
+                // ✅ Updated: Using api.js function
+                await deletePayrollCandidate(id);
                 
                 Swal.close();
                 Swal.fire({
@@ -275,10 +279,7 @@ const PayrollPage = () => {
                                         <th className="p-4 w-64 whitespace-nowrap">Email</th>
                                         <th className="p-4 w-30 whitespace-nowrap">Phone</th>
                                         <th className="p-4 w-35 whitespace-nowrap">Company</th>
-                                        {/* <th className="p-4 w-35 whitespace-nowrap">Department</th> */}
                                         <th className="p-4 w-40 whitespace-nowrap">Designation</th>
-                                        {/* <th className="p-4 w-48 whitespace-nowrap">Agreed Salary</th> */}
-                                        {/* <th className="p-4 w-48 whitespace-nowrap">Deductions</th> */}
                                         <th className="p-4 w-30 whitespace-nowrap">Net Salary</th>
                                         <th className="p-4 w-80 whitespace-nowrap text-center">Actions</th>
                                     </tr>
@@ -322,22 +323,9 @@ const PayrollPage = () => {
                                                     {user.companyName}
                                                 </span>
                                             </td>
-                                            {/* <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.department}>
-                                                {user.department}
-                                            </td> */}
                                             <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.designation}>
                                                 {user.designation}
                                             </td>
-                                            {/* <td className="p-4 text-gray-700 whitespace-nowrap font-semibold">
-                                                {formatCurrency(user.agreedSalary)}
-                                            </td> */}
-                                            {/* <td className="p-4 text-gray-700 whitespace-nowrap">
-                                                <div className="text-xs">
-                                                    <div>PF: {formatCurrency(user.pfDeduction)}</div>
-                                                    <div>PT: {formatCurrency(user.ptDeduction)}</div>
-                                                    <div>Others: {formatCurrency(user.otherDeductions)}</div>
-                                                </div>
-                                            </td> */}
                                             <td className="p-4 whitespace-nowrap">
                                                 <span className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 text-sm font-bold px-3 py-1 rounded-lg">
                                                     {formatCurrency(user.netSalary)}
@@ -417,12 +405,9 @@ const PayrollPage = () => {
                                     <div className="w-1 h-6 bg-gradient-to-r from-pink-600 to-rose-600 rounded-full"></div>
                                     <h3 className="text-lg font-bold text-gray-800">Profile Picture</h3>
                                 </div>
-<div className="flex flex-col items-center border border-gray-200 rounded-lg p-4 max-w-xs mx-auto bg-gray-50">
-
-
+                                <div className="flex flex-col items-center border border-gray-200 rounded-lg p-4 max-w-xs mx-auto bg-gray-50">
                                     <div className="mb-4">
-<div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center overflow-hidden">
-
+                                        <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center overflow-hidden">
                                             {previewImage || formData.profilePic ? (
                                                 <img 
                                                     src={previewImage || formData.profilePic} 

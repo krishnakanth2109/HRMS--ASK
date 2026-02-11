@@ -916,4 +916,22 @@ export const sendOnboardingLink = async (data) => {
     throw error.response ? error.response.data : new Error("Network Error");
   }
 };
-export default api;﻿// --- START OF FILE: routes/employeeRoutes.js ---
+
+/* =============================================================================
+   PAYROLL CANDIDATE MANAGEMENT
+============================================================================= */
+export const getPayrollCandidates = async () => 
+  (await api.get("/api/payroll/all")).data;
+
+export const managePayrollCandidate = async (formData, id = null) => {
+  const url = id ? `/api/payroll/manage/${id}` : "/api/payroll/manage";
+  return (await api.post(url, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })).data;
+};
+
+export const deletePayrollCandidate = async (id) => 
+  (await api.delete(`/api/payroll/${id}`)).data;
+
+
+export default api;// --- START OF FILE: routes/employeeRoutes.js ---
