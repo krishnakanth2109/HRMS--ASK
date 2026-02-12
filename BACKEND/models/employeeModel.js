@@ -1,9 +1,9 @@
-// --- START OF FILE models/employeeModel.js ---
+// --- models/employeeModel.js ---
 
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-// Sub-schemas
+// 1. Experience Sub-schema
 const experienceSchema = new mongoose.Schema({
   company: String,
   role: String,
@@ -17,17 +17,20 @@ const experienceSchema = new mongoose.Schema({
   employmentType: String,
 });
 
+// 2. Personal Sub-schema (Updated with File URL keys)
 const personalSchema = new mongoose.Schema({
   dob: String,
-  gender: { type: String, enum: ["Male", "Female", "Prefer not to say"] },
+  gender: { type: String, enum: ["Male", "Female", "Prefer not to say", "Other"] },
   maritalStatus: String,
   nationality: String,
   panNumber: String,
   aadhaarNumber: String,
-  aadhaarFileUrl: String, // Stores Cloudinary URL
-  panFileUrl: String,     // Stores Cloudinary URL
+  // Keys for Cloudinary Storage
+  aadhaarFileUrl: { type: String, default: null }, 
+  panFileUrl: { type: String, default: null },     
 });
 
+// 3. Bank Sub-schema
 const bankSchema = new mongoose.Schema({
   accountNumber: String,
   bankName: String,
@@ -35,19 +38,19 @@ const bankSchema = new mongoose.Schema({
   branch: String,
 });
 
-// Main Employee Schema
+// 4. Main Employee Schema
 const EmployeeSchema = new mongoose.Schema({
   employeeId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: {
     type: String,
-    minlength: 6,
+    minlength: 8,
     select: false,
     default: null,
   },
   
-  // ✅ NEW: Company Reference
+  // Company Reference
   company: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Company",
@@ -58,10 +61,10 @@ const EmployeeSchema = new mongoose.Schema({
   
   phone: String,
   address: String,
-  emergency: String, // Emergency Name
-  emergencyPhone: String, // Emergency Phone
+  emergency: String, 
+  emergencyPhone: String,
   
-  // ✅ UPDATED: Status, Deactivation AND Reactivation Details
+  // Status and Deactivation Details
   isActive: { type: Boolean, default: true },
   status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
   
@@ -71,24 +74,39 @@ const EmployeeSchema = new mongoose.Schema({
   reactivationDate: { type: String, default: null },
   reactivationReason: { type: String, default: null },
 
+  // Nested Data
   bankDetails: bankSchema,
   personalDetails: personalSchema,
   experienceDetails: [experienceSchema],
 
+  // NEW: Array to store multiple company documents (Signed Policies, etc.)
+  companyDocuments: [
+    {
+      fileName: String,
+      fileUrl: String, // Cloudinary URL
+      uploadedAt: { type: Date, default: Date.now }
+    }
+  ],
+
   role: { type: String, enum: ["employee", "admin", "manager"], default: "employee" },
   isAdmin: { type: Boolean, default: false },
-});
+}, { timestamps: true });
 
-// Hash password before save (only if password exists and is modified)
+// Hash password before save
 EmployeeSchema.pre("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
+// Method to verify password
 EmployeeSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
   return await bcrypt.compare(candidatePassword, userPassword);
 };
 
 export default mongoose.model("Employee", EmployeeSchema);
-// --- END OF FILE models/employeeModel.js ---

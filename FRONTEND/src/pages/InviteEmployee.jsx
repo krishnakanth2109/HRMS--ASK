@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote  ,
-   CheckCircle, 
-  Clock, FileText } from 'lucide-react';
+import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote, 
+  CheckCircle, Clock, FileText, Upload, Download, File, Paperclip, Eye, ExternalLink } from 'lucide-react';
 import { getAllCompanies } from '../api';
 import api from '../api';
 
@@ -10,6 +9,13 @@ const SendOnboardingForm = () => {
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState('');
   const [loadingCompanies, setLoadingCompanies] = useState(true);
+
+  // Document Management States
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState([]); // For single invite
+  const [bulkSelectedDocuments, setBulkSelectedDocuments] = useState({}); // For bulk invite
 
   // Configuration States
   const [emailSubject, setEmailSubject] = useState('Welcome to [Company Name] – Complete Your Onboarding Process');
@@ -44,18 +50,161 @@ HR Team
     fetchHistory();
   }, []);
 
+  useEffect(() => {
+    if (selectedCompany) {
+      console.log('Selected company changed:', selectedCompany);
+      fetchCompanyDocuments();
+    } else {
+      setDocuments([]);
+    }
+  }, [selectedCompany]);
+
   const fetchCompanies = async () => {
     try {
       const response = await getAllCompanies();
       setCompanies(Array.isArray(response.data) ? response.data : response);
-    } catch (error) { console.error(error); } finally { setLoadingCompanies(false); }
+    } catch (error) { 
+      console.error('Error fetching companies:', error); 
+    } finally { 
+      setLoadingCompanies(false); 
+    }
   };
 
   const fetchHistory = async () => {
     try {
       const response = await api.get('/api/invited-employees/history');
       setSentHistory(response.data.data);
-    } catch (error) { console.error("History fetch error", error); }
+    } catch (error) { 
+      console.error("History fetch error", error); 
+    }
+  };
+
+  const fetchCompanyDocuments = async () => {
+    try {
+      console.log('Fetching documents for company:', selectedCompany);
+      const response = await api.get(`/api/invited-employees/documents/company/${selectedCompany}`);
+      console.log('Documents response:', response.data);
+      
+      if (response.data.success) {
+        setDocuments(response.data.data || []);
+        console.log('Documents set:', response.data.data.length);
+      } else {
+        setDocuments([]);
+        console.log('No documents found');
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      console.error("Error details:", error.response?.data);
+      setDocuments([]);
+    }
+  };
+
+  const handleDocumentUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    console.log('Uploading file:', file.name);
+    
+    if (!selectedCompany) {
+      alert('Please select a company first');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('companyId', selectedCompany);
+    formData.append('description', '');
+
+    setUploadingDocument(true);
+    try {
+      const response = await api.post('/api/invited-employees/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      console.log('Upload response:', response.data);
+      alert('Document uploaded successfully!');
+      fetchCompanyDocuments(); // Refresh the documents list
+      setShowDocumentUpload(false); // Close upload section
+    } catch (error) {
+      console.error('Upload error:', error);
+      console.error('Upload error details:', error.response?.data);
+      alert(error.response?.data?.error || 'Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+      e.target.value = ''; // Reset file input
+    }
+  };
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
+    
+    try {
+      await api.delete(`/api/invited-employees/documents/${documentId}`);
+      alert('Document deleted successfully');
+      fetchCompanyDocuments();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete document');
+    }
+  };
+
+  /**
+   * UPDATED: handleViewDocument
+   * Opens the file directly in a new tab. 
+   * This is the safest way to view Cloudinary PDFs.
+   */
+  const handleViewDocument = (fileUrl) => {
+    if (!fileUrl) return;
+    // We open directly. By using a standard anchor-style open, 
+    // the browser doesn't send your local app's Auth headers, avoiding the 401 error.
+    const win = window.open(fileUrl, '_blank');
+    if (win) win.focus();
+  };
+
+  /**
+   * UPDATED: handleDownloadDocument
+   * To force download from Cloudinary, we modify the URL to include 'fl_attachment'.
+   * This bypasses the browser PDF viewer and starts a download immediately.
+   */
+  const handleDownloadDocument = (fileUrl, fileName) => {
+    if (!fileUrl) return;
+
+    // Cloudinary Trick: Replace '/upload/' with '/upload/fl_attachment/' to force download
+    // If it's a 'raw' file, this might not work, so we use a standard download link.
+    let downloadUrl = fileUrl;
+    if (fileUrl.includes('/upload/')) {
+        downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+    }
+
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName || 'document.pdf');
+    link.setAttribute('target', '_blank');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const toggleDocumentSelection = (docId) => {
+    setSelectedDocuments(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const toggleBulkDocumentSelection = (rowIndex, docId) => {
+    setBulkSelectedDocuments(prev => {
+      const current = prev[rowIndex] || [];
+      const updated = current.includes(docId) 
+        ? current.filter(id => id !== docId) 
+        : [...current, docId];
+      return { ...prev, [rowIndex]: updated };
+    });
   };
 
   const getSelectedCompanyName = () => {
@@ -72,17 +221,21 @@ HR Team
       .replace(/\[COMPANY\]/g, getSelectedCompanyName())
       .replace(/\[ONBOARDING_LINK\]/g, formLink);
   };
+
   const parseSubject = () => {
     return emailSubject.replace(/\[Company Name\]/g, getSelectedCompanyName());
   };
-
 
   const handleSendSingle = async (e) => {
     e.preventDefault();
     if (!selectedCompany) return alert('Please select a company first');
     setSending(true);
     try {
-      await api.post('/api/invited-employees/invite', { ...singleData, companyId: selectedCompany });
+      await api.post('/api/invited-employees/invite', { 
+        ...singleData, 
+        companyId: selectedCompany,
+        requiredDocuments: selectedDocuments
+      });
 
       await api.post('/api/mail/send-onboarding', {
         recipientEmail: singleData.email,
@@ -92,9 +245,14 @@ HR Team
       });
 
       setSingleData({ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' });
+      setSelectedDocuments([]);
       fetchHistory();
       alert("Invitation sent successfully!");
-    } catch (error) { alert(error.response?.data?.error || "Error"); } finally { setSending(false); }
+    } catch (error) { 
+      alert(error.response?.data?.error || "Error"); 
+    } finally { 
+      setSending(false); 
+    }
   };
 
   const handleSendBulk = async (e) => {
@@ -103,7 +261,16 @@ HR Team
     const validRows = bulkRows.filter(r => r.email && r.email.includes('@'));
     setSending(true);
     try {
-      await api.post('/api/invited-employees/invite-bulk', { employees: validRows, companyId: selectedCompany });
+      const employeesWithDocs = validRows.map((emp, index) => ({
+        ...emp,
+        requiredDocuments: bulkSelectedDocuments[index] || []
+      }));
+
+      await api.post('/api/invited-employees/invite-bulk', { 
+        employees: employeesWithDocs, 
+        companyId: selectedCompany 
+      });
+
       for (let emp of validRows) {
         await api.post('/api/mail/send-onboarding', {
           recipientEmail: emp.email,
@@ -113,9 +280,14 @@ HR Team
         });
       }
       setBulkRows([{ email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' }]);
+      setBulkSelectedDocuments({});
       fetchHistory();
       alert("Bulk emails sent!");
-    } catch (error) { console.error(error); } finally { setSending(false); }
+    } catch (error) { 
+      console.error(error); 
+    } finally { 
+      setSending(false); 
+    }
   };
 
   const handleDelete = async (id) => {
@@ -123,7 +295,9 @@ HR Team
     try {
       await api.delete(`/api/invited-employees/${id}`);
       setSentHistory(prev => prev.filter(item => item._id !== id));
-    } catch (error) { alert("Delete failed"); }
+    } catch (error) { 
+      alert("Delete failed"); 
+    }
   };
 
   const addBulkRow = () => setBulkRows([...bulkRows, { email: '', name: '', role: '', department: 'IT', employmentType: '', salary: '' }]);
@@ -161,116 +335,275 @@ HR Team
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1">Email Body</label>
-              <textarea rows="4" value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" />
-              <p className="text-[10px] text-slate-400 mt-1 italic">Available tags: [NAME], [COMPANY], [ROLE], [DEPT], [EMPLOYMENT_TYPE], [ONBOARDING_LINK]</p>
+              <label className="text-xs font-semibold text-slate-500 ml-1">Message Template</label>
+              <textarea rows={10} value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono text-xs leading-relaxed" />
+              <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-4">
+                <span>💡 Use: [NAME], [ROLE], [DEPT], [EMPLOYMENT_TYPE], [COMPANY], [ONBOARDING_LINK]</span>
+              </div>
             </div>
           </div>
 
-          {/* 2. COMPANY & TAB SELECTOR */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2"><Building2 size={14} /> Target Company</label>
-              <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)} className="w-full p-3 bg-blue-50/50 border border-blue-100 rounded-xl font-semibold text-blue-700 outline-none">
-                <option value="">Choose Company...</option>
-                {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+          {/* 2. COMPANY SELECTION */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 mb-4 text-blue-600 font-bold uppercase text-xs tracking-widest">
+              <Building2 size={16} /> Select Company
+            </div>
+            {loadingCompanies ? (
+              <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg">
+                <RefreshCw className="animate-spin text-blue-500" size={18} />
+                <span className="text-slate-500 text-sm">Loading companies...</span>
+              </div>
+            ) : (
+              <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold">
+                <option value="">-- Select a Company --</option>
+                {companies.map(comp => <option key={comp._id} value={comp._id}>{comp.name}</option>)}
               </select>
-            </div>
-            <div className="bg-slate-200/50 p-1.5 rounded-2xl flex gap-1">
-              <button onClick={() => setActiveTab('single')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Single</button>
-              <button onClick={() => setActiveTab('bulk')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'bulk' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bulk Invite</button>
-            </div>
+            )}
           </div>
 
-          {/* 3. INPUT FORM */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5"><Send size={80} /></div>
+          {/* 2.5 DOCUMENT MANAGEMENT SECTION */}
+          {selectedCompany && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-blue-600 font-bold uppercase text-xs tracking-widest">
+                  <Paperclip size={16} /> Document Management
+                </div>
+                <button 
+                  onClick={() => setShowDocumentUpload(!showDocumentUpload)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Upload size={14} /> Upload Document
+                </button>
+              </div>
 
-            {activeTab === 'single' ? (
-              <form onSubmit={handleSendSingle} className="space-y-5">
+              {showDocumentUpload && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-xl border-2 border-dashed border-blue-200">
+                  <label className="cursor-pointer flex flex-col items-center gap-2">
+                    <Upload className="text-blue-600" size={32} />
+                    <span className="text-sm font-semibold text-blue-700">Click to upload document</span>
+                    <span className="text-xs text-slate-500">PDF, DOCX, JPG, PNG (Max 10MB)</span>
+                    <input 
+                      type="file" 
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={handleDocumentUpload}
+                      className="hidden"
+                      disabled={uploadingDocument}
+                    />
+                  </label>
+                  {uploadingDocument && (
+                    <div className="mt-3 flex items-center justify-center gap-2 text-blue-600">
+                      <RefreshCw className="animate-spin" size={16} />
+                      <span className="text-sm">Uploading...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-500 uppercase">Available Documents ({documents.length})</h4>
+                {documents.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <File className="mx-auto text-slate-300" size={40} />
+                    <p className="text-sm text-slate-400 mt-2">No documents uploaded yet</p>
+                    <p className="text-xs text-slate-400 mt-1">Upload documents to make them available for employees</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {documents.map(doc => (
+                      <div key={doc._id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-all">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <File className="text-blue-600 flex-shrink-0" size={16} />
+                              <h5 className="text-sm font-bold text-slate-900 truncate">{doc.fileName}</h5>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {doc.fileType?.toUpperCase()} • {(doc.fileSize / 1024).toFixed(1)} KB
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleViewDocument(doc.fileUrl)}
+                            className="flex-1 px-3 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all text-xs font-semibold flex items-center justify-center gap-1"
+                            title="View Document"
+                          >
+                            <Eye size={14} />
+                            View
+                          </button>
+                          <button 
+                            onClick={() => handleDownloadDocument(doc.fileUrl, doc.fileName)}
+                            className="flex-1 px-3 py-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-all text-xs font-semibold flex items-center justify-center gap-1"
+                            title="Download"
+                          >
+                            <Download size={14} />
+                            Download
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc._id)}
+                            className="px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 3. INVITE FORMS */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex gap-2 mb-6 border-b border-slate-200">
+              <button onClick={() => setActiveTab('single')} className={`px-6 py-3 font-bold text-sm transition-all ${activeTab === 'single' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                Single Invite
+              </button>
+              <button onClick={() => setActiveTab('bulk')} className={`px-6 py-3 font-bold text-sm transition-all ${activeTab === 'bulk' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                Bulk Invite
+              </button>
+            </div>
+
+            {activeTab === 'single' && (
+              <form onSubmit={handleSendSingle} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Full Name</label>
-                    <input placeholder="John Doe" required value={singleData.name} onChange={e => setSingleData({ ...singleData, name: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Email Address*</label>
+                    <input required type="email" placeholder="employee@company.com" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.email} onChange={e => setSingleData({ ...singleData, email: e.target.value })} />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Email Address</label>
-                    <input placeholder="john@company.com" type="email" required value={singleData.email} onChange={e => setSingleData({ ...singleData, email: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Full Name*</label>
+                    <input required placeholder="John Doe" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.name} onChange={e => setSingleData({ ...singleData, name: e.target.value })} />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Designation / Role</label>
-                    <input placeholder="Project Manager" required value={singleData.role} onChange={e => setSingleData({ ...singleData, role: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Role*</label>
+                    <input required placeholder="Software Engineer" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.role} onChange={e => setSingleData({ ...singleData, role: e.target.value })} />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Department</label>
-                    <select value={singleData.department} onChange={e => setSingleData({ ...singleData, department: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-white">
-                      <option value="IT">IT Department</option>
-                      <option value="NON-IT">NON-IT Department</option>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Department*</label>
+                    <select required className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.department} onChange={e => setSingleData({ ...singleData, department: e.target.value })}>
+                      <option value="IT">IT</option>
+                      <option value="NON-IT">NON-IT</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Employment Type</label>
-                    <select required value={singleData.employmentType} onChange={e => setSingleData({ ...singleData, employmentType: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-white">
-                      <option value="">Select Type...</option>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Employment Type*</label>
+                    <select required className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.employmentType} onChange={e => setSingleData({ ...singleData, employmentType: e.target.value })}>
+                      <option value="">Select Type</option>
                       <option value="Full-time">Full-time</option>
                       <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
                   </div>
                   {singleData.employmentType && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase">Monthly Salary</label>
-                      <input type="number" placeholder="Enter Amount" required value={singleData.salary} onChange={e => setSingleData({ ...singleData, salary: e.target.value })} className="w-full p-3 border rounded-xl outline-none focus:border-blue-500" />
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Salary (Optional)</label>
+                      <input type="number" placeholder="50000" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.salary} onChange={e => setSingleData({ ...singleData, salary: e.target.value })} />
                     </div>
                   )}
                 </div>
-                <button disabled={sending || !selectedCompany} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:bg-slate-300 flex items-center justify-center gap-2">
-                  {sending ? <RefreshCw className="animate-spin" /> : <Send size={18} />}
-                  {sending ? "Processing..." : `Send Invitation to ${singleData.name || 'Employee'}`}
+
+                {/* Required Documents Selection */}
+                {documents.length > 0 && (
+                  <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <h4 className="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
+                      <Paperclip size={16} /> Select Required Documents for this Employee
+                    </h4>
+                    <div className="space-y-2">
+                      {documents.map(doc => (
+                        <label key={doc._id} className="flex items-center gap-3 p-2 hover:bg-amber-100 rounded-lg cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={selectedDocuments.includes(doc._id)}
+                            onChange={() => toggleDocumentSelection(doc._id)}
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                          <File className="text-blue-600" size={14} />
+                          <span className="text-sm font-medium text-slate-700">{doc.fileName}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-amber-700 mt-3">
+                      Selected documents ({selectedDocuments.length}) will be required for this employee during onboarding
+                    </p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={sending || !selectedCompany} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 transition-all shadow-xl disabled:from-slate-300 disabled:to-slate-300">
+                  {sending ? "Sending..." : "Send Invitation"}
                 </button>
               </form>
-            ) : (
+            )}
+
+            {activeTab === 'bulk' && (
               <div className="space-y-4">
-                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                <div className="space-y-3">
                   {bulkRows.map((row, idx) => (
-                    <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
-                      <div className="flex-1 min-w-[120px]">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Name</label>
-                        <input placeholder="Name" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.name} onChange={e => updateBulkRow(idx, 'name', e.target.value)} />
+                    <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex flex-wrap gap-3 mb-3">
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Email</label>
+                          <input placeholder="email@company.com" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.email} onChange={e => updateBulkRow(idx, 'email', e.target.value)} />
+                        </div>
+                        <div className="flex-1 min-w-[120px]">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Name</label>
+                          <input placeholder="Name" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.name} onChange={e => updateBulkRow(idx, 'name', e.target.value)} />
+                        </div>
+                        <div className="flex-1 min-w-[100px]">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Role</label>
+                          <input placeholder="Role" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.role} onChange={e => updateBulkRow(idx, 'role', e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Dept</label>
+                          <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.department} onChange={e => updateBulkRow(idx, 'department', e.target.value)}>
+                            <option value="IT">IT</option>
+                            <option value="NON-IT">NON-IT</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Type</label>
+                          <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.employmentType} onChange={e => updateBulkRow(idx, 'employmentType', e.target.value)}>
+                            <option value="">Type</option>
+                            <option value="Full-time">FT</option>
+                            <option value="Intern">INT</option>
+                            <option value="Contract">CON</option>
+                          </select>
+                        </div>
+                        {row.employmentType && (
+                          <div className="w-20">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Sal</label>
+                            <input type="number" placeholder="Amt" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.salary} onChange={e => updateBulkRow(idx, 'salary', e.target.value)} />
+                          </div>
+                        )}
+                        <button onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== idx))} className="mb-1 p-2 text-slate-300 hover:text-red-500 transition-colors">
+                          <X size={18} />
+                        </button>
                       </div>
-                      <div className="flex-[1.2] min-w-[150px]">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Email</label>
-                        <input placeholder="Email" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.email} onChange={e => updateBulkRow(idx, 'email', e.target.value)} />
-                      </div>
-                      <div className="flex-1 min-w-[100px]">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Role</label>
-                        <input placeholder="Role" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.role} onChange={e => updateBulkRow(idx, 'role', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Dept</label>
-                        <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.department} onChange={e => updateBulkRow(idx, 'department', e.target.value)}>
-                          <option value="IT">IT</option>
-                          <option value="NON-IT">NON-IT</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Type</label>
-                        <select className="p-2 text-sm border rounded-lg bg-white outline-none" value={row.employmentType} onChange={e => updateBulkRow(idx, 'employmentType', e.target.value)}>
-                          <option value="">Type</option>
-                          <option value="FULL TIME">FT</option>
-                          <option value="INTERN">INT</option>
-                          <option value="CONTRACT">CON</option>
-                        </select>
-                      </div>
-                      {row.employmentType && (
-                        <div className="w-20">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Sal</label>
-                          <input type="number" placeholder="Amt" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.salary} onChange={e => updateBulkRow(idx, 'salary', e.target.value)} />
+
+                      {/* Document Selection for Each Employee */}
+                      {documents.length > 0 && (
+                        <div className="mt-2 p-3 bg-white rounded-lg border border-amber-200">
+                          <h5 className="text-xs font-bold text-slate-600 mb-2">Required Documents:</h5>
+                          <div className="flex flex-wrap gap-2">
+                            {documents.map(doc => (
+                              <label key={doc._id} className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md hover:bg-blue-50 cursor-pointer text-xs">
+                                <input 
+                                  type="checkbox"
+                                  checked={(bulkSelectedDocuments[idx] || []).includes(doc._id)}
+                                  onChange={() => toggleBulkDocumentSelection(idx, doc._id)}
+                                  className="w-3 h-3 text-blue-600 rounded"
+                                />
+                                <span className="text-slate-700">{doc.fileName}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
-                      <button onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== idx))} className="mb-1 p-2 text-slate-300 hover:text-red-500 transition-colors">
-                        <X size={18} />
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -307,79 +640,77 @@ HR Team
                   <p className="text-slate-400 text-sm font-medium">No invitations found in database.</p>
                 </div>
               )}
-         {sentHistory.map((item) => (
-  <div key={item._id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
-    <div className="flex justify-between items-start mb-2">
-      <div className="flex-1">
-        <h4 className="font-bold text-slate-900 truncate">{item.name || 'Unnamed Employee'}</h4>
-        <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
-          <Mail size={10} /> {item.email}
-        </p>
-      </div>
-      <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${
-        item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
-        item.status === 'revoked' ? 'bg-orange-100 text-orange-700' :
-        'bg-blue-100 text-blue-700'
-      }`}>
-        {item.status}
-      </span>
-    </div>
+              {sentHistory.map((item) => (
+                <div key={item._id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-900 truncate">{item.name || 'Unnamed Employee'}</h4>
+                      <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+                        <Mail size={10} /> {item.email}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${
+                      item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
+                      item.status === 'revoked' ? 'bg-orange-100 text-orange-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </div>
 
-    <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
-      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-        <Building2 size={12} className="text-blue-500" /> 
-        {item.company?.name || 'Unknown Company'}
-      </div>
-      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-        <Briefcase size={12} /> {item.role} • <span className="text-blue-600">{item.department}</span>
-      </div>
-      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-        <span>{item.employmentType || 'FT'}</span>
-        {item.salary && (
-          <span className="text-green-600 ml-2 flex items-center gap-1">
-            <Banknote size={10} /> {item.salary}
-          </span>
-        )}
-      </div>
-      
-      {/* NEW: Display policy status and dates */}
-  {/* NEW: Display policy status and dates */}
-<div className="flex items-center gap-2 text-[10px] font-bold mt-2 pt-2 border-t border-slate-200">
-  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] ${
-    item.policyStatus === 'accepted' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
-  }`}>
-    {item.policyStatus === 'accepted' ? <CheckCircle size={8} /> : <FileText size={8} />}
-    Policy: {item.policyStatus || 'not accepted'}
-  </span>
-  {item.onboardedAt && (
-    <span className="text-slate-500 flex items-center gap-1">
-      <CheckCircle size={8} />
-      Onboarded: {new Date(item.onboardedAt).toLocaleDateString()}
-    </span>
-  )}
-  {item.policyAcceptedAt && (
-    <span className="text-slate-500 flex items-center gap-1">
-      <Clock size={8} />
-      Policy: {new Date(item.policyAcceptedAt).toLocaleDateString()}
-    </span>
-  )}
-</div>
-    </div>
+                  <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                      <Building2 size={12} className="text-blue-500" /> 
+                      {item.company?.name || 'Unknown Company'}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                      <Briefcase size={12} /> {item.role} • <span className="text-blue-600">{item.department}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                      <span>{item.employmentType || 'FT'}</span>
+                      {item.salary && (
+                        <span className="text-green-600 ml-2 flex items-center gap-1">
+                          <Banknote size={10} /> {item.salary}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-[10px] font-bold mt-2 pt-2 border-t border-slate-200">
+                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] ${
+                        item.policyStatus === 'accepted' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {item.policyStatus === 'accepted' ? <CheckCircle size={8} /> : <FileText size={8} />}
+                        Policy: {item.policyStatus || 'not accepted'}
+                      </span>
+                      {item.onboardedAt && (
+                        <span className="text-slate-500 flex items-center gap-1">
+                          <CheckCircle size={8} />
+                          Onboarded: {new Date(item.onboardedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                      {item.policyAcceptedAt && (
+                        <span className="text-slate-500 flex items-center gap-1">
+                          <Clock size={8} />
+                          Policy: {new Date(item.policyAcceptedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-    <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-      <span className="text-[9px] font-bold text-slate-400 uppercase">
-        Invited: {new Date(item.invitedAt).toLocaleDateString()}
-      </span>
-      <button
-        onClick={() => handleDelete(item._id)}
-        className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-        title="Delete Permanently"
-      >
-        <Trash2 size={14} />
-      </button>
-    </div>
-  </div>
-))}
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">
+                      Invited: {new Date(item.invitedAt).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(item._id)}
+                      className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                      title="Delete Permanently"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="p-4 bg-white border-t border-slate-100 text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">

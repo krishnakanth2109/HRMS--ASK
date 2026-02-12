@@ -3,6 +3,7 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import InvitedEmployee from '../models/Invitedemployee.js'; // Adjust path as needed
 import Company from '../models/CompanyModel.js'; // Adjust path as needed
+import CompanyDocument from '../models/Companydocument.js'; // Added for document management
 
 const router = express.Router();
 
@@ -17,10 +18,168 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+// ========================================
+// DOCUMENT MANAGEMENT ROUTES
+// ========================================
+
+// --- UPLOAD DOCUMENT (ADMIN) ---
+router.post('/documents/upload', upload.single('file'), async (req, res) => {
+  try {
+    const { companyId, uploadedBy, description } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No file uploaded' 
+      });
+    }
+
+    if (!companyId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Company ID is required' 
+      });
+    }
+
+    // Check if company exists
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Company not found' 
+      });
+    }
+
+    // Upload to Cloudinary with proper resource type
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    
+    // Determine resource type based on file
+    let resourceType = 'raw'; // Default for documents
+    if (req.file.mimetype.startsWith('image/')) {
+      resourceType = 'image';
+    } else if (req.file.mimetype.startsWith('video/')) {
+      resourceType = 'video';
+    }
+    
+    const cloudinaryResponse = await cloudinary.uploader.upload(dataURI, { 
+      folder: "hrms_documents",
+      resource_type: resourceType,
+      format: req.file.originalname.split('.').pop() // Preserve original format
+    });
+
+    // Extract file extension
+    const fileType = req.file.originalname.split('.').pop().toLowerCase();
+
+    // Create document record in DB
+    const newDocument = new CompanyDocument({
+      fileName: req.file.originalname,
+      fileUrl: cloudinaryResponse.secure_url,
+      fileType: fileType,
+      fileSize: req.file.size,
+      cloudinaryPublicId: cloudinaryResponse.public_id,
+      company: companyId,
+      uploadedBy: uploadedBy || null,
+      description: description || ''
+    });
+
+    await newDocument.save();
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Document uploaded successfully',
+      data: newDocument 
+    });
+
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to upload document' 
+    });
+  }
+});
+
+// --- GET ALL DOCUMENTS FOR A COMPANY ---
+router.get('/documents/company/:companyId', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    const documents = await CompanyDocument.find({ company: companyId })
+      .sort({ uploadedAt: -1 });
+
+    res.status(200).json({ 
+      success: true, 
+      data: documents 
+    });
+
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch documents' 
+    });
+  }
+});
+
+// --- DELETE DOCUMENT ---
+router.delete('/documents/:documentId', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+
+    const document = await CompanyDocument.findById(documentId);
+    
+    if (!document) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Document not found' 
+      });
+    }
+
+    // Delete from Cloudinary
+    if (document.cloudinaryPublicId) {
+      try {
+        // Determine resource type from public ID or file type
+        let resourceType = 'raw';
+        if (document.fileType && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(document.fileType.toLowerCase())) {
+          resourceType = 'image';
+        }
+        
+        await cloudinary.uploader.destroy(document.cloudinaryPublicId, {
+          resource_type: resourceType,
+          invalidate: true
+        });
+      } catch (cloudinaryError) {
+        console.error('Cloudinary deletion error:', cloudinaryError);
+        // Continue with DB deletion even if Cloudinary fails
+      }
+    }
+
+    // Delete from DB
+    await CompanyDocument.findByIdAndDelete(documentId);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Document deleted successfully' 
+    });
+
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete document' 
+    });
+  }
+});
+
+// ========================================
+// EMPLOYEE INVITATION ROUTES
+// ========================================
+
 // --- INVITE SINGLE EMPLOYEE ---
 router.post('/invite', async (req, res) => {
   try {
-    const { email, companyId, invitedBy, name, role, department, employmentType, salary } = req.body;
+    const { email, companyId, invitedBy, name, role, department, employmentType, salary, requiredDocuments } = req.body;
 
     if (!email || !companyId) {
       return res.status(400).json({ 
@@ -49,8 +208,9 @@ router.post('/invite', async (req, res) => {
         existingInvite.name = name || existingInvite.name;
         existingInvite.role = role || existingInvite.role;
         existingInvite.department = department || existingInvite.department;
-        existingInvite.employmentType = employmentType || existingInvite.employmentType; // Added
-        existingInvite.salary = salary || existingInvite.salary; // Added
+        existingInvite.employmentType = employmentType || existingInvite.employmentType;
+        existingInvite.salary = salary || existingInvite.salary;
+        existingInvite.requiredDocuments = requiredDocuments || existingInvite.requiredDocuments; // Added
         existingInvite.invitedAt = new Date();
         if (invitedBy) existingInvite.invitedBy = invitedBy;
         
@@ -77,8 +237,9 @@ router.post('/invite', async (req, res) => {
       name,
       role,
       department,
-      employmentType, // Added
-      salary,        // Added
+      employmentType,
+      salary,
+      requiredDocuments: requiredDocuments || [], // Added
       status: 'pending'
     });
 
@@ -137,8 +298,9 @@ router.post('/invite-bulk', async (req, res) => {
             existingInvite.name = emp.name;
             existingInvite.role = emp.role;
             existingInvite.department = emp.department;
-            existingInvite.employmentType = emp.employmentType; // Added
-            existingInvite.salary = emp.salary;                 // Added
+            existingInvite.employmentType = emp.employmentType;
+            existingInvite.salary = emp.salary;
+            existingInvite.requiredDocuments = emp.requiredDocuments || []; // Added
             existingInvite.invitedAt = new Date();
             if (invitedBy) existingInvite.invitedBy = invitedBy;
             await existingInvite.save();
@@ -152,6 +314,7 @@ router.post('/invite-bulk', async (req, res) => {
             email: emailLower,
             company: companyId,
             invitedBy,
+            requiredDocuments: emp.requiredDocuments || [], // Added
             status: 'pending'
           });
           results.success.push(emailLower);
@@ -181,7 +344,9 @@ router.post('/verify-email', async (req, res) => {
 
     const invite = await InvitedEmployee.findOne({ 
       email: email.toLowerCase()
-    }).populate('company', 'name _id prefix');
+    })
+    .populate('company', 'name _id prefix')
+    .populate('requiredDocuments'); // Added to populate document details
 
     if (!invite) {
       return res.status(404).json({ success: false, error: 'Email not found in invitation list' });
@@ -209,8 +374,9 @@ router.post('/verify-email', async (req, res) => {
         name: invite.name,
         role: invite.role,
         department: invite.department,
-        employmentType: invite.employmentType, // Added
-        salary: invite.salary,                 // Added
+        employmentType: invite.employmentType,
+        salary: invite.salary,
+        requiredDocuments: invite.requiredDocuments, // Added
         invitedAt: invite.invitedAt
       }
     });
@@ -303,47 +469,23 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/complete-onboarding', upload.single('signature'), async (req, res) => {
-  // --- ADD THESE LOGS ---
-  console.log("--- ONBOARDING ATTEMPT ---");
-  console.log("Received Email:", req.body.email);
-  console.log("File Received:", req.file ? "YES" : "NO");
-
+router.post("/complete-onboarding", upload.single('signature'), async (req, res) => {
   try {
     const { email } = req.body;
     
-    // Normalize the email
-    const searchEmail = email ? email.toLowerCase().trim() : "";
-
-    // 1. First, just check if the employee exists at all without updating
-    const checkUser = await InvitedEmployee.findOne({ email: searchEmail });
-    console.log("Database Lookup Result:", checkUser ? "FOUND" : "NOT FOUND");
-
-    if (!checkUser) {
-      return res.status(404).json({ 
-        success: false, 
-        error: `Employee with email ${searchEmail} not found in database.` 
-      });
+    // Safety Check: If no file arrived, req.file will be undefined
+    if (!req.file) {
+      return res.status(400).json({ error: "Signature file is missing." });
     }
 
-    // 2. Proceed with Cloudinary...
-    const b64 = Buffer.from(req.file.buffer).toString("base64");
-    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-    const cldRes = await cloudinary.uploader.upload(dataURI, { folder: "hrms_signatures" });
+    // Now req.file.path or req.file.buffer will exist depending on your storage
+    const signatureUrl = req.file.path; // Cloudinary uses .path
 
-    // 3. Update
-    checkUser.signatureUrl = cldRes.secure_url;
-    checkUser.policyStatus = 'accepted';
-    checkUser.policyAcceptedAt = new Date();
-    checkUser.status = 'onboarded';
-    checkUser.onboardedAt = new Date();
-    await checkUser.save();
 
-    res.status(200).json({ success: true, message: 'Onboarding completed successfully' });
-
+    res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Backend Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

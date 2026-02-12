@@ -41,6 +41,10 @@ const invitedEmployeeSchema = new mongoose.Schema({
     default: 'not accepted' 
   },
   policyAcceptedAt: { type: Date },
+  requiredDocuments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CompanyDocument'
+  }]
   
 }, {
   timestamps: true

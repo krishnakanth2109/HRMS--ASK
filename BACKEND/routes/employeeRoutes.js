@@ -315,68 +315,77 @@ router.post("/idle-activity", protect, async (req, res) => {
  🚀 3. PUBLIC ONBOARDING (No Auth Required)
 =================================================================
 =========== */
-router.post("/onboard", async (req, res) => {
+
+
+// Update the /onboard route
+router.post("/onboard", upload.fields([
+  { name: 'aadhaarCard', maxCount: 1 },
+  { name: 'panCard', maxCount: 1 },
+  { name: 'companyDocuments' } // This collects all signed company docs
+]), async (req, res) => {
   try {
-    if (!req.body.company) {
-      return res.status(400).json({ error: "Company selection is required" });
+    // 1. Parse the text data
+    const data = JSON.parse(req.body.jsonData);
+
+    const company = await Company.findById(data.company);
+    if (!company) return res.status(404).json({ error: "Company not found" });
+
+    // 2. ID Generation Logic
+    const currentCount = await Employee.countDocuments({ company: data.company });
+    const paddedCount = String(currentCount + 1).padStart(2, "0");
+    const employeeId = `${company.prefix}${paddedCount}`;
+
+    // 3. Construct the Employee Object
+    // We spread the existing data (which includes personalDetails object from frontend)
+    const newEmployeeData = {
+      ...data,
+      employeeId,
+      role: "employee",
+      isActive: true,
+      // Initialize files if not present in jsonData
+      personalDetails: {
+        ...data.personalDetails
+      },
+      companyDocuments: []
+    };
+
+    // 4. Map Cloudinary URLs to Model Keys
+    // Aadhaar
+    if (req.files['aadhaarCard']) {
+      newEmployeeData.personalDetails.aadhaarFileUrl = req.files['aadhaarCard'][0].path;
     }
 
-    const company = await Company.findById(req.body.company);
-    if (!company) {
-      return res.status(404).json({ error: "Selected company not found" });
+    // PAN
+    if (req.files['panCard']) {
+      newEmployeeData.personalDetails.panFileUrl = req.files['panCard'][0].path;
     }
 
-    let employeeId;
-    let attempts = 0;
-    const maxAttempts = 5;
-    
-    while (attempts < maxAttempts) {
-      const currentCount = await Employee.countDocuments({ company: req.body.company });
-      const paddedCount = String(currentCount + 1).padStart(2, "0");
-      employeeId = `${company.prefix}${paddedCount}`;
-      
-      const existingEmployee = await Employee.findOne({ employeeId });
-      if (!existingEmployee) {
-        break; 
-      }
-      
-      attempts++;
-      if (attempts === maxAttempts) {
-        const timestamp = Date.now().toString().slice(-3);
-        employeeId = `${company.prefix}${paddedCount}_${timestamp}`;
-      }
+    // Multiple Company Documents (Loops through all files sent under this key)
+    if (req.files['companyDocuments']) {
+      newEmployeeData.companyDocuments = req.files['companyDocuments'].map(file => ({
+        fileName: file.originalname,
+        fileUrl: file.path, // This is the Cloudinary URL
+        uploadedAt: new Date()
+      }));
     }
 
-    req.body.employeeId = employeeId;
-    req.body.role = "employee"; 
-    req.body.isActive = true;
-    
-    const employee = new Employee(req.body);
+    // 5. Save to Database
+    const employee = new Employee(newEmployeeData);
     const result = await employee.save();
     
-    company.employeeCount = await Employee.countDocuments({ company: req.body.company });
+    // Update company count
+    company.employeeCount = await Employee.countDocuments({ company: data.company });
     await company.save();
     
     res.status(201).json({ 
+      success: true, 
       message: "Onboarding successful", 
-      employeeId: result.employeeId,
-      employee: result 
+      employeeId: result.employeeId 
     });
 
   } catch (err) {
     console.error("❌ Onboarding error:", err);
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern)[0];
-      return res.status(400).json({
-        error: `Duplicate value entered for ${field}. Please try again.`,
-        field: field,
-        details: "The system detected a duplicate entry. Please refresh and try again."
-      });
-    }
-    res.status(500).json({ 
-      error: "Onboarding failed. Please contact HR.",
-      details: err.message 
-    });
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
   }
 });
 

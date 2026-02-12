@@ -4,16 +4,16 @@ import {
   FaUser, FaEnvelope, FaBuilding, FaPhone, FaMapMarkerAlt,
   FaCalendarAlt, FaBriefcase, FaMoneyBill, FaBirthdayCake, FaFlag,
   FaHeartbeat, FaUniversity, FaCreditCard, FaCodeBranch,
-  FaEye, FaEyeSlash, FaLock, FaTimes, FaCheckCircle, FaSearch, FaIdCard
+  FaEye, FaEyeSlash, FaLock, FaTimes, FaCheckCircle, FaSearch, FaIdCard,
+  FaFileDownload, FaFileUpload, FaArrowRight, FaRocket, FaInfoCircle, FaVenusMars, FaRing
 } from "react-icons/fa";
 import {
-  ShieldCheck, UserCheck, Clock, Upload, ChevronRight,
-  ChevronLeft, CheckCircle2, AlertCircle, FileText,
-  Briefcase, X, Loader2
+  ShieldCheck, UserCheck, Clock, Upload, CheckCircle2, AlertCircle, FileText,
+  Briefcase, X, Loader2, Sparkles, Mail, Headphones
 } from 'lucide-react';
 
 // Import API functions
-import { publicOnboard, sendOnboardingOtp } from "../api";
+import { sendOnboardingOtp } from "../api";
 import api from "../api";
 
 const EmployeeOnboarding = () => {
@@ -28,13 +28,21 @@ const EmployeeOnboarding = () => {
   const [emailVerified, setEmailVerified] = useState(false);
   const [verifiedCompany, setVerifiedCompany] = useState(null);
   const [emailCheckLoading, setEmailCheckLoading] = useState(false);
+  const [assignedDocs, setAssignedDocs] = useState([]);
 
   // OTP State
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otp, setOtp] = useState("");
   const [verifying, setVerifying] = useState(false);
 
-  // Form State
+  // File State
+  const [docFiles, setDocFiles] = useState({
+    aadhaar: null,
+    pan: null,
+    filledDocs: {} // { docId: FileObject }
+  });
+
+  // Form State - UPDATED WITH MISSING MODEL FIELDS
   const [formData, setFormData] = useState({
     company: "",
     name: "",
@@ -43,13 +51,21 @@ const EmployeeOnboarding = () => {
     phone: "",
     address: "",
     emergency: "",
+    emergencyPhone: "", // Added missing field
     joiningDate: "",
     currentDepartment: "",
     currentRole: "",
     currentSalary: 0,
     employmentType: "",
     bankDetails: { accountNumber: "", bankName: "", ifsc: "", branch: "" },
-    personalDetails: { dob: "", gender: "Male", maritalStatus: "Single", nationality: "" },
+    personalDetails: {
+      dob: "",
+      gender: "Male", // Added missing field
+      maritalStatus: "Single", // Added missing field
+      nationality: "",
+      panNumber: "", // Added missing field
+      aadhaarNumber: "" // Added missing field
+    },
   });
 
   const handleChange = (e) => {
@@ -65,26 +81,51 @@ const EmployeeOnboarding = () => {
     }
   };
 
-  // --- UPDATED EMAIL VERIFICATION HANDLER ---
+  const handleFileChange = (e, type, docId = null) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (type === 'filledDocs') {
+      setDocFiles(prev => ({ ...prev, filledDocs: { ...prev.filledDocs, [docId]: file } }));
+    } else {
+      setDocFiles(prev => ({ ...prev, [type]: file }));
+    }
+  };
+
+  // --- EMAIL VERIFICATION ---
   const handleVerifyEmail = async () => {
     const email = formData.email.trim();
-
     if (!email || !email.includes('@')) {
-      Swal.fire("Invalid Email", "Please enter a valid email address", "warning");
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Email',
+        text: 'Please enter a valid work email address to proceed.',
+        confirmButtonColor: '#3b82f6'
+      });
       return;
     }
 
     setEmailCheckLoading(true);
-
     try {
       const response = await api.post('/api/invited-employees/verify-email', { email });
+
+      // Handle Case: Already Onboarded
+      if (response.data.alreadyOnboarded) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Already Onboarded',
+          html: `<p>This email is already registered for <b>${response.data.name}</b> at <b>${response.data.companyName}</b>.</p><p class="mt-2 text-sm text-gray-500">Please proceed to the login page.</p>`,
+          confirmButtonText: 'Go to Login',
+          confirmButtonColor: '#4f46e5',
+        }).then(() => { window.location.href = '/login'; });
+        return;
+      }
 
       if (response.data.success) {
         const empData = response.data.data;
         setEmailVerified(true);
         setVerifiedCompany(empData.company);
+        setAssignedDocs(empData.requiredDocuments || []);
 
-        // Auto-fill and lock fields (Added Employment Type and Salary logic)
         setFormData(prev => ({
           ...prev,
           company: empData.company._id,
@@ -97,32 +138,35 @@ const EmployeeOnboarding = () => {
 
         Swal.fire({
           icon: 'success',
-          title: 'Email Verified!',
-          text: `Welcome to ${empData.company.name}, ${empData.name || 'Employee'}! Please complete your onboarding form.`,
+          title: `Verification Successful!`,
+          html: `Welcome <b>${empData.name}</b>!<br/>Invitation verified for <b>${empData.company.name}</b>.`,
           timer: 4000,
-          showConfirmButton: true
+          showConfirmButton: false,
+          position: 'top-end',
+          toast: true
         });
       }
-    } catch (error) {
+    }
+    catch (error) {
       setEmailVerified(false);
-      setVerifiedCompany(null);
+      const status = error.response?.status;
+      const errorMsg = error.response?.data?.error || "";
 
-      if (error.response?.data?.onboarded) {
+      if (status === 409 || errorMsg.toLowerCase().includes("already onboarded")) {
         Swal.fire({
           icon: 'info',
           title: 'Already Onboarded',
-          text: `${error.response.data.message}\n\nPlease contact the HR team to continue.`,
-          confirmButtonColor: '#3085d6'
-        });
-      } else if (error.response?.status === 404) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Email Not Invited',
-          text: 'This email has not been invited by any company. Please contact your HR department.',
-          confirmButtonColor: '#dc2626'
-        });
+          html: `<p>This email is already registered.</p><p class="mt-2 text-sm text-gray-500">Please login to continue.</p>`,
+          confirmButtonText: 'Go to Login',
+          confirmButtonColor: '#4f46e5',
+        }).then(() => { window.location.href = '/login'; });
       } else {
-        Swal.fire("Error", error.response?.data?.error || "Verification failed", "error");
+        Swal.fire({
+          icon: "warning",
+          title: "Verification Failed",
+          text: errorMsg || "We couldn't find an active invitation for this email.",
+          confirmButtonColor: '#ef4444'
+        });
       }
     } finally {
       setEmailCheckLoading(false);
@@ -130,286 +174,291 @@ const EmployeeOnboarding = () => {
   };
 
   const validateForm = () => {
-    if (!formData.company) return "Company verification failed. Please use an invited email.";
-    if (!formData.name || !formData.email || !formData.password) return "Name, Email, and Password are required.";
-    if (formData.password.length < 8) return "Password must be at least 8 characters.";
-    if (formData.phone.length !== 10) return "Phone number must be 10 digits.";
-    if (!emailVerified) return "Please verify your email first.";
+    if (!formData.company) return "Company verification failed.";
+    if (!formData.name || !formData.email || !formData.password) return "Please fill in all required profile fields.";
+    if (formData.password.length < 8) return "Password must be at least 8 characters long.";
+    if (formData.phone.length !== 10) return "Phone number must be exactly 10 digits.";
+    if (!docFiles.aadhaar || !docFiles.pan) return "Identity documents (Aadhaar & PAN) are required.";
+    const unuploaded = assignedDocs.filter(doc => !docFiles.filledDocs[doc._id]);
+    if (unuploaded.length > 0) return `Please upload all ${unuploaded.length} assigned company documents.`;
     return null;
   };
 
   const handleInitialSubmit = async (e) => {
     e.preventDefault();
     const error = validateForm();
-    if (error) {
-      Swal.fire("Validation Error", error, "warning");
-      return;
-    }
+    if (error) return Swal.fire({ icon: "warning", title: "Missing Information", text: error, confirmButtonColor: '#f59e0b' });
 
     setLoading(true);
     try {
       await sendOnboardingOtp(formData.email);
       setLoading(false);
       setShowOtpModal(true);
-      Swal.fire({ icon: 'info', title: 'OTP Sent', text: `Verification code sent to ${formData.email}`, timer: 3000 });
+      Swal.fire({
+        icon: 'info',
+        title: 'OTP Sent',
+        text: 'A 6-digit verification code has been sent to your email.',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000
+      });
     } catch (err) {
       setLoading(false);
-      Swal.fire("Error", err.message || "Failed to send OTP.", "error");
+      Swal.fire("Error", "Failed to send OTP. Please try again later.", "error");
     }
   };
 
   const handleFinalSubmit = async () => {
-    if (otp.length !== 6) {
-      Swal.fire("Error", "Please enter a valid 6-digit OTP", "warning");
-      return;
-    }
-
+    if (otp.length !== 6) return Swal.fire("Invalid OTP", "Please enter the 6-digit code sent to your email.", "warning");
     setVerifying(true);
 
-    // Construct the payload to match employeeModel.js
+    const finalData = new FormData();
     const payload = {
       ...formData,
-      otp: otp,
-      // Ensure this matches the experienceSchema in your model
       experienceDetails: [{
-        company: verifiedCompany?.name || "", // Optional: Add current company name
         role: formData.currentRole,
         department: formData.currentDepartment,
-        joiningDate: formData.joiningDate, // Change from 'startDate' to 'joiningDate'
+        joiningDate: formData.joiningDate,
         lastWorkingDate: "Present",
         salary: Number(formData.currentSalary),
-        employmentType: formData.employmentType, // <--- ADD THIS HERE
+        employmentType: formData.employmentType,
       }]
     };
 
+    finalData.append("jsonData", JSON.stringify(payload));
+    finalData.append("otp", otp);
+    finalData.append("aadhaarCard", docFiles.aadhaar);
+    finalData.append("panCard", docFiles.pan);
+    Object.keys(docFiles.filledDocs).forEach((id) => {
+      finalData.append("companyDocuments", docFiles.filledDocs[id]);
+    });
+
     try {
-      // 1. Send to public onboarding route
-      await publicOnboard(payload);
-
-      // 2. Mark as onboarded in your invitation tracking table
-      await api.post('/api/invited-employees/mark-onboarded', {
-        email: formData.email
+      await api.post('/api/employees/onboard', finalData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-
+      await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
       setVerifying(false);
       setShowOtpModal(false);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Details Submitted!',
-        text: 'Now please review and accept company policies.',
-        timer: 3000,
-        showConfirmButton: true
-      });
-
-      // Transition to HR Compliance Portal
       setStage('compliance');
-
     } catch (err) {
       setVerifying(false);
-      console.error("Onboarding error:", err);
-      Swal.fire("Error", err.response?.data?.error || "Onboarding failed. Please try again.", "error");
+      Swal.fire({
+        icon: 'error',
+        title: 'Submission Failed',
+        text: err.response?.data?.error || "An error occurred during onboarding. Please check your details.",
+        confirmButtonColor: '#ef4444'
+      });
     }
   };
 
-  // Render based on stage
-  if (stage === 'compliance') {
-    return <ComplianceModule userEmail={formData.email} userName={formData.name} companyName={verifiedCompany?.name} onComplete={() => setStage('completed')} />;
-  }
+  if (stage === 'compliance') return <ComplianceModule userEmail={formData.email} userName={formData.name} companyName={verifiedCompany?.name} onComplete={() => setStage('completed')} />;
+  if (stage === 'completed') return <CompletionScreen userName={formData.name} companyName={verifiedCompany?.name} />;
 
-  if (stage === 'completed') {
-    return <CompletionScreen userName={formData.name} companyName={verifiedCompany?.name} />;
-  }
-
-  // Default: Onboarding Form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl p-8 md:p-12">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Hi! Welcome to Onboarding Process</h1>
-          <p className="text-gray-500">Complete your profile to join your team</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-12 px-4 font-sans">
+      <div className="max-w-4xl mx-auto bg-white/80 backdrop-blur-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-white">
+        <div className="bg-indigo-600 p-10 text-center text-white relative">
+          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none overflow-hidden">
+            <FaRocket className="absolute -bottom-10 -right-10 text-[15rem] rotate-12" />
+          </div>
+          <h1 className="text-4xl font-black mb-3">Employee Onboarding</h1>
+          <p className="text-indigo-100 text-lg opacity-90">Securely set up your official employee profile</p>
         </div>
 
-        <form onSubmit={handleInitialSubmit}>
-          <Section title="Email Verification" color="blue">
-            <div className="space-y-4">
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <Input
-                    icon={<FaEnvelope />}
-                    name="email"
-                    label="Company Email Address *"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    readOnly={emailVerified}
-                    placeholder="Enter Your Invited Email"
-                  />
-                </div>
-                <div>
+        <div className="p-8 md:p-12">
+          <form onSubmit={handleInitialSubmit}>
+            <Section title="1. Identity Verification" color="blue">
+              <div className="space-y-4">
+                <div className="flex flex-col md:flex-row items-end gap-4">
+                  <div className="flex-1 w-full">
+                    <Input icon={<FaEnvelope />} name="email" label="Professional Email Address *" type="email" value={formData.email} onChange={handleChange} required readOnly={emailVerified} placeholder="e.g. alex@company.com" />
+                  </div>
                   {!emailVerified && (
-                    <button
-                      type="button"
-                      onClick={handleVerifyEmail}
-                      disabled={emailCheckLoading || !formData.email}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
-                    >
-                      <FaSearch size={14} /> Proceed
+                    <button type="button" onClick={handleVerifyEmail} disabled={emailCheckLoading} className="w-full md:w-auto bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group">
+                      {emailCheckLoading ? <Loader2 className="animate-spin" /> : <FaSearch className="group-hover:scale-110 transition" />}
+                      Verify Invitation
                     </button>
                   )}
                 </div>
-              </div>
-
-              {emailVerified && verifiedCompany && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-3">
-                  <FaCheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={20} />
-                  <div>
-                    <p className="text-green-800 font-semibold">✓ Email Verified Successfully</p>
-                    <p className="text-green-700 text-sm mt-1">
-                      Company: <span className="font-bold">{verifiedCompany.name}</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Section>
-
-          {emailVerified && (
-            <>
-              <Section title="Personal Information" color="indigo">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
-                    icon={<FaUser />}
-                    name="name"
-                    label="Full Name *"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    readOnly={emailVerified}
-                    placeholder="Enter your full name"
-                  />
-
-                  <div className="relative">
-                    <label className="text-xs font-semibold text-gray-500 absolute left-10 top-2">Create Password *</label>
-                    <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Min 8 characters"
-                      className="w-full pl-10 pr-10 pt-6 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
-                    <div
-                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                {emailVerified && verifiedCompany && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center space-x-4 animate-in slide-in-from-top-2">
+                    <div className="bg-emerald-500 p-2 rounded-full text-white"><FaCheckCircle size={20} /></div>
+                    <div>
+                      <p className="text-emerald-900 font-bold leading-tight">Identity Confirmed</p>
+                      <p className="text-emerald-700 text-sm">Onboarding for <span className="font-bold">{verifiedCompany.name}</span></p>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Please remember this password for future logins.</p>
                   </div>
+                )}
+              </div>
+            </Section>
 
-                  <Input icon={<FaPhone />} name="phone" label="Phone Number *" type="tel" maxLength={10} value={formData.phone} onChange={handleChange} required placeholder="10-digit mobile number" />
-                  <Input icon={<FaMapMarkerAlt />} name="address" label="Current Address" value={formData.address} onChange={handleChange} placeholder="House No, Street, City, State" />
-                  <Input icon={<FaHeartbeat />} name="emergency" label="Emergency Contact" value={formData.emergency} onChange={handleChange} placeholder="Name - Relationship - Phone" />
-
-                  <Input icon={<FaBirthdayCake />} name="personalDetails.dob" type="date" label="Date of Birth" value={formData.personalDetails.dob} onChange={handleChange} />
-                  <Input icon={<FaFlag />} name="personalDetails.nationality" label="Nationality" value={formData.personalDetails.nationality} onChange={handleChange} placeholder="e.g. Indian" />
-                </div>
-              </Section>
-
-              <Section title="Job Details" color="green">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
-                    icon={<FaBriefcase />}
-                    name="currentRole"
-                    label="Designation/Role *"
-                    value={formData.currentRole}
-                    onChange={handleChange}
-                    required
-                    readOnly={true}
-                    placeholder="Role"
-                  />
-                  <Input
-                    icon={<FaBuilding />}
-                    name="currentDepartment"
-                    label="Department *"
-                    value={formData.currentDepartment}
-                    onChange={handleChange}
-                    required
-                    readOnly={true}
-                    placeholder="Department"
-                  />
-                  <Input
-                    icon={<FaIdCard />}
-                    name="employmentType"
-                    label="Employment Type *"
-                    value={formData.employmentType}
-                    readOnly={true}
-                    placeholder="Employment Type"
-                  />
-                  <Input icon={<FaCalendarAlt />} name="joiningDate" label="Joining Date *" type="date" value={formData.joiningDate} onChange={handleChange} required />
-
-                  {/* Conditional Agreed Salary Field */}
-                  {Number(formData.currentSalary) > 0 && (
-                    <Input
-                      icon={<FaMoneyBill />}
-                      name="currentSalary"
-                      label="Agreed Salary"
-                      type="number"
-                      value={formData.currentSalary}
-                      readOnly={true}
-                      placeholder="Salary Amount"
-                    />
-                  )}
-                </div>
-              </Section>
-
-              {/* Conditional Bank Details Section */}
-              {Number(formData.currentSalary) > 0 && (
-                <Section title="Bank Details" color="purple">
+            {emailVerified && (
+              <div className="animate-in fade-in duration-700">
+                <Section title="2. Personal Profile" color="indigo">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input icon={<FaUniversity />} name="bankDetails.bankName" label="Bank Name" value={formData.bankDetails.bankName} onChange={handleChange} placeholder="e.g. HDFC Bank" />
-                    <Input icon={<FaCreditCard />} name="bankDetails.accountNumber" label="Account Number" value={formData.bankDetails.accountNumber} onChange={handleChange} placeholder="Enter Account Number" />
-                    <Input icon={<FaCodeBranch />} name="bankDetails.ifsc" label="IFSC Code" value={formData.bankDetails.ifsc} onChange={handleChange} maxLength={11} placeholder="e.g. HDFC0001234" />
-                    <Input icon={<FaMapMarkerAlt />} name="bankDetails.branch" label="Branch Name" value={formData.bankDetails.branch} onChange={handleChange} placeholder="Enter Branch Name" />
+                    <Input icon={<FaUser />} name="name" label="Full Name (as per ID)" value={formData.name} readOnly={true} />
+                    <div className="relative group">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-indigo-500 absolute left-10 top-2 z-10">Create Account Password *</label>
+                      <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Min. 8 characters" className="w-full pl-10 pr-10 pt-7 pb-3 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium" required />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-indigo-600 transition" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}</div>
+                    </div>
+                    <Input icon={<FaPhone />} name="phone" label="Primary Phone *" value={formData.phone} onChange={handleChange} required maxLength={10} placeholder="10-digit mobile number" />
+                    <Input icon={<FaMapMarkerAlt />} name="address" label="Residential Address" value={formData.address} onChange={handleChange} placeholder="Street, City, Zip Code" />
+                    <Input icon={<FaBirthdayCake />} name="personalDetails.dob" type="date" label="Date of Birth" value={formData.personalDetails.dob} onChange={handleChange} />
+                    <Input icon={<FaFlag />} name="personalDetails.nationality" label="Nationality" value={formData.personalDetails.nationality} onChange={handleChange} />
+
+                    {/* NEW: GENDER SELECT */}
+                    <div className="relative group">
+                      <FaVenusMars className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 absolute left-10 top-2 z-10">Gender</label>
+                      <select name="personalDetails.gender" value={formData.personalDetails.gender} onChange={handleChange} className="w-full pl-10 pr-4 pt-7 pb-3 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium bg-white">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
+                    </div>
+
+                    {/* NEW: MARITAL STATUS SELECT */}
+                    <div className="relative group">
+                      <FaRing className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 absolute left-10 top-2 z-10">Marital Status</label>
+                      <select name="personalDetails.maritalStatus" value={formData.personalDetails.maritalStatus} onChange={handleChange} className="w-full pl-10 pr-4 pt-7 pb-3 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium bg-white">
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Divorced">Divorced</option>
+                        <option value="Widowed">Widowed</option>
+                      </select>
+                    </div>
+
+                    <Input icon={<FaUser />} name="emergency" label="Emergency Contact Name" value={formData.emergency} onChange={handleChange} placeholder="Full Name" />
+
+                    {/* NEW: EMERGENCY PHONE */}
+                    <Input icon={<FaPhone />} name="emergencyPhone" label="Emergency Phone" value={formData.emergencyPhone} onChange={handleChange} placeholder="Emergency Contact Number" />
                   </div>
                 </Section>
-              )}
 
-              <div className="pt-6">
-                <button type="submit" disabled={loading} className="w-full py-4 rounded-xl text-white font-bold text-lg bg-blue-600 hover:bg-blue-700 shadow-lg transition-all active:scale-95">
-                  {loading ? "Processing..." : "Submit Onboarding Details"}
-                </button>
+                <Section title="3. Role Information" color="emerald">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <BadgeBox icon={<FaBriefcase />} label="Designation" value={formData.currentRole} color="blue" />
+                    <BadgeBox icon={<FaBuilding />} label="Department" value={formData.currentDepartment} color="indigo" />
+                    <BadgeBox icon={<FaIdCard />} label="Job Type" value={formData.employmentType} color="emerald" />
+                    <div className="md:col-span-1">
+                      <Input icon={<FaCalendarAlt />} name="joiningDate" type="date" label="Joining Date" value={formData.joiningDate} onChange={handleChange} required />
+                    </div>
+                  </div>
+                </Section>
+
+                <Section title="4. Compliance & Documentation" color="orange">
+                  <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-4 items-start">
+                    <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><FaInfoCircle /></div>
+                    <p className="text-sm text-amber-800 leading-relaxed font-medium">
+                      Please enter your ID numbers and provide high-quality scans of your identity documents.
+                    </p>
+                  </div>
+
+                  {/* NEW: AADHAAR AND PAN NUMBERS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <Input icon={<FaIdCard />} name="personalDetails.aadhaarNumber" label="Aadhaar Number *" value={formData.personalDetails.aadhaarNumber} onChange={handleChange} placeholder="12-digit Aadhaar Number" required />
+                    <Input icon={<FaCreditCard />} name="personalDetails.panNumber" label="PAN Number *" value={formData.personalDetails.panNumber} onChange={handleChange} placeholder="10-digit PAN Number" required />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <FileUploadCard
+                      label="Aadhaar Card (Front & Back)"
+                      required
+                      file={docFiles.aadhaar}
+                      onChange={(e) => handleFileChange(e, 'aadhaar')}
+                    />
+                    <FileUploadCard
+                      label="PAN Card (Front)"
+                      required
+                      file={docFiles.pan}
+                      onChange={(e) => handleFileChange(e, 'pan')}
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest px-1">Assigned Company Policies</h4>
+                    {assignedDocs.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3">
+                        {assignedDocs.map((doc) => (
+                          <div key={doc._id} className="group flex flex-col sm:flex-row items-center justify-between p-5 bg-white border-2 border-slate-50 hover:border-indigo-100 hover:shadow-md rounded-2xl transition-all">
+                            <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                              <div className="p-3 bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-xl transition-colors">
+                                <FileText size={24} />
+                              </div>
+                              <div>
+                                <span className="block text-slate-800 font-bold group-hover:text-indigo-700">{doc.fileName}</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">Official Document</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-3 w-full sm:w-auto">
+                              <a
+                                href={doc.fileUrl}
+                                download={doc.fileName || "Company-Document"}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition"
+                              >
+                                <FaFileDownload /> Download File
+                              </a>
+
+                              <label className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition shadow-sm ${docFiles.filledDocs[doc._id] ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}>
+                                <input type="file" className="hidden" onChange={(e) => handleFileChange(e, 'filledDocs', doc._id)} />
+                                {docFiles.filledDocs[doc._id] ? <><FaCheckCircle /> Uploaded</> : <><FaFileUpload /> Upload Signed</>}
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                        <p className="text-slate-400 font-medium">No additional documents assigned.</p>
+                      </div>
+                    )}
+                  </div>
+                </Section>
+
+                {Number(formData.currentSalary) > 0 && (
+                  <Section title="5. Payroll & Bank Details" color="purple">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Input icon={<FaUniversity />} name="bankDetails.bankName" label="Bank Name" value={formData.bankDetails.bankName} onChange={handleChange} placeholder="e.g. HDFC Bank" />
+                      <Input icon={<FaCreditCard />} name="bankDetails.accountNumber" label="Account Number" value={formData.bankDetails.accountNumber} onChange={handleChange} placeholder="12-16 digit number" />
+                      <Input icon={<FaCodeBranch />} name="bankDetails.ifsc" label="IFSC Code" value={formData.bankDetails.ifsc} onChange={handleChange} placeholder="SBIN0001234" />
+                      <Input icon={<FaMapMarkerAlt />} name="bankDetails.branch" label="Branch Name" value={formData.bankDetails.branch} onChange={handleChange} placeholder="City/Area Name" />
+                    </div>
+                  </Section>
+                )}
+
+                <div className="pt-8">
+                  <button type="submit" disabled={loading} className="w-full py-5 rounded-[1.5rem] text-white font-black text-xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
+                    {loading ? <Loader2 className="animate-spin" /> : <FaArrowRight />}
+                    {loading ? "Processing Information..." : "Confirm & Submit Onboarding"}
+                  </button>
+                  <p className="text-center mt-4 text-slate-400 text-sm font-medium">By clicking submit, you verify all provided information is accurate.</p>
+                </div>
               </div>
-            </>
-          )}
-        </form>
+            )}
+          </form>
+        </div>
       </div>
 
       {showOtpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
-            <button onClick={() => setShowOtpModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500">
-              <FaTimes size={20} />
-            </button>
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold">Verify Email</h2>
-              <p className="text-gray-500">Enter code sent to {formData.email}</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] p-10 max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in-95">
+            <button onClick={() => setShowOtpModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><FaTimes size={20} /></button>
+            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <Mail size={40} />
             </div>
-            <input
-              type="text"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              className="w-full text-center text-3xl font-bold py-4 border-2 rounded-xl focus:border-blue-500 outline-none"
-              placeholder="000000"
-            />
-            <button onClick={handleFinalSubmit} disabled={verifying} className="w-full py-3 mt-4 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition shadow-md">
-              {verifying ? "Verifying..." : "Confirm & Submit"}
+            <h2 className="text-2xl font-black text-slate-800 mb-2">Verify Email</h2>
+            <p className="text-slate-500 mb-8 text-sm leading-relaxed">We've sent a 6-digit verification code to <br /><span className="font-bold text-slate-800">{formData.email}</span></p>
+            <input type="text" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-4xl font-black tracking-[0.5em] py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl mb-6 focus:border-indigo-500 outline-none transition-all" placeholder="000000" />
+            <button onClick={handleFinalSubmit} disabled={verifying} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50">
+              {verifying ? "Validating..." : "Confirm & Submit"}
             </button>
+            <p className="mt-6 text-xs text-slate-400 font-bold uppercase tracking-widest">Expires in 10:00</p>
           </div>
         </div>
       )}
@@ -417,7 +466,7 @@ const EmployeeOnboarding = () => {
   );
 };
 
-// HR Compliance Portal Component
+// --- COMPLIANCE MODULE ---
 const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [agreedPage1, setAgreedPage1] = useState(false);
@@ -429,27 +478,17 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setTimer(5);
-    setIsLocked(true);
-  }, [currentPage]);
-
+  useEffect(() => { setTimer(5); setIsLocked(true); }, [currentPage]);
   useEffect(() => {
     if (timer > 0) {
       const countdown = setInterval(() => setTimer(prev => prev - 1), 1000);
       return () => clearInterval(countdown);
-    } else {
-      setIsLocked(false);
-    }
+    } else setIsLocked(false);
   }, [timer]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError("Please upload a valid image file.");
-        return;
-      }
+    if (file && file.type.startsWith('image/')) {
       setSignatureFile(file);
       const reader = new FileReader();
       reader.onloadend = () => setSignaturePreview(reader.result);
@@ -460,10 +499,9 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
 
   const handleFinalSubmit = async () => {
     if (!agreedPage1 || !agreedPage2 || !signatureFile) {
-      setError("Please ensure both policies are agreed to and your signature is uploaded.");
+      setError("Please accept all policies and provide your signature to complete onboarding.");
       return;
     }
-
     setIsSubmitting(true);
     setError("");
 
@@ -472,187 +510,125 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
       formData.append('email', userEmail);
       formData.append('signature', signatureFile);
 
-      const response = await fetch('/api/invited-employees/complete-onboarding', {
-        method: 'POST',
-        body: formData,
+      const response = await api.post('/api/invited-employees/complete-onboarding', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const result = await response.json();
-
-      if (result.success) {
+      if (response.data.success) {
         Swal.fire({
           icon: 'success',
-          title: 'Policies Accepted!',
-          text: 'Your signature has been securely stored.',
-          timer: 2000,
-          showConfirmButton: false
+          title: 'Onboarding Successfully Completed!',
+          text: `Welcome to the team at ${companyName}!`,
+          showConfirmButton: false,
+          timer: 3000
         });
         onComplete();
       } else {
-        setError(result.error || "Submission failed. Please try again.");
+        setError(response.data.error || "Submission failed. Please check your network.");
       }
     } catch (err) {
-      console.error("Submission error:", err);
-      setError("Connection error. Is the backend server running?");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setError("Critical submission error. Please contact HR support.");
+    } finally { setIsSubmitting(false); }
   };
 
   return (
-    <div className="min-h-screen bg-[#fcfdfe] py-12 px-4 font-sans text-slate-900">
-      <div className="max-w-5xl mx-auto">
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-white shadow-sm border border-slate-200 rounded-2xl">
-              <Briefcase className="text-indigo-600" size={28} />
-            </div>
+    <div className="min-h-screen bg-slate-50 py-12 px-4 font-sans text-slate-900">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-indigo-600 text-white shadow-xl shadow-indigo-100 rounded-[1.25rem]"><ShieldCheck size={32} /></div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-800">HR Compliance Portal</h1>
-              <p className="text-sm text-slate-500 font-medium">Agreement for: {userEmail}</p>
+              <h1 className="text-3xl font-black tracking-tight text-slate-800">Policy Compliance</h1>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em]">{companyName} Official Agreement</p>
             </div>
           </div>
-
-          <div className="flex items-center bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
-            <TabItem active={currentPage === 1} done={agreedPage1} label="Professional Conduct" />
-            <div className="w-4 h-[1px] bg-slate-200 mx-1" />
-            <TabItem active={currentPage === 2} done={agreedPage2} label="Security & Privacy" />
+          <div className="flex items-center bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+            <TabItem active={currentPage === 1} done={agreedPage1} label="Conduct" />
+            <div className="w-8 h-[2px] bg-slate-100 mx-2" />
+            <TabItem active={currentPage === 2} done={agreedPage2} label="Security" />
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-100/50 border border-slate-100 overflow-hidden">
-          {/* Progress Bar */}
-          <div className="h-1.5 w-full bg-slate-50">
-            <div
-              className="h-full bg-indigo-600 transition-all duration-1000 ease-linear"
-              style={{ width: isLocked ? `${(5 - timer) * 20}%` : '100%' }}
-            />
+        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden relative">
+          <div className="h-2 w-full bg-slate-50">
+            <div className="h-full bg-indigo-600 transition-all duration-1000 ease-linear" style={{ width: isLocked ? `${(5 - timer) * 20}%` : '100%' }} />
           </div>
 
           <div className="p-8 md:p-14">
             {currentPage === 1 ? (
-              <div className="animate-in fade-in duration-500">
-                <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3 mb-10">
-                  <UserCheck className="text-indigo-600" size={32} /> Workplace Conduct
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <PolicyCard
-                    index={1}
-                    text="Employees must maintain professional, respectful, and ethical behavior with colleagues, clients, and management at all times while representing the organization."
-                  />
-                  <PolicyCard
-                    index={2}
-                    text="Regular attendance and punctuality are mandatory, and repeated late login, early logout, or unapproved absence may result in salary deductions or disciplinary action."
-                  />
-                  <PolicyCard
-                    index={3}
-                    text="All leave requests must be submitted and approved in advance through proper channels, and unauthorized leave will be treated as Loss of Pay (LOP)."
-                  />
-                  <PolicyCard
-                    index={4}
-                    text="Harassment, discrimination, abusive language, threats, or any form of violence in the workplace is strictly prohibited and may lead to strict disciplinary action."
-                  />
-                  <PolicyCard
-                    index={5}
-                    text="Consumption or possession of alcohol, drugs, or any intoxicating substances during work hours or within office premises is strictly not allowed."
-                  />
-                  <PolicyCard
-                    index={6}
-                    text="Employees are responsible for safeguarding company property such as laptops, ID cards, systems, and official documents, and misuse or damage may lead to recovery or action."
-                  />
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="mb-10">
+                  <h2 className="text-3xl font-black flex items-center gap-3 mb-2 text-slate-800">Workplace Conduct</h2>
+                  <p className="text-slate-500">Please review our professional behavioral expectations.</p>
                 </div>
-
-
-                <div className={`mt-12 p-8 rounded-3xl border-2 transition-all flex flex-col md:flex-row items-center justify-between gap-6 ${agreedPage1 ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-100 bg-slate-50'}`}>
-                  <label className={`flex items-center gap-4 cursor-pointer ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    <input type="checkbox" disabled={isLocked} checked={agreedPage1} onChange={(e) => setAgreedPage1(e.target.checked)} className="w-7 h-7 rounded-lg text-indigo-600" />
-                    <span className="text-lg font-bold text-slate-700">I agree to the Employee Discipline Policy</span>
-                  </label>
-                  {isLocked && <div className="text-indigo-600 font-bold tracking-tight flex items-center gap-2"><Clock size={18} /> {timer}s</div>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                  <PolicyCard index={1} title="Professionalism" text="Maintain ethical, respectful, and professional behavior at all times with clients and colleagues." />
+                  <PolicyCard index={2} title="Attendance" text="Consistency is key. Regular attendance and punctuality are mandatory for your role." />
+                  <PolicyCard index={3} title="Harassment" text="Zero tolerance for any form of workplace harassment, bullying, or discrimination." />
+                  <PolicyCard index={4} title="Dress Code" text="Adhere to the company's business casual or formal dress code as specified for your department." />
                 </div>
+                <label className={`flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage1 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}>
+                  <input type="checkbox" disabled={isLocked} checked={agreedPage1} onChange={(e) => setAgreedPage1(e.target.checked)} className="w-7 h-7 mt-1 accent-indigo-600" />
+                  <div>
+                    <span className="text-xl font-black block text-slate-800">I have read and agree to Workplace Conduct</span>
+                    <span className="text-slate-500 font-medium">By checking this, you commit to adhering to all company behavioral standards. {isLocked && <span className="text-indigo-600 ml-1">(Reading... {timer}s)</span>}</span>
+                  </div>
+                </label>
               </div>
             ) : (
-              <div className="animate-in fade-in duration-500">
-                <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3 mb-10">
-                  <ShieldCheck className="text-blue-600" size={32} /> Security & Privacy
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-                  <PolicyCard
-                    index={1}
-                    text="Company systems, computers, email accounts, and network resources must be used strictly for authorized and official work-related purposes only."
-                    variant="blue"
-                  />
-                  <PolicyCard
-                    index={2}
-                    text="Confidential company, employee, and client information must not be disclosed, shared, or discussed with any unauthorized person inside or outside the organization."
-                    variant="blue"
-                  />
-                  <PolicyCard
-                    index={3}
-                    text="Sharing passwords, login credentials, or access details with others is strictly prohibited, and employees are personally responsible for securing their accounts."
-                    variant="blue"
-                  />
-                  <PolicyCard
-                    index={4}
-                    text="Copying, transferring, downloading, or storing official company data without proper authorization is considered a serious policy violation."
-                    variant="blue"
-                  />
-                  <PolicyCard
-                    index={5}
-                    text="Employees must not use company internet or network access for illegal, harmful, offensive, or non-work-related activities that could affect security."
-                    variant="blue"
-                  />
-                  <PolicyCard
-                    index={6}
-                    text="Any suspected data breach, phishing attempt, system vulnerability, or unusual activity must be reported immediately to the IT or administration team."
-                    variant="blue"
-                  />
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="mb-10">
+                  <h2 className="text-3xl font-black flex items-center gap-3 mb-2 text-slate-800">Security & Confidentiality</h2>
+                  <p className="text-slate-500">Protecting company data and privacy is our top priority.</p>
                 </div>
-
-
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                  <div className="lg:col-span-3">
-                    <div className={`p-8 rounded-3xl border-2 transition-all h-full ${agreedPage2 ? 'border-blue-600 bg-blue-50/20' : 'border-slate-100 bg-slate-50'}`}>
-                      <label className={`flex items-center gap-4 cursor-pointer ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <input type="checkbox" disabled={isLocked} checked={agreedPage2} onChange={(e) => setAgreedPage2(e.target.checked)} className="w-7 h-7 rounded-lg text-blue-600" />
-                        <span className="text-lg font-bold text-slate-700">I agree to the Privacy & Security Policy</span>
-                      </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                  <PolicyCard index={1} title="Data Privacy" text="Confidential information, trade secrets, and client data must never be disclosed." />
+                  <PolicyCard index={2} title="IT Assets" text="Login credentials and company hardware must be kept strictly private and secure." />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                  <label className={`lg:col-span-2 flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage2 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 bg-slate-50/30'}`}>
+                    <input type="checkbox" disabled={isLocked} checked={agreedPage2} onChange={(e) => setAgreedPage2(e.target.checked)} className="w-7 h-7 mt-1 accent-indigo-600" />
+                    <div>
+                      <span className="text-xl font-black block text-slate-800">I agree to Security & Privacy Terms</span>
+                      <span className="text-slate-500 font-medium italic text-sm">Mandatory for internal system access. {isLocked && `(${timer}s)`}</span>
                     </div>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <div className="bg-slate-900 rounded-3xl p-6 text-white">
-                      <h3 className="text-xs font-bold text-slate-400 mb-4 flex items-center gap-2 uppercase tracking-widest"><FileText size={16} /> Signature Upload</h3>
-                      {!signaturePreview ? (
-                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-700 rounded-2xl cursor-pointer">
-                          <Upload className="text-slate-500 mb-2" />
-                          <p className="text-[10px] text-slate-400">Click to upload image</p>
+                  </label>
+
+                  <div className="relative">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 text-center">Digital Signature</p>
+                    <div className="bg-slate-900 rounded-[2rem] p-6 text-white text-center h-40 flex flex-col justify-center border-4 border-slate-800 relative overflow-hidden group">
+                      {signaturePreview ? (
+                        <div className="bg-white rounded-xl p-3 h-full flex justify-center relative animate-in zoom-in">
+                          <img src={signaturePreview} alt="Signature" className="max-h-full object-contain" />
+                          <button onClick={() => { setSignaturePreview(null); setSignatureFile(null); }} className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1.5 shadow-lg"><X size={16} /></button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer h-full flex flex-col items-center justify-center group-hover:bg-slate-800 transition-colors">
+                          <Upload className="mb-2 text-indigo-400" size={30} />
+                          <p className="text-[10px] font-black uppercase tracking-tighter">Upload Signature Image</p>
+                          <p className="text-[9px] text-slate-500 mt-1">PNG or JPG (transparent preferred)</p>
                           <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                         </label>
-                      ) : (
-                        <div className="relative bg-white rounded-2xl p-4 h-32 flex justify-center">
-                          <img src={signaturePreview} alt="Preview" className="max-h-full object-contain" />
-                          <button onClick={() => { setSignaturePreview(null); setSignatureFile(null); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={14} /></button>
-                        </div>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             )}
+            {error && <div className="mt-8 p-5 bg-red-50 border border-red-100 text-red-600 rounded-[1.5rem] text-sm font-bold flex gap-3 animate-bounce"><AlertCircle size={20} /> {error}</div>}
           </div>
 
-          {error && <div className="mx-8 md:mx-14 mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-center gap-3 font-bold text-sm"><AlertCircle size={20} />{error}</div>}
-
-          {/* Footer */}
-          <div className="px-8 md:px-14 py-8 bg-slate-50 border-t flex justify-between">
-            <button onClick={() => setCurrentPage(1)} className={`font-bold text-slate-600 ${currentPage === 1 ? 'invisible' : ''}`}>Back</button>
+          <div className="px-8 md:px-14 py-8 bg-slate-50 border-t flex items-center justify-between">
+            <button onClick={() => setCurrentPage(1)} className={`font-black text-slate-400 hover:text-slate-600 transition flex items-center gap-2 ${currentPage === 1 ? 'invisible' : ''}`}>
+              Go Back
+            </button>
             {currentPage === 1 ? (
-              <button onClick={() => setCurrentPage(2)} disabled={!agreedPage1} className={`px-10 py-4 rounded-2xl font-bold ${agreedPage1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>Next Policy</button>
+              <button onClick={() => setCurrentPage(2)} disabled={!agreedPage1} className="px-12 py-4 rounded-2xl font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3">
+                Continue to Next Step <FaArrowRight />
+              </button>
             ) : (
-              <button onClick={handleFinalSubmit} disabled={isSubmitting} className={`flex items-center gap-2 px-12 py-4 rounded-2xl font-bold text-white ${agreedPage2 && signatureFile ? 'bg-slate-900 hover:bg-black' : 'bg-slate-400'}`}>
-                {isSubmitting ? <><Loader2 className="animate-spin" /> Submitting...</> : 'Complete Onboarding'}
+              <button onClick={handleFinalSubmit} disabled={isSubmitting} className="px-12 py-4 rounded-2xl font-black text-white bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all active:scale-95 flex items-center gap-3">
+                {isSubmitting ? <><Loader2 className="animate-spin" /> Completing Process...</> : <><CheckCircle2 /> Finalize Onboarding</>}
               </button>
             )}
           </div>
@@ -662,90 +638,137 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
   );
 };
 
-// Completion Screen Component
-const CompletionScreen = ({ userName, companyName }) => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl p-10 md:p-16 text-center border-2 border-emerald-100">
-        <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <CheckCircle2 className="w-14 h-14 text-white" strokeWidth={3} />
+const CompletionScreen = ({ userName, companyName }) => (
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+    <div className="max-w-3xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-700">
+      <div className="bg-emerald-500 h-4 w-full"></div>
+      <div className="p-10 md:p-16 text-center">
+        <div className="w-32 h-32 bg-emerald-50 text-emerald-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner animate-pulse">
+          <CheckCircle2 size={70} />
         </div>
-
-        <h2 className="text-4xl md:text-5xl font-bold text-slate-800 mb-3">
-          Onboarding Completed
-        </h2>
-
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 my-8 border border-indigo-100">
-          <p className="text-lg text-slate-700 mb-2">
-            Welcome aboard, <span className="font-bold text-indigo-600">{userName}</span>!
-          </p>
-          <p className="text-slate-600">
-            You are now officially part of <span className="font-bold text-blue-600">{companyName}</span>
-          </p>
-        </div>
-
-        <div className="space-y-3 text-left bg-slate-50 rounded-2xl p-6 mb-8">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <p className="text-slate-700">Your personal details have been recorded</p>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <p className="text-slate-700">Company policies have been accepted</p>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <p className="text-slate-700">Your signature has been securely stored</p>
-          </div>
-        </div>
-
-        <p className="text-slate-500 mb-8 text-sm">
-          Your HR team will be in touch shortly with your next steps. Check your email for login credentials and additional information.
+        <h2 className="text-5xl font-black text-slate-800 mb-4 leading-tight">Onboarding Completed!</h2>
+        <p className="text-xl text-slate-600 mb-12">
+          Welcome to the family, <span className="font-bold text-indigo-600">{userName}</span>! <br />
+          Your profile has been successfully integrated into <b>{companyName}</b>.
         </p>
 
-        <button
-          onClick={() => window.location.href = '/'}
-          className="w-full py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-blue-700 shadow-lg transition-all active:scale-95"
-        >
-          Go to Login Portal
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mb-12">
+          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4"><Clock size={20} /></div>
+            <h4 className="font-bold text-slate-800 text-sm mb-1">Status</h4>
+            <p className="text-xs text-slate-500">Profile awaiting HR verification</p>
+          </div>
+          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+            <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-4"><Sparkles size={20} /></div>
+            <h4 className="font-bold text-slate-800 text-sm mb-1">Credentials</h4>
+            <p className="text-xs text-slate-500">Check your email for login instructions</p>
+          </div>
+          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4"><Headphones size={20} /></div>
+            <h4 className="font-bold text-slate-800 text-sm mb-1">Support</h4>
+            <p className="text-xs text-slate-500">Contact HR if you need help logging in</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <button onClick={() => window.location.href = '/'} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
+            Access Employee Dashboard <FaArrowRight />
+          </button>
+          <p className="text-slate-400 text-sm font-medium">Auto-redirecting to login in 10 seconds...</p>
+        </div>
       </div>
+      <div className="bg-slate-50 py-6 px-10 text-center border-t">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">Official Onboarding Portal • Confidential</p>
+      </div>
+    </div>
+  </div>
+);
+
+// --- REUSABLE UI COMPONENTS ---
+const TabItem = ({ active, done, label }) => (
+  <div className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all ${active ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>
+    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] border-2 transition-colors ${done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'border-white' : 'border-slate-200'}`}>
+      {done ? <CheckCircle2 size={14} /> : active ? "•" : ""}
+    </div>
+    <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+  </div>
+);
+
+const PolicyCard = ({ index, title, text }) => (
+  <div className="flex gap-5 p-6 bg-white border border-slate-100 rounded-[2rem] hover:shadow-lg hover:shadow-slate-100 transition-all group">
+    <span className="shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">{index}</span>
+    <div>
+      <h4 className="font-black text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">{title}</h4>
+      <p className="text-slate-500 text-sm leading-relaxed">{text}</p>
+    </div>
+  </div>
+);
+
+const Section = ({ title, children, color }) => {
+  const colorMap = {
+    blue: "border-blue-100 bg-blue-50/20 text-blue-800",
+    indigo: "border-indigo-100 bg-indigo-50/20 text-indigo-800",
+    emerald: "border-emerald-100 bg-emerald-50/20 text-emerald-800",
+    orange: "border-orange-100 bg-orange-50/20 text-orange-800",
+    purple: "border-purple-100 bg-purple-50/20 text-purple-800",
+  };
+
+  return (
+    <div className={`border-2 rounded-[2rem] p-8 mb-10 transition-all ${colorMap[color] || 'border-slate-100 bg-slate-50/20'}`}>
+      <h3 className="text-2xl font-black mb-8 flex items-center gap-3 uppercase tracking-tight">
+        {title}
+      </h3>
+      {children}
     </div>
   );
 };
 
-// Sub-components
-const TabItem = ({ active, done, label }) => (
-  <div className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${active ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>
-    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] border-2 ${done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'border-white' : 'border-slate-300'}`}>{done ? <CheckCircle2 size={10} /> : ""}</div>
-    <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
-  </div>
-);
-
-const PolicyCard = ({ index, text, variant = "indigo" }) => (
-  <div className="flex gap-4 p-5 bg-white border border-slate-100 rounded-3xl hover:shadow-md transition-all">
-    <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black border ${variant === "indigo" ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>{index}</span>
-    <p className="text-slate-600 text-sm leading-relaxed">{text}</p>
-  </div>
-);
-
-// Reusable Components
-const Section = ({ title, children, color }) => (
-  <div className={`border border-${color}-100 rounded-xl p-6 bg-${color}-50/30 mb-6 shadow-sm`}>
-    <h3 className={`text-xl font-bold text-${color}-800 border-b border-${color}-200 pb-3 mb-5`}>{title}</h3>
-    {children}
-  </div>
-);
-
 const Input = ({ icon, label, readOnly, ...props }) => (
   <div className="relative group">
-    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{icon}</div>
-    <label className="absolute left-10 top-2 text-xs font-semibold text-gray-500">{label}</label>
+    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors">{icon}</div>
+    <label className="absolute left-10 top-2 text-[10px] font-black uppercase tracking-wider text-slate-400 group-focus-within:text-indigo-500 transition-colors">{label}</label>
     <input
       {...props}
       readOnly={readOnly}
-      className={`w-full pl-10 pr-4 pt-6 pb-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-400 ${readOnly ? 'bg-gray-100 cursor-not-allowed text-gray-600' : 'bg-white'}`}
+      className={`w-full pl-10 pr-4 pt-7 pb-3 border-2 border-slate-100 rounded-2xl outline-none transition-all font-medium ${readOnly ? 'bg-slate-100/50 cursor-not-allowed text-slate-500' : 'bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'}`}
     />
+  </div>
+);
+
+const BadgeBox = ({ icon, label, value, color }) => (
+  <div className="flex flex-col bg-white border-2 border-slate-50 p-4 rounded-2xl shadow-sm">
+    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+      {icon} {label}
+    </span>
+    <span className="text-sm font-bold text-slate-800 truncate">{value || 'N/A'}</span>
+  </div>
+);
+
+const FileUploadCard = ({ label, required, file, onChange }) => (
+  <div className="relative group">
+    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+      {label} {required && <span className="text-red-500">*</span>}
+    </p>
+    <label className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all ${file ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30'}`}>
+      <input
+        type="file"
+        onChange={onChange}
+        accept=".pdf,.png,.jpg,.jpeg"
+        className="hidden"
+      />
+      {file ? (
+        <>
+          <CheckCircle2 className="text-emerald-500 mb-2" size={32} />
+          <span className="text-xs font-bold text-emerald-700 truncate max-w-full px-4">{file.name}</span>
+          <span className="text-[10px] text-emerald-600 mt-1 uppercase font-black">Click to change</span>
+        </>
+      ) : (
+        <>
+          <Upload className="text-slate-300 group-hover:text-indigo-500 mb-2 transition-colors" size={32} />
+          <span className="text-xs font-bold text-slate-500 group-hover:text-indigo-600 transition-colors text-center">Drag & drop or <br /><span className="text-indigo-600">Choose File</span></span>
+        </>
+      )}
+    </label>
   </div>
 );
 
