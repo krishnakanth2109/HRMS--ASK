@@ -55,11 +55,14 @@ router.post('/documents/upload', upload.single('file'), async (req, res) => {
     const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
     
     // Determine resource type based on file
-    let resourceType = 'raw'; // Default for documents
+    let resourceType = 'raw'; 
     if (req.file.mimetype.startsWith('image/')) {
       resourceType = 'image';
     } else if (req.file.mimetype.startsWith('video/')) {
       resourceType = 'video';
+    } else if (req.file.mimetype === 'application/pdf') {
+      // IMPORTANT: Uploading PDF as 'image' allows Cloudinary to use flags like fl_attachment
+      resourceType = 'image'; 
     }
     
     const cloudinaryResponse = await cloudinary.uploader.upload(dataURI, { 

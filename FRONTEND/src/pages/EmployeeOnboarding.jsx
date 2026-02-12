@@ -68,6 +68,26 @@ const EmployeeOnboarding = () => {
     },
   });
 
+  // --- DOWNLOAD HANDLER ---
+  const handleDownload = async (fileUrl, fileName) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName || 'Company-Document');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download failed:", error);
+      // Fallback: Open in new tab if fetch fails
+      window.open(fileUrl, '_blank');
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name.startsWith("bankDetails.")) {
@@ -287,7 +307,7 @@ const EmployeeOnboarding = () => {
                     <div className="bg-emerald-500 p-2 rounded-full text-white"><FaCheckCircle size={20} /></div>
                     <div>
                       <p className="text-emerald-900 font-bold leading-tight">Identity Confirmed</p>
-                      <p className="text-emerald-700 text-sm">Onboarding for <span className="font-bold">{verifiedCompany.name}</span></p>
+                      <p className="text-emerald-700 text-sm">Welcome to <span className="font-bold">{verifiedCompany.name}</span></p>
                     </div>
                   </div>
                 )}
@@ -368,13 +388,13 @@ const EmployeeOnboarding = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <FileUploadCard
-                      label="Aadhaar Card (Front & Back)"
+                      label="Aadhaar Card"
                       required
                       file={docFiles.aadhaar}
                       onChange={(e) => handleFileChange(e, 'aadhaar')}
                     />
                     <FileUploadCard
-                      label="PAN Card (Front)"
+                      label="PAN Card"
                       required
                       file={docFiles.pan}
                       onChange={(e) => handleFileChange(e, 'pan')}
@@ -397,13 +417,13 @@ const EmployeeOnboarding = () => {
                               </div>
                             </div>
                             <div className="flex gap-3 w-full sm:w-auto">
-                              <a
-                                href={doc.fileUrl}
-                                download={doc.fileName || "Company-Document"}
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(doc.fileUrl, doc.fileName)}
                                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition"
                               >
                                 <FaFileDownload /> Download File
-                              </a>
+                              </button>
 
                               <label className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition shadow-sm ${docFiles.filledDocs[doc._id] ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}>
                                 <input type="file" className="hidden" onChange={(e) => handleFileChange(e, 'filledDocs', doc._id)} />
@@ -562,10 +582,18 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                   <p className="text-slate-500">Please review our professional behavioral expectations.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                  <PolicyCard index={1} title="Professionalism" text="Maintain ethical, respectful, and professional behavior at all times with clients and colleagues." />
-                  <PolicyCard index={2} title="Attendance" text="Consistency is key. Regular attendance and punctuality are mandatory for your role." />
-                  <PolicyCard index={3} title="Harassment" text="Zero tolerance for any form of workplace harassment, bullying, or discrimination." />
-                  <PolicyCard index={4} title="Dress Code" text="Adhere to the company's business casual or formal dress code as specified for your department." />
+                  <PolicyCard index={1} title="Professional Conduct" text="Employees must maintain professional, respectful, and ethical behavior at all times with colleagues, clients, and management." />
+
+                  <PolicyCard index={2} title="Attendance & Punctuality" text="Regular attendance and punctuality are mandatory, and repeated late logins, early logouts, or unapproved absences may lead to salary deductions or disciplinary action." />
+
+                  <PolicyCard index={3} title="Leave Policy" text="All leave requests must be submitted and approved in advance, and unauthorized leave will be treated as Loss of Pay (LOP)." />
+
+                  <PolicyCard index={4} title="Workplace Behavior" text="Harassment, discrimination, abusive language, threats, or any form of workplace violence is strictly prohibited and may result in disciplinary action." />
+
+                  <PolicyCard index={5} title="Substance Prohibition" text="Consumption or possession of alcohol, drugs, or any intoxicating substances during work hours or on office premises is strictly prohibited." />
+
+                  <PolicyCard index={6} title="Company Property Responsibility" text="Employees are responsible for safeguarding company property such as laptops, ID cards, and systems provided to them." />
+
                 </div>
                 <label className={`flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage1 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}>
                   <input type="checkbox" disabled={isLocked} checked={agreedPage1} onChange={(e) => setAgreedPage1(e.target.checked)} className="w-7 h-7 mt-1 accent-indigo-600" />
@@ -582,8 +610,18 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                   <p className="text-slate-500">Protecting company data and privacy is our top priority.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                  <PolicyCard index={1} title="Data Privacy" text="Confidential information, trade secrets, and client data must never be disclosed." />
-                  <PolicyCard index={2} title="IT Assets" text="Login credentials and company hardware must be kept strictly private and secure." />
+                  <PolicyCard index={1} title="Authorized System Usage" text="Company systems, computers, email accounts, and network resources must be used only for authorized and official work purposes." />
+
+                  <PolicyCard index={2} title="Confidentiality" text="Confidential company, employee, and client information must not be disclosed, shared, or discussed with unauthorized persons inside or outside the organization." />
+
+                  <PolicyCard index={3} title="Account Security" text="Sharing passwords, login credentials, or access details is strictly prohibited, and employees are personally responsible for securing their accounts." />
+
+                  <PolicyCard index={4} title="Data Protection" text="Copying, transferring, downloading, or storing company data without proper authorization is considered a serious policy violation." />
+
+                  <PolicyCard index={5} title="Internet & Network Usage" text="Company internet and network access must not be used for illegal, harmful, offensive, or non-work-related activities that could impact security." />
+
+                  <PolicyCard index={6} title="Security Incident Reporting" text="Any suspected data breach, phishing attempt, system vulnerability, or unusual system activity must be reported immediately to the IT or administration team." />
+
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                   <label className={`lg:col-span-2 flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage2 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 bg-slate-50/30'}`}>
