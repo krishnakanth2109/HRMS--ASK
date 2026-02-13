@@ -183,8 +183,8 @@ const EmployeeOnboarding = () => {
       } else {
         Swal.fire({
           icon: "warning",
-          title: "Verification Failed",
-          text: errorMsg || "We couldn't find an active invitation for this email.",
+          title: "Verification Failed ",
+          text: errorMsg || "We Couldn't Find an active invitation for this email. Please check with your HR team.",
           confirmButtonColor: '#ef4444'
         });
       }
@@ -229,49 +229,91 @@ const EmployeeOnboarding = () => {
     }
   };
 
-  const handleFinalSubmit = async () => {
-    if (otp.length !== 6) return Swal.fire("Invalid OTP", "Please enter the 6-digit code sent to your email.", "warning");
-    setVerifying(true);
+const handleFinalSubmit = async () => {
+  if (otp.length !== 6) return Swal.fire("Invalid OTP", "Please enter the 6-digit code sent to your email.", "warning");
+  setVerifying(true);
 
-    const finalData = new FormData();
-    const payload = {
-      ...formData,
-      experienceDetails: [{
-        role: formData.currentRole,
-        department: formData.currentDepartment,
-        joiningDate: formData.joiningDate,
-        lastWorkingDate: "Present",
-        salary: Number(formData.currentSalary),
-        employmentType: formData.employmentType,
-      }]
-    };
-
-    finalData.append("jsonData", JSON.stringify(payload));
-    finalData.append("otp", otp);
-    finalData.append("aadhaarCard", docFiles.aadhaar);
-    finalData.append("panCard", docFiles.pan);
-    Object.keys(docFiles.filledDocs).forEach((id) => {
-      finalData.append("companyDocuments", docFiles.filledDocs[id]);
-    });
-
-    try {
-      await api.post('/api/employees/onboard', finalData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
-      setVerifying(false);
-      setShowOtpModal(false);
-      setStage('compliance');
-    } catch (err) {
-      setVerifying(false);
-      Swal.fire({
-        icon: 'error',
-        title: 'Submission Failed',
-        text: err.response?.data?.error || "An error occurred during onboarding. Please check your details.",
-        confirmButtonColor: '#ef4444'
-      });
-    }
+  const finalData = new FormData();
+  const payload = {
+    ...formData,
+    experienceDetails: [{
+      role: formData.currentRole,
+      department: formData.currentDepartment,
+      joiningDate: formData.joiningDate,
+      lastWorkingDate: "Present",
+      salary: Number(formData.currentSalary),
+      employmentType: formData.employmentType,
+    }]
   };
+
+  // Append JSON data
+  finalData.append("jsonData", JSON.stringify(payload));
+  
+  // Append OTP
+  finalData.append("otp", otp);
+  
+  // IMPORTANT: Check if files exist before appending
+  // Append Aadhaar Card - Make sure the key matches exactly what backend expects
+  if (docFiles.aadhaar) {
+    console.log("Appending Aadhaar file:", docFiles.aadhaar.name);
+    finalData.append("aadhaarCard", docFiles.aadhaar);
+  } else {
+    console.warn("Aadhaar file is missing");
+  }
+  
+  // Append PAN Card
+  if (docFiles.pan) {
+    console.log("Appending PAN file:", docFiles.pan.name);
+    finalData.append("panCard", docFiles.pan);
+  } else {
+    console.warn("PAN file is missing");
+  }
+  
+  // Append Company Documents
+  if (Object.keys(docFiles.filledDocs).length > 0) {
+    console.log("Appending company documents:", Object.keys(docFiles.filledDocs).length);
+    Object.keys(docFiles.filledDocs).forEach((id) => {
+      const file = docFiles.filledDocs[id];
+      console.log(`Appending company document: ${file.name}`);
+      finalData.append("companyDocuments", file);
+    });
+  }
+
+  // Log FormData contents for debugging
+  console.log("FormData entries:");
+  for (let pair of finalData.entries()) {
+    if (pair[0] === 'jsonData') {
+      console.log(pair[0], pair[1].substring(0, 100) + '...');
+    } else if (pair[0].includes('Card') || pair[0].includes('companyDocuments')) {
+      console.log(pair[0], pair[1]?.name, pair[1]?.type, pair[1]?.size);
+    } else {
+      console.log(pair[0], pair[1]);
+    }
+  }
+
+  try {
+    const response = await api.post('/api/employees/onboard', finalData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    
+    console.log("Onboard response:", response.data);
+    
+    await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+    setVerifying(false);
+    setShowOtpModal(false);
+    setStage('compliance');
+  } catch (err) {
+    console.error("Onboard submission error:", err);
+    console.error("Error response:", err.response?.data);
+    setVerifying(false);
+    Swal.fire({
+      icon: 'error',
+      title: 'Submission Failed',
+      text: err.response?.data?.error || err.response?.data?.details || "An error occurred during onboarding. Please check your details.",
+      confirmButtonColor: '#ef4444'
+    });
+  }
+};
 
   if (stage === 'compliance') return <ComplianceModule userEmail={formData.email} userName={formData.name} companyName={verifiedCompany?.name} onComplete={() => setStage('completed')} />;
   if (stage === 'completed') return <CompletionScreen userName={formData.name} companyName={verifiedCompany?.name} />;

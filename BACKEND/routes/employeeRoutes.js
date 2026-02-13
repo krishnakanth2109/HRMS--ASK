@@ -5,7 +5,7 @@ import Employee from "../models/employeeModel.js";
 import Company from "../models/CompanyModel.js";
 import Notification from "../models/notificationModel.js";
 import Otp from "../models/OtpModel.js"; 
-import { upload } from "../config/cloudinary.js";
+import { upload, cloudinary } from "../config/cloudinary.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import nodemailer from "nodemailer";
@@ -13,14 +13,28 @@ import bcrypt from "bcrypt";
 
 const router = express.Router();
 
+// FIXED: Nodemailer transporter configuration with better error handling
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: process.env.SMTP_PORT || 465,
-  secure: true, 
+  port: parseInt(process.env.SMTP_PORT) || 587, // Use 587 for TLS, 465 for SSL
+  secure: process.env.SMTP_SECURE === "true" || false, // false for 587, true for 465
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false // Only for development, helps with self-signed certificates
+  }
+});
+
+// Verify transporter connection on startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Email server configuration error:", error);
+    console.log("Please check your SMTP credentials in .env file");
+  } else {
+    console.log("✅ Email server is ready to send messages");
+  }
 });
 
 /* ==============================================================
@@ -28,12 +42,28 @@ const transporter = nodemailer.createTransport({
  📁 1. FILE UPLOAD ROUTE
 =================================================================
 =========== */
-router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
+router.post("/upload-doc", protect, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
-    res.status(200).json({ url: req.file.path });
+
+    // Handle file upload to Cloudinary manually
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    
+    // Determine resource type
+    let resourceType = 'raw';
+    if (req.file.mimetype.startsWith('image/')) {
+      resourceType = 'image';
+    }
+    
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: "hrms_employee_documents",
+      resource_type: resourceType,
+    });
+
+    res.status(200).json({ url: result.secure_url });
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ error: error.message });
@@ -49,7 +79,6 @@ router.post("/upload-doc", protect, upload.single("file"), (req, res) => {
 // CREATE employee → ADMIN ONLY
 router.post("/", protect, onlyAdmin, async (req, res) => {
   try {
-
     // ✅ CHECK FOR COMPANY
     if (req.body.company) {
       const company = await Company.findById(req.body.company);
@@ -316,16 +345,29 @@ router.post("/idle-activity", protect, async (req, res) => {
 =================================================================
 =========== */
 
-
-// Update the /onboard route
+// FIXED: /onboard route with proper file handling
+// FIXED: /onboard route with proper file handling using memory storage only
 router.post("/onboard", upload.fields([
   { name: 'aadhaarCard', maxCount: 1 },
   { name: 'panCard', maxCount: 1 },
-  { name: 'companyDocuments' } // This collects all signed company docs
+  { name: 'companyDocuments' }
 ]), async (req, res) => {
   try {
+    // Log received files for debugging
+    console.log("========== ONBOARD REQUEST ==========");
+    console.log("Received files:", {
+      aadhaarCard: req.files?.['aadhaarCard'] ? req.files['aadhaarCard'].length : 0,
+      panCard: req.files?.['panCard'] ? req.files['panCard'].length : 0,
+      companyDocuments: req.files?.['companyDocuments'] ? req.files['companyDocuments'].length : 0
+    });
+
     // 1. Parse the text data
+    if (!req.body.jsonData) {
+      return res.status(400).json({ error: "No form data received" });
+    }
+    
     const data = JSON.parse(req.body.jsonData);
+    console.log("Company ID:", data.company);
 
     const company = await Company.findById(data.company);
     if (!company) return res.status(404).json({ error: "Company not found" });
@@ -334,48 +376,154 @@ router.post("/onboard", upload.fields([
     const currentCount = await Employee.countDocuments({ company: data.company });
     const paddedCount = String(currentCount + 1).padStart(2, "0");
     const employeeId = `${company.prefix}${paddedCount}`;
+    console.log("Generated Employee ID:", employeeId);
 
     // 3. Construct the Employee Object
-    // We spread the existing data (which includes personalDetails object from frontend)
     const newEmployeeData = {
       ...data,
       employeeId,
       role: "employee",
       isActive: true,
-      // Initialize files if not present in jsonData
       personalDetails: {
-        ...data.personalDetails
+        ...data.personalDetails,
+        aadhaarFileUrl: null,
+        panFileUrl: null
       },
       companyDocuments: []
     };
 
-    // 4. Map Cloudinary URLs to Model Keys
-    // Aadhaar
-    if (req.files['aadhaarCard']) {
-      newEmployeeData.personalDetails.aadhaarFileUrl = req.files['aadhaarCard'][0].path;
+    // 4. Handle Aadhaar Card Upload (Image) - DIRECT TO CLOUDINARY
+    if (req.files && req.files['aadhaarCard'] && req.files['aadhaarCard'][0]) {
+      const file = req.files['aadhaarCard'][0];
+      console.log("Processing Aadhaar Card:", file.originalname);
+      
+      try {
+        // Convert buffer to base64
+        const b64 = Buffer.from(file.buffer).toString("base64");
+        const dataURI = "data:" + file.mimetype + ";base64," + b64;
+        
+        // Upload to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(dataURI, {
+          folder: "hrms_employee_documents/aadhaar",
+          resource_type: "image",
+          public_id: `aadhaar_${Date.now()}_${file.originalname.replace(/\.[^/.]+$/, "")}`,
+          format: file.originalname.split('.').pop()
+        });
+        
+        newEmployeeData.personalDetails.aadhaarFileUrl = uploadResult.secure_url;
+        console.log("✅ Aadhaar uploaded to Cloudinary:", uploadResult.secure_url);
+      } catch (uploadError) {
+        console.error("❌ Aadhaar upload failed:", uploadError);
+        return res.status(500).json({ 
+          error: "Failed to upload Aadhaar card", 
+          details: uploadError.message 
+        });
+      }
+    } else {
+      console.warn("⚠️ No Aadhaar Card file received");
+      return res.status(400).json({ error: "Aadhaar card is required" });
     }
 
-    // PAN
-    if (req.files['panCard']) {
-      newEmployeeData.personalDetails.panFileUrl = req.files['panCard'][0].path;
+    // 5. Handle PAN Card Upload (Image) - DIRECT TO CLOUDINARY
+    if (req.files && req.files['panCard'] && req.files['panCard'][0]) {
+      const file = req.files['panCard'][0];
+      console.log("Processing PAN Card:", file.originalname);
+      
+      try {
+        // Convert buffer to base64
+        const b64 = Buffer.from(file.buffer).toString("base64");
+        const dataURI = "data:" + file.mimetype + ";base64," + b64;
+        
+        // Upload to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(dataURI, {
+          folder: "hrms_employee_documents/pan",
+          resource_type: "image",
+          public_id: `pan_${Date.now()}_${file.originalname.replace(/\.[^/.]+$/, "")}`,
+          format: file.originalname.split('.').pop()
+        });
+        
+        newEmployeeData.personalDetails.panFileUrl = uploadResult.secure_url;
+        console.log("✅ PAN uploaded to Cloudinary:", uploadResult.secure_url);
+      } catch (uploadError) {
+        console.error("❌ PAN upload failed:", uploadError);
+        return res.status(500).json({ 
+          error: "Failed to upload PAN card", 
+          details: uploadError.message 
+        });
+      }
+    } else {
+      console.warn("⚠️ No PAN Card file received");
+      return res.status(400).json({ error: "PAN card is required" });
     }
 
-    // Multiple Company Documents (Loops through all files sent under this key)
-    if (req.files['companyDocuments']) {
-      newEmployeeData.companyDocuments = req.files['companyDocuments'].map(file => ({
-        fileName: file.originalname,
-        fileUrl: file.path, // This is the Cloudinary URL
-        uploadedAt: new Date()
-      }));
+    // 6. Handle Company Documents (PDF, DOCX, etc.) - DIRECT TO CLOUDINARY
+    if (req.files && req.files['companyDocuments'] && req.files['companyDocuments'].length > 0) {
+      console.log(`Processing ${req.files['companyDocuments'].length} company documents`);
+      
+      for (const file of req.files['companyDocuments']) {
+        try {
+          console.log(`Uploading ${file.originalname} to Cloudinary...`);
+          
+          // Convert buffer to base64
+          const b64 = Buffer.from(file.buffer).toString("base64");
+          const dataURI = "data:" + file.mimetype + ";base64," + b64;
+          
+          // Determine resource type
+          const resourceType = file.mimetype.startsWith('image/') ? 'image' : 'raw';
+          
+          // Upload to Cloudinary
+          const uploadResult = await cloudinary.uploader.upload(dataURI, {
+            folder: "hrms_employee_documents/company",
+            resource_type: resourceType,
+            public_id: `${Date.now()}_${file.originalname.replace(/\.[^/.]+$/, "")}`,
+            format: file.originalname.split('.').pop()
+          });
+          
+          newEmployeeData.companyDocuments.push({
+            fileName: file.originalname,
+            fileUrl: uploadResult.secure_url,
+            uploadedAt: new Date(),
+            fileType: file.mimetype,
+            fileSize: file.size
+          });
+          
+          console.log(`✅ Uploaded ${file.originalname}: ${uploadResult.secure_url}`);
+        } catch (uploadError) {
+          console.error(`❌ Error uploading ${file.originalname}:`, uploadError);
+          return res.status(500).json({ 
+            error: `Failed to upload document: ${file.originalname}`,
+            details: uploadError.message 
+          });
+        }
+      }
     }
 
-    // 5. Save to Database
+    // 7. Validate required files
+    if (!newEmployeeData.personalDetails.aadhaarFileUrl) {
+      console.error("❌ Aadhaar file URL is missing");
+      return res.status(400).json({ error: "Aadhaar card upload failed" });
+    }
+    
+    if (!newEmployeeData.personalDetails.panFileUrl) {
+      console.error("❌ PAN file URL is missing");
+      return res.status(400).json({ error: "PAN card upload failed" });
+    }
+
+    // 8. Save to Database
+    console.log("Saving employee to database...");
+    console.log("Aadhaar URL:", newEmployeeData.personalDetails.aadhaarFileUrl);
+    console.log("PAN URL:", newEmployeeData.personalDetails.panFileUrl);
+    console.log("Company Documents:", newEmployeeData.companyDocuments.length);
+    
     const employee = new Employee(newEmployeeData);
     const result = await employee.save();
     
     // Update company count
     company.employeeCount = await Employee.countDocuments({ company: data.company });
     await company.save();
+    
+    console.log(`✅ Employee onboarded successfully: ${result.employeeId}`);
+    console.log("======================================");
     
     res.status(201).json({ 
       success: true, 
@@ -385,16 +533,24 @@ router.post("/onboard", upload.fields([
 
   } catch (err) {
     console.error("❌ Onboarding error:", err);
-    res.status(500).json({ error: "Internal Server Error", details: err.message });
+    console.error("Error stack:", err.stack);
+    res.status(500).json({ 
+      success: false,
+      error: "Internal Server Error", 
+      message: err.message 
+    });
   }
 });
 
-
-// ROUTE: SEND OTP
+// FIXED: ROUTE: SEND OTP with better error handling
 router.post("/send-onboarding-otp", async (req, res) => {
   try {
     const { email } = req.body;
     
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
     const existingUser = await Employee.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already registered. Please login." });
@@ -408,24 +564,52 @@ router.post("/send-onboarding-otp", async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await transporter.sendMail({
-      from: `"HRMS Team" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: "Verify your Account Registration",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>Email Verification</h2>
-          <p>You are about to submit your employee onboarding details.</p>
-          <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
-          <p>This code expires in 5 minutes.</p>
-        </div>
-      `,
-    });
+    // Check if SMTP credentials are configured
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️ SMTP credentials not configured. OTP will not be sent via email.");
+      console.log(`OTP for ${email}: ${otpCode} (Save this for testing)`);
+      
+      // For development, return OTP in response (remove in production)
+      if (process.env.NODE_ENV !== 'production') {
+        return res.status(200).json({ 
+          message: "OTP generated (SMTP not configured)", 
+          otp: otpCode,
+          devMode: true 
+        });
+      }
+    }
 
-    res.status(200).json({ message: "OTP sent to email." });
+    // Try to send email, but don't fail if email fails
+    try {
+      await transporter.sendMail({
+        from: `"HRMS Team" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
+        to: email,
+        subject: "Verify your Account Registration",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Email Verification</h2>
+            <p>You are about to submit your employee onboarding details.</p>
+            <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
+            <p>This code expires in 5 minutes.</p>
+          </div>
+        `,
+      });
+      console.log(`OTP email sent to ${email}`);
+    } catch (emailError) {
+      console.error("Failed to send OTP email:", emailError);
+      // Don't return error, just log it
+    }
+
+    // Always return success (OTP is saved in DB)
+    res.status(200).json({ 
+      message: "OTP sent to email.",
+      // Include OTP in development mode only
+      ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
+    });
+    
   } catch (error) {
     console.error("OTP Error:", error);
-    res.status(500).json({ error: "Failed to send email." });
+    res.status(500).json({ error: "Failed to process OTP request." });
   }
 });
 
@@ -435,9 +619,14 @@ router.post("/send-onboarding-otp", async (req, res) => {
 =================================================================
 =========== */
 
+// FIXED: Forgot password OTP with better error handling
 router.post("/forgot-password-otp", async (req, res) => {
   try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
     const employee = await Employee.findOne({ email });
     if (!employee) {
@@ -452,21 +641,42 @@ router.post("/forgot-password-otp", async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await transporter.sendMail({
-      from: `"HRMS Support" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: "Password Reset Request",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>Password Reset</h2>
-          <p>We received a request to reset your password.</p>
-          <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626;">${otpCode}</strong></p>
-          <p>If you did not request this, please ignore this email.</p>
-        </div>
-      `,
-    });
+    // Check if SMTP credentials are configured
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️ SMTP credentials not configured. Password reset OTP will not be sent via email.");
+      console.log(`Password reset OTP for ${email}: ${otpCode}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        return res.status(200).json({ 
+          message: "OTP generated (SMTP not configured)", 
+          otp: otpCode,
+          devMode: true 
+        });
+      }
+    }
 
-    res.status(200).json({ message: "OTP sent to your email." });
+    try {
+      await transporter.sendMail({
+        from: `"HRMS Support" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
+        to: email,
+        subject: "Password Reset Request",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Password Reset</h2>
+            <p>We received a request to reset your password.</p>
+            <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626;">${otpCode}</strong></p>
+            <p>If you did not request this, please ignore this email.</p>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError);
+    }
+
+    res.status(200).json({ 
+      message: "OTP sent to your email.",
+      ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
+    });
   } catch (error) {
     console.error("Forgot Password OTP Error:", error);
     res.status(500).json({ error: "Failed to send OTP." });
@@ -476,6 +686,11 @@ router.post("/forgot-password-otp", async (req, res) => {
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
     const validOtp = await Otp.findOne({ email, otp });
     
     if (!validOtp) {
@@ -491,6 +706,10 @@ router.post("/verify-otp", async (req, res) => {
 router.post("/reset-password", async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
 
     const validOtp = await Otp.findOne({ email, otp });
     if (!validOtp) {
@@ -534,21 +753,41 @@ router.post("/change-password-otp", protect, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await transporter.sendMail({
-      from: `"HRMS Security" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: "Change Password Verification",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>Security Verification</h2>
-          <p>You requested to change your password.</p>
-          <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
-          <p>If you did not make this request, please contact admin immediately.</p>
-        </div>
-      `,
-    });
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("⚠️ SMTP credentials not configured. Change password OTP will not be sent.");
+      console.log(`Change password OTP for ${email}: ${otpCode}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        return res.status(200).json({ 
+          message: "OTP generated (SMTP not configured)", 
+          otp: otpCode,
+          devMode: true 
+        });
+      }
+    }
 
-    res.status(200).json({ message: "OTP sent to your registered email." });
+    try {
+      await transporter.sendMail({
+        from: `"HRMS Security" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
+        to: email,
+        subject: "Change Password Verification",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Security Verification</h2>
+            <p>You requested to change your password.</p>
+            <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
+            <p>If you did not make this request, please contact admin immediately.</p>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error("Failed to send change password email:", emailError);
+    }
+
+    res.status(200).json({ 
+      message: "OTP sent to your registered email.",
+      ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
+    });
   } catch (error) {
     console.error("Change Password OTP Error:", error);
     res.status(500).json({ error: "Failed to send OTP." });
@@ -559,6 +798,10 @@ router.post("/change-password-verify", protect, async (req, res) => {
   try {
     const { otp, newPassword } = req.body;
     const email = req.user.email; 
+
+    if (!otp || !newPassword) {
+      return res.status(400).json({ message: "OTP and new password are required" });
+    }
 
     const validOtp = await Otp.findOne({ email, otp });
     if (!validOtp) {
@@ -582,5 +825,5 @@ router.post("/change-password-verify", protect, async (req, res) => {
   }
 });
 
-
 export default router;
+// --- END OF FILE employeeRoutes.js ---

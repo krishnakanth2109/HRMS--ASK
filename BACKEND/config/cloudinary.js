@@ -1,26 +1,18 @@
-// --- START OF FILE config/cloudinary.js ---
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import multer from "multer";
-import dotenv from "dotenv";
+import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
 
-dotenv.config();
-
+// Cloudinary configuration
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "employee_docs", // Folder name in Cloudinary
-    allowed_formats: ["jpg", "jpeg", "png", "pdf"],
-  },
+// Use memory storage only - no disk storage
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-const upload = multer({ storage: storage });
-
-export { upload, cloudinary };
-// --- END OF FILE config/cloudinary.js ---
+export { cloudinary, upload };

@@ -682,9 +682,6 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Duration / Notes
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Phone
-              </th>
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -746,18 +743,6 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                   ) : (
                     <span className="text-sm text-slate-400">--</span>
                   )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-slate-700">
-                    {employee.phoneNumber ? (
-                      <div className="flex items-center gap-1">
-                        <FaPhone className="text-slate-500 text-xs" />
-                        <span className="font-mono">{employee.phoneNumber}</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">No phone</span>
-                    )}
-                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {/* ✅ FIXED: REMOVED CHECK FOR PHONE NUMBER */}

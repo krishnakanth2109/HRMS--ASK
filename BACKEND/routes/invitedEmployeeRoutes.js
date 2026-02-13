@@ -55,14 +55,11 @@ router.post('/documents/upload', upload.single('file'), async (req, res) => {
     const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
     
     // Determine resource type based on file
-    let resourceType = 'raw'; 
+    let resourceType = 'raw'; // Default for documents
     if (req.file.mimetype.startsWith('image/')) {
       resourceType = 'image';
     } else if (req.file.mimetype.startsWith('video/')) {
       resourceType = 'video';
-    } else if (req.file.mimetype === 'application/pdf') {
-      // IMPORTANT: Uploading PDF as 'image' allows Cloudinary to use flags like fl_attachment
-      resourceType = 'image'; 
     }
     
     const cloudinaryResponse = await cloudinary.uploader.upload(dataURI, { 
@@ -472,23 +469,47 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post("/complete-onboarding", upload.single('signature'), async (req, res) => {
+router.post('/complete-onboarding', upload.single('signature'), async (req, res) => {
+  // --- ADD THESE LOGS ---
+  console.log("--- ONBOARDING ATTEMPT ---");
+  console.log("Received Email:", req.body.email);
+  console.log("File Received:", req.file ? "YES" : "NO");
+
   try {
     const { email } = req.body;
     
-    // Safety Check: If no file arrived, req.file will be undefined
-    if (!req.file) {
-      return res.status(400).json({ error: "Signature file is missing." });
+    // Normalize the email
+    const searchEmail = email ? email.toLowerCase().trim() : "";
+
+    // 1. First, just check if the employee exists at all without updating
+    const checkUser = await InvitedEmployee.findOne({ email: searchEmail });
+    console.log("Database Lookup Result:", checkUser ? "FOUND" : "NOT FOUND");
+
+    if (!checkUser) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Employee with email ${searchEmail} not found in database.` 
+      });
     }
 
-    // Now req.file.path or req.file.buffer will exist depending on your storage
-    const signatureUrl = req.file.path; // Cloudinary uses .path
+    // 2. Proceed with Cloudinary...
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    const cldRes = await cloudinary.uploader.upload(dataURI, { folder: "hrms_signatures" });
 
+    // 3. Update
+    checkUser.signatureUrl = cldRes.secure_url;
+    checkUser.policyStatus = 'accepted';
+    checkUser.policyAcceptedAt = new Date();
+    checkUser.status = 'onboarded';
+    checkUser.onboardedAt = new Date();
+    await checkUser.save();
 
-    res.status(200).json({ success: true });
+    res.status(200).json({ success: true, message: 'Onboarding completed successfully' });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Backend Error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
