@@ -38,15 +38,41 @@ transporter.verify((error, success) => {
 const createInsufficientHoursEmail = (employeeData) => {
   const { employeeName, date, punchIn, punchOut, workedHours, workedMinutes, workedSeconds, requiredHours, loginStatus, workedStatus } = employeeData;
 
-  const formatTime = (dateObj) => {
-    if (!dateObj) return '--';
-    return new Date(dateObj).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-  };
+const formatTime = (dateObj) => {
+  if (!dateObj) return '--';
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '--';
-    return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  };
+  const utcDate = new Date(dateObj);
+
+  // Convert UTC → IST manually (+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(utcDate.getTime() + istOffset);
+
+  let hours = istDate.getUTCHours();
+  const minutes = istDate.getUTCMinutes();
+  const seconds = istDate.getUTCSeconds();
+
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+
+  return `${hours.toString().padStart(2, '0')}:${minutes
+    .toString()
+    .padStart(2, '0')}:${seconds
+    .toString()
+    .padStart(2, '0')} ${ampm}`;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '--';
+
+  const utcDate = new Date(dateStr);
+
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(utcDate.getTime() + istOffset);
+
+  return istDate.toDateString();
+};
+
 
   const getStatusBadge = (status) => {
     const colors = {
