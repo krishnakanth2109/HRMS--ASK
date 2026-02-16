@@ -317,14 +317,14 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
 
   if (!open || !employee) return null;
 
-  const handleSubmit = (e) => { 
-    e.preventDefault(); 
-    if (!endDate || !reason.trim()) { 
-      setError("All fields are required."); 
-      return; 
-    } 
-    setError(""); 
-    onSubmit({ endDate, reason }); 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!endDate || !reason.trim()) {
+      setError("All fields are required.");
+      return;
+    }
+    setError("");
+    onSubmit({ endDate, reason });
   };
 
   return (
@@ -370,77 +370,77 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
 function DeactivationDetailsModal({ open, employee, onClose }) {
   if (!open || !employee) return null;
   return (
-<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-  <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100">
 
-    {/* Header */}
-    <div className="px-6 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white flex justify-between items-center">
-      <div>
-        <h3 className="text-xl font-semibold tracking-wide">
-          Deactivation Details
-        </h3>
-        <p className="text-sm text-red-100">
-          Employee Status Information
-        </p>
-      </div>
+        {/* Header */}
+        <div className="px-6 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-semibold tracking-wide">
+              Deactivation Details
+            </h3>
+            <p className="text-sm text-red-100">
+              Employee Status Information
+            </p>
+          </div>
 
-      <span className="px-3 py-1 text-xs rounded-full bg-white/20 backdrop-blur-sm">
-        {employee?.deactivationDate ? "Deactivated" : "Inactive"}
-      </span>
-    </div>
-
-    {/* Body */}
-    <div className="p-6 space-y-5">
-
-      {/* Name */}
-      <div className="flex justify-between items-center border-b pb-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Employee Name
-          </label>
-          <p className="text-lg font-semibold text-gray-800">
-            {employee?.name || "N/A"}
-          </p>
+          <span className="px-3 py-1 text-xs rounded-full bg-white/20 backdrop-blur-sm">
+            {employee?.deactivationDate ? "Deactivated" : "Inactive"}
+          </span>
         </div>
-      </div>
 
-      {/* Date */}
-      <div className="flex justify-between items-center border-b pb-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Deactivation Date
-          </label>
-          <p className="text-md font-medium text-gray-700">
-            {employee?.deactivationDate || "Not Recorded"}
-          </p>
+        {/* Body */}
+        <div className="p-6 space-y-5">
+
+          {/* Name */}
+          <div className="flex justify-between items-center border-b pb-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Employee Name
+              </label>
+              <p className="text-lg font-semibold text-gray-800">
+                {employee?.name || "N/A"}
+              </p>
+            </div>
+          </div>
+
+          {/* Date */}
+          <div className="flex justify-between items-center border-b pb-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Deactivation Date
+              </label>
+              <p className="text-md font-medium text-gray-700">
+                {employee?.deactivationDate || "Not Recorded"}
+              </p>
+            </div>
+          </div>
+
+          {/* Reason */}
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Deactivation Reason
+            </label>
+
+            <div className="mt-2 bg-gray-50 border rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
+              {employee?.deactivationReason || "No reason provided."}
+            </div>
+          </div>
+
         </div>
-      </div>
 
-      {/* Reason */}
-      <div>
-        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          Deactivation Reason
-        </label>
-
-        <div className="mt-2 bg-gray-50 border rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
-          {employee?.deactivationReason || "No reason provided."}
+        {/* Footer */}
+        <div className="flex justify-end px-6 py-4 bg-gray-50 border-t">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition duration-200 shadow-md"
+          >
+            Close
+          </button>
         </div>
+
       </div>
-
     </div>
-
-    {/* Footer */}
-    <div className="flex justify-end px-6 py-4 bg-gray-50 border-t">
-      <button
-        onClick={onClose}
-        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition duration-200 shadow-md"
-      >
-        Close
-      </button>
-    </div>
-
-  </div>
-</div>
 
 
   );
@@ -653,8 +653,8 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
                         <td className="px-4 py-3 font-mono text-slate-600">{row.displayTime || "-"}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded text-xs font-bold ${row.workedStatus === "Full Day" ? "bg-green-100 text-green-700" :
-                              row.workedStatus.includes("Absent") ? "bg-red-100 text-red-700" :
-                                "bg-yellow-100 text-yellow-700"
+                            row.workedStatus.includes("Absent") ? "bg-red-100 text-red-700" :
+                              "bg-yellow-100 text-yellow-700"
                             }`}>{row.workedStatus}</span>
                         </td>
                       </tr>
@@ -731,8 +731,8 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
                         <td className="px-4 py-3 text-slate-500 truncate max-w-xs">{l.reason || "-"}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded text-xs font-bold ${l.status === "Approved" ? "bg-green-100 text-green-700" :
-                              l.status === "Rejected" ? "bg-red-100 text-red-700" :
-                                "bg-yellow-100 text-yellow-700"
+                            l.status === "Rejected" ? "bg-red-100 text-red-700" :
+                              "bg-yellow-100 text-yellow-700"
                             }`}>{l.status}</span>
                         </td>
                       </tr>
@@ -921,9 +921,9 @@ const EmployeeManagement = () => {
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 relative z-10">
           <div className="overflow-x-auto min-h-[300px]">
             <table className="min-w-full">
-              <thead className="bg-gray-300 border-b border-gray-200">
-                <tr className="text-blue-600 uppercase text-size-600 font-bold tracking-wider ">
-                  <th className="p-4 text-left  pl-6">ID</th>
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-600">
+                <tr className="text-white uppercase text-sm font-semibold tracking-wide">
+                  <th className="p-4 text-left pl-6">ID</th>
                   <th className="p-4 text-left">Name</th>
                   <th className="p-4 text-left">Role</th>
                   <th className="p-4 text-left">Department</th>
@@ -931,6 +931,7 @@ const EmployeeManagement = () => {
                   <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-gray-100">
                 {activeEmployees.length > 0 || inactiveEmployees.length > 0 ? (
                   <>

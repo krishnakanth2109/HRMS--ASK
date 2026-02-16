@@ -938,22 +938,61 @@ const AdminAttendance = () => {
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider sticky top-0 z-10 shadow-sm">
-                <tr>
-                  {/* ✅ NEW: Checkbox Header in Compare Mode */}
-                  {isCompareMode && <th className="px-6 py-4 text-center border-b">Select</th>}
-                  <th className="px-6 py-4 text-left font-semibold border-b">Employee</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Assigned Hrs</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b text-blue-700 bg-blue-50/50">Present</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">On Time</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Late</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Approved OT</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Full Days</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Half Days</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Absent</th>
-                  <th className="px-6 py-4 text-center font-semibold border-b">Actions</th>
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 
+                   text-white uppercase text-xs tracking-wider 
+                   sticky top-0 z-20 shadow-md backdrop-blur-md">
+                <tr className="divide-x divide-slate-600">
+
+                  {isCompareMode && (
+                    <th className="px-6 py-4 text-center font-semibold">
+                      Select
+                    </th>
+                  )}
+
+                  <th className="px-6 py-4 text-left font-semibold">
+                    Employee
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Assigned Hrs
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold 
+                  ">
+                    Present
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    On Time
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Late
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Approved OT
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Full Days
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Half Days
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Absent
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-semibold">
+                    Actions
+                  </th>
+
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-200">
                 {summaryLoading ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500 font-medium">Loading summary...</td></tr>) : paginatedSummaryData.length === 0 ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500">No summary data available.</td></tr>) : paginatedSummaryData.map((emp) => {
                   const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
