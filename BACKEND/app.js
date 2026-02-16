@@ -53,6 +53,7 @@ const allowedOrigins = [
   "https://hrms-ask.vercel.app",
   "https://hrms-ask-1jx6.onrender.com",
   // "https://hrms.vagarioussolutions.com",
+  "http://hrms.vagarioussolutions.com",
 ];
 
 // -------------------- SOCKET.IO FOR REAL-TIME CHAT --------------------
