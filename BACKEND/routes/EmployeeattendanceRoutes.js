@@ -221,7 +221,12 @@ router.get('/all', onlyAdmin, async (req, res) => {
 });
 
 /* ================= UTILITIES ================= */
-const getToday = () => new Date().toISOString().split("T")[0];
+const getToday = () => {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata"
+  });
+};
+
 
 const timeToMinutes = (timeStr) => {
   const [h, m] = timeStr.split(":").map(Number);
