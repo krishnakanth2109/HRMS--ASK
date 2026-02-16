@@ -644,8 +644,14 @@ const AdminLocationSettings = () => {
                       </p>
                     )}
                  </div>
-                 <button onClick={handleSaveGlobalSettings} disabled={loading} className="w-full bg-gray-900 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-black transition shadow-sm flex justify-center items-center gap-2">{loading ? "Saving..." : <><FaSave /> Save Configuration</>}</button>
-             </div>
+                 <button
+  onClick={handleSaveGlobalSettings}
+  disabled={loading}
+  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-blue-700 transition shadow-sm flex justify-center items-center gap-2 disabled:bg-blue-400 disabled:cursor-not-allowed"
+>
+  {loading ? "Saving..." : <><FaSave /> Save Configuration</>}
+</button>
+        </div>
           </div>
         </div>
 

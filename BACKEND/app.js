@@ -51,7 +51,8 @@ const allowedOrigins = [
   "http://localhost:5000",
   "https://hrms-ask-1.onrender.com",
   "https://hrms-ask.vercel.app",
-  "https://hrms-ask-1jx6.onrender.com"
+  "https://hrms-ask-1jx6.onrender.com",
+  // "https://hrms.vagarioussolutions.com",
 ];
 
 // -------------------- SOCKET.IO FOR REAL-TIME CHAT --------------------

@@ -76,6 +76,8 @@ const AdminDashboard = () => {
   const [isGlobalWFH, setIsGlobalWFH] = useState(false);
   // Expand state for Working Remotely list
   const [showAllRemote, setShowAllRemote] = useState(false);
+  // ✅ NEW STATE FOR TODAY'S ATTENDANCE DATA
+  const [todayAttendanceData, setTodayAttendanceData] = useState([]);
 
   // --- 1. General Dashboard Stats ---
   const { statCards, activeEmployees, departmentList } = useMemo(
@@ -83,13 +85,16 @@ const AdminDashboard = () => {
     [employees, leaveRequests, getDashboardData]
   );
 
-  // --- 2. Calculate Today's Overview Counts ---
+  // --- 2. Calculate Today's Overview Counts and Fetch Attendance Data ---
   useEffect(() => {
     const calculateTodayCounts = async () => {
       try {
         const today = new Date().toISOString().split("T")[0];
         const todayAttendance = await getAttendanceByDateRange(today, today);
         const attendanceArray = Array.isArray(todayAttendance) ? todayAttendance : [];
+        
+        // ✅ Store today's attendance data for later use
+        setTodayAttendanceData(attendanceArray);
 
         const todayLeaveRequests = leaveRequests.filter(leave => {
           if (leave.status !== 'Approved') return false;
@@ -151,37 +156,35 @@ const AdminDashboard = () => {
       setOfficeConfig(configData);
       setIsGlobalWFH(configData?.globalWorkMode === 'WFH');
 
-      // --- LOGIC 1: UPCOMING BIRTHDAYS THIS MONTH ---
- // --- LOGIC 1: UPCOMING BIRTHDAYS THIS MONTH (ACTIVE EMPLOYEES ONLY) ---
-const today = new Date();
-const currentMonth = today.getMonth();
-const todayDate = today.getDate();
+      // --- LOGIC 1: UPCOMING BIRTHDAYS THIS MONTH (ACTIVE EMPLOYEES ONLY) ---
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const todayDate = today.getDate();
 
-const birthdays = allEmployees
-  .filter(emp => {
-    // ✅ ADD THIS CHECK: Only include active employees (isActive !== false)
-    if (emp.isActive === false) return false;
-    if (!emp.personalDetails?.dob) return false;
+      const birthdays = allEmployees
+        .filter(emp => {
+          // ✅ ADD THIS CHECK: Only include active employees (isActive !== false)
+          if (emp.isActive === false) return false;
+          if (!emp.personalDetails?.dob) return false;
 
-    const dob = new Date(emp.personalDetails.dob);
-    return dob.getMonth() === currentMonth && dob.getDate() >= todayDate;
-  })
-  .map(emp => {
-    const dob = new Date(emp.personalDetails.dob);
-    return {
-      name: emp.name,
-      employeeId: emp.employeeId,
-      department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
-      role: emp.role || emp.experienceDetails?.[0]?.role || "N/A",
-      dobDay: dob.getDate(),
-      dobMonth: dob.getMonth()
-    };
-  })
-  // Sort by upcoming date
-  .sort((a, b) => a.dobDay - b.dobDay);
+          const dob = new Date(emp.personalDetails.dob);
+          return dob.getMonth() === currentMonth && dob.getDate() >= todayDate;
+        })
+        .map(emp => {
+          const dob = new Date(emp.personalDetails.dob);
+          return {
+            name: emp.name,
+            employeeId: emp.employeeId,
+            department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
+            role: emp.role || emp.experienceDetails?.[0]?.role || "N/A",
+            dobDay: dob.getDate(),
+            dobMonth: dob.getMonth()
+          };
+        })
+        // Sort by upcoming date
+        .sort((a, b) => a.dobDay - b.dobDay);
 
-setMonthlyBirthdays(birthdays);
-
+      setMonthlyBirthdays(birthdays);
 
       // --- LOGIC 2: ON LEAVE TODAY ---
       const employeeMap = new Map();
@@ -223,11 +226,14 @@ setMonthlyBirthdays(birthdays);
       // Unique leaves
       setOnLeaveToday(Array.from(new Map(onLeave.map(item => [item.employeeId, item])).values()));
 
-      // --- LOGIC 3: REMOTE WORKERS ---
+      // --- LOGIC 3: REMOTE WORKERS (FILTERED BY TODAY'S ATTENDANCE) ---
       const currentGlobalMode = configData.globalWorkMode || 'WFO';
       const currentDay = today.getDay();
 
       let remoteList = [];
+      
+      // First, get all employees configured for remote work today
+      const configuredRemoteEmployees = [];
       empModes.forEach(emp => {
         const basicInfo = employeeMap.get(emp.employeeId);
         if (!basicInfo) return;
@@ -246,13 +252,42 @@ setMonthlyBirthdays(birthdays);
         }
 
         if (effectiveMode === 'WFH') {
-          remoteList.push({
-            name: basicInfo.name,
-            employeeId: basicInfo.employeeId,
-            department: basicInfo.department || "N/A"
+          configuredRemoteEmployees.push({
+            ...basicInfo,
+            employeeId: emp.employeeId
           });
         }
       });
+
+      // If global WFH, all active employees are configured for remote work
+      if (currentGlobalMode === 'WFH') {
+        configuredRemoteEmployees.push(...allEmployees
+          .filter(emp => emp.isActive !== false)
+          .map(emp => ({
+            name: emp.name,
+            employeeId: emp.employeeId,
+            department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
+            role: emp.role || emp.experienceDetails?.[0]?.role || "N/A"
+          }))
+        );
+        // Remove duplicates (in case of overlap)
+        const uniqueMap = new Map();
+        configuredRemoteEmployees.forEach(emp => uniqueMap.set(emp.employeeId, emp));
+        configuredRemoteEmployees.length = 0;
+        configuredRemoteEmployees.push(...uniqueMap.values());
+      }
+
+      // ✅ FILTER: Only include configured remote employees who have punched in today
+      const punchedInEmployeeIds = new Set(
+        todayAttendanceData
+          .filter(att => att.punchIn)
+          .map(att => att.employeeId)
+      );
+
+      remoteList = configuredRemoteEmployees.filter(emp => 
+        punchedInEmployeeIds.has(emp.employeeId)
+      );
+
       setRemoteWorkers(remoteList);
 
     } catch (error) {
@@ -262,10 +297,10 @@ setMonthlyBirthdays(birthdays);
     }
   };
 
-  // ✅ FETCH TEAM DATA ON MOUNT
+  // ✅ FETCH TEAM DATA ON MOUNT AND WHEN TODAY'S ATTENDANCE DATA CHANGES
   useEffect(() => {
     fetchTeamData();
-  }, []);
+  }, [todayAttendanceData]); // Re-fetch when today's attendance data changes
 
   // --- 3. Calculate Date Range (Updated for Month Support) ---
   const weekDates = useMemo(() => {
@@ -853,7 +888,7 @@ setMonthlyBirthdays(birthdays);
           )}
         </div>
 
-        {/* 🏠 Working Remotely */}
+        {/* 🏠 Working Remotely (Punched In Only) */}
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -879,13 +914,61 @@ setMonthlyBirthdays(birthdays);
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
             </div>
           ) : isGlobalWFH ? (
-            <div className="text-center py-6 bg-green-50 rounded-lg">
-              <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-3">
-                <FaLaptopHouse className="text-white text-2xl" />
+            remoteWorkers.length > 0 ? (
+              <div>
+                <div className="flex -space-x-3 mb-4">
+                  {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 6)).map((worker, index) => (
+                    <div
+                      key={index}
+                      className="relative group"
+                      title={`${worker.name} (${worker.department})`}
+                    >
+                      <div className={`w-10 h-10 rounded-full ring-2 ring-white bg-gradient-to-tr ${gradients[index % gradients.length]} flex items-center justify-center text-white font-bold text-sm`}>
+                        {worker.name.charAt(0)}
+                      </div>
+                    </div>
+                  ))}
+                  {!showAllRemote && remoteWorkers.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRemote(true)}
+                      className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs ring-2 ring-white hover:bg-gray-300"
+                      title="Show all"
+                    >
+                      +{remoteWorkers.length - 6}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 3)).map((worker, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="font-medium text-sm">{worker.name}</span>
+                      <span className="text-xs text-gray-500">{worker.department}</span>
+                    </div>
+                  ))}
+                  {remoteWorkers.length > 3 && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllRemote(v => !v)}
+                        className="w-full text-center text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded py-1 transition"
+                        title={showAllRemote ? "Show less" : "Show all"}
+                      >
+                        {showAllRemote ? "Show less" : `Show all (${remoteWorkers.length})`}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h4 className="font-bold text-green-800">Global Remote Day</h4>
-              <p className="text-sm text-green-600 mt-1">Everyone is working from home today</p>
-            </div>
+            ) : (
+              <div className="text-center py-6 bg-green-50 rounded-lg">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-3">
+                  <FaLaptopHouse className="text-white text-2xl" />
+                </div>
+                <h4 className="font-bold text-green-800">Global Remote Day</h4>
+                <p className="text-sm text-green-600 mt-1">No remote employees have punched in yet</p>
+              </div>
+            )
           ) : remoteWorkers.length > 0 ? (
             <div>
               <div className="flex -space-x-3 mb-4">
@@ -934,7 +1017,7 @@ setMonthlyBirthdays(birthdays);
             </div>
           ) : (
             <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <p className="text-gray-400">No employees working remotely</p>
+              <p className="text-gray-400">No employees working remotely today</p>
             </div>
           )}
         </div>

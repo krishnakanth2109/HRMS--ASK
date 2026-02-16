@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 
 // Import API functions
-import { sendOnboardingOtp } from "../api";
 import api from "../api";
 
 const EmployeeOnboarding = () => {
@@ -30,11 +29,6 @@ const EmployeeOnboarding = () => {
   const [emailCheckLoading, setEmailCheckLoading] = useState(false);
   const [assignedDocs, setAssignedDocs] = useState([]);
 
-  // OTP State
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [verifying, setVerifying] = useState(false);
-
   // File State
   const [docFiles, setDocFiles] = useState({
     aadhaar: null,
@@ -42,7 +36,7 @@ const EmployeeOnboarding = () => {
     filledDocs: {} // { docId: FileObject }
   });
 
-  // Form State - UPDATED WITH MISSING MODEL FIELDS
+  // Form State
   const [formData, setFormData] = useState({
     company: "",
     name: "",
@@ -51,7 +45,7 @@ const EmployeeOnboarding = () => {
     phone: "",
     address: "",
     emergency: "",
-    emergencyPhone: "", // Added missing field
+    emergencyPhone: "",
     joiningDate: "",
     currentDepartment: "",
     currentRole: "",
@@ -60,11 +54,11 @@ const EmployeeOnboarding = () => {
     bankDetails: { accountNumber: "", bankName: "", ifsc: "", branch: "" },
     personalDetails: {
       dob: "",
-      gender: "Male", // Added missing field
-      maritalStatus: "Single", // Added missing field
+      gender: "Male",
+      maritalStatus: "Single",
       nationality: "",
-      panNumber: "", // Added missing field
-      aadhaarNumber: "" // Added missing field
+      panNumber: "",
+      aadhaarNumber: ""
     },
   });
 
@@ -83,7 +77,6 @@ const EmployeeOnboarding = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Download failed:", error);
-      // Fallback: Open in new tab if fetch fails
       window.open(fileUrl, '_blank');
     }
   };
@@ -128,7 +121,6 @@ const EmployeeOnboarding = () => {
     try {
       const response = await api.post('/api/invited-employees/verify-email', { email });
 
-      // Handle Case: Already Onboarded
       if (response.data.alreadyOnboarded) {
         Swal.fire({
           icon: 'info',
@@ -194,7 +186,7 @@ const EmployeeOnboarding = () => {
   };
 
   const validateForm = () => {
-    if (!formData.company) return "Company verification failed.";
+    if (!formData.company) return "Please verify your email/invitation first.";
     if (!formData.name || !formData.email || !formData.password) return "Please fill in all required profile fields.";
     if (formData.password.length < 8) return "Password must be at least 8 characters long.";
     if (formData.phone.length !== 10) return "Phone number must be exactly 10 digits.";
@@ -210,110 +202,51 @@ const EmployeeOnboarding = () => {
     if (error) return Swal.fire({ icon: "warning", title: "Missing Information", text: error, confirmButtonColor: '#f59e0b' });
 
     setLoading(true);
-    try {
-      await sendOnboardingOtp(formData.email);
-      setLoading(false);
-      setShowOtpModal(true);
-      Swal.fire({
-        icon: 'info',
-        title: 'OTP Sent',
-        text: 'A 6-digit verification code has been sent to your email.',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 3000
+
+    const finalData = new FormData();
+    const payload = {
+      ...formData,
+      experienceDetails: [{
+        role: formData.currentRole,
+        department: formData.currentDepartment,
+        joiningDate: formData.joiningDate,
+        lastWorkingDate: "Present",
+        salary: Number(formData.currentSalary),
+        employmentType: formData.employmentType,
+      }]
+    };
+
+    finalData.append("jsonData", JSON.stringify(payload));
+
+    if (docFiles.aadhaar) finalData.append("aadhaarCard", docFiles.aadhaar);
+    if (docFiles.pan) finalData.append("panCard", docFiles.pan);
+
+    if (Object.keys(docFiles.filledDocs).length > 0) {
+      Object.keys(docFiles.filledDocs).forEach((id) => {
+        finalData.append("companyDocuments", docFiles.filledDocs[id]);
       });
+    }
+
+    try {
+      // Direct submission to DB
+      await api.post('/api/employees/onboard', finalData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+
+      setLoading(false);
+      setStage('compliance'); // Direct transition to Policy Compliance
     } catch (err) {
       setLoading(false);
-      Swal.fire("Error", "Failed to send OTP. Please try again later.", "error");
+      Swal.fire({
+        icon: 'error',
+        title: 'Submission Failed',
+        text: err.response?.data?.error || "An error occurred during onboarding. Please check your details.",
+        confirmButtonColor: '#ef4444'
+      });
     }
   };
-
-const handleFinalSubmit = async () => {
-  if (otp.length !== 6) return Swal.fire("Invalid OTP", "Please enter the 6-digit code sent to your email.", "warning");
-  setVerifying(true);
-
-  const finalData = new FormData();
-  const payload = {
-    ...formData,
-    experienceDetails: [{
-      role: formData.currentRole,
-      department: formData.currentDepartment,
-      joiningDate: formData.joiningDate,
-      lastWorkingDate: "Present",
-      salary: Number(formData.currentSalary),
-      employmentType: formData.employmentType,
-    }]
-  };
-
-  // Append JSON data
-  finalData.append("jsonData", JSON.stringify(payload));
-  
-  // Append OTP
-  finalData.append("otp", otp);
-  
-  // IMPORTANT: Check if files exist before appending
-  // Append Aadhaar Card - Make sure the key matches exactly what backend expects
-  if (docFiles.aadhaar) {
-    console.log("Appending Aadhaar file:", docFiles.aadhaar.name);
-    finalData.append("aadhaarCard", docFiles.aadhaar);
-  } else {
-    console.warn("Aadhaar file is missing");
-  }
-  
-  // Append PAN Card
-  if (docFiles.pan) {
-    console.log("Appending PAN file:", docFiles.pan.name);
-    finalData.append("panCard", docFiles.pan);
-  } else {
-    console.warn("PAN file is missing");
-  }
-  
-  // Append Company Documents
-  if (Object.keys(docFiles.filledDocs).length > 0) {
-    console.log("Appending company documents:", Object.keys(docFiles.filledDocs).length);
-    Object.keys(docFiles.filledDocs).forEach((id) => {
-      const file = docFiles.filledDocs[id];
-      console.log(`Appending company document: ${file.name}`);
-      finalData.append("companyDocuments", file);
-    });
-  }
-
-  // Log FormData contents for debugging
-  console.log("FormData entries:");
-  for (let pair of finalData.entries()) {
-    if (pair[0] === 'jsonData') {
-      console.log(pair[0], pair[1].substring(0, 100) + '...');
-    } else if (pair[0].includes('Card') || pair[0].includes('companyDocuments')) {
-      console.log(pair[0], pair[1]?.name, pair[1]?.type, pair[1]?.size);
-    } else {
-      console.log(pair[0], pair[1]);
-    }
-  }
-
-  try {
-    const response = await api.post('/api/employees/onboard', finalData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    
-    console.log("Onboard response:", response.data);
-    
-    await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
-    setVerifying(false);
-    setShowOtpModal(false);
-    setStage('compliance');
-  } catch (err) {
-    console.error("Onboard submission error:", err);
-    console.error("Error response:", err.response?.data);
-    setVerifying(false);
-    Swal.fire({
-      icon: 'error',
-      title: 'Submission Failed',
-      text: err.response?.data?.error || err.response?.data?.details || "An error occurred during onboarding. Please check your details.",
-      confirmButtonColor: '#ef4444'
-    });
-  }
-};
 
   if (stage === 'compliance') return <ComplianceModule userEmail={formData.email} userName={formData.name} companyName={verifiedCompany?.name} onComplete={() => setStage('completed')} />;
   if (stage === 'completed') return <CompletionScreen userName={formData.name} companyName={verifiedCompany?.name} />;
@@ -325,7 +258,7 @@ const handleFinalSubmit = async () => {
           <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none overflow-hidden">
             <FaRocket className="absolute -bottom-10 -right-10 text-[15rem] rotate-12" />
           </div>
-          <h1 className="text-4xl font-black mb-3">Employee Onboarding</h1>
+          <h1 className="text-4xl font-black mb-3">Welcome to Onboarding!</h1>
           <p className="text-indigo-100 text-lg opacity-90">Securely set up your official employee profile</p>
         </div>
 
@@ -335,7 +268,7 @@ const handleFinalSubmit = async () => {
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row items-end gap-4">
                   <div className="flex-1 w-full">
-                    <Input icon={<FaEnvelope />} name="email" label="Professional Email Address *" type="email" value={formData.email} onChange={handleChange} required readOnly={emailVerified} placeholder="e.g. alex@company.com" />
+                    <Input icon={<FaEnvelope />} name="email" label="Professional Email Address *" type="email" value={formData.email} onChange={handleChange} required readOnly={emailVerified} placeholder="Enter your invited email address" />
                   </div>
                   {!emailVerified && (
                     <button type="button" onClick={handleVerifyEmail} disabled={emailCheckLoading} className="w-full md:w-auto bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group">
@@ -372,7 +305,6 @@ const handleFinalSubmit = async () => {
                     <Input icon={<FaBirthdayCake />} name="personalDetails.dob" type="date" label="Date of Birth" value={formData.personalDetails.dob} onChange={handleChange} />
                     <Input icon={<FaFlag />} name="personalDetails.nationality" label="Nationality" value={formData.personalDetails.nationality} onChange={handleChange} />
 
-                    {/* NEW: GENDER SELECT */}
                     <div className="relative group">
                       <FaVenusMars className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 absolute left-10 top-2 z-10">Gender</label>
@@ -384,7 +316,6 @@ const handleFinalSubmit = async () => {
                       </select>
                     </div>
 
-                    {/* NEW: MARITAL STATUS SELECT */}
                     <div className="relative group">
                       <FaRing className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 absolute left-10 top-2 z-10">Marital Status</label>
@@ -397,8 +328,6 @@ const handleFinalSubmit = async () => {
                     </div>
 
                     <Input icon={<FaUser />} name="emergency" label="Emergency Contact Name" value={formData.emergency} onChange={handleChange} placeholder="Full Name" />
-
-                    {/* NEW: EMERGENCY PHONE */}
                     <Input icon={<FaPhone />} name="emergencyPhone" label="Emergency Phone" value={formData.emergencyPhone} onChange={handleChange} placeholder="Emergency Contact Number" />
                   </div>
                 </Section>
@@ -418,29 +347,19 @@ const handleFinalSubmit = async () => {
                   <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-4 items-start">
                     <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><FaInfoCircle /></div>
                     <p className="text-sm text-amber-800 leading-relaxed font-medium">
-                      Please enter your ID numbers and provide high-quality scans of your identity documents.
+                      Download the attached document, complete it manually or in Word, re-upload it with accurate details, and provide your ID numbers along with high-quality scanned copies of your identity documents.
+
                     </p>
                   </div>
 
-                  {/* NEW: AADHAAR AND PAN NUMBERS */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <Input icon={<FaIdCard />} name="personalDetails.aadhaarNumber" label="Aadhaar Number *" value={formData.personalDetails.aadhaarNumber} onChange={handleChange} placeholder="12-digit Aadhaar Number" required />
                     <Input icon={<FaCreditCard />} name="personalDetails.panNumber" label="PAN Number *" value={formData.personalDetails.panNumber} onChange={handleChange} placeholder="10-digit PAN Number" required />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <FileUploadCard
-                      label="Aadhaar Card"
-                      required
-                      file={docFiles.aadhaar}
-                      onChange={(e) => handleFileChange(e, 'aadhaar')}
-                    />
-                    <FileUploadCard
-                      label="PAN Card"
-                      required
-                      file={docFiles.pan}
-                      onChange={(e) => handleFileChange(e, 'pan')}
-                    />
+                    <FileUploadCard label="Aadhaar Card" required file={docFiles.aadhaar} onChange={(e) => handleFileChange(e, 'aadhaar')} />
+                    <FileUploadCard label="PAN Card" required file={docFiles.pan} onChange={(e) => handleFileChange(e, 'pan')} />
                   </div>
 
                   <div className="space-y-4">
@@ -459,14 +378,9 @@ const handleFinalSubmit = async () => {
                               </div>
                             </div>
                             <div className="flex gap-3 w-full sm:w-auto">
-                              <button
-                                type="button"
-                                onClick={() => handleDownload(doc.fileUrl, doc.fileName)}
-                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition"
-                              >
+                              <button type="button" onClick={() => handleDownload(doc.fileUrl, doc.fileName)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition">
                                 <FaFileDownload /> Download File
                               </button>
-
                               <label className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition shadow-sm ${docFiles.filledDocs[doc._id] ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}>
                                 <input type="file" className="hidden" onChange={(e) => handleFileChange(e, 'filledDocs', doc._id)} />
                                 {docFiles.filledDocs[doc._id] ? <><FaCheckCircle /> Uploaded</> : <><FaFileUpload /> Upload Signed</>}
@@ -496,8 +410,8 @@ const handleFinalSubmit = async () => {
 
                 <div className="pt-8">
                   <button type="submit" disabled={loading} className="w-full py-5 rounded-[1.5rem] text-white font-black text-xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
-                    {loading ? <Loader2 className="animate-spin" /> : <FaArrowRight />}
-                    {loading ? "Processing Information..." : "Confirm & Submit Onboarding"}
+                    {loading ? <Loader2 className="animate-spin" /> : <FaCheckCircle />}
+                    {loading ? "Processing Information..." : "Confirm Details"}
                   </button>
                   <p className="text-center mt-4 text-slate-400 text-sm font-medium">By clicking submit, you verify all provided information is accurate.</p>
                 </div>
@@ -506,24 +420,6 @@ const handleFinalSubmit = async () => {
           </form>
         </div>
       </div>
-
-      {showOtpModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[2rem] p-10 max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in-95">
-            <button onClick={() => setShowOtpModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><FaTimes size={20} /></button>
-            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <Mail size={40} />
-            </div>
-            <h2 className="text-2xl font-black text-slate-800 mb-2">Verify Email</h2>
-            <p className="text-slate-500 mb-8 text-sm leading-relaxed">We've sent a 6-digit verification code to <br /><span className="font-bold text-slate-800">{formData.email}</span></p>
-            <input type="text" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-4xl font-black tracking-[0.5em] py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl mb-6 focus:border-indigo-500 outline-none transition-all" placeholder="000000" />
-            <button onClick={handleFinalSubmit} disabled={verifying} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50">
-              {verifying ? "Validating..." : "Confirm & Submit"}
-            </button>
-            <p className="mt-6 text-xs text-slate-400 font-bold uppercase tracking-widest">Expires in 10:00</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -625,17 +521,11 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                   <PolicyCard index={1} title="Professional Conduct" text="Employees must maintain professional, respectful, and ethical behavior at all times with colleagues, clients, and management." />
-
                   <PolicyCard index={2} title="Attendance & Punctuality" text="Regular attendance and punctuality are mandatory, and repeated late logins, early logouts, or unapproved absences may lead to salary deductions or disciplinary action." />
-
                   <PolicyCard index={3} title="Leave Policy" text="All leave requests must be submitted and approved in advance, and unauthorized leave will be treated as Loss of Pay (LOP)." />
-
                   <PolicyCard index={4} title="Workplace Behavior" text="Harassment, discrimination, abusive language, threats, or any form of workplace violence is strictly prohibited and may result in disciplinary action." />
-
                   <PolicyCard index={5} title="Substance Prohibition" text="Consumption or possession of alcohol, drugs, or any intoxicating substances during work hours or on office premises is strictly prohibited." />
-
                   <PolicyCard index={6} title="Company Property Responsibility" text="Employees are responsible for safeguarding company property such as laptops, ID cards, and systems provided to them." />
-
                 </div>
                 <label className={`flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage1 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}>
                   <input type="checkbox" disabled={isLocked} checked={agreedPage1} onChange={(e) => setAgreedPage1(e.target.checked)} className="w-7 h-7 mt-1 accent-indigo-600" />
@@ -653,17 +543,11 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                   <PolicyCard index={1} title="Authorized System Usage" text="Company systems, computers, email accounts, and network resources must be used only for authorized and official work purposes." />
-
                   <PolicyCard index={2} title="Confidentiality" text="Confidential company, employee, and client information must not be disclosed, shared, or discussed with unauthorized persons inside or outside the organization." />
-
                   <PolicyCard index={3} title="Account Security" text="Sharing passwords, login credentials, or access details is strictly prohibited, and employees are personally responsible for securing their accounts." />
-
                   <PolicyCard index={4} title="Data Protection" text="Copying, transferring, downloading, or storing company data without proper authorization is considered a serious policy violation." />
-
                   <PolicyCard index={5} title="Internet & Network Usage" text="Company internet and network access must not be used for illegal, harmful, offensive, or non-work-related activities that could impact security." />
-
                   <PolicyCard index={6} title="Security Incident Reporting" text="Any suspected data breach, phishing attempt, system vulnerability, or unusual system activity must be reported immediately to the IT or administration team." />
-
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                   <label className={`lg:col-span-2 flex items-start gap-4 p-8 rounded-[2rem] border-2 cursor-pointer transition-all ${agreedPage2 ? 'border-indigo-600 bg-indigo-50/50 shadow-inner' : 'border-slate-100 bg-slate-50/30'}`}>
@@ -673,7 +557,6 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                       <span className="text-slate-500 font-medium italic text-sm">Mandatory for internal system access. {isLocked && `(${timer}s)`}</span>
                     </div>
                   </label>
-
                   <div className="relative">
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 text-center">Digital Signature</p>
                     <div className="bg-slate-900 rounded-[2rem] p-6 text-white text-center h-40 flex flex-col justify-center border-4 border-slate-800 relative overflow-hidden group">
@@ -686,7 +569,6 @@ const ComplianceModule = ({ userEmail, userName, companyName, onComplete }) => {
                         <label className="cursor-pointer h-full flex flex-col items-center justify-center group-hover:bg-slate-800 transition-colors">
                           <Upload className="mb-2 text-indigo-400" size={30} />
                           <p className="text-[10px] font-black uppercase tracking-tighter">Upload Signature Image</p>
-                          <p className="text-[9px] text-slate-500 mt-1">PNG or JPG (transparent preferred)</p>
                           <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                         </label>
                       )}
@@ -731,7 +613,6 @@ const CompletionScreen = ({ userName, companyName }) => (
           Welcome to the family, <span className="font-bold text-indigo-600">{userName}</span>! <br />
           Your profile has been successfully integrated into <b>{companyName}</b>.
         </p>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mb-12">
           <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
             <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4"><Clock size={20} /></div>
@@ -749,22 +630,14 @@ const CompletionScreen = ({ userName, companyName }) => (
             <p className="text-xs text-slate-500">Contact HR if you need help logging in</p>
           </div>
         </div>
-
-        <div className="space-y-4">
-          <button onClick={() => window.location.href = '/'} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
-            Access Employee Dashboard <FaArrowRight />
-          </button>
-          <p className="text-slate-400 text-sm font-medium">Auto-redirecting to login in 10 seconds...</p>
-        </div>
-      </div>
-      <div className="bg-slate-50 py-6 px-10 text-center border-t">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">Official Onboarding Portal • Confidential</p>
+        <button onClick={() => window.location.href = '/'} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
+          Access Employee Dashboard <FaArrowRight />
+        </button>
       </div>
     </div>
   </div>
 );
 
-// --- REUSABLE UI COMPONENTS ---
 const TabItem = ({ active, done, label }) => (
   <div className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all ${active ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>
     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] border-2 transition-colors ${done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'border-white' : 'border-slate-200'}`}>
@@ -792,12 +665,9 @@ const Section = ({ title, children, color }) => {
     orange: "border-orange-100 bg-orange-50/20 text-orange-800",
     purple: "border-purple-100 bg-purple-50/20 text-purple-800",
   };
-
   return (
     <div className={`border-2 rounded-[2rem] p-8 mb-10 transition-all ${colorMap[color] || 'border-slate-100 bg-slate-50/20'}`}>
-      <h3 className="text-2xl font-black mb-8 flex items-center gap-3 uppercase tracking-tight">
-        {title}
-      </h3>
+      <h3 className="text-2xl font-black mb-8 flex items-center gap-3 uppercase tracking-tight">{title}</h3>
       {children}
     </div>
   );
@@ -830,22 +700,16 @@ const FileUploadCard = ({ label, required, file, onChange }) => (
       {label} {required && <span className="text-red-500">*</span>}
     </p>
     <label className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all ${file ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30'}`}>
-      <input
-        type="file"
-        onChange={onChange}
-        accept=".pdf,.png,.jpg,.jpeg"
-        className="hidden"
-      />
+      <input type="file" onChange={onChange} accept=".pdf,.png,.jpg,.jpeg" className="hidden" />
       {file ? (
         <>
           <CheckCircle2 className="text-emerald-500 mb-2" size={32} />
           <span className="text-xs font-bold text-emerald-700 truncate max-w-full px-4">{file.name}</span>
-          <span className="text-[10px] text-emerald-600 mt-1 uppercase font-black">Click to change</span>
         </>
       ) : (
         <>
           <Upload className="text-slate-300 group-hover:text-indigo-500 mb-2 transition-colors" size={32} />
-          <span className="text-xs font-bold text-slate-500 group-hover:text-indigo-600 transition-colors text-center">Drag & drop or <br /><span className="text-indigo-600">Choose File</span></span>
+          <span className="text-xs font-bold text-slate-500 group-hover:text-indigo-600 transition-colors text-center">Choose File</span>
         </>
       )}
     </label>

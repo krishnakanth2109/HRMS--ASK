@@ -1,17 +1,14 @@
-// --- START OF FILE AdminviewAttendance.jsx ---
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
-import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api"; 
-import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, } from "react-icons/fa";
-import { toBlob } from 'html-to-image'; 
+import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api";
+import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, FaExchangeAlt, FaCheck, FaHome } from "react-icons/fa";
+import { toBlob } from 'html-to-image';
 
 // ==========================================
 // HELPER FUNCTIONS
 // ==========================================
 
-// Helper to ensure URLs are always HTTPS
 const getSecureUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("http:")) {
@@ -20,11 +17,9 @@ const getSecureUrl = (url) => {
   return url;
 };
 
-// ✅ NEW: Helper for DD/MM/YYYY Format
 const formatDateDMY = (dateInput) => {
   if (!dateInput) return "--";
   const date = new Date(dateInput);
-  // Ensure valid date
   if (isNaN(date.getTime())) return "--";
   return date.toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -50,7 +45,6 @@ const formatDecimalHours = (decimalHours) => {
   return `${hours}h ${minutes}m`;
 };
 
-// ✅ ADD THESE HELPER FUNCTIONS FOR ROLE/DEPARTMENT
 const getCurrentDepartment = (employee) => {
   if (employee.currentDepartment) return employee.currentDepartment;
   if (employee && Array.isArray(employee.experienceDetails)) {
@@ -71,22 +65,16 @@ const getCurrentRole = (employee) => {
 
 const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDayThreshold) => {
   const statusUpper = (apiStatus || "").toUpperCase();
-
   if (statusUpper === "LEAVE") return "Leave";
   if (statusUpper === "HOLIDAY") return "Holiday";
   if (statusUpper === "ABSENT" && !punchIn) return "Absent";
-
   if (punchIn && !punchOut) return "Working..";
-
   if (!punchIn) return "Absent";
-
   const workedMilliseconds = new Date(punchOut) - new Date(punchIn);
   const workedHours = workedMilliseconds / (1000 * 60 * 60);
-
   if (workedHours >= fullDayThreshold) return "Full Day";
   if (workedHours >= halfDayThreshold) return "Half Day";
-  
-  return "Absent"; // Or "Short Day" depending on logic, effectively not full day
+  return "Absent";
 };
 
 const LocationViewButton = ({ location }) => {
@@ -127,77 +115,124 @@ const normalizeDateStr = (dateInput) => {
 
 const isHoliday = (dateStr, holidays) => {
   const target = new Date(dateStr);
-  target.setHours(0,0,0,0);
-  
+  target.setHours(0, 0, 0, 0);
   if (!Array.isArray(holidays)) return null;
-
   return holidays.find(h => {
     const start = new Date(h.startDate);
     const end = new Date(h.endDate || h.startDate);
-    start.setHours(0,0,0,0);
-    end.setHours(0,0,0,0);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
     return target >= start && target <= end;
   });
 };
 
-const getCurrentLocation = () => {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      console.warn("Geolocation not supported");
-      resolve({ latitude: 0, longitude: 0 });
-    } else {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error("Location access denied or failed", error);
-          resolve({ latitude: 0, longitude: 0 });
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    }
-  });
-};
-
-// ==========================================
-// ✅ NEW COMPONENT: Live Timer for UI
-// ==========================================
 const LiveTimer = ({ startTime }) => {
   const [timeStr, setTimeStr] = useState("0h 0m 0s");
-
   useEffect(() => {
     if (!startTime) return;
-    
     const updateTimer = () => {
-        const now = new Date();
-        const start = new Date(startTime);
-        const diffMs = now - start;
-
-        if (diffMs < 0) {
-            setTimeStr("0h 0m 0s");
-            return;
-        }
-
-        const totalSeconds = Math.floor(diffMs / 1000);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-
-        setTimeStr(`${hours}h ${minutes}m ${seconds}s`);
+      const now = new Date();
+      const start = new Date(startTime);
+      const diffMs = now - start;
+      if (diffMs < 0) { setTimeStr("0h 0m 0s"); return; }
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setTimeStr(`${hours}h ${minutes}m ${seconds}s`);
     };
-
-    updateTimer(); // Initial call
+    updateTimer();
     const interval = setInterval(updateTimer, 1000);
-
     return () => clearInterval(interval);
   }, [startTime]);
-
   return <span className="text-blue-600 font-mono font-bold animate-pulse">{timeStr}</span>;
 };
+
+// ==========================================
+// ✅ NEW COMPONENT: Attendance Comparison Modal
+// ==========================================
+const AttendanceComparisonModal = ({ isOpen, onClose, selectedStats, employeeImages, startDate, endDate }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-[100] flex justify-center items-center p-4 animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+              <FaExchangeAlt className="text-blue-600" /> Attendance Comparison
+            </h2>
+            <p className="text-slate-500 font-medium">{formatDateDMY(startDate)} to {formatDateDMY(endDate)}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><FaTimes size={24} /></button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6 bg-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {selectedStats.map(emp => (
+              <div key={emp.employeeId} className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-white flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-200 flex-shrink-0">
+                    {employeeImages[emp.employeeId] ? (
+                      <img src={employeeImages[emp.employeeId]} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-slate-400">{emp.employeeName.charAt(0)}</div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-800 leading-tight">{emp.employeeName}</h4>
+                    <p className="text-sm font-mono text-slate-500">{emp.employeeId}</p>
+                  </div>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                      <p className="text-[10px] font-bold text-blue-600 uppercase">Present Days</p>
+                      <p className="text-2xl font-black text-blue-800">{emp.presentDays}</p>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded-lg text-center">
+                      <p className="text-[10px] font-bold text-red-600 uppercase">Absent Days</p>
+                      <p className="text-2xl font-black text-red-800">{emp.absentDays}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                      <span className="text-sm text-slate-600">On Time</span>
+                      <span className="font-bold text-green-600">{emp.onTimeDays}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                      <span className="text-sm text-slate-600">Late Arrivals</span>
+                      <span className="font-bold text-orange-600">{emp.lateDays}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                      <span className="text-sm text-slate-600">Full Days</span>
+                      <span className="font-bold text-slate-800">{emp.fullDays}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                      <span className="text-sm text-slate-600">Half Days</span>
+                      <span className="font-bold text-slate-800">{emp.halfDays}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm text-slate-600">Approved OT</span>
+                      <span className="font-bold text-indigo-600">{emp.approvedOT}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 border-t bg-white flex justify-end">
+          <button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors">Close Comparison</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==========================================
 // SUB-COMPONENTS (MODALS & PAGINATION)
 // ==========================================
@@ -212,49 +247,30 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
   useEffect(() => {
     if (isOpen) {
       const now = new Date();
-      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       setPunchOutDateTime(localDateTime);
       setLocationLoading(true);
       setLocationError('');
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setCurrentLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-            setLocationLoading(false);
-          },
-          (error) => {
-            console.error('Location error:', error);
-            setLocationError('Unable to get location. Please enable location services.');
-            setLocationLoading(false);
-          },
+          (position) => { setCurrentLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude }); setLocationLoading(false); },
+          (error) => { setLocationError('Unable to get location.'); setLocationLoading(false); },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-      } else {
-        setLocationError('Geolocation is not supported by this browser.');
-        setLocationLoading(false);
-      }
+      } else { setLocationError('Geolocation not supported.'); setLocationLoading(false); }
     }
   }, [isOpen, employee]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!punchOutDateTime) { alert('Please select a punch out time'); return; }
-    if (locationLoading) { alert('Please wait while we get your location...'); return; }
-    if (locationError || !currentLocation) { alert('Location is required. Please enable location services.'); return; }
+    if (locationLoading) { alert('Getting location...'); return; }
+    if (locationError || !currentLocation) { alert('Location required.'); return; }
     const selectedTime = new Date(punchOutDateTime);
     const punchInTime = new Date(employee.punchIn);
-    if (selectedTime <= punchInTime) { alert('Punch out time must be after punch in time'); return; }
+    if (selectedTime <= punchInTime) { alert('Must be after punch in'); return; }
     setLoading(true);
-    try {
-      await onPunchOut(employee.employeeId, selectedTime.toISOString(), currentLocation, employee.date);
-      onClose();
-    } catch (error) {
-      // Error is logged in handleAdminPunchOut
-    } finally {
-      setLoading(false);
-    }
+    try { await onPunchOut(employee.employeeId, selectedTime.toISOString(), currentLocation, employee.date); onClose(); } catch (error) { } finally { setLoading(false); }
   };
 
   if (!isOpen || !employee) return null;
@@ -289,115 +305,58 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
   );
 };
 
-// ✅ UPDATED: Include employeeImages prop
 const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holidays, dateRange, employeeImages }) => {
   const contentRef = useRef(null);
-
   const completeHistory = useMemo(() => {
     if (!isOpen || !employeeData || !dateRange.startDate || !dateRange.endDate) return [];
-
     const history = [];
     const start = new Date(dateRange.startDate);
     const end = new Date(dateRange.endDate);
-    
     const shift = shiftsMap[employeeData.employeeId];
     const weeklyOffs = shift?.weeklyOffDays || [0];
-    
     const adminFullDayHours = shift?.fullDayHours || 9;
     const adminHalfDayHours = shift?.halfDayHours || 4.5;
-
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        const dayOfWeek = d.getDay();
-        
-        const record = employeeData.records.find(r => normalizeDateStr(r.date) === dateStr);
-        
-        const holidayObj = isHoliday(dateStr, holidays);
-        const isWeeklyOff = weeklyOffs.includes(dayOfWeek);
-        const isWorkingDay = !holidayObj && !isWeeklyOff;
-
-        let workedStatus = "--";
-        let loginStatus = "--";
-        let displayTime = "--";
-        let punchIn = null;
-        let punchOut = null;
-        let rowClass = "";
-        let shiftDuration = adminFullDayHours;
-
-        if (record) {
-            punchIn = record.punchIn;
-            punchOut = record.punchOut;
-            displayTime = record.displayTime;
-            loginStatus = calculateLoginStatus(record.punchIn, shift, record.loginStatus);
-            
-            workedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, adminFullDayHours, adminHalfDayHours);
-            
-            if (workedStatus === "Absent") {
-                rowClass = "bg-red-50/50 hover:bg-red-50"; 
-            } else if (workedStatus === "Half Day") {
-                rowClass = "bg-yellow-50/50 hover:bg-yellow-50";
-            } else {
-                rowClass = "hover:bg-gray-50";
-            }
-        } else {
-            if (isWorkingDay) {
-                workedStatus = "Absent (Not Logged In)";
-                rowClass = "bg-red-100/30 hover:bg-red-50";
-            } else if (holidayObj) {
-                workedStatus = `Holiday: ${holidayObj.name}`;
-                rowClass = "bg-purple-50/50 text-purple-700 hover:bg-purple-50";
-                shiftDuration = 0;
-            } else if (isWeeklyOff) {
-                workedStatus = "Weekly Off";
-                rowClass = "bg-gray-100/50 text-gray-500 hover:bg-gray-100";
-                shiftDuration = 0;
-            }
-        }
-
-        history.push({
-            date: dateStr,
-            punchIn,
-            punchOut,
-            shiftHours: shiftDuration,
-            displayTime,
-            loginStatus,
-            workedStatus,
-            isWorkingDay,
-            isAbsent: workedStatus.includes("Absent"),
-            isFullDay: workedStatus === "Full Day",
-            isHalfDay: workedStatus === "Half Day",
-            isPresent: !!punchIn,
-            rowClass
-        });
+      const dateStr = d.toISOString().split('T')[0];
+      const dayOfWeek = d.getDay();
+      const record = employeeData.records.find(r => normalizeDateStr(r.date) === dateStr);
+      const holidayObj = isHoliday(dateStr, holidays);
+      const isWeeklyOff = weeklyOffs.includes(dayOfWeek);
+      const isWorkingDay = !holidayObj && !isWeeklyOff;
+      let workedStatus = "--"; let loginStatus = "--"; let displayTime = "--"; let punchIn = null; let punchOut = null; let rowClass = ""; let shiftDuration = adminFullDayHours;
+      if (record) {
+        punchIn = record.punchIn; punchOut = record.punchOut; displayTime = record.displayTime;
+        loginStatus = calculateLoginStatus(record.punchIn, shift, record.loginStatus);
+        workedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, adminFullDayHours, adminHalfDayHours);
+        if (workedStatus === "Absent") rowClass = "bg-red-50/50 hover:bg-red-50";
+        else if (workedStatus === "Half Day") rowClass = "bg-yellow-50/50 hover:bg-yellow-50";
+        else rowClass = "hover:bg-gray-50";
+      } else {
+        if (isWorkingDay) { workedStatus = "Absent (Not Logged In)"; rowClass = "bg-red-100/30 hover:bg-red-50"; }
+        else if (holidayObj) { workedStatus = `Holiday: ${holidayObj.name}`; rowClass = "bg-purple-50/50 text-purple-700 hover:bg-purple-50"; shiftDuration = 0; }
+        else if (isWeeklyOff) { workedStatus = "Weekly Off"; rowClass = "bg-gray-100/50 text-gray-500 hover:bg-gray-100"; shiftDuration = 0; }
+      }
+      history.push({ date: dateStr, punchIn, punchOut, shiftHours: shiftDuration, displayTime, loginStatus, workedStatus, isWorkingDay, isAbsent: workedStatus.includes("Absent"), isFullDay: workedStatus === "Full Day", isHalfDay: workedStatus === "Half Day", isPresent: !!punchIn, rowClass });
     }
-    
     return history.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [isOpen, employeeData, shiftsMap, holidays, dateRange]);
 
   const stats = useMemo(() => {
-      return completeHistory.reduce((acc, curr) => {
-          if (curr.isWorkingDay) acc.workingDays++;
-          if (curr.isPresent) acc.present++;
-          if (curr.isFullDay) acc.fullDays++;
-          if (curr.isHalfDay) acc.halfDays++;
-          if (curr.isAbsent) acc.absent++;
-          return acc;
-      }, { workingDays: 0, present: 0, fullDays: 0, halfDays: 0, absent: 0 });
+    return completeHistory.reduce((acc, curr) => {
+      if (curr.isWorkingDay) acc.workingDays++;
+      if (curr.isPresent) acc.present++;
+      if (curr.isFullDay) acc.fullDays++;
+      if (curr.isHalfDay) acc.halfDays++;
+      if (curr.isAbsent) acc.absent++;
+      return acc;
+    }, { workingDays: 0, present: 0, fullDays: 0, halfDays: 0, absent: 0 });
   }, [completeHistory]);
 
   if (!isOpen || !employeeData) return null;
 
   const downloadIndividualReport = () => {
     if (completeHistory.length === 0) return;
-    const formattedData = completeHistory.map(item => ({
-        "Date": formatDateDMY(item.date),
-        "Punch In": item.punchIn ? new Date(item.punchIn).toLocaleTimeString() : "--",
-        "Punch Out": item.punchOut ? new Date(item.punchOut).toLocaleTimeString() : "--",
-        "Assigned Hrs": formatDecimalHours(item.shiftHours),
-        "Duration": item.displayTime || "--",
-        "Login Status": item.loginStatus,
-        "Worked Status": item.workedStatus
-    }));
+    const formattedData = completeHistory.map(item => ({ "Date": formatDateDMY(item.date), "Punch In": item.punchIn ? new Date(item.punchIn).toLocaleTimeString() : "--", "Punch Out": item.punchOut ? new Date(item.punchOut).toLocaleTimeString() : "--", "Assigned Hrs": formatDecimalHours(item.shiftHours), "Duration": item.displayTime || "--", "Login Status": item.loginStatus, "Worked Status": item.workedStatus }));
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = { Sheets: { data: ws }, SheetNames: ["data"] };
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -406,49 +365,31 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
 
   const handleShareImage = async () => {
     if (contentRef.current) {
-        try {
-            const blob = await toBlob(contentRef.current, { backgroundColor: '#ffffff' });
-            if (blob) {
-                const file = new File([blob], "attendance_summary.png", { type: "image/png" });
-                if (navigator.share) {
-                    await navigator.share({ files: [file], title: 'Attendance Summary', text: `Attendance for ${employeeData.name}` });
-                } else {
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `Attendance_${employeeData.name}.png`;
-                    link.click();
-                    URL.revokeObjectURL(link.href);
-                }
-            }
-        } catch (error) { console.error("Error generating image:", error); }
+      try {
+        const blob = await toBlob(contentRef.current, { backgroundColor: '#ffffff' });
+        if (blob) {
+          const file = new File([blob], "attendance_summary.png", { type: "image/png" });
+          if (navigator.share) await navigator.share({ files: [file], title: 'Attendance Summary', text: `Attendance for ${employeeData.name}` });
+          else { const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `Attendance_${employeeData.name}.png`; link.click(); URL.revokeObjectURL(link.href); }
+        }
+      } catch (error) { console.error("Error generating image:", error); }
     }
   };
 
-  // Get image for current user
   const profilePic = employeeImages ? employeeImages[employeeData.employeeId] : null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        
-        {/* Header - Fixed */}
         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-white shrink-0 z-20">
           <div className="flex items-center gap-3">
-             {/* ✅ UPDATED: Show Profile Pic */}
-             <div className="w-12 h-12 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg overflow-hidden bg-slate-100">
-                {profilePic ? (
-                    <img src={profilePic} alt={employeeData.name} className="w-full h-full object-cover" />
-                ) : (
-                    (employeeData.name || "U").charAt(0)
-                )}
-             </div>
-             <div>
-                <h3 className="text-xl font-bold text-slate-800">Attendance History</h3>
-                <p className="text-slate-500 font-medium text-sm flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    {employeeData.name} ({employeeData.employeeId})
-                </p>
-             </div>
+            <div className="w-12 h-12 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg overflow-hidden bg-slate-100">
+              {profilePic ? <img src={profilePic} alt={employeeData.name} className="w-full h-full object-cover" /> : (employeeData.name || "U").charAt(0)}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">Attendance History</h3>
+              <p className="text-slate-500 font-medium text-sm flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>{employeeData.name} ({employeeData.employeeId})</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={handleShareImage} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors"><FaShareAlt /> Share</button>
@@ -456,219 +397,120 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
             <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2 hover:bg-slate-50 rounded-full"><FaTimes size={20} /></button>
           </div>
         </div>
-        
-        {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar" ref={contentRef}>
-            
-            {/* Stats Cards */}
-            <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4 sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm pb-6 border-b border-slate-200/50">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow">
-                    <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Working Days</span>
-                    <span className="text-2xl font-bold text-slate-800">{stats.workingDays}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-indigo-500">
-                    <span className="text-xs font-bold uppercase text-indigo-500 tracking-wider">Present</span>
-                    <span className="text-2xl font-bold text-slate-800">{stats.present}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-green-500">
-                    <span className="text-xs font-bold uppercase text-green-500 tracking-wider">Full Days</span>
-                    <span className="text-2xl font-bold text-slate-800">{stats.fullDays}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-yellow-500">
-                    <span className="text-xs font-bold uppercase text-yellow-600 tracking-wider">Half Days</span>
-                    <span className="text-2xl font-bold text-slate-800">{stats.halfDays}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-red-500">
-                    <span className="text-xs font-bold uppercase text-red-500 tracking-wider">Absent</span>
-                    <span className="text-2xl font-bold text-slate-800">{stats.absent}</span>
-                </div>
+          <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4 sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm pb-6 border-b border-slate-200/50">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow">
+              <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Working Days</span>
+              <span className="text-2xl font-bold text-slate-800">{stats.workingDays}</span>
             </div>
-
-            {/* Table Area */}
-            <div className="px-5 pb-10">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar"> 
-                        <table className="min-w-full text-sm text-left border-collapse">
-                            <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold sticky top-0 z-20 shadow-sm">
-                                <tr>
-                                    <th className="px-6 py-4 whitespace-nowrap">Date</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Punch In</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Punch Out</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Assigned</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Duration</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Login Status</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Worked Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                            {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
-                                <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
-                                    {/* ✅ DD/MM/YYYY */}
-                                    <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-50">
-                                        {formatDateDMY(item.date)}
-                                        <div className="text-[10px] font-normal text-slate-400 uppercase">
-                                            {new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-green-600 font-medium whitespace-nowrap">
-                                        {item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                                    </td>
-                                    <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">
-                                        {item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDecimalHours(item.shiftHours)}</td>
-                                    <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">{item.displayTime}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {item.loginStatus !== "--" && (
-                                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"}`}>
-                                                {item.loginStatus}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 font-semibold whitespace-nowrap">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${
-                                            item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : 
-                                            item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" :
-                                            item.isAbsent ? "bg-red-100 text-red-800" : 
-                                            "bg-slate-100 text-slate-600"
-                                        }`}>
-                                            {item.workedStatus}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))) : (<tr><td colSpan="7" className="text-center p-10 text-slate-500">No data for selected range.</td></tr>)}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-indigo-500">
+              <span className="text-xs font-bold uppercase text-indigo-500 tracking-wider">Present</span>
+              <span className="text-2xl font-bold text-slate-800">{stats.present}</span>
             </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-green-500">
+              <span className="text-xs font-bold uppercase text-green-500 tracking-wider">Full Days</span>
+              <span className="text-2xl font-bold text-slate-800">{stats.fullDays}</span>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-yellow-500">
+              <span className="text-xs font-bold uppercase text-yellow-600 tracking-wider">Half Days</span>
+              <span className="text-2xl font-bold text-slate-800">{stats.halfDays}</span>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-red-500">
+              <span className="text-xs font-bold uppercase text-red-500 tracking-wider">Absent</span>
+              <span className="text-2xl font-bold text-slate-800">{stats.absent}</span>
+            </div>
+          </div>
+          <div className="px-5 pb-10">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                <table className="min-w-full text-sm text-left border-collapse">
+                  <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold sticky top-0 z-20 shadow-sm">
+                    <tr>
+                      <th className="px-6 py-4 whitespace-nowrap">Date</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Punch In</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Punch Out</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Assigned</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Duration</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Login Status</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Worked Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
+                      <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
+                        <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-50">
+                          {formatDateDMY(item.date)}
+                          <div className="text-[10px] font-normal text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                        </td>
+                        <td className="px-6 py-4 text-green-600 font-medium whitespace-nowrap">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                        <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDecimalHours(item.shiftHours)}</td>
+                        <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">{item.displayTime}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{item.loginStatus !== "--" && (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"}`}>{item.loginStatus}</span>)}</td>
+                        <td className="px-6 py-4 font-semibold whitespace-nowrap"><span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : item.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{item.workedStatus}</span></td>
+                      </tr>
+                    ))) : (<tr><td colSpan="7" className="text-center p-10 text-slate-500">No data for selected range.</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// ✅ UPDATED: Include employeeImages prop
-// ✅ UPDATED: Include employeeImages prop and show role/department
-// ✅ UPDATED: StatusListModal with conditional columns based on title
 const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, allEmployees }) => {
   if (!isOpen) return null;
-  
-  // Create a map for quick employee data lookup
   const employeeInfoMap = useMemo(() => {
     const map = {};
-    allEmployees.forEach(emp => {
-      map[emp.employeeId] = {
-        name: emp.name,
-        role: getCurrentRole(emp),
-      };
-    });
+    allEmployees.forEach(emp => { map[emp.employeeId] = { name: emp.name, role: getCurrentRole(emp) }; });
     return map;
   }, [allEmployees]);
-
-  // Check if this is the "Login Required" modal
   const isLoginRequired = title === "Login Required";
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
-          <div>
-            <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-            <p className="text-sm text-slate-500 font-semibold">{employees.length} Employees</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2">
-            <FaTimes size={20} />
-          </button>
+          <div><h3 className="text-xl font-bold text-slate-800">{title}</h3><p className="text-sm text-slate-500 font-semibold">{employees.length} Employees</p></div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2"><FaTimes size={20} /></button>
         </div>
         <div className="p-5 overflow-y-auto">
           {employees.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Employee</th>
-                    <th className="px-4 py-3 text-left">Role</th>
-                    {/* Conditionally show Login Status column */}
-                    {!isLoginRequired && <th className="px-4 py-3 text-left">Login Status</th>}
-                    {/* Conditionally show Worked Status column */}
-                    {!isLoginRequired && <th className="px-4 py-3 text-left">Worked Status</th>}
-                  </tr>
+                  <tr><th className="px-4 py-3 text-left">Employee</th><th className="px-4 py-3 text-left">Role</th>{!isLoginRequired && <th className="px-4 py-3 text-left">Login Status</th>}{!isLoginRequired && <th className="px-4 py-3 text-left">Worked Status</th>}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {employees.map((emp, index) => {
                     const employeeInfo = employeeInfoMap[emp.employeeId] || {};
                     const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
-                    
                     return (
                       <tr key={emp.employeeId || index} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            {/* Profile Picture */}
-                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">
-                              {profilePic ? (
-                                <img src={profilePic} alt={emp.name || emp.employeeName} className="w-full h-full object-cover" />
-                              ) : (
-                                (emp.name || emp.employeeName || "U").charAt(0)
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-800">{emp.name || emp.employeeName || employeeInfo.name}</p>
-                              <p className="text-xs text-slate-500 font-mono">{emp.employeeId}</p>
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.name || emp.employeeName || "U").charAt(0)}</div>
+                            <div><p className="font-semibold text-slate-800">{emp.name || emp.employeeName || employeeInfo.name}</p><p className="text-xs text-slate-500 font-mono">{emp.employeeId}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm font-medium text-slate-700 bg-blue-50 px-2 py-1 rounded">
-                            {employeeInfo.role || "N/A"}
-                          </span>
-                        </td>
-                        {/* Conditionally show Login Status cell */}
-                        {!isLoginRequired && (
-                          <td className="px-4 py-3">
-                            {emp.displayLoginStatus && (
-                              <span className={`text-xs px-3 py-1 rounded-full font-bold ${
-                                emp.displayLoginStatus === 'LATE' 
-                                  ? 'bg-red-100 text-red-700 border border-red-200' 
-                                  : 'bg-green-100 text-green-700 border border-green-200'
-                              }`}>
-                                {emp.displayLoginStatus}
-                              </span>
-                            )}
-                          </td>
-                        )}
-                        {/* Conditionally show Worked Status cell */}
-                        {!isLoginRequired && (
-                          <td className="px-4 py-3">
-                            {emp.workedStatus && (
-                              <span className={`text-xs px-3 py-1 rounded-full font-bold ${
-                                emp.workedStatus === 'Full Day' 
-                                  ? 'bg-green-100 text-green-800 border border-green-200' :
-                                emp.workedStatus === 'Half Day' 
-                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                                emp.workedStatus.includes('Absent') 
-                                  ? 'bg-red-100 text-red-800 border border-red-200' :
-                                  'bg-slate-100 text-slate-800 border border-slate-200'
-                              }`}>
-                                {emp.workedStatus}
-                              </span>
-                            )}
-                          </td>
-                        )}
+                        <td className="px-4 py-3"><span className="text-sm font-medium text-slate-700 bg-blue-50 px-2 py-1 rounded">{employeeInfo.role || "N/A"}</span></td>
+                        {!isLoginRequired && (<td className="px-4 py-3">{emp.displayLoginStatus && (<span className={`text-xs px-3 py-1 rounded-full font-bold ${emp.displayLoginStatus === 'LATE' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>{emp.displayLoginStatus}</span>)}</td>)}
+                        {!isLoginRequired && (<td className="px-4 py-3">{emp.workedStatus && (<span className={`text-xs px-3 py-1 rounded-full font-bold ${emp.workedStatus === 'Full Day' ? 'bg-green-100 text-green-800 border border-green-200' : emp.workedStatus === 'Half Day' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' : emp.workedStatus.includes('Absent') ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-800 border border-slate-200'}`}>{emp.workedStatus}</span>)}</td>)}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <p className="text-center text-slate-500 py-8">No employees in this category.</p>
-          )}
+          ) : <p className="text-center text-slate-500 py-8">No employees in this category.</p>}
         </div>
       </div>
     </div>
   );
 };
+
 const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange, setItemsPerPage }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -693,16 +535,13 @@ const AdminAttendance = () => {
   const [rawDailyData, setRawDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [allEmployees, setAllEmployees] = useState([]);
-  
-  // Summary Date States
-// NEW (Fixed: Manually creates YYYY-MM-01)
-const [summaryStartDate, setSummaryStartDate] = useState(() => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-});
-  const [summaryEndDate, setSummaryEndDate] = useState(todayISO);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
 
+  const [summaryStartDate, setSummaryStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [summaryEndDate, setSummaryEndDate] = useState(todayISO);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [rawSummaryData, setRawSummaryData] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [overtimeData, setOvertimeData] = useState([]);
@@ -710,142 +549,124 @@ const [summaryStartDate, setSummaryStartDate] = useState(() => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [statusListModal, setStatusListModal] = useState({ isOpen: false, title: "", employees: [] });
   const [shiftsMap, setShiftsMap] = useState({});
-  const [holidays, setHolidays] = useState([]); 
-  
+  const [holidays, setHolidays] = useState([]);
   const [dailyCurrentPage, setDailyCurrentPage] = useState(1);
   const [dailyItemsPerPage, setDailyItemsPerPage] = useState(10);
   const [summaryCurrentPage, setSummaryCurrentPage] = useState(1);
   const [summaryItemsPerPage, setSummaryItemsPerPage] = useState(10);
   const [punchOutModal, setPunchOutModal] = useState({ isOpen: false, employee: null });
-
   const [dailySearchTerm, setDailySearchTerm] = useState("");
   const [summarySearchTerm, setSummarySearchTerm] = useState("");
-
-  // ✅ NEW STATES: For Profile Images & Lightbox
   const [employeeImages, setEmployeeImages] = useState({});
   const [previewImage, setPreviewImage] = useState(null);
+
+  // ✅ NEW STATE FOR EMPLOYEE WORK MODES
+  const [employeeWorkModes, setEmployeeWorkModes] = useState({});
+
+  // ✅ NEW STATES FOR COMPARISON
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [selectedCompareIds, setSelectedCompareIds] = useState([]);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
 
   const fetchShifts = useCallback(async () => {
     try {
       const response = await getAllShifts();
       const data = Array.isArray(response) ? response : response.data || [];
-      const map = {};
-      data.forEach(shift => { if(shift.employeeId) map[shift.employeeId] = shift; });
+      const map = {}; data.forEach(shift => { if (shift.employeeId) map[shift.employeeId] = shift; });
       setShiftsMap(map);
     } catch (error) { console.error("Error fetching shifts:", error); }
   }, []);
 
   const fetchHolidays = useCallback(async () => {
+    try { const response = await getHolidays(); setHolidays(response || []); } catch (error) { console.error("Error fetching holidays:", error); }
+  }, []);
+
+  const fetchAllEmployees = useCallback(async () => {
+    try { const data = await getEmployees(); setAllEmployees(data); } catch (error) { setAllEmployees([]); }
+  }, []);
+
+  const fetchOvertimeData = useCallback(async () => {
+    try { const data = await getAllOvertimeRequests(); setOvertimeData(data); } catch (error) { setOvertimeData([]); }
+  }, []);
+
+  const fetchDailyData = useCallback(async (start, end) => {
+    setLoading(true);
+    try { const data = await getAttendanceByDateRange(start, end); setRawDailyData(Array.isArray(data) ? data : []); } catch (error) { setRawDailyData([]); } finally { setLoading(false); }
+  }, []);
+
+  const fetchSummaryData = useCallback(async (start, end) => {
+    setSummaryLoading(true);
+    try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data : []); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); }
+  }, []);
+
+  // ✅ NEW: Fetch employee work modes from the same endpoint used in AdminLocationSettings
+  const fetchEmployeeWorkModes = useCallback(async () => {
     try {
-        const response = await getHolidays();
-        setHolidays(response || []);
+      const { data } = await api.get("/api/admin/settings/employees-modes");
+      if (data && data.employees) {
+        const modeMap = {};
+        data.employees.forEach(emp => {
+          modeMap[emp.employeeId] = {
+            currentEffectiveMode: emp.currentEffectiveMode || 'WFO',
+            ruleType: emp.ruleType || 'Global'
+          };
+        });
+        setEmployeeWorkModes(modeMap);
+      }
     } catch (error) {
-        console.error("Error fetching holidays:", error);
+      console.error("Error fetching employee work modes:", error);
     }
   }, []);
 
-  const fetchAllEmployees = useCallback(async () => { 
-    try { 
-      const data = await getEmployees(); 
-      setAllEmployees(data); 
-    } catch (error) { setAllEmployees([]); } 
-  }, []);
+  useEffect(() => {
+    fetchShifts();
+    fetchHolidays();
+    fetchDailyData(startDate, endDate);
+    fetchEmployeeWorkModes(); // Fetch work modes
+  }, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays, fetchEmployeeWorkModes]);
 
-  const fetchOvertimeData = useCallback(async () => { 
-    try { const data = await getAllOvertimeRequests(); setOvertimeData(data); } catch (error) { setOvertimeData([]); } 
-  }, []);
-  
-  const fetchDailyData = useCallback(async (start, end) => { 
-    setLoading(true); 
-    try { const data = await getAttendanceByDateRange(start, end); setRawDailyData(Array.isArray(data) ? data : []); } catch (error) { setRawDailyData([]); } finally { setLoading(false); } 
-  }, []);
-  
-  const fetchSummaryData = useCallback(async (start, end) => { 
-    setSummaryLoading(true); 
-    try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data : []); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); } 
-  }, []);
+  useEffect(() => {
+    fetchAllEmployees();
+    fetchSummaryData(summaryStartDate, summaryEndDate);
+    fetchOvertimeData();
+    fetchEmployeeWorkModes(); // Also fetch when summary dates change
+  }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees, fetchEmployeeWorkModes]);
 
-
-
-  // ✅ NEW: Fetch Images for all employees
   useEffect(() => {
     const fetchImages = async () => {
       const newImages = {};
       if (allEmployees.length === 0) return;
-
-      // Limit calls or implement caching logic if needed. 
-      // For now, we fetch for all loaded employees to ensure profiles are visible.
       for (const emp of allEmployees) {
-         if (!employeeImages[emp.employeeId]) {
-            try {
-               const res = await api.get(`/api/profile/${emp.employeeId}`);
-               if (res.data?.profilePhoto?.url) {
-                  newImages[emp.employeeId] = getSecureUrl(res.data.profilePhoto.url);
-               }
-            } catch (err) {
-               // Ignore errors, keep blank/initials
-            }
-         }
+        if (!employeeImages[emp.employeeId]) {
+          try {
+            const res = await api.get(`/api/profile/${emp.employeeId}`);
+            if (res.data?.profilePhoto?.url) newImages[emp.employeeId] = getSecureUrl(res.data.profilePhoto.url);
+          } catch (err) { }
+        }
       }
-
-      if (Object.keys(newImages).length > 0) {
-        setEmployeeImages(prev => ({ ...prev, ...newImages }));
-      }
+      if (Object.keys(newImages).length > 0) setEmployeeImages(prev => ({ ...prev, ...newImages }));
     };
-    
-    if (allEmployees.length > 0) {
-        fetchImages();
-    }
+    if (allEmployees.length > 0) fetchImages();
   }, [allEmployees]);
-
-
-
 
   const handleAdminPunchOut = async (employeeId, punchOutTime, location, dateOfRecord) => {
     try {
-      const response = await api.post(`/api/attendance/admin-punch-out`, {
-        employeeId, 
-        punchOutTime, 
-        latitude: location.latitude, 
-        longitude: location.longitude, 
-        adminId: 'Admin', 
-        date: dateOfRecord
-      });
-
-      if (response.data.success) {
-        alert('Employee punched out successfully!');
-        await fetchDailyData(startDate, endDate);
-        await fetchSummaryData(summaryStartDate, summaryEndDate);
-      }
-    } catch (error) {
-      const errMsg = error.response?.data?.message || error.message;
-      alert(`Failed to punch out: ${errMsg}`);
-      throw error; 
-    }
+      const response = await api.post(`/api/attendance/admin-punch-out`, { employeeId, punchOutTime, latitude: location.latitude, longitude: location.longitude, adminId: 'Admin', date: dateOfRecord });
+      if (response.data.success) { alert('Employee punched out successfully!'); await fetchDailyData(startDate, endDate); await fetchSummaryData(summaryStartDate, summaryEndDate); }
+    } catch (error) { const errMsg = error.response?.data?.message || error.message; alert(`Failed to punch out: ${errMsg}`); throw error; }
   };
 
-// NEW Function
-const handleMonthChange = (e) => {
-  const val = e.target.value;
-  setSelectedMonth(val);
-  
-  if(val) {
-      // ✅ FIX: Simply append "-01" to the YYYY-MM value from the picker
+  const handleMonthChange = (e) => {
+    const val = e.target.value; setSelectedMonth(val);
+    if (val) {
       const startStr = `${val}-01`;
-
-      // Calculate end date (Last day of month)
       const [year, month] = val.split('-').map(Number);
       const end = new Date(year, month, 0);
-      // Use local string formatting for end date to avoid timezone shifts
       const offset = end.getTimezoneOffset() * 60000;
       const endStr = new Date(end.getTime() - offset).toISOString().split('T')[0];
-      
-      setSummaryStartDate(startStr);
-      setSummaryEndDate(endStr);
-  }
-};
-  useEffect(() => { fetchShifts(); fetchHolidays(); fetchDailyData(startDate, endDate);}, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays]);
-  useEffect(() => { fetchAllEmployees(); fetchSummaryData(summaryStartDate, summaryEndDate); fetchOvertimeData(); }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees]);
+      setSummaryStartDate(startStr); setSummaryEndDate(endStr);
+    }
+  };
 
   const empNameMap = useMemo(() => {
     return allEmployees.reduce((acc, emp) => { acc[emp.employeeId] = emp.name; return acc; }, {});
@@ -853,134 +674,79 @@ const handleMonthChange = (e) => {
 
   const processedDailyData = useMemo(() => {
     const mapped = rawDailyData.map(item => {
-        const shift = shiftsMap[item.employeeId];
-        const adminFullDayHours = shift?.fullDayHours || 9;
-        const adminHalfDayHours = shift?.halfDayHours || 4.5;
-        
-        const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
-        
-        return {
-            ...item,
-            employeeName: realName,
-            assignedHours: adminFullDayHours, 
-            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
-            displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus)
-        };
+      const shift = shiftsMap[item.employeeId];
+      const adminFullDayHours = shift?.fullDayHours || 9;
+      const adminHalfDayHours = shift?.halfDayHours || 4.5;
+      const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
+
+      // ✅ Get work mode for this employee (default to 'WFO' if not found)
+      const workMode = employeeWorkModes[item.employeeId]?.currentEffectiveMode || 'WFO';
+
+      return {
+        ...item,
+        employeeName: realName,
+        assignedHours: adminFullDayHours,
+        workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
+        displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus),
+        workMode: workMode // Add work mode to the item
+      };
     });
-    mapped.sort((a, b) => {
-        const timeA = a.punchIn ? new Date(a.punchIn).getTime() : 0;
-        const timeB = b.punchIn ? new Date(b.punchIn).getTime() : 0;
-        return timeB - timeA;
-    });
+    mapped.sort((a, b) => { const timeA = a.punchIn ? new Date(a.punchIn).getTime() : 0; const timeB = b.punchIn ? new Date(b.punchIn).getTime() : 0; return timeB - timeA; });
     if (!dailySearchTerm) return mapped;
     const lowerTerm = dailySearchTerm.toLowerCase();
     return mapped.filter(item => (item.employeeName && item.employeeName.toLowerCase().includes(lowerTerm)) || (item.employeeId && item.employeeId.toLowerCase().includes(lowerTerm)));
-  }, [rawDailyData, shiftsMap, dailySearchTerm, empNameMap]);
+  }, [rawDailyData, shiftsMap, dailySearchTerm, empNameMap, employeeWorkModes]);
 
   const processedSummaryData = useMemo(() => {
     return rawSummaryData.map(item => {
-        const shift = shiftsMap[item.employeeId];
-        
-        const adminFullDayHours = shift?.fullDayHours || 9;
-        const adminHalfDayHours = shift?.halfDayHours || 4.5;
-        
-        const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
-        return { 
-          ...item, 
-          employeeName: realName, 
-          assignedHours: adminFullDayHours, 
-          workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours), 
-          displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus) 
-        };
+      const shift = shiftsMap[item.employeeId];
+      const adminFullDayHours = shift?.fullDayHours || 9;
+      const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
+      const workMode = employeeWorkModes[item.employeeId]?.currentEffectiveMode || 'WFO';
+      return {
+        ...item,
+        employeeName: realName,
+        assignedHours: adminFullDayHours,
+        workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, shift?.halfDayHours || 4.5),
+        displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus),
+        workMode: workMode
+      };
     });
-  }, [rawSummaryData, shiftsMap, empNameMap]);
+  }, [rawSummaryData, shiftsMap, empNameMap, employeeWorkModes]);
 
-  // ✅ UPDATED: Accurate Absent Logic using Date Loop
   const employeeSummaryStats = useMemo(() => {
     if (!allEmployees.length) return [];
-    
-    // Create Map for quick lookup of raw summary records
     const attendanceMap = new Map();
-    processedSummaryData.forEach(r => {
-        const key = `${r.employeeId}_${normalizeDateStr(r.date)}`;
-        attendanceMap.set(key, r);
-    });
-
-    // ✅ FIX: Filter Overtime requests by selected date range
+    processedSummaryData.forEach(r => { const key = `${r.employeeId}_${normalizeDateStr(r.date)}`; attendanceMap.set(key, r); });
     const approvedOTCounts = overtimeData.reduce((acc, ot) => {
-        if (ot.status === 'APPROVED') {
-            // Check if OT date falls within summary start/end date
-            const otDateStr = normalizeDateStr(ot.date); // Assuming OT object has 'date' field
-            if (otDateStr >= summaryStartDate && otDateStr <= summaryEndDate) {
-                 acc[ot.employeeId] = (acc[ot.employeeId] || 0) + 1;
-            }
-        }
-        return acc;
+      if (ot.status === 'APPROVED') {
+        const otDateStr = normalizeDateStr(ot.date);
+        if (otDateStr >= summaryStartDate && otDateStr <= summaryEndDate) acc[ot.employeeId] = (acc[ot.employeeId] || 0) + 1;
+      }
+      return acc;
     }, {});
-
-    // Iterate through ALL active employees
     const activeEmployees = allEmployees.filter(e => e.isActive !== false);
-
     const summaryArray = activeEmployees.map(emp => {
-        const shift = shiftsMap[emp.employeeId];
-        const weeklyOffs = shift?.weeklyOffDays || [0];
-        const adminFullDayHours = shift?.fullDayHours || 9;
-        
-        let stats = {
-            employeeId: emp.employeeId,
-            employeeName: emp.name,
-            assignedHours: adminFullDayHours,
-            presentDays: 0,
-            onTimeDays: 0,
-            lateDays: 0,
-            fullDays: 0,
-            halfDays: 0,
-            absentDays: 0,
-            approvedOT: approvedOTCounts[emp.employeeId] || 0
-        };
-
-        const start = new Date(summaryStartDate);
-        const end = new Date(summaryEndDate);
-
-        // Loop through each day in the selected range
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
-            const key = `${emp.employeeId}_${dateStr}`;
-            const record = attendanceMap.get(key);
-            const dayOfWeek = d.getDay();
-            
-            const holidayObj = isHoliday(dateStr, holidays);
-            const isWeeklyOff = weeklyOffs.includes(dayOfWeek);
-            const isWorkingDay = !holidayObj && !isWeeklyOff;
-
-            if (record) {
-                // Present
-                if (record.punchIn) {
-                    stats.presentDays++;
-                    if (record.displayLoginStatus === 'LATE') stats.lateDays++;
-                    else stats.onTimeDays++;
-                }
-
-                if (record.workedStatus === "Full Day") stats.fullDays++;
-                else if (record.workedStatus === "Half Day") stats.halfDays++;
-                else if (record.status === "ABSENT" || record.workedStatus.includes("Absent")) stats.absentDays++;
-                
-            } else {
-                // No record found for this day
-                if (isWorkingDay) {
-                    stats.absentDays++; // Absent only if it was a working day
-                }
-            }
-        }
-        return stats;
+      const shift = shiftsMap[emp.employeeId];
+      const weeklyOffs = shift?.weeklyOffDays || [0];
+      const adminFullDayHours = shift?.fullDayHours || 9;
+      let stats = { employeeId: emp.employeeId, employeeName: emp.name, assignedHours: adminFullDayHours, presentDays: 0, onTimeDays: 0, lateDays: 0, fullDays: 0, halfDays: 0, absentDays: 0, approvedOT: approvedOTCounts[emp.employeeId] || 0 };
+      const start = new Date(summaryStartDate);
+      const end = new Date(summaryEndDate);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const key = `${emp.employeeId}_${dateStr}`;
+        const record = attendanceMap.get(key);
+        const holidayObj = isHoliday(dateStr, holidays);
+        const isWeeklyOff = weeklyOffs.includes(d.getDay());
+        if (record) {
+          if (record.punchIn) { stats.presentDays++; if (record.displayLoginStatus === 'LATE') stats.lateDays++; else stats.onTimeDays++; }
+          if (record.workedStatus === "Full Day") stats.fullDays++; else if (record.workedStatus === "Half Day") stats.halfDays++; else if (record.status === "ABSENT" || record.workedStatus.includes("Absent")) stats.absentDays++;
+        } else if (!holidayObj && !isWeeklyOff) stats.absentDays++;
+      }
+      return stats;
     });
-
-    // Sort: Most present days first
-    const sortedArray = summaryArray.sort((a, b) => {
-        if (b.presentDays !== a.presentDays) return b.presentDays - a.presentDays; 
-        return a.employeeName.localeCompare(b.employeeName);
-    });
-
+    const sortedArray = summaryArray.sort((a, b) => b.presentDays - a.presentDays || a.employeeName.localeCompare(b.employeeName));
     if (!summarySearchTerm) return sortedArray;
     const lowerTerm = summarySearchTerm.toLowerCase();
     return sortedArray.filter(item => (item.employeeName && item.employeeName.toLowerCase().includes(lowerTerm)) || (item.employeeId && item.employeeId.toLowerCase().includes(lowerTerm)));
@@ -988,79 +754,65 @@ const handleMonthChange = (e) => {
 
   const absentEmployees = useMemo(() => {
     if (allEmployees.length === 0 || loading || startDate !== endDate) return [];
-    const activeOnly = allEmployees.filter(e => e.isActive !== false);
     const presentIds = new Set(rawDailyData.map(att => att.employeeId));
-    return activeOnly.filter(emp => !presentIds.has(emp.employeeId));
+    return allEmployees.filter(emp => emp.isActive !== false && !presentIds.has(emp.employeeId));
   }, [allEmployees, rawDailyData, loading, startDate, endDate]);
 
   const dailyStats = useMemo(() => {
-      const fullList = rawDailyData.map(item => {
-        const shift = shiftsMap[item.employeeId];
-        const adminFullDayHours = shift?.fullDayHours || 9;
-        const adminHalfDayHours = shift?.halfDayHours || 4.5;
-        
-        const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
-        return {
-            ...item,
-            employeeName: realName,
-            workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, adminFullDayHours, adminHalfDayHours),
-            displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus)
-        };
-      });
-      const working = fullList.filter(item => item.punchIn && !item.punchOut);
-      const completed = fullList.filter(item => item.punchIn && item.punchOut);
-      return { workingList: working, workingCount: working.length, completedList: completed, completedCount: completed.length, absentCount: startDate === endDate ? absentEmployees.length : 0 };
-  }, [rawDailyData, shiftsMap, absentEmployees, startDate, endDate, empNameMap]);
-  
+    const fullList = rawDailyData.map(item => {
+      const shift = shiftsMap[item.employeeId];
+      const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
+      const workMode = employeeWorkModes[item.employeeId]?.currentEffectiveMode || 'WFO';
+      return {
+        ...item,
+        employeeName: realName,
+        workedStatus: getWorkedStatus(item.punchIn, item.punchOut, item.status, shift?.fullDayHours || 9, shift?.halfDayHours || 4.5),
+        displayLoginStatus: calculateLoginStatus(item.punchIn, shift, item.loginStatus),
+        workMode: workMode
+      };
+    });
+    const working = fullList.filter(item => item.punchIn && !item.punchOut);
+    const completed = fullList.filter(item => item.punchIn && item.punchOut);
+    return { workingList: working, workingCount: working.length, completedList: completed, completedCount: completed.length, absentCount: startDate === endDate ? absentEmployees.length : 0 };
+  }, [rawDailyData, shiftsMap, absentEmployees, startDate, endDate, empNameMap, employeeWorkModes]);
+
   const paginatedDailyData = useMemo(() => processedDailyData.slice((dailyCurrentPage - 1) * dailyItemsPerPage, dailyCurrentPage * dailyItemsPerPage), [processedDailyData, dailyCurrentPage, dailyItemsPerPage]);
   const paginatedSummaryData = useMemo(() => employeeSummaryStats.slice((summaryCurrentPage - 1) * summaryItemsPerPage, summaryCurrentPage * summaryItemsPerPage), [employeeSummaryStats, summaryCurrentPage, summaryItemsPerPage]);
 
   const exportDailyLogToExcel = () => exportToExcel(processedDailyData, `Daily_Log_${startDate}_to_${endDate}`, [
-    { label: "Employee Name", value: item => item.employeeName }, 
-    { label: "Employee ID", value: item => item.employeeId }, 
-    // ✅ DD/MM/YYYY for Export
-    { label: "Date", value: item => formatDateDMY(item.date) },
-    { label: "Punch In", value: item => item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, 
-    { label: "Punch Out", value: item => item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, 
-    { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) },
-    { label: "Duration", value: item => item.displayTime || "0h 0m" }, 
-    { label: "Login Status", value: item => item.displayLoginStatus }, 
-    { label: "Worked Status", value: item => item.workedStatus }
+    { label: "Employee Name", value: item => item.employeeName }, { label: "Employee ID", value: item => item.employeeId }, { label: "Date", value: item => formatDateDMY(item.date) }, { label: "Punch In", value: item => item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, { label: "Punch Out", value: item => item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) }, { label: "Duration", value: item => item.displayTime || "0h 0m" }, { label: "Login Status", value: item => item.displayLoginStatus }, { label: "Worked Status", value: item => item.workedStatus }
   ]);
 
   const exportSummaryToExcel = () => exportToExcel(employeeSummaryStats, `Attendance_Summary_${summaryStartDate}_to_${summaryEndDate}`, [
-    { label: "Employee ID", value: item => item.employeeId }, 
-    { label: "Employee Name", value: item => item.employeeName }, 
-    { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) },
-    { label: "Present Days", value: item => item.presentDays },
-    { label: "On-Time Days", value: item => item.onTimeDays }, 
-    { label: "Late Days", value: item => item.lateDays }, 
-    { label: "Approved OT", value: item => item.approvedOT },
-    { label: "Full Days", value: item => item.fullDays }, 
-    { label: "Half Days", value: item => item.halfDays }, 
-    { label: "Absent Days", value: item => item.absentDays },
+    { label: "Employee ID", value: item => item.employeeId }, { label: "Employee Name", value: item => item.employeeName }, { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) }, { label: "Present Days", value: item => item.presentDays }, { label: "On-Time Days", value: item => item.onTimeDays }, { label: "Late Days", value: item => item.lateDays }, { label: "Approved OT", value: item => item.approvedOT }, { label: "Full Days", value: item => item.fullDays }, { label: "Half Days", value: item => item.halfDays }, { label: "Absent Days", value: item => item.absentDays },
   ]);
 
   const exportToExcel = (data, fileName, fields) => {
     if (data.length === 0) { alert("No data to export."); return; }
     const formattedData = data.map(item => fields.reduce((obj, field) => { obj[field.label] = field.value(item); return obj; }, {}));
-    const ws = XLSX.utils.json_to_sheet(formattedData);
-    const wb = { Sheets: { data: ws }, SheetNames: ["data"] };
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const ws = XLSX.utils.json_to_sheet(formattedData); const wb = { Sheets: { data: ws }, SheetNames: ["data"] }; const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     FileSaver.saveAs(new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" }), `${fileName}.xlsx`);
   };
 
-  const handleViewDetails = (employeeId, employeeName) => { 
-      const records = rawSummaryData.filter(r => r.employeeId === employeeId); 
-      setSelectedEmployee({ name: employeeName, records, employeeId, startDate: summaryStartDate, endDate: summaryEndDate }); 
-      setIsModalOpen(true); 
+  const handleViewDetails = (employeeId, employeeName) => {
+    const records = rawSummaryData.filter(r => r.employeeId === employeeId);
+    setSelectedEmployee({ name: employeeName, records, employeeId, startDate: summaryStartDate, endDate: summaryEndDate }); setIsModalOpen(true);
   };
-  
-const handleOpenStatusModal = (type) => {
+
+  const handleOpenStatusModal = (type) => {
     if (type === 'WORKING') setStatusListModal({ isOpen: true, title: "Currently Working", employees: dailyStats.workingList });
     else if (type === 'COMPLETED') setStatusListModal({ isOpen: true, title: "Shift Completed", employees: dailyStats.completedList });
     else if (type === 'ABSENT' && startDate === endDate) setStatusListModal({ isOpen: true, title: "Login Required", employees: absentEmployees });
-};
+  };
+
+  // ✅ NEW: Toggle selection for comparison
+  const toggleSelection = (id) => {
+    setSelectedCompareIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  };
+
+  const selectedStatsForComparison = useMemo(() => {
+    return employeeSummaryStats.filter(s => selectedCompareIds.includes(s.employeeId));
+  }, [employeeSummaryStats, selectedCompareIds]);
 
   const StatCard = ({ icon, title, value, colorClass, onClick }) => (
     <div className={`relative flex-1 p-5 bg-white rounded-xl shadow-md flex items-center gap-5 border-l-4 ${colorClass} ${onClick ? 'cursor-pointer hover:bg-slate-50' : ''}`} onClick={onClick}>
@@ -1071,158 +823,83 @@ const handleOpenStatusModal = (type) => {
   return (
     <div className="p-4 md:p-8 bg-slate-100 min-h-screen font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
-        
+
         {/* Daily Log Section */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
           <div className="p-5 border-b border-slate-200 bg-slate-50/50">
-            {/* Row 1: Heading */}
             <div className="mb-4">
-                <div className="flex items-center gap-2 text-xl font-bold text-slate-800">
-                   <FaCalendarAlt className="text-blue-600"/> Daily Attendance Log
-                </div>
+              <div className="flex items-center gap-2 text-xl font-bold text-slate-800"><FaCalendarAlt className="text-blue-600" /> Daily Attendance Log</div>
             </div>
-
-            {/* Row 2: Controls (Search, Date, Buttons) in one line */}
             <div className="flex flex-wrap items-center gap-4">
-                {/* Search */}
-                <div className="relative group flex-grow-0">
-                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                    <input 
-                      type="text" 
-                      placeholder="Search Name or ID..." 
-                      value={dailySearchTerm} 
-                      onChange={(e) => { setDailySearchTerm(e.target.value); setDailyCurrentPage(1); }} 
-                      className="pl-10 pr-3 py-2 w-64 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
-                    />
-                </div>
-
-                {/* From Date */}
-                <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden">
-                    <span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">From</span>
-                    <input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={(e) => setStartDate(e.target.value)} 
-                      className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" 
-                    />
-                </div>
-
-                {/* To Date */}
-                <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden">
-                    <span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">To</span>
-                    <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={(e) => setEndDate(e.target.value)} 
-                      className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" 
-                    />
-                </div>
-                
-                {/* Buttons Group (Right side of the row) */}
-                <div className="flex items-center gap-3 ml-auto">
-                    <button onClick={exportDailyLogToExcel} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-transform active:scale-95">
-                        <FaFileExcel/><span>Export</span>
-                    </button>
-               
-                </div>
+              <div className="relative group flex-grow-0"><FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" /><input type="text" placeholder="Search Name or ID..." value={dailySearchTerm} onChange={(e) => { setDailySearchTerm(e.target.value); setDailyCurrentPage(1); }} className="pl-10 pr-3 py-2 w-64 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" /></div>
+              <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden"><span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">From</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" /></div>
+              <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden"><span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">To</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" /></div>
+              <div className="flex items-center gap-3 ml-auto"><button onClick={exportDailyLogToExcel} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-transform active:scale-95"><FaFileExcel /><span>Export</span></button></div>
             </div>
           </div>
-
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-            <StatCard icon={<FaClock className="text-orange-500 text-3xl"/>} title="Currently Working" value={dailyStats.workingCount} colorClass="border-orange-500" onClick={() => handleOpenStatusModal('WORKING')} />
-            <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl"/>} title="Shift Completed" value={dailyStats.completedCount} colorClass="border-green-500" onClick={() => handleOpenStatusModal('COMPLETED')} />
-            {startDate === endDate && (<StatCard icon={<FaUserSlash className="text-red-500 text-3xl"/>} title="Login Required" value={loading ? '...' : dailyStats.absentCount} colorClass="border-red-500" onClick={() => handleOpenStatusModal('ABSENT')} />)}
+            <StatCard icon={<FaClock className="text-orange-500 text-3xl" />} title="Currently Working" value={dailyStats.workingCount} colorClass="border-orange-500" onClick={() => handleOpenStatusModal('WORKING')} />
+            <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} title="Shift Completed" value={dailyStats.completedCount} colorClass="border-green-500" onClick={() => handleOpenStatusModal('COMPLETED')} />
+            {startDate === endDate && (<StatCard icon={<FaUserSlash className="text-red-500 text-3xl" />} title="Login Required" value={loading ? '...' : dailyStats.absentCount} colorClass="border-red-500" onClick={() => handleOpenStatusModal('ABSENT')} />)}
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-                <thead className="bg-slate-800 text-slate-100 uppercase tracking-wider">
-                  <tr>
-                    <th className="px-6 py-4 text-left">Employee</th>
-                    <th className="px-6 py-4 text-left">Date</th>
-                    <th className="px-6 py-4 text-left">Punch In</th>
-                    <th className="px-6 py-4 text-left">Punch Out</th>
-                    <th className="px-6 py-4 text-left">Work Hrs</th>
-                    <th className="px-6 py-4 text-left">Duration</th>
-                    <th className="px-6 py-4 text-left">Login Status</th>
-                    <th className="px-6 py-4 text-left">Worked Status</th>
-                    <th className="px-6 py-4 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
+              <thead className="bg-slate-800 text-slate-100 uppercase tracking-wider">
+                <tr><th className="px-6 py-4 text-left">Employee</th><th className="px-6 py-4 text-left">Date</th><th className="px-6 py-4 text-left">Punch In</th><th className="px-6 py-4 text-left">Punch Out</th><th className="px-6 py-4 text-left">Work Hrs</th><th className="px-6 py-4 text-left">Duration</th><th className="px-6 py-4 text-left">Login Status</th><th className="px-6 py-4 text-left">Worked Status</th><th className="px-6 py-4 text-left">Actions</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
                 {loading ? (<tr><td colSpan="9" className="text-center p-10 font-medium text-slate-500">Loading daily log...</td></tr>) : paginatedDailyData.length === 0 ? (<tr><td colSpan="9" className="text-center p-10 text-slate-500">No records found.</td></tr>) : paginatedDailyData.map((item, idx) => {
                   const isAbsent = item.status === "ABSENT" || item.workedStatus.includes("Absent");
                   const canPunchOut = item.punchIn && !item.punchOut;
-                  
-                  // Color Logic for Punch In: Red if Late, Green if On Time
                   const punchInColor = item.displayLoginStatus === 'LATE' ? 'text-red-600' : 'text-green-600';
-
-                  // Color Logic for Punch Out: Green if Full Day, Red if Short Day/Half Day
                   const punchOutColor = item.workedStatus === 'Full Day' ? 'text-green-600' : 'text-red-600';
-
-                  // Get Profile Pic
                   const profilePic = employeeImages ? employeeImages[item.employeeId] : null;
+
+                  // ✅ Check if employee is working from home
+                  const isWorkFromHome = item.workMode === 'WFH';
 
                   return (
                     <tr key={item._id || idx} className={`hover:bg-blue-50/60 transition-colors ${isAbsent ? "bg-red-50" : ""}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                         <div className="flex items-center gap-3">
-                             {/* ✅ UPDATED: Profile Picture */}
-                             <div 
-                                className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer"
-                                onClick={() => profilePic && setPreviewImage(profilePic)}
-                             >
-                                {profilePic ? (
-                                    <img src={profilePic} alt={item.employeeName} className="w-full h-full object-cover" />
-                                ) : (
-                                    (item.employeeName || "U").charAt(0)
-                                )}
-                             </div>
-                             <div>
-                                <div className="font-semibold text-slate-800">{item.employeeName}</div>
-                                <div className="text-slate-500 font-mono text-xs">{item.employeeId}</div>
-                             </div>
-                         </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer" onClick={() => profilePic && setPreviewImage(profilePic)}>
+                            {profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (item.employeeName || "U").charAt(0)}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-slate-800">{item.employeeName}</div>
+                            <div className="flex items-center">
+                              <span className="text-slate-500 font-mono text-xs">{item.employeeId}</span>
+                              {/* ✅ Home symbol for Work From Home employees - beside the ID */}
+                              {isWorkFromHome && (
+                                <span
+                                  className="w-10 h-5 flex items-center justify-center rounded-full overflow-hidden"
+                                  title="Working from Home"
+                                >
+                                  <img
+                                    src="https://image2url.com/r2/default/images/1771229256808-7f17d81e-c508-495b-91f1-f6fda3c6ac5b.png"
+                                    alt="Home"
+                                    className="w-12 h-12 object-contain"
+                                  />
+                                </span>
+
+
+
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </td>
-                      {/* ✅ DD/MM/YYYY */}
                       <td className="px-6 py-4 whitespace-nowrap text-slate-600">{formatDateDMY(item.date)}</td>
-                      
-                      {/* Merged Punch In & Location */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                         <div className={`font-medium ${punchInColor}`}>
-                            {item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                         </div>
-                         {item.punchIn && <LocationViewButton location={item.punchInLocation} />}
-                      </td>
-
-                      {/* Merged Punch Out & Location */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                         <div className={`font-medium ${item.punchOut ? punchOutColor : 'text-slate-400'}`}>
-                             {item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                         </div>
-                         {item.punchOut && <LocationViewButton location={item.punchOutLocation} />}
-                      </td>
-
+                      <td className="px-6 py-4 whitespace-nowrap"><div className={`font-medium ${punchInColor}`}>{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchIn && <LocationViewButton location={item.punchInLocation} />}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><div className={`font-medium ${item.punchOut ? punchOutColor : 'text-slate-400'}`}>{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchOut && <LocationViewButton location={item.punchOutLocation} />}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-600">{formatDecimalHours(item.assignedHours)}</td>
-                      
-                      {/* Duration: Live Timer if Active, else Static */}
-                      <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">
-                        {(!item.punchOut && item.punchIn) ? (
-                            <LiveTimer startTime={item.punchIn} />
-                        ) : (
-                            item.displayTime || "0h 0m 0s"
-                        )}
-                      </td>
-                      
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{(!item.punchOut && item.punchIn) ? <LiveTimer startTime={item.punchIn} /> : (item.displayTime || "0h 0m 0s")}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.displayLoginStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>{item.displayLoginStatus}</span></td>
                       <td className="px-6 py-4 whitespace-nowrap font-semibold"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-800"}`}>{item.workedStatus}</span></td>
-                      
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {canPunchOut ? (
-                          <button onClick={() => setPunchOutModal({ isOpen: true, employee: item })} className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500" title="Admin Punch Out"><FaSignOutAlt /> Punch Out</button>
-                        ) : item.punchOut ? <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 text-xs font-semibold rounded-md"><FaCheckCircle /> Done</span> : <span className="text-slate-400 text-xs">--</span>}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{canPunchOut ? <button onClick={() => setPunchOutModal({ isOpen: true, employee: item })} className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"><FaSignOutAlt /> Punch Out</button> : item.punchOut ? <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 text-xs font-semibold rounded-md"><FaCheckCircle /> Done</span> : <span className="text-slate-400 text-xs">--</span>}</td>
                     </tr>
-                  )})}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -1233,118 +910,67 @@ const handleOpenStatusModal = (type) => {
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden mt-8">
           <div className="p-6 border-b border-slate-200 bg-slate-50/50">
             <div className="flex flex-col gap-6">
-                
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3"><FaUsers className="text-2xl text-purple-600" /><h2 className="text-xl font-bold text-slate-800">Employee Attendance Summary</h2></div>
+                {/* ✅ NEW: Comparison Action Buttons */}
                 <div className="flex items-center gap-3">
-                    <FaUsers className="text-2xl text-purple-600"/>
-                    <h2 className="text-xl font-bold text-slate-800">Employee Attendance Summary</h2>
+                  {!isCompareMode ? (
+                    <button onClick={() => setIsCompareMode(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition-all active:scale-95"><FaExchangeAlt /> Compare Attendance</button>
+                  ) : (
+                    <div className="flex items-center gap-2 animate-in slide-in-from-right duration-300">
+                      <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-full">{selectedCompareIds.length} Selected</span>
+                      <button onClick={() => { if (selectedCompareIds.length < 2) alert("Select at least 2 employees to compare."); else setIsComparisonModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition-all"><FaCheck /> Proceed Comparison</button>
+                      <button onClick={() => { setIsCompareMode(false); setSelectedCompareIds([]); }} className="px-4 py-2 bg-slate-400 text-white font-bold rounded-lg hover:bg-slate-500">Cancel</button>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-                    
-                    {/* Search */}
-                    <div className="relative group w-full">
-                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Search Employee</label>
-                        <FaSearch className="absolute left-3 top-[34px] text-slate-400" />
-                        <input 
-                            type="text" 
-                            placeholder="Name or ID..." 
-                            value={summarySearchTerm} 
-                            onChange={(e) => { setSummarySearchTerm(e.target.value); setSummaryCurrentPage(1); }} 
-                            className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm"
-                        />
-                    </div>
-
-                    {/* Month Filter */}
-                    <div className="w-full">
-                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Select Month</label>
-                        <div className="relative">
-                            <FaCalendarDay className="absolute left-3 top-2.5 text-slate-400" />
-                            <input 
-                                type="month" 
-                                value={selectedMonth} 
-                                onChange={handleMonthChange} 
-                                className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" 
-                            />
-                        </div>
-                    </div>
-
-                    {/* From Date */}
-                    <div className="w-full">
-                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">From</label>
-                        <input 
-                            type="date" 
-                            value={summaryStartDate} 
-                            onChange={(e) => setSummaryStartDate(e.target.value)} 
-                            className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" 
-                        />
-                    </div>
-
-                    {/* To Date */}
-                    <div className="w-full">
-                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">To</label>
-                        <input 
-                            type="date" 
-                            value={summaryEndDate} 
-                            onChange={(e) => setSummaryEndDate(e.target.value)} 
-                            className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" 
-                        />
-                    </div>
-
-                    {/* Export Button */}
-                    <div className="w-full">
-                        <button 
-                            onClick={exportSummaryToExcel} 
-                            className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-transform active:scale-95 h-[42px]"
-                        >
-                            <FaFileExcel/> Export Summary
-                        </button>
-                    </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                <div className="relative group w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Search Employee</label><FaSearch className="absolute left-3 top-[34px] text-slate-400" /><input type="text" placeholder="Name or ID..." value={summarySearchTerm} onChange={(e) => { setSummarySearchTerm(e.target.value); setSummaryCurrentPage(1); }} className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm" /></div>
+                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Select Month</label><div className="relative"><FaCalendarDay className="absolute left-3 top-2.5 text-slate-400" /><input type="month" value={selectedMonth} onChange={handleMonthChange} className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div></div>
+                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">From</label><input type="date" value={summaryStartDate} onChange={(e) => setSummaryStartDate(e.target.value)} className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div>
+                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">To</label><input type="date" value={summaryEndDate} onChange={(e) => setSummaryEndDate(e.target.value)} className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div>
+                <div className="w-full"><button onClick={exportSummaryToExcel} className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-transform active:scale-95 h-[42px]"><FaFileExcel /> Export Summary</button></div>
+              </div>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider sticky top-0 z-10 shadow-sm">
-                  <tr>
-                      <th className="px-6 py-4 text-left font-semibold border-b">Employee</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Assigned Hrs</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b text-blue-700 bg-blue-50/50">Present</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">On Time</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Late</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Approved OT</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Full Days</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Half Days</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Absent</th>
-                      <th className="px-6 py-4 text-center font-semibold border-b">Actions</th>
-                  </tr>
+                <tr>
+                  {/* ✅ NEW: Checkbox Header in Compare Mode */}
+                  {isCompareMode && <th className="px-6 py-4 text-center border-b">Select</th>}
+                  <th className="px-6 py-4 text-left font-semibold border-b">Employee</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Assigned Hrs</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b text-blue-700 bg-blue-50/50">Present</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">On Time</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Late</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Approved OT</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Full Days</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Half Days</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Absent</th>
+                  <th className="px-6 py-4 text-center font-semibold border-b">Actions</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {summaryLoading ? (<tr><td colSpan="10" className="text-center p-10 text-slate-500 font-medium">Loading summary...</td></tr>) : paginatedSummaryData.length === 0 ? (<tr><td colSpan="10" className="text-center p-10 text-slate-500">No summary data available.</td></tr>) : paginatedSummaryData.map((emp) => {
-                    // Get Profile Pic
-                    const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
-                    
-                    return (
-                    <tr key={emp.employeeId} className="hover:bg-purple-50/30 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                         <div className="flex items-center gap-3">
-                             {/* ✅ UPDATED: Profile Picture */}
-                             <div 
-                                className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer"
-                                onClick={() => profilePic && setPreviewImage(profilePic)}
-                             >
-                                {profilePic ? (
-                                    <img src={profilePic} alt={emp.employeeName} className="w-full h-full object-cover" />
-                                ) : (
-                                    (emp.employeeName || "U").charAt(0)
-                                )}
-                             </div>
-                             <div>
-                                <div className="font-bold text-slate-800">{emp.employeeName}</div>
-                                <div className="text-slate-500 font-mono text-xs">{emp.employeeId}</div>
-                             </div>
-                         </div>
-                      </td>
+                {summaryLoading ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500 font-medium">Loading summary...</td></tr>) : paginatedSummaryData.length === 0 ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500">No summary data available.</td></tr>) : paginatedSummaryData.map((emp) => {
+                  const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
+                  return (
+                    <tr key={emp.employeeId} className={`transition-colors ${selectedCompareIds.includes(emp.employeeId) ? 'bg-blue-50' : 'hover:bg-purple-50/30'}`}>
+                      {/* ✅ NEW: Checkbox Cell in Compare Mode */}
+                      {isCompareMode && (
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            checked={selectedCompareIds.includes(emp.employeeId)}
+                            onChange={() => toggleSelection(emp.employeeId)}
+                          />
+                        </td>
+                      )}
+                      <td className="px-6 py-4 whitespace-nowrap"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer" onClick={() => profilePic && setPreviewImage(profilePic)}>{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.employeeName || "U").charAt(0)}</div><div><div className="font-bold text-slate-800">{emp.employeeName}</div><div className="text-slate-500 font-mono text-xs">{emp.employeeId}</div></div></div></td>
                       <td className="px-6 py-4 text-center font-medium text-slate-600">{formatDecimalHours(emp.assignedHours)}</td>
                       <td className="px-6 py-4 text-center font-bold text-blue-600 bg-blue-50/30 text-lg">{emp.presentDays}</td>
                       <td className="px-6 py-4 text-center font-semibold text-green-600">{emp.onTimeDays}</td>
@@ -1355,7 +981,8 @@ const handleOpenStatusModal = (type) => {
                       <td className="px-6 py-4 text-center text-red-500 font-bold">{emp.absentDays}</td>
                       <td className="px-6 py-4 text-center"><button onClick={() => handleViewDetails(emp.employeeId, emp.employeeName)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"><FaEye /></button></td>
                     </tr>
-                )})}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -1363,50 +990,23 @@ const handleOpenStatusModal = (type) => {
         </div>
       </div>
 
-      <AttendanceDetailModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          employeeData={selectedEmployee} 
-          shiftsMap={shiftsMap} 
-          holidays={holidays} 
-          dateRange={{ startDate: summaryStartDate, endDate: summaryEndDate }} 
-          employeeImages={employeeImages} // Pass images prop
-      />
-      
-<StatusListModal 
-    isOpen={statusListModal.isOpen} 
-    onClose={() => setStatusListModal({ ...statusListModal, isOpen: false })} 
-    title={statusListModal.title} 
-    employees={statusListModal.employees} 
-    employeeImages={employeeImages}
-    allEmployees={allEmployees} // Add this prop
-/>
-      
+      <AttendanceDetailModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} employeeData={selectedEmployee} shiftsMap={shiftsMap} holidays={holidays} dateRange={{ startDate: summaryStartDate, endDate: summaryEndDate }} employeeImages={employeeImages} />
+      <StatusListModal isOpen={statusListModal.isOpen} onClose={() => setStatusListModal({ ...statusListModal, isOpen: false })} title={statusListModal.title} employees={statusListModal.employees} employeeImages={employeeImages} allEmployees={allEmployees} />
       <AdminPunchOutModal isOpen={punchOutModal.isOpen} onClose={() => setPunchOutModal({ isOpen: false, employee: null })} employee={punchOutModal.employee} onPunchOut={handleAdminPunchOut} />
-      
-    
 
-      {/* ✅ LIGHTBOX / FULL SCREEN IMAGE POPUP */}
-      {previewImage && (
-        <div 
-          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setPreviewImage(null)}
-        >
-          <button className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 backdrop-blur-sm">
-             <FaTimes size={24} />
-          </button>
-          <img 
-            src={previewImage} 
-            alt="Full Preview" 
-            className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()} 
-          />
-        </div>
-      )}
+      {/* ✅ NEW: Comparison Popup */}
+      <AttendanceComparisonModal
+        isOpen={isComparisonModalOpen}
+        onClose={() => setIsComparisonModalOpen(false)}
+        selectedStats={selectedStatsForComparison}
+        employeeImages={employeeImages}
+        startDate={summaryStartDate}
+        endDate={summaryEndDate}
+      />
+
+      {previewImage && (<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}><button className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 backdrop-blur-sm"><FaTimes size={24} /></button><img src={previewImage} alt="Full Preview" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} /></div>)}
     </div>
   );
 };
 
 export default AdminAttendance;
-
-// --- END OF FILE AdminviewAttendance.jsx ---

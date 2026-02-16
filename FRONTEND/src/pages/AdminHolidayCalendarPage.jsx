@@ -3,9 +3,7 @@ import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import * as XLSX from "xlsx"; 
 import Swal from "sweetalert2"; 
-// ✅ IMPORTS UPDATED: Added updateHoliday
 import { getHolidays, addHoliday, updateHoliday, deleteHolidayById, getEmployees } from "../api";
-// ✅ ICONS UPDATED: Added FaEdit
 import { 
   FaChevronLeft, 
   FaChevronRight, 
@@ -34,19 +32,15 @@ const AdminHolidayCalendarPage = () => {
   const [activeDate, setActiveDate] = useState(new Date()); 
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // ✅ NEW: Edit State
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  // Cursors for month view
   const [birthdayCursor, setBirthdayCursor] = useState(new Date());
   const [holidayCursor, setHolidayCursor] = useState(new Date());
 
-  // Toggles for "Show All"
   const [showAllHolidays, setShowAllHolidays] = useState(false);
   const [showAllBirthdays, setShowAllBirthdays] = useState(false);
 
-  // Year Filter State
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const fileInputRef = useRef(null);
@@ -57,7 +51,6 @@ const AdminHolidayCalendarPage = () => {
     return d;
   };
 
-  // ✅ HELPER: Formats date safely for input fields (YYYY-MM-DD)
   const formatDateForInput = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -79,14 +72,27 @@ const AdminHolidayCalendarPage = () => {
   const fetchBirthdays = useCallback(async () => {
     try {
       const allEmployees = await getEmployees();
+      
+      // ✅ LOG DATA: Open browser console (F12) to see if 'status' and 'dob' exist correctly
+      console.log("Fetched Employees:", allEmployees);
+
       const result = allEmployees
-        .filter((emp) => emp.personalDetails?.dob)
+        .filter((emp) => {
+          // Normalize status to lowercase for comparison
+          const status = emp.status ? emp.status.toLowerCase() : "";
+          // Check if employee is NOT deactive and has a DOB
+          const isActive = status === "active" || status === ""; 
+          return isActive && emp.personalDetails?.dob;
+        })
         .map((emp) => ({
           name: emp.name,
           dob: new Date(emp.personalDetails.dob),
         }));
+        
       setBirthdays(result);
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error("Error fetching birthdays:", err); 
+    }
   }, []);
 
   useEffect(() => { fetchHolidays(); fetchBirthdays(); }, [fetchHolidays, fetchBirthdays]);
@@ -96,7 +102,6 @@ const AdminHolidayCalendarPage = () => {
   /* =========================================================
       HANDLERS
   ==========================================================*/
-
   const handleCloseModal = () => {
     setHolidayData({ name: "", description: "", startDate: "", endDate: "" });
     setIsEditing(false);
@@ -104,7 +109,6 @@ const AdminHolidayCalendarPage = () => {
     setIsModalOpen(false);
   };
 
-  // ✅ NEW: Handle Edit Click
   const handleEdit = (holiday) => {
     setHolidayData({
       name: holiday.name,
@@ -121,19 +125,14 @@ const AdminHolidayCalendarPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Ensure End Date is set
       const payload = { ...holidayData, endDate: holidayData.endDate || holidayData.startDate };
-
       if (isEditing) {
-        // ✅ UPDATE EXISTING
         await updateHoliday(editId, payload);
         Swal.fire('Success', 'Holiday updated successfully', 'success');
       } else {
-        // ✅ ADD NEW
         await addHoliday(payload);
         Swal.fire('Success', 'Holiday added successfully', 'success');
       }
-
       fetchHolidays();
       handleCloseModal();
     } catch (error) {
@@ -259,9 +258,6 @@ const AdminHolidayCalendarPage = () => {
         })
         .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 
-  /* =========================================================
-      CALENDAR LOGIC
-  ==========================================================*/
   const getTileDetails = (date) => {
     const current = normalizeDate(date);
     const holiday = holidays.find(h => {
@@ -319,33 +315,25 @@ const AdminHolidayCalendarPage = () => {
             <h1 className="text-3xl font-extrabold text-slate-900">Holiday Calendar</h1>
             <p className="text-slate-500 text-sm mt-1">Manage holidays & track birthdays</p>
           </div>
-          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition">
-            <FaPlus className="inline mr-2"/> Add New Holiday
-          </button>
+    <button
+  onClick={() => setIsModalOpen(true)}
+  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition active:scale-95"
+>
+  <FaPlus className="inline mr-2" />
+  Add New Holiday
+</button>
+
         </div>
 
         <div className="grid lg:grid-cols-12 gap-8">
-          
-          {/* --- LEFT SIDE: LISTS --- */}
           <div className="lg:col-span-6 space-y-6">
-            
-            {/* HOLIDAYS CONTAINER */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 bg-gradient-to-r from-emerald-500 to-teal-600 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2"><FaCalendarAlt /> <span className="font-bold">Holidays</span></div>
-                
                 <div className="flex items-center gap-2">
                   {showAllHolidays && (
-                    <select 
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition text-white outline-none border-none cursor-pointer"
-                    >
-                      {availableYears.map(year => (
-                        <option key={year} value={year} className="text-slate-800 bg-white">
-                          {year}
-                        </option>
-                      ))}
+                    <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition text-white outline-none border-none cursor-pointer">
+                      {availableYears.map(year => <option key={year} value={year} className="text-slate-800 bg-white">{year}</option>)}
                     </select>
                   )}
                   <button onClick={() => setShowAllHolidays(!showAllHolidays)} className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition">
@@ -360,7 +348,6 @@ const AdminHolidayCalendarPage = () => {
                   )}
                 </div>
               </div>
-
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
                 {displayedHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays {showAllHolidays ? `in ${selectedYear}` : "this month"}</p> : 
                   displayedHolidays.map(h => (
@@ -374,30 +361,15 @@ const AdminHolidayCalendarPage = () => {
                         <p className="text-[10px] text-slate-400">{new Date(h.startDate).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    
-                    {/* ✅ UPDATED BUTTONS: BIG & VISIBLE */}
                     <div className="flex gap-2">
-                        <button 
-                            onClick={() => handleEdit(h)} 
-                            className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                            title="Edit"
-                        >
-                            <FaEdit size={16}/>
-                        </button>
-                        <button 
-                            onClick={() => handleDelete(h._id)} 
-                            className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-                            title="Delete"
-                        >
-                            <FaTrash size={16}/>
-                        </button>
+                        <button onClick={() => handleEdit(h)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="Edit"><FaEdit size={16}/></button>
+                        <button onClick={() => handleDelete(h._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Delete"><FaTrash size={16}/></button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* BIRTHDAYS CONTAINER (Unchanged) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gradient-to-r from-orange-400 to-pink-500 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2"><FaBirthdayCake /> <span className="font-bold">Birthdays</span></div>
@@ -431,7 +403,6 @@ const AdminHolidayCalendarPage = () => {
             </div>
           </div>
 
-          {/* --- RIGHT SIDE: CALENDAR (Unchanged) --- */}
           <div className="lg:col-span-6">
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 h-full relative">
               <Calendar
@@ -456,59 +427,29 @@ const AdminHolidayCalendarPage = () => {
         </div>
       </div>
 
-      {/* --- MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
             <div className="bg-slate-50 p-4 border-b flex justify-between items-center">
-              {/* Dynamic Title */}
-              <h3 className="font-bold text-lg text-slate-800">
-                {isEditing ? "Edit Holiday" : "Add Holiday"}
-              </h3>
+              <h3 className="font-bold text-lg text-slate-800">{isEditing ? "Edit Holiday" : "Add Holiday"}</h3>
               <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><FaTimes/></button>
             </div>
-            
             <div className="p-6 space-y-6">
-              
-              {/* Hide Import functionality during Edit Mode */}
               {!isEditing && (
                 <>
                   <div className="border border-dashed border-blue-300 bg-blue-50 rounded-xl p-4 flex flex-col items-center justify-center gap-2">
                     <p className="text-xs text-blue-600 font-medium">Bulk Import via Excel</p>
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx,.csv" />
-                    <button 
-                      onClick={() => fileInputRef.current.click()}
-                      disabled={loading}
-                      className="bg-white text-blue-600 px-4 py-1.5 rounded-lg shadow-sm text-xs font-bold border border-blue-100 hover:bg-blue-100"
-                    >
+                    <button onClick={() => fileInputRef.current.click()} disabled={loading} className="bg-white text-blue-600 px-4 py-1.5 rounded-lg shadow-sm text-xs font-bold border border-blue-100 hover:bg-blue-100">
                       <FaFileImport className="inline mr-1"/> Choose File
                     </button>
                   </div>
-                  <div className="relative text-center">
-                    <span className="bg-white px-2 text-xs text-gray-400 relative z-10">OR MANUALLY</span>
-                    <div className="absolute top-1/2 left-0 w-full border-t border-gray-100"></div>
-                  </div>
+                  <div className="relative text-center"><span className="bg-white px-2 text-xs text-gray-400 relative z-10">OR MANUALLY</span><div className="absolute top-1/2 left-0 w-full border-t border-gray-100"></div></div>
                 </>
               )}
-
-              {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-3">
-                <input 
-                  name="name" 
-                  value={holidayData.name} 
-                  onChange={handleChange} 
-                  placeholder="Holiday Name" 
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none" 
-                  required 
-                />
-                <textarea 
-                  name="description" 
-                  value={holidayData.description} 
-                  onChange={handleChange} 
-                  placeholder="Description" 
-                  rows="2" 
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none resize-none" 
-                />
+                <input name="name" value={holidayData.name} onChange={handleChange} placeholder="Holiday Name" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none" required />
+                <textarea name="description" value={holidayData.description} onChange={handleChange} placeholder="Description" rows="2" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none resize-none" />
                 <div className="flex gap-3">
                   <div className="w-1/2">
                     <label className="text-[10px] uppercase font-bold text-gray-400">Start Date</label>
@@ -519,17 +460,13 @@ const AdminHolidayCalendarPage = () => {
                     <input type="date" name="endDate" value={holidayData.endDate} min={holidayData.startDate} onChange={handleChange} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none" />
                   </div>
                 </div>
-                {/* Dynamic Submit Button */}
-                <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition shadow-lg">
-                  {loading ? "Processing..." : (isEditing ? "Update Holiday" : "Add Holiday")}
-                </button>
+                <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition shadow-lg">{loading ? "Processing..." : (isEditing ? "Update Holiday" : "Add Holiday")}</button>
               </form>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- CSS (Unchanged) --- */}
       <style>{`
         .react-calendar { width: 100%; border: none; font-family: inherit; }
         .react-calendar__navigation { margin-bottom: 30px; display: flex; }

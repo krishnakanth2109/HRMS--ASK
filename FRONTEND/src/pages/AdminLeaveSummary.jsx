@@ -487,7 +487,7 @@ const AdminLeaveSummary = () => {
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                📊 Employee Leave Statistics
+                Employee Leave Statistics
               </h1>
               <p className="text-gray-600">
                 Comprehensive overview including Leaves and Absents..
