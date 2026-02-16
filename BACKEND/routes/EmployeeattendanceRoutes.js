@@ -37,15 +37,15 @@ transporter.verify((error, success) => {
 /* ================= EMAIL TEMPLATE ================= */
 const createInsufficientHoursEmail = (employeeData) => {
   const { employeeName, date, punchIn, punchOut, workedHours, workedMinutes, workedSeconds, requiredHours, loginStatus, workedStatus } = employeeData;
-  
+
   const formatTime = (dateObj) => {
     if (!dateObj) return '--';
-    return new Date(dateObj).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    return new Date(dateObj).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '--';
-    return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const getStatusBadge = (status) => {
@@ -60,7 +60,7 @@ const createInsufficientHoursEmail = (employeeData) => {
     return `<span style="background-color: ${color.bg}; color: ${color.text}; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${status.replace(/_/g, ' ')}</span>`;
   };
 
-return `
+  return `
 <!DOCTYPE html>
 <html>
 <body style="margin:0; padding:0; background-color:#eef2f7; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
@@ -171,7 +171,8 @@ return `
           <!-- Footer -->
           <tr>
             <td style="background:#f3f4f6; padding:18px; text-align:center; font-size:12px; color:#9ca3af;">
-              © ${new Date().getFullYear()} Attendance Management System <br/>
+              © ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric' })}
+ Attendance Management System <br/>
               This is an automated notification. Please do not reply to this email.
             </td>
           </tr>
@@ -269,7 +270,7 @@ router.post('/punch-in', async (req, res) => {
     }
 
     let address = "Unknown Location";
-    try { address = await reverseGeocode(latitude, longitude); } catch {}
+    try { address = await reverseGeocode(latitude, longitude); } catch { }
 
     let attendance = await Attendance.findOne({ employeeId });
     if (!attendance) {
@@ -284,7 +285,7 @@ router.post('/punch-in', async (req, res) => {
         shiftStartTime: "09:00",
         shiftEndTime: "18:00",
         lateGracePeriod: 15,
-        autoExtendShift: true, 
+        autoExtendShift: true,
         fullDayHours: 8,
         halfDayHours: 4,
         quarterDayHours: 2
@@ -311,7 +312,7 @@ router.post('/punch-in', async (req, res) => {
       };
 
       attendance.attendance.push(todayRecord);
-    } 
+    }
     else {
       if (todayRecord.workedStatus === "FULL_DAY") {
         return res.status(400).json({ message: "Your shift is completed. You cannot punch in again today." });
@@ -361,7 +362,7 @@ router.post('/punch-out', async (req, res) => {
 
     const currentSession = (todayRecord.sessions || []).find(s => !s.punchOut);
     if (!currentSession) {
-        return res.status(400).json({ message: "You are already Punched Out." });
+      return res.status(400).json({ message: "You are already Punched Out." });
     }
 
     // 1. Close current session
@@ -376,9 +377,9 @@ router.post('/punch-out', async (req, res) => {
     // 3. Calculate Total Worked Time
     let totalSeconds = 0;
     todayRecord.sessions.forEach(sess => {
-        if(sess.punchIn && sess.punchOut) {
-            totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
-        }
+      if (sess.punchIn && sess.punchOut) {
+        totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+      }
     });
 
     const h = Math.floor(totalSeconds / 3600);
@@ -408,21 +409,21 @@ router.post('/punch-out', async (req, res) => {
 
     /* ================= ✅ NEW: AUTOMATED EARLY PUNCH-OUT EMAIL ================= */
     if (h < shift.fullDayHours && req.user && req.user.email) {
-        const emailData = {
-          employeeName: attendance.employeeName,
-          date: today,
-          punchIn: todayRecord.punchIn,
-          punchOut: todayRecord.punchOut,
-          workedHours: h,
-          workedMinutes: m,
-          workedSeconds: s,
-          requiredHours: shift.fullDayHours,
-          loginStatus: todayRecord.loginStatus || 'ON_TIME',
-          workedStatus: todayRecord.workedStatus
-        };
-        
-        // Asynchronous call so response is not delayed
-        sendInsufficientHoursEmail(req.user.email, emailData);
+      const emailData = {
+        employeeName: attendance.employeeName,
+        date: today,
+        punchIn: todayRecord.punchIn,
+        punchOut: todayRecord.punchOut,
+        workedHours: h,
+        workedMinutes: m,
+        workedSeconds: s,
+        requiredHours: shift.fullDayHours,
+        loginStatus: todayRecord.loginStatus || 'ON_TIME',
+        workedStatus: todayRecord.workedStatus
+      };
+
+      // Asynchronous call so response is not delayed
+      sendInsufficientHoursEmail(req.user.email, emailData);
     }
     /* =========================================================================== */
 
@@ -448,36 +449,36 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
 
     let targetDateStr = date.includes("T") ? date.split("T")[0] : date;
     let dayRecord = attendance.attendance.find(a => a.date === targetDateStr);
-    
+
     if (!dayRecord) {
-        return res.status(400).json({ message: `No attendance entry found for date: ${targetDateStr}` });
+      return res.status(400).json({ message: `No attendance entry found for date: ${targetDateStr}` });
     }
 
     const sessions = dayRecord.sessions || [];
     const openSession = sessions.find(s => !s.punchOut);
 
     if (openSession) {
-        openSession.punchOut = punchOutDateObj;
-        openSession.durationSeconds = (punchOutDateObj - new Date(openSession.punchIn)) / 1000;
+      openSession.punchOut = punchOutDateObj;
+      openSession.durationSeconds = (punchOutDateObj - new Date(openSession.punchIn)) / 1000;
     }
 
     dayRecord.punchOut = punchOutDateObj;
-    dayRecord.punchOutLocation = { 
-        latitude: latitude || 0, 
-        longitude: longitude || 0, 
-        address: "Admin Force Logout",
-        timestamp: new Date()
+    dayRecord.punchOutLocation = {
+      latitude: latitude || 0,
+      longitude: longitude || 0,
+      address: "Admin Force Logout",
+      timestamp: new Date()
     };
     dayRecord.status = "COMPLETED";
     dayRecord.adminPunchOut = true;
-    dayRecord.adminPunchOutBy = req.user.name; 
+    dayRecord.adminPunchOutBy = req.user.name;
     dayRecord.adminPunchOutTimestamp = new Date();
 
     let totalSeconds = 0;
     dayRecord.sessions.forEach(sess => {
-        if(sess.punchIn && sess.punchOut) {
-            totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
-        }
+      if (sess.punchIn && sess.punchOut) {
+        totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+      }
     });
 
     const h = Math.floor(totalSeconds / 3600);
@@ -510,47 +511,47 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
 
 /* ================= CORRECTION REQUESTS ================= */
 router.post('/request-correction', async (req, res) => {
-    try {
-        const { employeeId, date, time, reason } = req.body;
-        let attendance = await Attendance.findOne({ employeeId });
-        if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+  try {
+    const { employeeId, date, time, reason } = req.body;
+    let attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
 
-        const now = new Date();
-        const currentYearMonth = now.toISOString().slice(0, 7); 
+    const now = new Date();
+    const currentYearMonth = now.toISOString().slice(0, 7);
 
-        const monthlyRequestCount = attendance.attendance.filter(day => 
-            day.date.startsWith(currentYearMonth) && 
-            day.lateCorrectionRequest?.hasRequest === true
-        ).length;
+    const monthlyRequestCount = attendance.attendance.filter(day =>
+      day.date.startsWith(currentYearMonth) &&
+      day.lateCorrectionRequest?.hasRequest === true
+    ).length;
 
-        if (monthlyRequestCount >= 3) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Monthly limit reached. You can only submit 3 login correction requests per month." 
-            });
-        }
-
-        let dayRecord = attendance.attendance.find(a => a.date === date);
-        if (!dayRecord) return res.status(400).json({ message: "No attendance found for this date." });
-
-        if (dayRecord.lateCorrectionRequest?.hasRequest) {
-            return res.status(400).json({ message: "A request for this date has already been submitted." });
-        }
-
-        const requestedDateObj = new Date(`${date}T${time}:00`);
-
-        dayRecord.lateCorrectionRequest = {
-            hasRequest: true,
-            status: "PENDING",
-            requestedTime: requestedDateObj,
-            reason: reason
-        };
-
-        await attendance.save();
-        res.json({ success: true, message: `Request sent to Admin. (${monthlyRequestCount + 1}/3 used this month)` });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (monthlyRequestCount >= 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Monthly limit reached. You can only submit 3 login correction requests per month."
+      });
     }
+
+    let dayRecord = attendance.attendance.find(a => a.date === date);
+    if (!dayRecord) return res.status(400).json({ message: "No attendance found for this date." });
+
+    if (dayRecord.lateCorrectionRequest?.hasRequest) {
+      return res.status(400).json({ message: "A request for this date has already been submitted." });
+    }
+
+    const requestedDateObj = new Date(`${date}T${time}:00`);
+
+    dayRecord.lateCorrectionRequest = {
+      hasRequest: true,
+      status: "PENDING",
+      requestedTime: requestedDateObj,
+      reason: reason
+    };
+
+    await attendance.save();
+    res.json({ success: true, message: `Request sent to Admin. (${monthlyRequestCount + 1}/3 used this month)` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/:employeeId', async (req, res) => {
@@ -706,7 +707,7 @@ router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
     const attendance = await Attendance.findOne({ employeeId });
     const dayRecord = attendance.attendance.find(a => a.date === date);
     const newPunchOut = new Date(dayRecord.statusCorrectionRequest.requestedPunchOut);
-    
+
     dayRecord.punchOut = newPunchOut;
     if (dayRecord.sessions.length > 0) {
       dayRecord.sessions[dayRecord.sessions.length - 1].punchOut = newPunchOut;
@@ -714,13 +715,13 @@ router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
 
     let totalSeconds = 0;
     dayRecord.sessions.forEach(sess => {
-        if(sess.punchIn && sess.punchOut) totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+      if (sess.punchIn && sess.punchOut) totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
     });
 
     dayRecord.workedHours = Math.floor(totalSeconds / 3600);
     dayRecord.workedMinutes = Math.floor((totalSeconds % 3600) / 60);
     dayRecord.workedSeconds = Math.floor(totalSeconds % 60);
-    dayRecord.workedStatus = "FULL_DAY"; 
+    dayRecord.workedStatus = "FULL_DAY";
     dayRecord.status = "COMPLETED";
     dayRecord.statusCorrectionRequest.status = "APPROVED";
     dayRecord.statusCorrectionRequest.adminComment = adminComment;
