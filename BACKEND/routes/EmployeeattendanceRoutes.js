@@ -199,6 +199,60 @@ const createInsufficientHoursEmail = (employeeData) => {
 `;
 };
 
+/* ================= ✅ NEW: LEAVE DEDUCTED FOR MISSING ATTENDANCE (ABSENT) ================= */
+const createMissingAttendanceEmail = (employeeData) => {
+  const { employeeName, date } = employeeData;
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '--';
+    const d = new Date(dateStr);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return `${months[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}, ${days[d.getDay()]}`;
+  };
+
+  return `
+<!DOCTYPE html>
+<html>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" cellspacing="0" cellpadding="0" style="padding:20px; max-width:600px; margin: 0 auto;">
+    <tr>
+      <td>
+        <h2 style="color:#000000; font-size: 20px; margin: 0 0 20px 0; border-bottom: 2px solid #3b82f6; display:inline-block; padding-bottom: 4px;">Leave Deducted for Worked Hours Less Than Half Day</h2>
+        
+        <p style="margin:0 0 18px 0; font-size:15px; color:#1f2937;">
+          Hi ${employeeName},
+        </p>
+        
+        <p style="margin:0 0 25px 0; font-size:15px; color:#1f2937; line-height:1.6;">
+         
+          There has been a penalization of 1 of leave for Worked Hours Less Than Half Day.
+           
+        </p>
+
+        <h3 style="margin:0 0 10px 0; font-size:16px; color:#1f2937;">Leave Deduction Details</h3>
+        
+        <hr style="border:0; border-top:1px solid #d1d5db; margin:0 0 15px 0;"/>
+        
+        <p style="margin:5px 0; font-size:15px; color:#1f2937;">Penalization Date: ${formatDate(date)}</p>
+        <p style="margin:5px 0; font-size:15px; color:#1f2937;">Penalization Reason: Worked Hours Less Than minimum  Half day required hours</p>
+        <p style="margin:5px 0; font-size:15px; color:#1f2937;">Leave Type Deducted: Unpaid Leave</p>
+
+        <hr style="border:0; border-top:1px solid #d1d5db; margin:15px 0 25px 0;"/>
+
+        <p style="margin:0 0 25px 0; font-size:15px; color:#1f2937; line-height:1.6;">
+          In case you might have any question related to this deduction, please reach out to your Reporting Manager or HR manager for more clarity.
+        </p>
+
+     
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+};
+
 /* ================= ✅ NEW: UNINFORMED ABSENCE TEMPLATE ================= */
 const createUninformedAbsenceEmail = (employeeName, absentDate) => {
 return `
@@ -284,6 +338,19 @@ const sendInsufficientHoursEmail = async (employeeEmail, employeeData) => {
     await transporter.sendMail(mailOptions);
     console.log(`✅ Insufficient hours email sent to ${employeeEmail}`);
   } catch (error) { console.error('❌ Error sending email:', error); }
+};
+
+const sendMissingAttendanceEmail = async (employeeEmail, employeeData) => {
+  try {
+    const mailOptions = {
+      from: `<${process.env.SMTP_USER}>`,
+      to: employeeEmail,
+      subject: `Leave Deducted for Worked Hours Less Than Half Day - ${employeeData.date}`,
+      html: createMissingAttendanceEmail(employeeData),
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Missing attendance (Leave Deducted) email sent to ${employeeEmail}`);
+  } catch (error) { console.error('❌ Error sending missing attendance email:', error); }
 };
 
 const sendUninformedAbsenceEmail = async (employeeEmail, employeeName, absentDate) => {
@@ -540,7 +607,7 @@ router.post('/punch-out', async (req, res) => {
 
     await attendance.save();
 
-    // ✅ Send "Shortage Of Working Hours" email ONLY on final punch-out when hours are short
+    // ✅ Send correct email based on workedStatus ONLY on final punch-out when hours are short
     if (h < shift.fullDayHours && req.user && req.user.email) {
       const emailData = {
         employeeName: attendance.employeeName,
@@ -554,7 +621,12 @@ router.post('/punch-out', async (req, res) => {
         loginStatus: todayRecord.loginStatus || 'ON_TIME',
         workedStatus: todayRecord.workedStatus
       };
-      sendInsufficientHoursEmail(req.user.email, emailData);
+
+      if (todayRecord.workedStatus === "ABSENT") {
+        sendMissingAttendanceEmail(req.user.email, emailData);
+      } else if (todayRecord.workedStatus === "HALF_DAY") {
+        sendInsufficientHoursEmail(req.user.email, emailData);
+      }
     }
 
     res.json({ success: true, message: `Punched out. Total: ${h}h ${m}m`, data: todayRecord });

@@ -131,6 +131,110 @@ const createLeaveStatusEmail = (data) => {
 `;
 };
 
+/* ================= EMAIL TEMPLATE FOR ADMIN NOTIFICATION ================= */
+const createAdminLeaveNotificationEmail = (data) => {
+  const { name, employeeId,email, leaveType, from, to, reason } = data;
+
+  return `
+<!DOCTYPE html>
+<html>
+<body style="margin:0; padding:0; background-color:#eef2f7; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:40px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 8px 20px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg, #1e3a8a, #3b82f6); padding:35px 30px; text-align:center;">
+              <h1 style="margin:0; font-size:24px; color:#ffffff; font-weight:700;">
+                New Leave Request
+              </h1>
+              <p style="margin:8px 0 0 0; color:#e0e7ff; font-size:14px; opacity:0.9;">
+                Action Required: Pending Approval
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:35px 30px;">
+              <p style="margin:0 0 25px 0; font-size:15px; color:#4b5563; line-height:1.7;">
+                Please be advised that a new leave application has been submitted by <strong>${name}</strong> and is currently awaiting your review. Below are the details of the request:
+              </p>
+
+              <!-- Info Card -->
+              <table width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc; border-radius:10px; padding:20px; border:1px solid #e5e7eb; margin-bottom:25px;">
+                <tr>
+                  <td>
+                    <table width="100%" style="font-size:14px; border-collapse:collapse;">
+                      <tr>
+                        <td style="padding:10px 0; color:#6b7280; width: 30%;">Employee Name</td>
+                        <td style="padding:10px 0; text-align:right; font-weight:700; color:#111827;">
+                          ${name}
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding:10px 0; color:#6b7280;">Employee Email</td>
+                        <td style="padding:10px 0; text-align:right; font-weight:600;">
+                          <a href="mailto:${email}" style="color:#3b82f6; text-decoration:none;">${email || 'N/A'}</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:10px 0; color:#6b7280;">Employee ID</td>
+                        <td style="padding:10px 0; text-align:right; font-weight:600; color:#111827;">
+                          ${employeeId || 'N/A'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:10px 0; color:#6b7280;">Leave Type</td>
+                        <td style="padding:10px 0; text-align:right; font-weight:600; color:#3b82f6;">
+                          ${leaveType}
+                        </td>
+                      </tr>
+
+
+                      
+                      <tr>
+                        <td style="padding:10px 0; color:#6b7280;">Duration</td>
+                        <td style="padding:10px 0; text-align:right; font-weight:600; color:#111827;">
+                          ${new Date(from).toLocaleDateString()} - ${new Date(to).toLocaleDateString()}
+                        </td>
+                      </tr>
+                      <tr style="border-top:1px solid #e5e7eb;">
+                        <td style="padding:15px 0 0 0; color:#6b7280; vertical-align:top;">Reason</td>
+                        <td style="padding:15px 0 0 0; text-align:right; color:#4b5563; font-style: italic;">
+                          "${reason || 'No reason provided.'}"
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0; font-size:15px; color:#4b5563; line-height:1.7;">
+                Kindly log in to the Admin Portal to approve, reject, or review this request in further detail.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f3f4f6; padding:18px; text-align:center; font-size:12px; color:#9ca3af;">
+              © ${new Date().getFullYear()} Attendance Management System <br/>
+              This is an automated notification from the HR system. Please do not reply directly to this email.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+};
+
 // ===================================================================================
 // ✅ EMPLOYEE CREATES LEAVE (ADMIN GETS EMAIL)
 // ===================================================================================
@@ -181,17 +285,21 @@ export const createLeave = async (req, res) => {
 
       if (adminEmails.length > 0) {
         const mailOptions = {
-          from: ` <${process.env.SMTP_USER}>`,
+          from: `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
           to: adminEmails.join(','),
-          subject: `New Leave Request: ${name}`,
-          html: `<h3>New Leave Request Submitted</h3>
-                 <p><strong>Employee:</strong> ${name} (${loggedUser.employeeId})</p>
-                 <p><strong>Type:</strong> ${leaveType}</p>
-                 <p><strong>Dates:</strong> ${from} to ${to}</p>
-                 <p><strong>Reason:</strong> ${reason}</p>
-                 <p>Please login to the Admin Portal to review.</p>`
+          subject: `New Leave Request from ${name}`,
+          html: createAdminLeaveNotificationEmail({
+            name: name,
+            employeeId: loggedUser.employeeId,
+            email: loggedUser.email,
+            leaveType: leaveType,
+            from: from,
+            to: to,
+            reason: reason
+          })
         };
         await transporter.sendMail(mailOptions);
+        console.log(`✅ Leave notification email sent to Admins`);
       }
     } catch (emailErr) {
       console.error("❌ Failed to send Leave Notification to Admin:", emailErr);
