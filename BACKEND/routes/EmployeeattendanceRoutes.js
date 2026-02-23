@@ -5,6 +5,7 @@ import { reverseGeocode, validateCoordinates } from '../Services/locationService
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import LeaveRequest from "../models/LeaveRequest.js";
+import Holiday from "../models/Holiday.js";
 import nodemailer from 'nodemailer';
 
 const router = express.Router();
@@ -418,14 +419,27 @@ router.post('/punch-in', async (req, res) => {
     const today = getToday();
     const now = new Date();
 
+    // ✅ Fetch shift early to know the employee's dynamic rotational week offs
+    let shift = await Shift.findOne({ employeeId });
+    if (!shift) {
+      shift = {
+        shiftStartTime: "09:00",
+        shiftEndTime: "18:00",
+        lateGracePeriod: 15,
+        autoExtendShift: true,
+        fullDayHours: 8,
+        halfDayHours: 4,
+        quarterDayHours: 2,
+        weeklyOffDays: [0] // Default fallback (Sunday)
+      };
+    }
+
     /* ================= ✅ CHECK YESTERDAY'S ABSENCE WITHOUT LEAVE ================= */
     const yesterday = getYesterdayDate();
     let attendance = await Attendance.findOne({ employeeId });
 
     if (attendance) {
       // ✅ UNINFORMED ABSENCE email only fires on the very FIRST punch-in of the day.
-      // Guard 1: no todayRecord at all means no sessions yet.
-      // Guard 2: sessions.length === 0 as extra safety for edge cases.
       const todayRecordCheck = attendance.attendance.find(a => a.date === today);
       const isFirstPunchInToday = !todayRecordCheck || (todayRecordCheck.sessions && todayRecordCheck.sessions.length === 0);
 
@@ -433,13 +447,46 @@ router.post('/punch-in', async (req, res) => {
         const yesterdayRecord = attendance.attendance.find(a => a.date === yesterday);
 
         if (!yesterdayRecord) {
+          // ✅ 1. Check if yesterday was a dynamic Rotational Week Off
+          const yesterdayDateObj = new Date(yesterday);
+          const dayNum = yesterdayDateObj.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+
+          let isWeekOff = false;
+
+          // Check using exact frontend matching logic: check array of numbers representing week days
+          if (shift.weeklyOffDays && Array.isArray(shift.weeklyOffDays)) {
+            isWeekOff = shift.weeklyOffDays.includes(dayNum);
+          } else if (shift.weekOffs && Array.isArray(shift.weekOffs)) {
+            // Fallback for older schema configurations using strings
+            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const yesterdayDayName = daysOfWeek[dayNum];
+            isWeekOff = shift.weekOffs.some(off => 
+              String(off).toLowerCase() === yesterdayDayName.toLowerCase() || 
+              off === dayNum
+            );
+          } else {
+            // Ultimate fallback (Sunday)
+            isWeekOff = (dayNum === 0);
+          }
+
+          // ✅ 2. Check if yesterday was a Holiday
+          const startOfYest = new Date(`${yesterday}T00:00:00.000Z`);
+          const endOfYest = new Date(`${yesterday}T23:59:59.999Z`);
+          
+          const isHoliday = await Holiday.findOne({
+            startDate: { $lte: endOfYest },
+            endDate: { $gte: startOfYest }
+          });
+
+          // ✅ 3. Check if yesterday had an approved leave
           const approvedLeaveYesterday = await LeaveRequest.findOne({
             employeeId: String(employeeId).trim(),
             status: "Approved",
             "details.date": yesterday
           });
 
-          if (!approvedLeaveYesterday && req.user && req.user.email) {
+          // ✅ ONLY send the email if it wasn't a week off, wasn't a holiday, and didn't have approved leave
+          if (!isWeekOff && !isHoliday && !approvedLeaveYesterday && req.user && req.user.email) {
             sendUninformedAbsenceEmail(req.user.email, employeeName, yesterday);
           }
         }
@@ -476,19 +523,6 @@ router.post('/punch-in', async (req, res) => {
     }
 
     let todayRecord = attendance.attendance.find(a => a.date === today);
-
-    let shift = await Shift.findOne({ employeeId, isActive: true });
-    if (!shift) {
-      shift = {
-        shiftStartTime: "09:00",
-        shiftEndTime: "18:00",
-        lateGracePeriod: 15,
-        autoExtendShift: true,
-        fullDayHours: 8,
-        halfDayHours: 4,
-        quarterDayHours: 2
-      };
-    }
 
     if (!todayRecord) {
       const diffMin = getTimeDifferenceInMinutes(now, shift.shiftStartTime);

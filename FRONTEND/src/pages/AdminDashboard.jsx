@@ -4,7 +4,7 @@ import {
   FaUsers, FaClipboardList, FaChevronLeft, FaChevronRight,
   FaSyncAlt, FaUmbrellaBeach, FaAngleRight, FaCalendarAlt, FaFileAlt, FaBullhorn,
   FaUserClock, FaChartPie, FaCalendarCheck, FaLayerGroup, FaConnectdevelop,
-  FaCheck, FaTimes, FaWifi, FaRegCalendarCheck, FaRegClock
+  FaCheck, FaTimes, FaHeart, FaGift, FaUserTie, FaUserFriends
 } from "react-icons/fa";
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { EmployeeContext } from "../context/EmployeeContext";
@@ -18,223 +18,84 @@ import api from "../api";
 import Swal from "sweetalert2";
 
 /* ═══════════════════════════════════════════════════
-   GLOBAL STYLES (updated to match image exactly)
+   HELPER FUNCTIONS
 ═══════════════════════════════════════════════════ */
-const GlobalStyle = () => (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
-
-    .adm {
-      font-family: 'Nunito', sans-serif;
-      min-height: 100vh;
-      padding: 30px 30px 48px;
-      color: #111a35;
-      background: linear-gradient(150deg,
-        #c4d2f6 0%, #b1c2ef 15%, #97aceb 30%,
-        #7a96e3 46%, #6080d8 60%, #4d6cc6 74%,
-        #3e5cb2 88%, #334fa0 100%
-      );
-    }
-
-    .adm-h1 { font-size: 26px; font-weight: 900; color: #101830; margin-bottom: 24px; }
-
-    /* Glass card */
-    .g {
-      background: rgba(255,255,255,0.76);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.58);
-      box-shadow: 0 2px 22px rgba(30,50,130,0.10);
-    }
-
-    /* ── STAT ROW (exactly 4 cards) ── */
-    .stat-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 22px;
-    }
-    @media(max-width:900px){ .stat-row { grid-template-columns: 1fr 1fr; } }
-
-    .sc {
-      padding: 22px 22px;
-      display: flex; align-items: center; justify-content: space-between;
-      cursor: pointer; transition: transform .18s, box-shadow .18s;
-    }
-    .sc:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(40,60,150,0.18); }
-    .sc-num  { font-size: 32px; font-weight: 800; line-height: 1; color: #101830; }
-    .sc-lbl  { font-size: 14px; font-weight: 700; color: #5a6a90; margin-top: 6px; }
-    .sc-icon { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-
-    /* ── MAIN 2-COL ── */
-    .mg { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    @media(max-width:900px){ .mg { grid-template-columns: 1fr; } }
-    .rc { display: flex; flex-direction: column; gap: 18px; }
-
-    .cp { padding: 22px 22px; }
-    .sec-t { font-size: 16px; font-weight: 800; color: #101830; margin-bottom: 16px; }
-
-    /* ── DEPT (left side) ── */
-    .dept-bar-wrap { display: flex; align-items: center; gap: 18px; }
-    .dept-pct-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #4a5a80; margin-bottom: 4px; }
-    .dept-bar {
-      height: 34px; border-radius: 24px;
-      display: flex; align-items: center; padding-left: 16px;
-      color: #fff; font-size: 13px; font-weight: 800;
-    }
-
-    /* ── GAUGE (today attendance) ── */
-    .gauge-area { display: flex; align-items: flex-end; gap: 22px; }
-    .gauge-legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .gauge-nav { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-    .gnav-btn {
-      background: rgba(90,130,210,0.14); border: none; border-radius: 8px;
-      padding: 5px 10px; cursor: pointer; color: #3a5ab0; font-size: 12px; font-weight: 700;
-    }
-    .gnav-btn:disabled { opacity: 0.35; cursor: default; }
-    .gnav-label { font-size: 12px; font-weight: 700; color: #3a5ab0; }
-    .dept-sel {
-      background: rgba(255,255,255,0.95);
-      border: 1.5px solid rgba(90,130,210,0.25);
-      border-radius: 10px; padding: 6px 12px;
-      font-size: 12px; font-weight: 700; color: #101830;
-      outline: none; cursor: pointer; font-family: 'Nunito', sans-serif;
-    }
-
-    /* ── LEAVE ACTIVITY ── */
-    .lv-row {
-      display: flex; align-items: center; gap: 11px;
-      padding: 9px 0; border-bottom: 1px solid rgba(80,110,190,0.09);
-    }
-    .lv-row:last-child { border-bottom: none; }
-    .lv-av {
-      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 15px; color: #fff; overflow: hidden;
-    }
-    .lv-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .lv-name { font-size: 13px; font-weight: 800; color: #101830; }
-    .lv-sub  { font-size: 11px; font-weight: 600; color: #7080a0; }
-    .lv-badge { font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
-    .badge-pending  { background: rgba(251,191,36,0.18); color: #b45309; }
-    .badge-approved { background: rgba(52,211,153,0.18); color: #047857; }
-    .badge-rejected { background: rgba(248,113,113,0.18); color: #b91c1c; }
-    .lv-actions { margin-left: auto; display: flex; gap: 7px; flex-shrink: 0; }
-    .btn-ap { background:#22c55e; color:#fff; border:none; border-radius:8px; width:28px; height:28px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-    .btn-rj { background:#ef4444; color:#fff; border:none; border-radius:8px; width:28px; height:28px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-
-    /* ── REMOTE WORKERS ── */
-    .rw-card {
-      display: flex; align-items: center; gap: 11px;
-      padding: 9px 12px; border-radius: 13px;
-      background: rgba(255,255,255,0.55); margin-bottom: 8px;
-    }
-    .rw-av {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 800; font-size: 14px; flex-shrink: 0;
-    }
-    .rw-name { font-size: 13px; font-weight: 800; color: #101830; }
-    .rw-sub  { font-size: 11px; color: #7080a0; font-weight: 600; }
-
-    /* ── BIRTHDAY ── */
-    .bd-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px; border-radius: 12px;
-      background: rgba(255,255,255,0.50); margin-bottom: 7px;
-    }
-    .bd-av {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg,#ff9a6c,#ff6b9d);
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 800; font-size: 14px; flex-shrink: 0;
-      border-radius: 50%;
-    }
-
-    /* ── QUICK ACTIONS ── */
-    .qa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-top: 18px; }
-    @media(max-width:900px){ .qa-grid { grid-template-columns: 1fr 1fr; } }
-    .qa-btn {
-      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-      border-radius: 15px; background: rgba(255,255,255,0.86);
-      border: 1.5px solid rgba(255,255,255,0.65);
-      cursor: pointer; text-align: left;
-      transition: transform .18s, box-shadow .18s; font-family: 'Nunito', sans-serif;
-    }
-    .qa-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(40,60,150,0.16); }
-    .qa-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; flex-shrink: 0; }
-    .qa-lbl  { font-size: 13px; font-weight: 800; color: #101830; flex: 1; }
-
-    .spin {
-      width: 28px; height: 28px; border-radius: 50%;
-      border: 3px solid rgba(70,100,200,0.18); border-top-color: #4a6bbf;
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .view-all-btn { font-size: 12px; font-weight: 700; color: #3a5ab0; cursor: pointer; background: none; border: none; padding: 0; font-family: 'Nunito', sans-serif; }
-    .view-all-btn:hover { text-decoration: underline; }
-    .show-more-btn {
-      width: 100%; margin-top: 4px;
-      background: rgba(80,120,200,0.10); border: 1.5px solid rgba(80,120,200,0.20);
-      border-radius: 9px; padding: 6px 0; font-size: 12px; font-weight: 800; color: #3a5ab0;
-      cursor: pointer; font-family: 'Nunito', sans-serif;
-    }
-    .show-more-btn:hover { background: rgba(80,120,200,0.20); }
-
-    .empty-msg { text-align: center; color: #8090b0; padding: 18px 0; font-size: 13px; }
-  `}</style>
-);
+const getSecureUrl = (url) => (!url ? "" : url.startsWith("http:") ? url.replace("http:", "https:") : url);
 
 /* ═══════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════ */
-const getSecureUrl = url => (!url ? "" : url.startsWith("http:") ? url.replace("http:", "https:") : url);
-
-/* ═══════════════════════════════════════════════════
-   SEMI-CIRCLE GAUGE (re-used for today attendance)
+   GAUGE CHART COMPONENT
 ═══════════════════════════════════════════════════ */
 const GaugeChart = ({ present, total }) => {
-  const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-  const circ = Math.PI * 80;
+  const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+  const circumference = Math.PI * 160;
+  
   return (
-    <div style={{ position: "relative", width: 180, height: 100, flexShrink: 0 }}>
-      <svg width="180" height="100" viewBox="0 0 180 100">
-        <path d="M 10 90 A 80 80 0 0 1 170 90" fill="none" stroke="#d4e2f9" strokeWidth="18" strokeLinecap="round" />
-        <path d="M 10 90 A 80 80 0 0 1 170 90" fill="none" stroke="#192f7a" strokeWidth="18" strokeLinecap="round"
-          strokeDasharray={`${(pct / 100) * circ} ${circ}`} style={{ transition: "stroke-dasharray .8s ease" }} />
+    <div className="relative w-[200px] h-[110px]">
+      <svg width="200" height="110" viewBox="0 0 200 110">
+        <path
+          d="M 20 90 A 80 80 0 0 1 180 90"
+          fill="none"
+          stroke="rgba(255,255,255,0.25)"
+          strokeWidth="18"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 20 90 A 80 80 0 0 1 180 90"
+          fill="none"
+          stroke="white"
+          strokeWidth="18"
+          strokeLinecap="round"
+          strokeDasharray={`${(percentage / 100) * circumference} ${circumference}`}
+          style={{ transition: "stroke-dasharray 0.8s ease" }}
+        />
       </svg>
-      <div style={{ position: "absolute", bottom: 2, left: 0, right: 0, textAlign: "center" }}>
-        <span style={{ fontSize: 22, fontWeight: 900, color: "#101830" }}>{pct}%</span>
+      <div className="absolute bottom-0 left-0 right-0 text-center text-3xl font-black text-white drop-shadow-lg">
+        {percentage}%
       </div>
     </div>
   );
 };
 
 /* ═══════════════════════════════════════════════════
-   DONUT CHART
+   DONUT CHART COMPONENT
 ═══════════════════════════════════════════════════ */
-const DCOLS = ["#8b5cf6", "#ec4899", "#3b82f6", "#06b6d4", "#f97316", "#10b981"];
-
-const DonutChart = ({ data, total }) => (
-  <ResponsiveContainer width={150} height={150}>
-    <PieChart>
-      <Pie data={data} cx="50%" cy="50%" innerRadius={46} outerRadius={68}
-        paddingAngle={3} dataKey="employees" startAngle={90} endAngle={-270}>
-        {data.map((_, i) => <Cell key={i} fill={DCOLS[i % DCOLS.length]} />)}
-      </Pie>
-      <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle"
-        style={{ fontSize: 20, fontWeight: 900, fill: "#101830" }}>{total}</text>
-    </PieChart>
-  </ResponsiveContainer>
-);
-
-const AV = ["#5b8aff", "#ff6b9d", "#43c99e", "#ff9a3c", "#9c6dff", "#3cb8e8", "#f06060", "#62c462"];
-const badgeClass = s => `lv-badge ${s === "Approved" ? "badge-approved" : s === "Rejected" ? "badge-rejected" : "badge-pending"}`;
+const DonutChart = ({ data, total }) => {
+  const COLORS = ["#FFB347", "#4ECDC4", "#FF6B6B", "#FFB347", "#4ECDC4", "#FF6B6B"];
+  
+  return (
+    <ResponsiveContainer width={160} height={160}>
+      <PieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={50}
+          outerRadius={70}
+          paddingAngle={2}
+          dataKey="employees"
+          startAngle={90}
+          endAngle={-270}
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+          ))}
+        </Pie>
+        <text
+          x="50%"
+          y="52%"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="text-2xl font-black fill-white"
+        >
+          {total}
+        </text>
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
 
 /* ═══════════════════════════════════════════════════
-   MAIN
+   MAIN DASHBOARD COMPONENT
 ═══════════════════════════════════════════════════ */
 const AdminDashboard = () => {
   const { employees } = useContext(EmployeeContext);
@@ -242,57 +103,57 @@ const AdminDashboard = () => {
   const { leaveRequests } = useContext(LeaveRequestContext);
   const navigate = useNavigate();
 
-  /* Today attendance filter state */
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // today
+  // State
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceDateData, setAttendanceDateData] = useState([]);
-  const [loadingGraph, setLoadingGraph] = useState(false);
-
-  /* today counts */
-  const [todayCounts, setTodayCounts] = useState({ present: 0, notLoggedIn: 0, onLeave: 0 });
-  const [todayAttendanceData, setTodayAttendanceData] = useState([]); // for remote workers
-
-  /* team */
+  const [todayCounts, setTodayCounts] = useState({ present: 0, absent: 0, onLeave: 0 });
+  const [todayAttendanceData, setTodayAttendanceData] = useState([]);
   const [loadingTeamData, setLoadingTeamData] = useState(false);
   const [monthlyBirthdays, setMonthlyBirthdays] = useState([]);
   const [remoteWorkers, setRemoteWorkers] = useState([]);
   const [isGlobalWFH, setIsGlobalWFH] = useState(false);
   const [showAllRemote, setShowAllRemote] = useState(false);
-
-  /* leave activity */
   const [leaveActivity, setLeaveActivity] = useState([]);
   const [leaveEmpImages, setLeaveEmpImages] = useState({});
   const [loadingLeave, setLoadingLeave] = useState(false);
+  const [showAllLeave, setShowAllLeave] = useState(false);
 
+  // Memoized data
   const { statCards, activeEmployees, departmentList } = useMemo(
     () => getDashboardData(employees, leaveRequests),
     [employees, leaveRequests, getDashboardData]
   );
 
-  /* ── 1. TODAY COUNTS based on selectedDate ── */
+  // Fetch today's attendance
   useEffect(() => {
-    const run = async () => {
+    const fetchTodayAttendance = async () => {
       try {
-        const arr = await getAttendanceByDateRange(selectedDate, selectedDate);
-        const attendance = Array.isArray(arr) ? arr : [];
-        setAttendanceDateData(attendance); // for gauge
-        // For remote workers we still need today's attendance (punch in set)
+        const data = await getAttendanceByDateRange(selectedDate, selectedDate);
+        const attendance = Array.isArray(data) ? data : [];
+        setAttendanceDateData(attendance);
         setTodayAttendanceData(attendance);
 
-        const todayLeaves = leaveRequests.filter(l => l.status === "Approved" && selectedDate >= l.from && selectedDate <= l.to);
+        const todayLeaves = leaveRequests.filter(
+          l => l.status === "Approved" && selectedDate >= l.from && selectedDate <= l.to
+        );
+        
         const presentIds = new Set(attendance.filter(a => a.punchIn).map(a => a.employeeId));
         const leaveIds = new Set(todayLeaves.map(l => l.employeeId));
         const activeIds = new Set(activeEmployees.filter(e => e.isActive !== false).map(e => e.employeeId));
+        
         setTodayCounts({
           present: presentIds.size,
-          notLoggedIn: Array.from(activeIds).filter(id => !presentIds.has(id) && !leaveIds.has(id)).length,
+          absent: Array.from(activeIds).filter(id => !presentIds.has(id) && !leaveIds.has(id)).length,
           onLeave: todayLeaves.length
         });
-      } catch (e) { console.error(e); }
+      } catch (error) {
+        console.error("Error fetching attendance:", error);
+      }
     };
-    run();
+    fetchTodayAttendance();
   }, [activeEmployees, leaveRequests, selectedDate]);
 
-  /* ── 2. LEAVE ACTIVITY (same as before) ── */
+  // Fetch leave activity
   const fetchLeaveActivity = useCallback(async () => {
     setLoadingLeave(true);
     try {
@@ -302,6 +163,7 @@ const AdminDashboard = () => {
         if (e.employeeId) empMap.set(e.employeeId, e);
         if (e._id) empMap.set(e._id, e);
       });
+
       const enriched = leavesData.map(leave => {
         const emp = empMap.get(leave.employeeId);
         return {
@@ -310,27 +172,35 @@ const AdminDashboard = () => {
           department: emp?.experienceDetails?.[0]?.department || emp?.department || "N/A",
         };
       });
-      const sorted = [...enriched].sort((a, b) => {
-        const da = new Date(a.createdAt || a.appliedDate || a.from);
-        const db = new Date(b.createdAt || b.appliedDate || b.from);
-        return db - da;
-      }).slice(0, 5);
+
+      const sorted = [...enriched]
+        .sort((a, b) => new Date(b.createdAt || b.appliedDate || b.from) - new Date(a.createdAt || a.appliedDate || a.from))
+        .slice(0, 8);
+      
       setLeaveActivity(sorted);
 
       const imgs = {};
       for (const lv of sorted) {
         try {
           const res = await api.get(`/api/profile/${lv.employeeId}`);
-          if (res.data?.profilePhoto?.url) imgs[lv.employeeId] = getSecureUrl(res.data.profilePhoto.url);
-        } catch (_) { }
+          if (res.data?.profilePhoto?.url) {
+            imgs[lv.employeeId] = getSecureUrl(res.data.profilePhoto.url);
+          }
+        } catch (_) {}
       }
       setLeaveEmpImages(imgs);
-    } catch (e) { console.error(e); }
-    finally { setLoadingLeave(false); }
+    } catch (error) {
+      console.error("Error fetching leave activity:", error);
+    } finally {
+      setLoadingLeave(false);
+    }
   }, []);
 
-  useEffect(() => { fetchLeaveActivity(); }, [fetchLeaveActivity]);
+  useEffect(() => {
+    fetchLeaveActivity();
+  }, [fetchLeaveActivity]);
 
+  // Handle leave actions
   const handleLeaveAction = async (id, action) => {
     const isApprove = action === "approve";
     const result = await Swal.fire({
@@ -341,17 +211,46 @@ const AdminDashboard = () => {
       confirmButtonColor: isApprove ? "#10B981" : "#EF4444",
       cancelButtonColor: "#6B7280",
       confirmButtonText: isApprove ? "Yes, Approve" : "Yes, Reject",
+      background: "rgba(255,255,255,0.95)",
+      backdrop: "rgba(0,0,0,0.4)"
     });
+
     if (!result.isConfirmed) return;
+
     try {
-      Swal.fire({ title: "Processing…", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      if (isApprove) await approveLeaveRequestById(id); else await rejectLeaveRequestById(id);
+      Swal.fire({
+        title: "Processing...",
+        allowOutsideClick: false,
+        background: "rgba(255,255,255,0.95)",
+        didOpen: () => Swal.showLoading()
+      });
+
+      if (isApprove) {
+        await approveLeaveRequestById(id);
+      } else {
+        await rejectLeaveRequestById(id);
+      }
+
       await fetchLeaveActivity();
-      Swal.fire("Done!", `Leave ${action}d successfully.`, "success");
-    } catch (_) { Swal.fire("Error!", "Failed. Please try again.", "error"); }
+      Swal.fire({
+        title: "Done!",
+        text: `Leave ${action}d successfully.`,
+        icon: "success",
+        background: "rgba(255,255,255,0.95)",
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (_) {
+      Swal.fire({
+        title: "Error!",
+        text: "Failed. Please try again.",
+        icon: "error",
+        background: "rgba(255,255,255,0.95)"
+      });
+    }
   };
 
-  /* ── 3. TEAM DATA (remote & birthdays) ── */
+  // Fetch team data
   const fetchTeamData = useCallback(async () => {
     setLoadingTeamData(true);
     try {
@@ -360,75 +259,102 @@ const AdminDashboard = () => {
         api.get("/api/admin/settings/office"),
         api.get("/api/admin/settings/employees-modes")
       ]);
+
       const allEmp = empRes.data || [];
       const cfg = cfgRes.data;
       const empModes = modesRes.data?.employees || [];
       setIsGlobalWFH(cfg?.globalWorkMode === "WFH");
 
-      const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
-      const curMonth = todayDate.getMonth(); const curDay = todayDate.getDate();
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      const currentMonth = todayDate.getMonth();
+      const currentDay = todayDate.getDate();
 
-      // Birthdays
-      setMonthlyBirthdays(
-        allEmp.filter(e => e.isActive !== false && e.personalDetails?.dob).map(e => {
+      // Calculate birthdays
+      const birthdays = allEmp
+        .filter(e => e.isActive !== false && e.personalDetails?.dob)
+        .map(e => {
           const dob = new Date(e.personalDetails.dob);
-          return { name: e.name, employeeId: e.employeeId, department: e.department || e.experienceDetails?.[0]?.department || "N/A", dobDay: dob.getDate(), dobMonth: dob.getMonth() };
-        }).filter(e => e.dobMonth === curMonth && e.dobDay >= curDay).sort((a, b) => a.dobDay - b.dobDay)
-      );
+          return {
+            name: e.name,
+            employeeId: e.employeeId,
+            department: e.department || e.experienceDetails?.[0]?.department || "N/A",
+            dobDay: dob.getDate(),
+            dobMonth: dob.getMonth()
+          };
+        })
+        .filter(e => e.dobMonth === currentMonth && e.dobDay >= currentDay)
+        .sort((a, b) => a.dobDay - b.dobDay)
+        .slice(0, 4);
 
-      // Remote workers
-      const empMap = new Map(); allEmp.forEach(e => empMap.set(e.employeeId, e));
+      setMonthlyBirthdays(birthdays);
+
+      // Calculate remote workers
+      const empMap = new Map();
+      allEmp.forEach(e => empMap.set(e.employeeId, e));
+      
       const globalMode = cfg?.globalWorkMode || "WFO";
       const weekday = new Date().getDay();
-      const remList = [];
+      const remoteList = [];
+
       if (globalMode === "WFH") {
         allEmp.filter(e => e.isActive !== false).forEach(e =>
-          remList.push({ name: e.name, employeeId: e.employeeId, department: e.department || e.experienceDetails?.[0]?.department || "N/A" })
+          remoteList.push({
+            name: e.name,
+            employeeId: e.employeeId,
+            department: e.department || e.experienceDetails?.[0]?.department || "N/A"
+          })
         );
       } else {
         empModes.forEach(em => {
-          const base = empMap.get(em.employeeId); if (!base) return;
+          const base = empMap.get(em.employeeId);
+          if (!base) return;
+
           let mode = globalMode;
-          if (em.ruleType === "Permanent") { mode = em.config.permanentMode; }
-          else if (em.ruleType === "Temporary" && em.config.temporary) {
-            const f = new Date(em.config.temporary.fromDate); f.setHours(0,0,0,0);
-            const t = new Date(em.config.temporary.toDate); t.setHours(23,59,59,999);
-            if (todayDate >= f && todayDate <= t) mode = em.config.temporary.mode;
+          if (em.ruleType === "Permanent") {
+            mode = em.config.permanentMode;
+          } else if (em.ruleType === "Temporary" && em.config.temporary) {
+            const fromDate = new Date(em.config.temporary.fromDate);
+            const toDate = new Date(em.config.temporary.toDate);
+            fromDate.setHours(0, 0, 0, 0);
+            toDate.setHours(23, 59, 59, 999);
+            if (todayDate >= fromDate && todayDate <= toDate) {
+              mode = em.config.temporary.mode;
+            }
           } else if (em.ruleType === "Recurring" && em.config.recurring?.days?.includes(weekday)) {
             mode = em.config.recurring.mode;
           }
-          if (mode === "WFH") remList.push({ name: base.name, employeeId: em.employeeId, department: base.department || base.experienceDetails?.[0]?.department || "N/A" });
+
+          if (mode === "WFH") {
+            remoteList.push({
+              name: base.name,
+              employeeId: em.employeeId,
+              department: base.department || base.experienceDetails?.[0]?.department || "N/A"
+            });
+          }
         });
       }
-      const punchedIn = new Set(todayAttendanceData.filter(a => a.punchIn).map(a => a.employeeId));
-      setRemoteWorkers(remList.filter(w => punchedIn.has(w.employeeId)));
-    } catch (e) { console.error(e); }
-    finally { setLoadingTeamData(false); }
+
+      const punchedInIds = new Set(todayAttendanceData.filter(a => a.punchIn).map(a => a.employeeId));
+      setRemoteWorkers(remoteList.filter(w => punchedInIds.has(w.employeeId)));
+    } catch (error) {
+      console.error("Error fetching team data:", error);
+    } finally {
+      setLoadingTeamData(false);
+    }
   }, [todayAttendanceData]);
 
-  useEffect(() => { fetchTeamData(); }, [fetchTeamData]);
+  useEffect(() => {
+    fetchTeamData();
+  }, [fetchTeamData]);
 
-  /* ── 4. Today attendance data for gauge (based on selectedDate) already in attendanceDateData ── */
-  // Prepare data for gauge based on selectedDate
-  const filteredEmployeesForGauge = useMemo(() => {
-    // employees active
-    return activeEmployees.filter(e => e.isActive !== false);
-  }, [activeEmployees]);
-
-  const presentCountForSelectedDate = useMemo(() => {
-    const ids = new Set(attendanceDateData.filter(a => a.punchIn).map(a => a.employeeId));
-    return ids.size;
-  }, [attendanceDateData]);
-
-  const totalActiveForSelectedDate = filteredEmployeesForGauge.length;
-  const absentCountForSelectedDate = totalActiveForSelectedDate - presentCountForSelectedDate;
-
-  /* date navigation */
+  // Date navigation handlers
   const handlePrevDay = () => {
     const prev = new Date(selectedDate);
     prev.setDate(prev.getDate() - 1);
     setSelectedDate(prev.toISOString().split('T')[0]);
   };
+
   const handleNextDay = () => {
     const next = new Date(selectedDate);
     next.setDate(next.getDate() + 1);
@@ -437,239 +363,340 @@ const AdminDashboard = () => {
       setSelectedDate(next.toISOString().split('T')[0]);
     }
   };
+
   const handleToday = () => {
     setSelectedDate(new Date().toISOString().split('T')[0]);
   };
 
+  // Department data for donut
   const departmentData = useMemo(() => {
-    const c = {};
-    activeEmployees.forEach(e => { const d = e.department || "Unassigned"; c[d] = (c[d] || 0) + 1; });
-    return Object.entries(c).map(([name, employees]) => ({ name, employees }));
+    const counts = {};
+    activeEmployees.forEach(e => {
+      const dept = e.department || "Unassigned";
+      counts[dept] = (counts[dept] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, employees]) => ({ name, employees }));
   }, [activeEmployees]);
 
   const totalActive = statCards.totalEmployees || 0;
 
+  // Quick actions
   const quickActions = [
-    { title: "Employee Management",  icon: <FaUsers />,         to: "/employees",               color: "linear-gradient(135deg,#5b8aff,#3a63e8)" },
-    { title: "Group Management",     icon: <FaLayerGroup />,    to: "/admin/groups",            color: "linear-gradient(135deg,#9c6dff,#6e3fe8)" },
-    { title: "Employees Attendance", icon: <FaUserClock />,     to: "/attendance",              color: "linear-gradient(135deg,#43c99e,#1e9e72)" },
-    { title: "Leave Approvals",      icon: <FaCalendarCheck />, to: "/admin/admin-Leavemanage", color: "linear-gradient(135deg,#ffb74d,#f57c00)" },
-    { title: "Payroll",              icon: <FaFileAlt />,       to: "/admin/payroll",           color: "linear-gradient(135deg,#f06060,#c0392b)" },
-    { title: "Announcements",        icon: <FaBullhorn />,      to: "/admin/notices",           color: "linear-gradient(135deg,#5b8aff,#3a4eb8)" },
-    { title: "Holiday Calendar",     icon: <FaCalendarAlt />,   to: "/admin/holiday-calendar",  color: "linear-gradient(135deg,#43c99e,#1a7a5e)" },
-    { title: "Shift Management",     icon: <FaChartPie />,      to: "/admin/settings",          color: "linear-gradient(135deg,#ff6b9d,#c0396d)" },
+    { title: "Employee Management", icon: <FaUsers />, to: "/employees", color: "#FFB347" },
+    { title: "Group Management", icon: <FaLayerGroup />, to: "/admin/groups", color: "#4ECDC4" },
+    { title: "Employees Attendance", icon: <FaUserClock />, to: "/attendance", color: "#FF6B6B" },
+    { title: "Leave Approvals", icon: <FaCalendarCheck />, to: "/admin/admin-Leavemanage", color: "#FFB347" },
+    { title: "Payroll", icon: <FaFileAlt />, to: "/admin/payroll", color: "#4ECDC4" },
+    { title: "Announcements", icon: <FaBullhorn />, to: "/admin/notices", color: "#FF6B6B" },
+    { title: "Holiday Calendar", icon: <FaCalendarAlt />, to: "/admin/holiday-calendar", color: "#FFB347" },
+    { title: "Shift Management", icon: <FaChartPie />, to: "/admin/settings", color: "#4ECDC4" },
   ];
 
-  /* ═══ RENDER ═══ */
+  // Format date for display
+  const formatDisplayDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const displayedLeaveActivity = showAllLeave ? leaveActivity : leaveActivity.slice(0, 4);
+
   return (
-    <div className="adm">
-      <GlobalStyle />
+    <div className="min-h-screen p-6 font-nunito" style={{
+      background: 'linear-gradient(145deg, #667eea 0%, #764ba2 50%, #6b8cff 100%)'
+    }}>
+      {/* Dashboard Title */}
+      <h1 className="text-3xl font-extrabold text-white mb-6 drop-shadow-lg">Dashboard Overview!</h1>
 
-      <div className="adm-h1">Dashboard Overview!</div>
+      {/* Top Section: Today Attendance Report + Stats Cards in 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
 
-      {/* ── STAT CARDS (exactly as image) ── */}
-      <div className="stat-row">
-        <div className="g sc" onClick={() => navigate("/employees")}>
-          <div><div className="sc-num">{statCards.totalEmployees}</div><div className="sc-lbl">Total Employees</div></div>
-          <div className="sc-icon" style={{ background: "rgba(91,138,255,0.14)" }}><FaUsers style={{ color: "#5b8aff" }} /></div>
-        </div>
-        <div className="g sc" onClick={() => navigate("/admin/today-overview")}>
-          <div><div className="sc-num">{todayCounts.present}</div><div className="sc-lbl">Present today</div></div>
-          <div className="sc-icon" style={{ background: "rgba(67,201,158,0.14)" }}><FaUserClock style={{ color: "#43c99e" }} /></div>
-        </div>
-        <div className="g sc" onClick={() => navigate("/admin/today-overview")}>
-          <div><div className="sc-num">{todayCounts.notLoggedIn}</div><div className="sc-lbl">Absent today</div></div>
-          <div className="sc-icon" style={{ background: "rgba(240,96,96,0.14)" }}><FaUmbrellaBeach style={{ color: "#f06060" }} /></div>
-        </div>
-        <div className="g sc" onClick={() => navigate("/admin/admin-Leavemanage", { state: { defaultStatus: "Pending" } })}>
-          <div><div className="sc-num">{statCards.pendingLeaves}</div><div className="sc-lbl">Leave requests</div></div>
-          <div className="sc-icon" style={{ background: "rgba(156,109,255,0.14)" }}><FaClipboardList style={{ color: "#9c6dff" }} /></div>
-        </div>
-      </div>
 
-      {/* ── MAIN 2-COL ── */}
-      <div className="mg">
-
-        {/* LEFT COLUMN */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-
-          {/* Employee Departments (donut) */}
-          <div className="g cp">
-            <div className="sec-t">Employee Departments</div>
-            <div className="dept-bar-wrap">
-              <DonutChart data={departmentData} total={totalActive} />
-              <div style={{ flex: 1 }}>
-                {departmentData.map((dept, i) => {
-                  const pct = totalActive > 0 ? Math.round((dept.employees / totalActive) * 100) : 0;
-                  return (
-                    <div key={i} style={{ marginBottom: 10 }}>
-                      <div className="dept-pct-row"><span>{dept.name}</span><span>{pct}%</span></div>
-                      <div className="dept-bar" style={{ background: DCOLS[i % DCOLS.length], width: `${Math.max(pct, 8)}%`, minWidth: 60 }}>
-                        {dept.name}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Stats Cards - 2x2 Grid on Right side */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Total Employees */}
+          <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-5 flex items-center justify-between cursor-pointer hover:bg-white/30 transition-all hover:-translate-y-1" onClick={() => navigate("/employees")}>
+            <div>
+              <h3 className="text-3xl font-extrabold text-white drop-shadow-md">{statCards.totalEmployees}</h3>
+              <p className="text-sm font-semibold text-white/90">Total Employees</p>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-white/30 flex items-center justify-center text-white text-3xl">
+              <FaUsers />
             </div>
           </div>
 
-          {/* Leave Activity */}
-          <div className="g cp">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div className="sec-t" style={{ margin: 0 }}>Leave requests</div>
-              <button className="view-all-btn" onClick={() => navigate("/admin/admin-Leavemanage")}>View all</button>
+          {/* Present today */}
+          <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-5 flex items-center justify-between cursor-pointer hover:bg-white/30 transition-all hover:-translate-y-1" onClick={() => navigate("/admin/today-overview")}>
+            <div>
+              <h3 className="text-3xl font-extrabold text-white drop-shadow-md">{todayCounts.present}</h3>
+              <p className="text-sm font-semibold text-white/90">Present today</p>
             </div>
+            <div className="w-14 h-14 rounded-xl bg-white/30 flex items-center justify-center text-white text-3xl">
+              <FaUserClock />
+            </div>
+          </div>
 
-            {loadingLeave ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}><div className="spin" /></div>
-            ) : leaveActivity.length === 0 ? (
-              <div className="empty-msg">No recent leave activity</div>
-            ) : (
-              leaveActivity.map((lv, i) => {
-                const img = leaveEmpImages[lv.employeeId];
+          {/* Absent today */}
+          <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-5 flex items-center justify-between cursor-pointer hover:bg-white/30 transition-all hover:-translate-y-1" onClick={() => navigate("/admin/today-overview")}>
+            <div>
+              <h3 className="text-3xl font-extrabold text-white drop-shadow-md">{todayCounts.absent}</h3>
+              <p className="text-sm font-semibold text-white/90">Absent today</p>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-white/30 flex items-center justify-center text-white text-3xl">
+              <FaUmbrellaBeach />
+            </div>
+          </div>
+
+          {/* Leave requests */}
+          <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-5 flex items-center justify-between cursor-pointer hover:bg-white/30 transition-all hover:-translate-y-1" onClick={() => navigate("/admin/admin-Leavemanage")}>
+            <div>
+              <h3 className="text-3xl font-extrabold text-white drop-shadow-md">{statCards.pendingLeaves}</h3>
+              <p className="text-sm font-semibold text-white/90">Leave requests</p>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-white/30 flex items-center justify-center text-white text-3xl">
+              <FaClipboardList />
+            </div>
+          </div>
+        </div>
+        <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-extrabold text-white drop-shadow-md">Today Attendance Report</h2>
+            <div className="flex items-center gap-2 bg-white/20 rounded-full p-1">
+              <button className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center hover:bg-white/40 transition" onClick={handlePrevDay}>
+                <FaChevronLeft size={12} />
+              </button>
+              <span className="text-sm font-bold text-white min-w-[80px] text-center">{formatDisplayDate(selectedDate)}</span>
+              <button 
+                className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center hover:bg-white/40 transition disabled:opacity-30 disabled:cursor-not-allowed" 
+                onClick={handleNextDay}
+                disabled={selectedDate === new Date().toISOString().split('T')[0]}
+              >
+                <FaChevronRight size={12} />
+              </button>
+              <button className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center hover:bg-white/40 transition" onClick={handleToday}>
+                <FaSyncAlt size={12} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8">
+            <GaugeChart 
+              present={todayCounts.present} 
+              total={Math.max(activeEmployees.filter(e => e.isActive !== false).length, 1)} 
+            />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-white"></div>
+                <span className="text-sm font-semibold text-white/90">
+                  Present: <span className="font-extrabold text-white ml-1">{todayCounts.present}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-white/40"></div>
+                <span className="text-sm font-semibold text-white/90">
+                  Absent: <span className="font-extrabold text-white ml-1">{todayCounts.absent}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    
+
+
+        
+      </div>
+
+      {/* Two Column Layout - Employee Departments and Leave requests (half screen each) */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        {/* Employee Departments */}
+        <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-extrabold text-white drop-shadow-md">Employee Departments</h2>
+          </div>
+          <div className="flex items-center gap-6">
+            <DonutChart data={departmentData} total={totalActive} />
+            <div className="flex-1 space-y-4">
+              {departmentData.map((dept, index) => {
+                const percentage = totalActive > 0 ? Math.round((dept.employees / totalActive) * 100) : 0;
                 return (
-                  <div key={lv._id || i} className="lv-row">
-                    <div className="lv-av" style={{ background: AV[i % AV.length] }}>
-                      {img ? <img src={img} alt={lv.employeeName} /> : (lv.employeeName || "?").charAt(0).toUpperCase()}
+                  <div key={index} className="space-y-1">
+                    <div className="flex justify-between text-xs font-bold text-white/90">
+                      <span>{dept.name}</span>
+                      <span>{percentage}%</span>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="lv-name">{lv.employeeName}</div>
-                      <div className="lv-sub">{lv.leaveType || "Leave"} · {lv.department} · {lv.from} → {lv.to}</div>
-                    </div>
-                    <span className={badgeClass(lv.status)}>{lv.status}</span>
-                    <div className="lv-actions">
-                      <button className="btn-ap" title="Approve" onClick={() => handleLeaveAction(lv._id, "approve")}><FaCheck size={10} /></button>
-                      <button className="btn-rj" title="Reject" onClick={() => handleLeaveAction(lv._id, "reject")}><FaTimes size={10} /></button>
+                    <div className="h-9 rounded-full bg-white/25 flex items-center pl-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 h-full bg-white/40 rounded-full" style={{ width: `${percentage}%` }}></div>
+                      <span className="relative z-10 text-white text-xs font-bold drop-shadow-md">{dept.name}</span>
                     </div>
                   </div>
                 );
-              })
-            )}
+              })}
+            </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN */}
-        <div className="rc">
-
-          {/* TODAY Attendance Report (Gauge) */}
-          <div className="g cp">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>
-                <span style={{ color: "#4060c0" }}>Today </span>
-                <span style={{ color: "#101830" }}>Attendance Report</span>
-              </div>
-              {/* Date filter exactly as image: Today/Yesterday picker */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button className="gnav-btn" onClick={handlePrevDay}><FaChevronLeft size={10} /></button>
-                <span className="gnav-label">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                <button className="gnav-btn" onClick={handleNextDay} disabled={selectedDate === new Date().toISOString().split('T')[0]}><FaChevronRight size={10} /></button>
-                <button className="gnav-btn" onClick={handleToday}><FaSyncAlt size={10} /></button>
-              </div>
-            </div>
-
-            <div className="gauge-area">
-              <GaugeChart present={presentCountForSelectedDate} total={Math.max(totalActiveForSelectedDate, 1)} />
-              <div style={{ paddingBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", marginBottom: 7 }}>
-                  <span className="gauge-legend-dot" style={{ background: "#192f7a" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#5a6a90" }}>Present: <b style={{ color: "#101830" }}>{presentCountForSelectedDate}</b></span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <span className="gauge-legend-dot" style={{ background: "#d4e2f9" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#5a6a90" }}>Absent: <b style={{ color: "#101830" }}>{absentCountForSelectedDate}</b></span>
-                </div>
-              </div>
-            </div>
+        {/* Leave requests */}
+        <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-extrabold text-white drop-shadow-md">Leave requests</h2>
+            <span className="text-xs font-semibold text-white/80 bg-white/20 px-3 py-1.5 rounded-full cursor-pointer hover:bg-white/30 transition" onClick={() => navigate("/admin/admin-Leavemanage")}>
+              View all
+            </span>
           </div>
 
-          {/* Working Remotely */}
-          <div className="g cp">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <FaWifi style={{ color: "#43c99e", fontSize: 15 }} />
-                <div className="sec-t" style={{ margin: 0 }}>Working remotely</div>
-              </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {isGlobalWFH && (
-                  <span style={{ background: "rgba(67,201,158,0.18)", color: "#047857", fontSize: 10, fontWeight: 800, padding: "2px 9px", borderRadius: 20 }}>Global</span>
-                )}
-                <span style={{ background: "rgba(67,201,158,0.18)", color: "#047857", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20 }}>{remoteWorkers.length}</span>
-              </div>
+          {loadingLeave ? (
+            <div className="flex justify-center py-5">
+              <div className="w-8 h-8 rounded-full border-3 border-white/30 border-t-white animate-spin"></div>
             </div>
-
-            {loadingTeamData ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}><div className="spin" /></div>
-            ) : remoteWorkers.length === 0 ? (
-              <div className="empty-msg">No employees working remotely today</div>
-            ) : (
-              <>
-                {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 4)).map((w, i) => (
-                  <div key={w.employeeId} className="rw-card">
-                    <div className="rw-av" style={{ background: AV[i % AV.length] }}>
-                      {w.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="rw-name">{w.name}</div>
-                      <div className="rw-sub">{w.employeeId} · {w.department}</div>
-                    </div>
+          ) : displayedLeaveActivity.length === 0 ? (
+            <div className="text-center py-5 text-white/60 text-sm font-semibold">No recent leave requests</div>
+          ) : (
+            <div className="space-y-3">
+              {displayedLeaveActivity.map((leave, index) => (
+                <div key={leave._id || index} className="flex items-center gap-3 pb-3 border-b border-white/15 last:border-0 last:pb-0">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-300 to-pink-400 flex items-center justify-center text-white font-bold text-base flex-shrink-0 overflow-hidden">
+                    {leaveEmpImages[leave.employeeId] ? (
+                      <img src={leaveEmpImages[leave.employeeId]} alt={leave.employeeName} className="w-full h-full object-cover" />
+                    ) : (
+                      (leave.employeeName || "U").charAt(0).toUpperCase()
+                    )}
                   </div>
-                ))}
-                {remoteWorkers.length > 4 && (
-                  <button className="show-more-btn" onClick={() => setShowAllRemote(v => !v)}>
-                    {showAllRemote ? "Show less" : `Show all (${remoteWorkers.length})`}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Upcoming Birthdays */}
-          <div className="g cp">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🎂</span>
-                <div className="sec-t" style={{ margin: 0 }}>Upcoming Birthday's</div>
-              </div>
-              <span style={{ background: "rgba(255,180,60,0.18)", color: "#b45309", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, cursor: "pointer" }}>
-                Wish All
-              </span>
-            </div>
-            {loadingTeamData ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}><div className="spin" /></div>
-            ) : monthlyBirthdays.length === 0 ? (
-              <div className="empty-msg">No upcoming birthdays this month</div>
-            ) : (
-              monthlyBirthdays.slice(0, 4).map((p, i) => (
-                <div key={i} className="bd-row">
-                  <div className="bd-av">{p.name.charAt(0).toUpperCase()}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#101830" }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: "#8090b0", fontWeight: 600 }}>{p.department} · {p.dobDay}/{p.dobMonth + 1}</div>
+                  <div className="flex-1">
+                    <div className="text-sm font-extrabold text-white">{leave.employeeName}</div>
+                    <div className="text-xs font-semibold text-white/70">{leave.department} • {leave.from} → {leave.to}</div>
+                  </div>
+                  <div className="text-xs font-bold text-white bg-white/20 px-2.5 py-1 rounded-full">{leave.leaveType || "SICK LEAVE"}</div>
+                  <div className="flex gap-1.5">
+                    <button className="w-7 h-7 rounded-lg bg-green-500/30 text-white flex items-center justify-center hover:bg-green-500/50 transition" title="Approve" onClick={() => handleLeaveAction(leave._id, "approve")}>
+                      <FaCheck size={10} />
+                    </button>
+                    <button className="w-7 h-7 rounded-lg bg-red-500/30 text-white flex items-center justify-center hover:bg-red-500/50 transition" title="Reject" onClick={() => handleLeaveAction(leave._id, "reject")}>
+                      <FaTimes size={10} />
+                    </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+              {leaveActivity.length > 4 && (
+                <button className="w-full py-2 rounded-full border border-white/30 bg-white/15 text-white text-xs font-bold hover:bg-white/25 transition mt-2" onClick={() => setShowAllLeave(!showAllLeave)}>
+                  {showAllLeave ? "Show less" : `Show all (${leaveActivity.length})`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── QUICK ACTIONS ── */}
-      <div className="g" style={{ marginTop: 22, padding: "22px 24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#5b8aff,#3a63e8)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+      {/* Right side components - Working Remotely and Upcoming Birthdays */}
+      <div className="grid grid-cols-2 gap-4 mb-6"> 
+        {/* Working Remotely */}
+        <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-extrabold text-white drop-shadow-md">Working remotely</h2>
+            <span className="text-xs font-bold text-white bg-green-500/30 px-3 py-1.5 rounded-full">{remoteWorkers.length}</span>
+          </div>
+
+          {loadingTeamData ? (
+            <div className="flex justify-center py-5">
+              <div className="w-8 h-8 rounded-full border-3 border-white/30 border-t-white animate-spin"></div>
+            </div>
+          ) : remoteWorkers.length === 0 ? (
+            <div className="text-center py-5 text-white/60 text-sm font-semibold">No employees working remotely today</div>
+          ) : (
+            <div className="space-y-3">
+              {(showAllRemote ? remoteWorkers : remoteWorkers.slice(0, 4)).map((worker, index) => (
+                <div key={worker.employeeId} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/15">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-base">
+                    {worker.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white">{worker.name}</h4>
+                    <p className="text-xs font-semibold text-white/70">{worker.employeeId} · {worker.department}</p>
+                  </div>
+                </div>
+              ))}
+              {remoteWorkers.length > 4 && (
+                <button className="w-full py-2 rounded-full border border-white/30 bg-white/15 text-white text-xs font-bold hover:bg-white/25 transition mt-2" onClick={() => setShowAllRemote(!showAllRemote)}>
+                  {showAllRemote ? "Show less" : `Show all (${remoteWorkers.length})`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming Birthdays */}
+        <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-extrabold text-white drop-shadow-md">Upcoming Birthday's</h2>
+            <button className="text-xs font-bold text-white bg-yellow-500/30 px-3 py-1.5 rounded-full hover:bg-yellow-500/40 transition flex items-center gap-1">
+              <FaGift size={12} />
+              Wish All
+            </button>
+          </div>
+
+          {loadingTeamData ? (
+            <div className="flex justify-center py-5">
+              <div className="w-8 h-8 rounded-full border-3 border-white/30 border-t-white animate-spin"></div>
+            </div>
+          ) : monthlyBirthdays.length === 0 ? (
+            <div className="text-center py-5 text-white/60 text-sm font-semibold">No upcoming birthdays this month</div>
+          ) : (
+            <div className="space-y-3">
+              {monthlyBirthdays.map((bday, index) => (
+                <div key={index} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/15">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-300 to-pink-400 flex items-center justify-center text-white font-bold text-base">
+                    {bday.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white">{bday.name}</h4>
+                    <p className="text-xs font-semibold text-white/70">{bday.department} · {bday.dobDay}/{bday.dobMonth + 1}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chando Connect Section */}
+      <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6 flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white text-2xl">
+            <FaHeart />
+          </div>
+          <div>
+            <h3 className="text-xl font-extrabold text-white">Chando</h3>
+            <p className="text-sm font-semibold text-white/80">Connect with team members</p>
+          </div>
+        </div>
+        <div className="flex gap-4">
+          <button className="px-7 py-3 rounded-full border-2 border-white/50 bg-white/20 text-white font-bold text-sm hover:bg-white/30 transition hover:scale-105">
+            Connect
+          </button>
+          <button className="px-7 py-3 rounded-full border-2 border-white/50 bg-white/30 text-white font-bold text-sm hover:bg-white/40 transition hover:scale-105">
+            Chando
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="backdrop-blur-xl bg-white/20 rounded-2xl border border-white/30 shadow-xl p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-11 h-11 rounded-xl bg-white/30 flex items-center justify-center text-white text-2xl">
             <FaConnectdevelop />
           </div>
-          <span style={{ fontSize: 18, fontWeight: 900, color: "#101830" }}>Quick Actions</span>
+          <h2 className="text-2xl font-extrabold text-white">Quick Actions</h2>
         </div>
-        <p style={{ fontSize: 12, color: "#7080a0", fontWeight: 600, margin: "6px 0 0 46px" }}>Navigate to frequently used admin sections</p>
-        <div className="qa-grid">
-          {quickActions.map((a, i) => (
-            <button key={i} className="qa-btn" onClick={() => navigate(a.to)}>
-              <div className="qa-icon" style={{ background: a.color }}>{a.icon}</div>
-              <span className="qa-lbl">{a.title}</span>
-              <FaAngleRight style={{ color: "#a0aac0", flexShrink: 0 }} />
-            </button>
+        <p className="text-sm text-white/80 ml-14 mb-4">Navigate to frequently used admin sections</p>
+
+        <div className="grid grid-cols-4 gap-3">
+          {quickActions.map((action, index) => (
+            <div key={index} className="flex items-center gap-3 p-4 rounded-xl bg-white/20 border border-white/30 cursor-pointer hover:bg-white/30 transition-all hover:-translate-y-1" onClick={() => navigate(action.to)}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-xl" style={{ background: `linear-gradient(135deg, ${action.color}, ${action.color}dd)` }}>
+                {action.icon}
+              </div>
+              <span className="text-sm font-bold text-white flex-1">{action.title}</span>
+              <FaAngleRight className="text-white/60 text-xs" />
+            </div>
           ))}
         </div>
       </div>
