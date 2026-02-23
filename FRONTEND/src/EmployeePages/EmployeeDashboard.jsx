@@ -480,7 +480,7 @@ useEffect(() => {
         loadAttendance(user.employeeId),
         loadShiftTimings(user.employeeId),
         loadProfilePic(),
-        loadRequestLimit(user.employeeId), // ✅ ADD THIS LINE
+        loadRequestLimit(user.employeeId), 
       ]);
       setLoading(false);
 
@@ -1355,7 +1355,7 @@ const gradients = [
                     <button onClick={() => setIsShiftDropdownOpen(!isShiftDropdownOpen)} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition-all text-sm font-semibold"> <FaRegClock /> Shift Details <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12} /> </button>
                     {isShiftDropdownOpen && (
                       <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-4 animate-fade-in-down">
-                        <h4 className="font-bold text-blue-800 border-b pb-2 mb-3">Admin Assigned Shift</h4>
+                        <h4 className="font-bold text-blue-800 border-b pb-2 mb-3">Assigned Shift</h4>
                         <div className="space-y-3 text-sm text-gray-700">
                           <div className="flex justify-between"><span>Start Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
                           <div className="flex justify-between"><span>End Time:</span> <span className="font-semibold">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>

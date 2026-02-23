@@ -18,7 +18,6 @@ const addDays = (date, days) => {
 };
 
 // Robust Date Formatter (YYYY-MM-DD)
-// Uses local time to ensure consistency with the loop generator
 const formatDate = (dateInput) => {
   if (!dateInput) return "";
   const d = new Date(dateInput);
@@ -41,39 +40,18 @@ const calculateLeaveDays = (from, to) => {
   return diffDays;
 };
 
-const getMonthsForYear = () => {
-  const year = new Date().getFullYear();
-  const options = [];
-  for (let i = 0; i < 12; i++) {
-    const month = String(i + 1).padStart(2, '0');
-    options.push(`${year}-${month}`);
-  }
-  return options;
-};
-
-const getCurrentMonth = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  return `${year}-${month}`;
-};
-
-const isDateInMonth = (dateStr, monthFilter) => {
-  if (!dateStr || !monthFilter || monthFilter === "All") return true;
+// New specific filter check logic
+const isDateInFilter = (dateStr, yearFilter, monthFilter) => {
+  if (!dateStr) return false;
   const date = new Date(dateStr);
-  const [year, month] = monthFilter.split("-");
-  return (
-    date.getFullYear() === parseInt(year) &&
-    date.getMonth() + 1 === parseInt(month)
-  );
-};
+  if (isNaN(date.getTime())) return false;
 
-const formatMonth = (monthStr) => {
-  if (!monthStr || monthStr === "All") return "All Months";
-  const [year, month] = monthStr.split("-");
-  return `${new Date(year, month - 1).toLocaleString("default", {
-    month: "long",
-  })} ${year}`;
+  const y = date.getFullYear().toString();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+
+  if (yearFilter === "All") return true;
+  if (yearFilter === y && monthFilter === "All") return true;
+  return yearFilter === y && monthFilter === m;
 };
 
 const formatDisplayDate = (dateStr) => {
@@ -85,11 +63,30 @@ const formatDisplayDate = (dateStr) => {
   });
 };
 
+const MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 const AdminLeaveSummary = () => {
   const [allRequests, setAllRequests] = useState([]);
   const [employeesMap, setEmployeesMap] = useState(new Map());
   const [holidays, setHolidays] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  
+  // NEW: Separated Year and Month state
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -102,12 +99,9 @@ const AdminLeaveSummary = () => {
   const [rawAttendance, setRawAttendance] = useState([]);
   const [shiftsMap, setShiftsMap] = useState({});
 
-  const allMonths = useMemo(() => getMonthsForYear(), []);
-
   const fetchHolidays = async () => {
     try {
       const data = await getHolidays();
-      // Only keep raw data, we will format inside the logic to ensure consistency
       setHolidays(data || []);
     } catch (err) {
       console.error("Error fetching holidays:", err);
@@ -119,7 +113,8 @@ const AdminLeaveSummary = () => {
       try {
         setIsLoading(true);
         const year = new Date().getFullYear();
-        const startOfYear = `${year}-01-01`;
+        // Fetch long range to ensure we have all past available data
+        const startOfYear = `${year - 10}-01-01`; 
         const todayStr = new Date().toISOString().split('T')[0];
 
         const [leaves, employees, attendanceData, shiftsData] = await Promise.all([
@@ -132,7 +127,6 @@ const AdminLeaveSummary = () => {
         setAllRequests(leaves);
         setRawAttendance(Array.isArray(attendanceData) ? attendanceData : []);
 
-        // Filter only active employees (isActive !== false)
         const activeEmployees = employees.filter(emp => emp.isActive !== false);
         
         const empMap = new Map(
@@ -163,6 +157,23 @@ const AdminLeaveSummary = () => {
     fetchAllData();
   }, []);
 
+  // Dynamically calculate which years actually have data
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    years.add(new Date().getFullYear()); // Always ensure current year is an option
+    
+    allRequests.forEach(req => {
+      if (req.from) years.add(new Date(req.from).getFullYear());
+      if (req.to) years.add(new Date(req.to).getFullYear());
+    });
+    
+    rawAttendance.forEach(att => {
+      if (att.date) years.add(new Date(att.date).getFullYear());
+    });
+    
+    return Array.from(years).sort((a, b) => b - a); // Sort descending
+  }, [allRequests, rawAttendance]);
+
   const enrichedRequests = useMemo(
     () =>
       allRequests.map((req) => ({
@@ -173,12 +184,11 @@ const AdminLeaveSummary = () => {
   );
 
   // --- CORE SANDWICH LOGIC ---
-  const calculateSandwichData = (combinedLeaves, monthFilter) => {
+  const calculateSandwichData = (combinedLeaves, yearFilter, monthFilter) => {
     const activeLeaves = combinedLeaves.filter(
       (leave) =>
-        (monthFilter === "All" ||
-          isDateInMonth(leave.from, monthFilter) ||
-          isDateInMonth(leave.to, monthFilter))
+        isDateInFilter(leave.from, yearFilter, monthFilter) ||
+        isDateInFilter(leave.to, yearFilter, monthFilter)
     );
 
     if (activeLeaves.length === 0 && holidays.length === 0) {
@@ -200,14 +210,11 @@ const AdminLeaveSummary = () => {
     let sandwichDays = 0;
     const sandwichDetails = [];
 
-    // Check Holiday Sandwiches using String Comparison
     holidays.forEach((holiday) => {
-      // Use formatDate to get string YYYY-MM-DD
       const hStartStr = formatDate(holiday.startDate);
       const hEndStr = formatDate(holiday.endDate || holiday.startDate);
 
-      // Check if holiday falls in selected month
-      if (monthFilter !== "All" && !isDateInMonth(hStartStr, monthFilter)) return;
+      if (!isDateInFilter(hStartStr, yearFilter, monthFilter)) return;
 
       const hStart = new Date(hStartStr);
       const hEnd = new Date(hEndStr);
@@ -228,14 +235,13 @@ const AdminLeaveSummary = () => {
       }
     });
 
-    // Check Weekend Sandwiches (Sat/Mon)
     for (const [dateStr, isFullDay] of bookedMap.entries()) {
       if (!isFullDay) continue;
 
       const d = new Date(dateStr);
-      if (monthFilter !== "All" && !isDateInMonth(dateStr, monthFilter)) continue;
+      if (!isDateInFilter(dateStr, yearFilter, monthFilter)) continue;
 
-      if (d.getDay() === 6) { // Saturday
+      if (d.getDay() === 6) { 
         const mondayStr = formatDate(addDays(d, 2));
         if (bookedMap.get(mondayStr) === true) {
           sandwichCount++;
@@ -265,7 +271,6 @@ const AdminLeaveSummary = () => {
       const shift = shiftsMap[empId] || { weeklyOffDays: [0] }; 
       const weeklyOffs = shift.weeklyOffDays || [0];
 
-      // Use Set of Strings for Punches
       const employeePunches = new Set(
         rawAttendance
           .filter(r => r.employeeId === empId && r.punchIn)
@@ -273,15 +278,21 @@ const AdminLeaveSummary = () => {
       );
 
       let loopStart, loopEnd;
-      const currentYear = new Date().getFullYear();
 
-      if (selectedMonth === "All") {
-          loopStart = new Date(currentYear, 0, 1);
+      if (selectedYear === "All") {
+          const minYear = availableYears.length > 0 ? Math.min(...availableYears) : new Date().getFullYear();
+          loopStart = new Date(minYear, 0, 1);
           loopEnd = new Date(); 
+      } else if (selectedMonth === "All") {
+          const y = parseInt(selectedYear);
+          loopStart = new Date(y, 0, 1);
+          loopEnd = new Date(y, 11, 31);
+          if (loopEnd > today) loopEnd = new Date();
       } else {
-          const [y, m] = selectedMonth.split('-');
-          loopStart = new Date(parseInt(y), parseInt(m) - 1, 1);
-          loopEnd = new Date(parseInt(y), parseInt(m), 0);
+          const y = parseInt(selectedYear);
+          const m = parseInt(selectedMonth);
+          loopStart = new Date(y, m - 1, 1);
+          loopEnd = new Date(y, m, 0); 
           if (loopEnd > today) loopEnd = new Date(); 
       }
 
@@ -297,22 +308,20 @@ const AdminLeaveSummary = () => {
           }
       });
 
-      // Loop through dates
       for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
-          const dateStr = formatDate(d); // YYYY-MM-DD
+          const dateStr = formatDate(d); 
           const dayOfWeek = d.getDay();
 
-          // ✅ FIXED HOLIDAY CHECK: String Comparison
           const isHol = holidays.some(h => {
              const startStr = formatDate(h.startDate);
              const endStr = formatDate(h.endDate || h.startDate);
              return dateStr >= startStr && dateStr <= endStr;
           });
 
-          if (isHol) continue; // It's a holiday, don't mark absent
-          if (weeklyOffs.includes(dayOfWeek)) continue; // Weekly off
-          if (employeePunches.has(dateStr)) continue; // Present
-          if (appliedLeaveDates.has(dateStr)) continue; // Applied Leave
+          if (isHol) continue; 
+          if (weeklyOffs.includes(dayOfWeek)) continue; 
+          if (employeePunches.has(dateStr)) continue; 
+          if (appliedLeaveDates.has(dateStr)) continue; 
 
           absents.push({
               _id: `absent-${empId}-${dateStr}`,
@@ -331,13 +340,9 @@ const AdminLeaveSummary = () => {
       
       const leavesInMonth = approvedLeavesOnly.filter(
           (leave) =>
-            selectedMonth === "All" ||
-            isDateInMonth(leave.from, selectedMonth) ||
-            isDateInMonth(leave.to, selectedMonth)
+            isDateInFilter(leave.from, selectedYear, selectedMonth) ||
+            isDateInFilter(leave.to, selectedYear, selectedMonth)
       );
-
-      // Combine for Sandwich Calculation
-      const combinedForStats = [...leavesInMonth, ...absents];
 
       const normalLeaveDays = leavesInMonth.reduce(
         (total, leave) => total + calculateLeaveDays(leave.from, leave.to),
@@ -346,12 +351,16 @@ const AdminLeaveSummary = () => {
 
       const absentDaysCount = absents.length;
       
-      // Calculate sandwich using mixed list (leaves + absents)
-      const sandwichData = calculateSandwichData([...approvedLeavesOnly, ...absents], selectedMonth);
+      const sandwichData = calculateSandwichData(
+        [...approvedLeavesOnly, ...absents], 
+        selectedYear, 
+        selectedMonth
+      );
 
       const totalConsumed = normalLeaveDays + absentDaysCount + sandwichData.days;
       
-      const monthlyCredit = 1;
+      // Basic credit logic, customize as needed
+      const monthlyCredit = (selectedMonth === "All" && selectedYear !== "All") ? 12 : 1; 
       const pendingLeaves = Math.max(0, monthlyCredit - totalConsumed);
       const extraLeaves = Math.max(0, totalConsumed - monthlyCredit);
 
@@ -370,7 +379,7 @@ const AdminLeaveSummary = () => {
         rawAbsents: absents 
       };
     });
-  }, [enrichedRequests, employeesMap, selectedMonth, holidays, rawAttendance, shiftsMap]);
+  }, [enrichedRequests, employeesMap, selectedYear, selectedMonth, holidays, rawAttendance, shiftsMap, availableYears]);
 
   const filteredEmployeeStats = useMemo(() => {
     let filtered = [...employeeStats];
@@ -448,9 +457,8 @@ const AdminLeaveSummary = () => {
 
     const leaves = empStats.rawLeaves.filter(
         (req) =>
-          selectedMonth === "All" ||
-          isDateInMonth(req.from, selectedMonth) ||
-          isDateInMonth(req.to, selectedMonth)
+          isDateInFilter(req.from, selectedYear, selectedMonth) ||
+          isDateInFilter(req.to, selectedYear, selectedMonth)
     );
     
     const mergedHistory = [...leaves, ...empStats.rawAbsents].sort(
@@ -526,36 +534,62 @@ const AdminLeaveSummary = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📅 Filter by Month
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
-              >
-                <option value="All">All Months</option>
-                {allMonths.map((m) => (
-                  <option key={m} value={m}>
-                    {formatMonth(m)}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  📅 Select Year
+                </label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
+                >
+                  <option value="All">All Years</option>
+                  {availableYears.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  🗓️ Select Month
+                </label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  disabled={selectedYear === "All"}
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200 disabled:opacity-50 disabled:bg-gray-100"
+                >
+                  <option value="All">All Months</option>
+                  {MONTH_OPTIONS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          {(searchQuery || selectedMonth !== "All") && (
+          {(searchQuery || selectedYear !== "All" || selectedMonth !== "All") && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-gray-600">
                 Showing {filteredEmployeeStats.length} active employee
                 {filteredEmployeeStats.length !== 1 ? "s" : ""}
-                {selectedMonth !== "All" &&
-                  ` for ${formatMonth(selectedMonth)}`}
+                {(selectedYear !== "All" || selectedMonth !== "All") &&
+                  ` for ${
+                    selectedMonth !== "All" 
+                      ? MONTH_OPTIONS.find(m => m.value === selectedMonth)?.label + " " 
+                      : ""
+                  }${selectedYear !== "All" ? selectedYear : ""}`}
               </p>
               <button
                 onClick={() => {
                   setSearchQuery("");
+                  setSelectedYear("All");
                   setSelectedMonth("All");
                   setSortConfig({ key: null, direction: "asc" });
                 }}
@@ -842,7 +876,7 @@ const AdminLeaveSummary = () => {
                                     </span>
                                     {isAbsentRecord ? (
                                         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
-                                            ABSENT (No Punch)
+                                            ABSENT (Uninformed Leave)
                                         </span>
                                     ) : (
                                         <span

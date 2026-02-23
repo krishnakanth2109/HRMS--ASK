@@ -152,6 +152,11 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
     return () => { document.removeEventListener("mousedown", handleClickOutside); };
   }, []);
 
+  // ✅ FORCING GMAIL BROWSER COMPOSER INSTEAD OF MAILTO:
+  const mailSubject = encodeURIComponent("Notice From HRMS");
+  const mailBody = encodeURIComponent(`Hi ${emp.name},\n\n`);
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emp.email}&su=${mailSubject}&body=${mailBody}`;
+
   return (
     <tr className={`border-t transition duration-150 ${isEven ? "bg-gray-50" : "bg-white"} hover:bg-blue-50`}>
       <td className="p-4 align-middle text-left font-mono font-semibold text-blue-700 text-sm pl-6">
@@ -192,7 +197,15 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
       </td>
 
       <td className="p-4 align-middle text-left text-gray-600 text-sm">
-        {emp.email}
+        {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
+        <a 
+          href={gmailComposeUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="hover:text-blue-700 hover:underline"
+        >
+          {emp.email}
+        </a>
       </td>
 
       <td className="p-4 align-middle text-center">
@@ -234,6 +247,11 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
     return () => { document.removeEventListener("mousedown", handleClickOutside); };
   }, []);
 
+  // ✅ FORCING GMAIL BROWSER COMPOSER INSTEAD OF MAILTO:
+  const mailSubject = encodeURIComponent("Notice From HRMS");
+  const mailBody = encodeURIComponent(`Hi ${emp.name},\n\n`);
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emp.email}&su=${mailSubject}&body=${mailBody}`;
+
   return (
     <tr className="border-t transition duration-150 bg-gray-100 opacity-60 hover:opacity-100 hover:bg-gray-200">
       <td className="p-4 align-middle text-left pl-6 font-mono font-semibold text-gray-500 text-sm">{emp.employeeId}</td>
@@ -274,7 +292,17 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
         </span>
       </td>
 
-      <td className="p-4 align-middle text-left text-gray-500 text-sm line-through decoration-red-500">{emp.email}</td>
+      <td className="p-4 align-middle text-left text-gray-500 text-sm line-through decoration-red-500">
+        {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
+        <a 
+          href={gmailComposeUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="hover:text-blue-700 hover:underline"
+        >
+          {emp.email}
+        </a>
+      </td>
 
       <td className="p-4 align-middle text-center">
         <div className="relative inline-block text-left" ref={menuRef}>
@@ -306,7 +334,6 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
 
-  // ✅ Reset form fields when modal opens
   useEffect(() => {
     if (open) {
       setEndDate("");
@@ -366,7 +393,6 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
   );
 }
 
-// ✅ FIXED: Using deactivationDate and deactivationReason from routes
 function DeactivationDetailsModal({ open, employee, onClose }) {
   if (!open || !employee) return null;
   return (
@@ -441,8 +467,6 @@ function DeactivationDetailsModal({ open, employee, onClose }) {
 
       </div>
     </div>
-
-
   );
 }
 
@@ -755,6 +779,7 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
 const EmployeeManagement = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true); 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedRole, setSelectedRole] = useState("All");
@@ -770,10 +795,15 @@ const EmployeeManagement = () => {
   const [previewImage, setPreviewImage] = useState(null);
 
   const fetchEmployees = useCallback(async () => {
+    setLoading(true); 
     try {
       const data = await getEmployees();
       setEmployees(data);
-    } catch (err) { console.error("Failed to fetch employees:", err); }
+    } catch (err) {
+      console.error("Failed to fetch employees:", err);
+    } finally {
+      setLoading(false); 
+    }
   }, []);
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
@@ -810,7 +840,6 @@ const EmployeeManagement = () => {
   const openViewDetailsModal = (emp) => { setSelectedEmployee(emp); setViewDetailsModalOpen(true); };
   const openOverviewModal = (emp) => { setSelectedEmployee(emp); setOverviewModalOpen(true); };
 
-  // ✅ HANDLER: Download Active
   const handleDownloadActive = () => {
     const data = activeEmployees.map(emp => ({
       ID: emp.employeeId,
@@ -823,7 +852,6 @@ const EmployeeManagement = () => {
     downloadExcelReport(data, "Active_Employees.xlsx");
   };
 
-  // ✅ HANDLER: Download Inactive
   const handleDownloadInactive = () => {
     const data = inactiveEmployees.map(emp => ({
       ID: emp.employeeId,
@@ -873,7 +901,8 @@ const EmployeeManagement = () => {
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+
           <div>
             <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
             <div className="flex gap-3 mt-3">
@@ -902,17 +931,17 @@ const EmployeeManagement = () => {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="flex flex-col md:flex-row gap-4 mb-10 px-8">
           <input type="text" placeholder="Search employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Departments</option>
             {departmentSet.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
           </select>
-          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Roles</option>
             {roleSet.map((role) => (<option key={role} value={role}>{role}</option>))}
           </select>
-          <select value={selectedEmploymentType} onChange={(e) => setSelectedEmploymentType(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+          <select value={selectedEmploymentType} onChange={(e) => setSelectedEmploymentType(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Employment Types</option>
             {employmentTypeSet.map((type) => (<option key={type} value={type}>{type}</option>))}
           </select>
@@ -933,7 +962,13 @@ const EmployeeManagement = () => {
               </thead>
 
               <tbody className="divide-y divide-gray-100">
-                {activeEmployees.length > 0 || inactiveEmployees.length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan="6" className="p-8 text-center text-gray-500 font-medium text-lg">
+                      Loading employees data...
+                    </td>
+                  </tr>
+                ) : activeEmployees.length > 0 || inactiveEmployees.length > 0 ? (
                   <>
                     {activeEmployees.map((emp, idx) => (
                       <EmployeeRow key={emp.employeeId} emp={emp} idx={idx} navigate={navigate} onDeactivateClick={openDeactivateModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
@@ -946,7 +981,11 @@ const EmployeeManagement = () => {
                     ))}
                   </>
                 ) : (
-                  <tr><td colSpan="6" className="p-8 text-center text-gray-400">No employees found matching criteria.</td></tr>
+                  <tr>
+                    <td colSpan="6" className="p-8 text-center text-gray-400 font-medium">
+                      No employees found matching criteria.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

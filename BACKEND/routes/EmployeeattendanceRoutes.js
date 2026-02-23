@@ -955,19 +955,42 @@ router.post("/approve-correction", async (req, res) => {
 router.post('/request-status-correction', async (req, res) => {
   try {
     const { employeeId, date, requestedPunchOut, reason } = req.body;
+
+    if (!employeeId || !date || !requestedPunchOut || !reason) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+
     const dayRecord = attendance.attendance.find(a => a.date === date);
-    if (!dayRecord.punchIn) return res.status(400).json({ message: "No punch-in found" });
+    if (!dayRecord) return res.status(404).json({ message: "No attendance record found for this date" });
+    if (!dayRecord.punchIn) return res.status(400).json({ message: "No punch-in found for this date" });
+
+    // ✅ Check if a request already exists for this date
+    if (dayRecord.statusCorrectionRequest?.hasRequest && dayRecord.statusCorrectionRequest?.status === "PENDING") {
+      return res.status(400).json({ message: "A correction request for this date is already pending" });
+    }
+
+    // ✅ Parse the requested punch-out as IST local time (server is Asia/Kolkata)
+    const requestedPunchOutDate = new Date(`${date}T${requestedPunchOut}:00`);
+
+    // ✅ Validate: requestedPunchOut must be after punchIn
+    if (requestedPunchOutDate <= new Date(dayRecord.punchIn)) {
+      return res.status(400).json({
+        message: "Requested punch-out time must be after your punch-in time. Please check the time you entered."
+      });
+    }
 
     dayRecord.statusCorrectionRequest = {
       hasRequest: true,
       status: "PENDING",
-      requestedPunchOut: new Date(`${date}T${requestedPunchOut}:00`),
+      requestedPunchOut: requestedPunchOutDate,
       reason: reason
     };
 
     await attendance.save();
-    res.json({ success: true });
+    res.json({ success: true, message: "Correction request submitted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -976,30 +999,94 @@ router.post('/request-status-correction', async (req, res) => {
 router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
   try {
     const { employeeId, date, adminComment } = req.body;
-    const attendance = await Attendance.findOne({ employeeId });
-    const dayRecord = attendance.attendance.find(a => a.date === date);
-    const newPunchOut = new Date(dayRecord.statusCorrectionRequest.requestedPunchOut);
 
-    dayRecord.punchOut = newPunchOut;
-    if (dayRecord.sessions.length > 0) {
-      dayRecord.sessions[dayRecord.sessions.length - 1].punchOut = newPunchOut;
+    const attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+
+    const dayRecord = attendance.attendance.find(a => a.date === date);
+    if (!dayRecord) return res.status(404).json({ message: "No attendance record found for this date" });
+    if (!dayRecord.statusCorrectionRequest?.hasRequest) {
+      return res.status(404).json({ message: "No correction request found for this date" });
     }
 
+    const newPunchOut = new Date(dayRecord.statusCorrectionRequest.requestedPunchOut);
+    const punchInTime = new Date(dayRecord.punchIn);
+
+    // ✅ Validate punchOut is strictly after punchIn before saving
+    if (newPunchOut <= punchInTime) {
+      return res.status(400).json({
+        message: "Cannot approve: requested punch-out time is not after the employee's punch-in time. Please reject and ask the employee to resubmit."
+      });
+    }
+
+    // ✅ Update punchOut on the day record
+    dayRecord.punchOut = newPunchOut;
+    dayRecord.isFinalPunchOut = true;
+    dayRecord.status = "COMPLETED";
+
+    // ✅ Update the last session's punchOut and recalculate its durationSeconds
+    if (dayRecord.sessions && dayRecord.sessions.length > 0) {
+      const lastSession = dayRecord.sessions[dayRecord.sessions.length - 1];
+      lastSession.punchOut = newPunchOut;
+      const sessDuration = (newPunchOut - new Date(lastSession.punchIn)) / 1000;
+      lastSession.durationSeconds = sessDuration > 0 ? sessDuration : 0;
+    }
+
+    // ✅ Recalculate total worked seconds from all sessions
     let totalSeconds = 0;
     dayRecord.sessions.forEach(sess => {
-      if (sess.punchIn && sess.punchOut) totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+      if (sess.punchIn && sess.punchOut) {
+        const dur = (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+        if (dur > 0) totalSeconds += dur;
+      }
     });
 
-    dayRecord.workedHours = Math.floor(totalSeconds / 3600);
-    dayRecord.workedMinutes = Math.floor((totalSeconds % 3600) / 60);
-    dayRecord.workedSeconds = Math.floor(totalSeconds % 60);
-    dayRecord.workedStatus = "FULL_DAY";
-    dayRecord.status = "COMPLETED";
+    // ✅ Fallback: if sessions give 0, calculate from punchIn → newPunchOut minus breaks
+    if (totalSeconds <= 0) {
+      const rawSeconds = (newPunchOut - punchInTime) / 1000;
+      const breakSeconds = dayRecord.totalBreakSeconds || 0;
+      totalSeconds = Math.max(0, rawSeconds - breakSeconds);
+    }
+
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+
+    dayRecord.workedHours = h;
+    dayRecord.workedMinutes = m;
+    dayRecord.workedSeconds = s;
+    dayRecord.displayTime = `${h}h ${m}m ${s}s`;
+
+    // ✅ Get shift thresholds for proper status calculation (same as punch-out route)
+    let shift = await Shift.findOne({ employeeId });
+    if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
+
+    let workedStatus = "ABSENT";
+    let attendanceCategory = "ABSENT";
+
+    if (h >= shift.fullDayHours) {
+      workedStatus = "FULL_DAY";
+      attendanceCategory = "FULL_DAY";
+    } else if (h >= shift.halfDayHours) {
+      workedStatus = "HALF_DAY";
+      attendanceCategory = "HALF_DAY";
+    } else if (h >= (shift.quarterDayHours || 2)) {
+      workedStatus = "QUARTER_DAY";
+      attendanceCategory = "ABSENT";
+    }
+
+    dayRecord.workedStatus = workedStatus;
+    dayRecord.attendanceCategory = attendanceCategory;
+
+    // ✅ Mark the correction request as approved
     dayRecord.statusCorrectionRequest.status = "APPROVED";
-    dayRecord.statusCorrectionRequest.adminComment = adminComment;
+    dayRecord.statusCorrectionRequest.adminComment = adminComment || "Approved by Admin";
 
     await attendance.save();
-    res.json({ success: true });
+    res.json({
+      success: true,
+      message: `Attendance corrected. Worked: ${h}h ${m}m ${s}s → Status: ${workedStatus}`
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

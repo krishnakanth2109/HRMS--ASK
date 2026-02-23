@@ -241,10 +241,10 @@ const EmployeeWorkModeRequest = () => {
           </div>
           
           {/* Detailed Description like Dashboard */}
-          <div className="flex items-start gap-2 bg-black/20 backdrop-blur-md p-3 rounded-lg text-sm font-medium border border-white/10">
-            <FaInfoCircle className="mt-0.5 flex-shrink-0" size={14} />
+          {/* <div className="flex items-start gap-2 bg-black/20 backdrop-blur-md p-3 rounded-lg text-sm font-medium border border-white/10"> */}
+            {/* <FaInfoCircle className="mt-0.5 flex-shrink-0" size={14} /> */}
             <span className="leading-tight">{description}</span>
-          </div>
+          {/* </div> */}
         </div>
       </div>
     );
