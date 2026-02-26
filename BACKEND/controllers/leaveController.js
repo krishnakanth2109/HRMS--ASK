@@ -238,6 +238,9 @@ const createAdminLeaveNotificationEmail = (data) => {
 // ===================================================================================
 // ✅ EMPLOYEE CREATES LEAVE (ADMIN GETS EMAIL)
 // ===================================================================================
+// ===================================================================================
+// ✅ EMPLOYEE CREATES LEAVE (ADMIN GETS EMAIL)
+// ===================================================================================
 export const createLeave = async (req, res) => {
   try {
     const loggedUser = req.user; 
@@ -275,18 +278,16 @@ export const createLeave = async (req, res) => {
 
     // 📧 SEND EMAIL TO ADMINS (Using SMTP)
     try {
+      // Fetch all admins from DB
       const admins = await Admin.find().lean();
+      // Extract emails and remove any null/undefined values
       const adminEmails = admins.map(admin => admin.email).filter(Boolean);
-      const specificAdminEmail = "oragantisagar041@gmail.com";
       
-      if (!adminEmails.includes(specificAdminEmail)) {
-        adminEmails.push(specificAdminEmail);
-      }
-
+      // Removed specificAdminEmail logic - now only using adminEmails from DB
       if (adminEmails.length > 0) {
         const mailOptions = {
           from: `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
-          to: adminEmails.join(','),
+          to: adminEmails.join(','), // Sends to all emails found in the Admin collection
           subject: `New Leave Request from ${name}`,
           html: createAdminLeaveNotificationEmail({
             name: name,
@@ -299,13 +300,13 @@ export const createLeave = async (req, res) => {
           })
         };
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Leave notification email sent to Admins`);
+        console.log(`✅ Leave notification email sent to DB Admins: ${adminEmails.join(', ')}`);
       }
     } catch (emailErr) {
       console.error("❌ Failed to send Leave Notification to Admin:", emailErr);
     }
 
-    // In-app Notifications
+    // In-app Notifications (Logic remains same)
     const admins = await Admin.find().lean();
     const notifList = [];
     for (const admin of admins) {

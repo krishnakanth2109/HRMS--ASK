@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import * as XLSX from "xlsx"; 
-import Swal from "sweetalert2"; 
+import * as XLSX from "xlsx";
+import Swal from "sweetalert2";
 import { getHolidays, addHoliday, updateHoliday, deleteHolidayById, getEmployees } from "../api";
-import { 
-  FaChevronLeft, 
-  FaChevronRight, 
+import {
+  FaChevronLeft,
+  FaChevronRight,
   FaFileImport,
   FaPlus,
   FaTimes,
   FaTrash,
-  FaEdit, 
+  FaEdit,
   FaCalendarAlt,
   FaBirthdayCake,
 } from "react-icons/fa";
@@ -28,10 +28,10 @@ const AdminHolidayCalendarPage = () => {
   const [holidays, setHolidays] = useState([]);
   const [birthdays, setBirthdays] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  const [activeDate, setActiveDate] = useState(new Date()); 
+
+  const [activeDate, setActiveDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
@@ -72,7 +72,7 @@ const AdminHolidayCalendarPage = () => {
   const fetchBirthdays = useCallback(async () => {
     try {
       const allEmployees = await getEmployees();
-      
+
       // ✅ LOG DATA: Open browser console (F12) to see if 'status' and 'dob' exist correctly
       console.log("Fetched Employees:", allEmployees);
 
@@ -81,17 +81,17 @@ const AdminHolidayCalendarPage = () => {
           // Normalize status to lowercase for comparison
           const status = emp.status ? emp.status.toLowerCase() : "";
           // Check if employee is NOT deactive and has a DOB
-          const isActive = status === "active" || status === ""; 
+          const isActive = status === "active" || status === "";
           return isActive && emp.personalDetails?.dob;
         })
         .map((emp) => ({
           name: emp.name,
           dob: new Date(emp.personalDetails.dob),
         }));
-        
+
       setBirthdays(result);
-    } catch (err) { 
-      console.error("Error fetching birthdays:", err); 
+    } catch (err) {
+      console.error("Error fetching birthdays:", err);
     }
   }, []);
 
@@ -121,7 +121,7 @@ const AdminHolidayCalendarPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e) => { 
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -164,15 +164,15 @@ const AdminHolidayCalendarPage = () => {
   const findKey = (obj, searchStr) => Object.keys(obj).find(key => key.toLowerCase().replace(/[^a-z]/g, '').includes(searchStr.toLowerCase()));
 
   const parseImportDate = (val) => {
-     if (!val) return null;
-     if (typeof val === 'number') return new Date(Math.round((val - 25569) * 86400 * 1000));
-     if (typeof val === 'string') {
-       const match = val.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-       if (match) return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
-       const stdDate = new Date(val);
-       return isNaN(stdDate.getTime()) ? null : stdDate;
-     }
-     return null;
+    if (!val) return null;
+    if (typeof val === 'number') return new Date(Math.round((val - 25569) * 86400 * 1000));
+    if (typeof val === 'string') {
+      const match = val.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (match) return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+      const stdDate = new Date(val);
+      return isNaN(stdDate.getTime()) ? null : stdDate;
+    }
+    return null;
   };
 
   const handleFileUpload = (e) => {
@@ -238,25 +238,25 @@ const AdminHolidayCalendarPage = () => {
   };
 
   // --- FILTERING LOGIC ---
-  const displayedBirthdays = showAllBirthdays 
+  const displayedBirthdays = showAllBirthdays
     ? [...birthdays].sort((a, b) => a.dob.getMonth() - b.dob.getMonth() || a.dob.getDate() - b.dob.getDate())
     : birthdays.filter((b) => b.dob.getMonth() === birthdayCursor.getMonth()).sort((a, b) => a.dob.getDate() - b.dob.getDate());
 
   const availableYears = [...new Set([
     new Date().getFullYear(),
     ...holidays.map(h => new Date(h.startDate).getFullYear())
-  ])].sort((a,b) => a - b);
+  ])].sort((a, b) => a - b);
 
   const displayedHolidays = showAllHolidays
     ? [...holidays]
-        .filter(h => new Date(h.startDate).getFullYear() === parseInt(selectedYear))
-        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+      .filter(h => new Date(h.startDate).getFullYear() === parseInt(selectedYear))
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
     : holidays
-        .filter((h) => {
-          const hDate = normalizeDate(h.startDate);
-          return hDate.getMonth() === holidayCursor.getMonth() && hDate.getFullYear() === holidayCursor.getFullYear();
-        })
-        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+      .filter((h) => {
+        const hDate = normalizeDate(h.startDate);
+        return hDate.getMonth() === holidayCursor.getMonth() && hDate.getFullYear() === holidayCursor.getFullYear();
+      })
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 
   const getTileDetails = (date) => {
     const current = normalizeDate(date);
@@ -308,20 +308,20 @@ const AdminHolidayCalendarPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans text-slate-800">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Holiday Calendar</h1>
             <p className="text-slate-500 text-sm mt-1">Manage holidays & track birthdays</p>
           </div>
-    <button
-  onClick={() => setIsModalOpen(true)}
-  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition active:scale-95"
->
-  <FaPlus className="inline mr-2" />
-  Add New Holiday
-</button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition active:scale-95"
+          >
+            <FaPlus className="inline mr-2" />
+            Add New Holiday
+          </button>
 
         </div>
 
@@ -341,37 +341,37 @@ const AdminHolidayCalendarPage = () => {
                   </button>
                   {!showAllHolidays && (
                     <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
-                      <button onClick={() => changeMonth(setHolidayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
-                      <span className="text-xs font-mono w-16 text-center">{holidayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
-                      <button onClick={() => changeMonth(setHolidayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                      <button onClick={() => changeMonth(setHolidayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10} /></button>
+                      <span className="text-xs font-mono w-16 text-center">{holidayCursor.toLocaleString('default', { month: 'short', year: '2-digit' })}</span>
+                      <button onClick={() => changeMonth(setHolidayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10} /></button>
                     </div>
                   )}
                 </div>
               </div>
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
-                {displayedHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays {showAllHolidays ? `in ${selectedYear}` : "this month"}</p> : 
+                {displayedHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays {showAllHolidays ? `in ${selectedYear}` : "this month"}</p> :
                   displayedHolidays.map(h => (
-                  <div key={h._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-md transition group">
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none">
-                        <span className="text-sm">{new Date(h.startDate).getDate()}</span>
+                    <div key={h._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-md transition group">
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none">
+                          <span className="text-sm">{new Date(h.startDate).getDate()}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-700">{h.name}</p>
+                          <p className="text-[10px] text-slate-400">{new Date(h.startDate).toLocaleDateString()}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-700">{h.name}</p>
-                        <p className="text-[10px] text-slate-400">{new Date(h.startDate).toLocaleDateString()}</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEdit(h)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="Edit"><FaEdit size={16} /></button>
+                        <button onClick={() => handleDelete(h._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Delete"><FaTrash size={16} /></button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => handleEdit(h)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="Edit"><FaEdit size={16}/></button>
-                        <button onClick={() => handleDelete(h._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Delete"><FaTrash size={16}/></button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-               <div className="p-4 bg-gradient-to-r from-orange-400 to-pink-500 flex justify-between items-center text-white">
+              <div className="p-4 bg-gradient-to-r from-orange-400 to-pink-500 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2"><FaBirthdayCake /> <span className="font-bold">Birthdays</span></div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setShowAllBirthdays(!showAllBirthdays)} className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition">
@@ -379,9 +379,9 @@ const AdminHolidayCalendarPage = () => {
                   </button>
                   {!showAllBirthdays && (
                     <div className="flex items-center gap-1 bg-white/20 rounded-lg px-1">
-                      <button onClick={() => changeMonth(setBirthdayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10}/></button>
-                      <span className="text-xs font-mono w-16 text-center">{birthdayCursor.toLocaleString('default',{month:'short', year:'2-digit'})}</span>
-                      <button onClick={() => changeMonth(setBirthdayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10}/></button>
+                      <button onClick={() => changeMonth(setBirthdayCursor)(-1)} className="p-1 hover:bg-white/20 rounded"><FaChevronLeft size={10} /></button>
+                      <span className="text-xs font-mono w-16 text-center">{birthdayCursor.toLocaleString('default', { month: 'short', year: '2-digit' })}</span>
+                      <button onClick={() => changeMonth(setBirthdayCursor)(1)} className="p-1 hover:bg-white/20 rounded"><FaChevronRight size={10} /></button>
                     </div>
                   )}
                 </div>
@@ -389,16 +389,16 @@ const AdminHolidayCalendarPage = () => {
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
                 {displayedBirthdays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No birthdays {showAllBirthdays ? "found" : "this month"}</p> :
                   displayedBirthdays.map((b, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition">
-                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
-                      {b.name.charAt(0)}
+                    <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
+                        {b.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">{b.name}</p>
+                        <p className="text-[10px] text-slate-400">{b.dob.getDate()} {b.dob.toLocaleString('default', { month: 'short' })}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">{b.name}</p>
-                      <p className="text-[10px] text-slate-400">{b.dob.getDate()} {b.dob.toLocaleString('default',{month:'short'})}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -416,10 +416,10 @@ const AdminHolidayCalendarPage = () => {
               />
               <div className="flex justify-center gap-8 mt-10 pt-6 border-t border-slate-50">
                 <div className="flex items-center gap-2">
-                   <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-emerald-400 to-teal-500 shadow-md shadow-emerald-100 flex items-center gap-2">🎉 Holiday</span>
+                  <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-emerald-400 to-teal-500 shadow-md shadow-emerald-100 flex items-center gap-2">🎉 Holiday</span>
                 </div>
                 <div className="flex items-center gap-2">
-                   <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-orange-400 to-pink-500 shadow-md shadow-rose-100 flex items-center gap-2">🎂 Birthday</span>
+                  <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-orange-400 to-pink-500 shadow-md shadow-rose-100 flex items-center gap-2">🎂 Birthday</span>
                 </div>
               </div>
             </div>
@@ -432,7 +432,7 @@ const AdminHolidayCalendarPage = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
             <div className="bg-slate-50 p-4 border-b flex justify-between items-center">
               <h3 className="font-bold text-lg text-slate-800">{isEditing ? "Edit Holiday" : "Add Holiday"}</h3>
-              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><FaTimes/></button>
+              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><FaTimes /></button>
             </div>
             <div className="p-6 space-y-6">
               {!isEditing && (
@@ -441,14 +441,23 @@ const AdminHolidayCalendarPage = () => {
                     <p className="text-xs text-blue-600 font-medium">Bulk Import via Excel</p>
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx,.csv" />
                     <button onClick={() => fileInputRef.current.click()} disabled={loading} className="bg-white text-blue-600 px-4 py-1.5 rounded-lg shadow-sm text-xs font-bold border border-blue-100 hover:bg-blue-100">
-                      <FaFileImport className="inline mr-1"/> Choose File
+                      <FaFileImport className="inline mr-1" /> Choose File
                     </button>
                   </div>
                   <div className="relative text-center"><span className="bg-white px-2 text-xs text-gray-400 relative z-10">OR MANUALLY</span><div className="absolute top-1/2 left-0 w-full border-t border-gray-100"></div></div>
                 </>
               )}
               <form onSubmit={handleSubmit} className="space-y-3">
-                <input name="name" value={holidayData.name} onChange={handleChange} placeholder="Holiday Name" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none" required />
+                <input
+                  name="name"
+                  value={holidayData.name}
+                  onChange={handleChange}
+                  placeholder="Holiday Name"
+                  pattern="[A-Za-z\s]+"
+                  title="Only alphabets and spaces are allowed"
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none"
+                  required
+                />
                 <textarea name="description" value={holidayData.description} onChange={handleChange} placeholder="Description" rows="2" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800 outline-none resize-none" />
                 <div className="flex gap-3">
                   <div className="w-1/2">

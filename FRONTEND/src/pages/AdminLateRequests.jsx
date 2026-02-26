@@ -572,7 +572,7 @@ const bulkUpdateRequestLimits = async () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen font-sans">
+    <div className="p-6 min-h-screen font-sans">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">

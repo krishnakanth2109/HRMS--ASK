@@ -1,9 +1,11 @@
 // pages/AdminNotifications.jsx
 import { useContext, useEffect, useState, useCallback } from "react";
 import { NotificationContext } from "../context/NotificationContext";
+import { useNavigate } from "react-router-dom"; // ADDED: Import useNavigate
 import { 
   FaBell, FaCheckCircle, FaTrash, FaUndo, 
-  FaExclamationCircle, FaClock, FaMapMarkerAlt, FaSignOutAlt, FaUserClock 
+  FaExclamationCircle, FaClock, FaMapMarkerAlt, FaSignOutAlt, FaUserClock, 
+  FaArrowLeft // ADDED: Import Back arrow icon
 } from "react-icons/fa";
 import api, { getAllOvertimeRequests } from "../api"; 
 
@@ -12,6 +14,7 @@ const HIDDEN_KEY = "admin_hidden_notifications";
 const READ_SYSTEM_KEY = "admin_read_system_notifications";
 
 const AdminNotifications = () => {
+  const navigate = useNavigate(); // ADDED: Initialize navigate function
   const { notifications, markAsRead, markAllAsRead: markContextAllRead } = useContext(NotificationContext);
 
   const [localNotifications, setLocalNotifications] = useState([]);
@@ -288,13 +291,23 @@ const AdminNotifications = () => {
         {/* ----------------- MAIN CONTENT ----------------- */}
         <div className="flex-1 bg-white rounded-xl shadow-md p-6 border overflow-y-auto">
           <div className="flex justify-between items-center mb-5">
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-700">
-                Notifications
-              </h2>
-              <p className="text-gray-500 text-sm">
-                Manage all your system alerts here
-              </p>
+            {/* ADDED: Flex container with Back Button */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate("/")}
+                className="p-3 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 hover:text-blue-600 transition shadow-sm"
+                title="Go Back"
+              >
+                <FaArrowLeft />
+              </button>
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-700">
+                  Notifications
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  Manage all your system alerts here
+                </p>
+              </div>
             </div>
 
             {localNotifications.filter((n) => !n.isRead).length > 0 && (

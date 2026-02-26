@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote, 
-  CheckCircle, Clock, FileText, Upload, Download, File, Paperclip, Eye, ExternalLink } from 'lucide-react';
+import {
+  Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote,
+  CheckCircle, Clock, FileText, Upload, Download, File, Paperclip, Eye, ExternalLink
+} from 'lucide-react';
 import { getAllCompanies } from '../api';
 import api from '../api';
 
@@ -63,10 +65,10 @@ HR Team
     try {
       const response = await getAllCompanies();
       setCompanies(Array.isArray(response.data) ? response.data : response);
-    } catch (error) { 
-      console.error('Error fetching companies:', error); 
-    } finally { 
-      setLoadingCompanies(false); 
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    } finally {
+      setLoadingCompanies(false);
     }
   };
 
@@ -74,8 +76,8 @@ HR Team
     try {
       const response = await api.get('/api/invited-employees/history');
       setSentHistory(response.data.data);
-    } catch (error) { 
-      console.error("History fetch error", error); 
+    } catch (error) {
+      console.error("History fetch error", error);
     }
   };
 
@@ -84,7 +86,7 @@ HR Team
       console.log('Fetching documents for company:', selectedCompany);
       const response = await api.get(`/api/invited-employees/documents/company/${selectedCompany}`);
       console.log('Documents response:', response.data);
-      
+
       if (response.data.success) {
         setDocuments(response.data.data || []);
         console.log('Documents set:', response.data.data.length);
@@ -102,9 +104,9 @@ HR Team
   const handleDocumentUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     console.log('Uploading file:', file.name);
-    
+
     if (!selectedCompany) {
       alert('Please select a company first');
       return;
@@ -126,7 +128,7 @@ HR Team
       const response = await api.post('/api/invited-employees/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       console.log('Upload response:', response.data);
       alert('Document uploaded successfully!');
       fetchCompanyDocuments(); // Refresh the documents list
@@ -143,7 +145,7 @@ HR Team
 
   const handleDeleteDocument = async (documentId) => {
     if (!window.confirm('Are you sure you want to delete this document?')) return;
-    
+
     try {
       await api.delete(`/api/invited-employees/documents/${documentId}`);
       alert('Document deleted successfully');
@@ -179,7 +181,7 @@ HR Team
     // If it's a 'raw' file, this might not work, so we use a standard download link.
     let downloadUrl = fileUrl;
     if (fileUrl.includes('/upload/')) {
-        downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+      downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
     }
 
     const link = document.createElement('a');
@@ -192,7 +194,7 @@ HR Team
   };
 
   const toggleDocumentSelection = (docId) => {
-    setSelectedDocuments(prev => 
+    setSelectedDocuments(prev =>
       prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
     );
   };
@@ -200,8 +202,8 @@ HR Team
   const toggleBulkDocumentSelection = (rowIndex, docId) => {
     setBulkSelectedDocuments(prev => {
       const current = prev[rowIndex] || [];
-      const updated = current.includes(docId) 
-        ? current.filter(id => id !== docId) 
+      const updated = current.includes(docId)
+        ? current.filter(id => id !== docId)
         : [...current, docId];
       return { ...prev, [rowIndex]: updated };
     });
@@ -231,8 +233,8 @@ HR Team
     if (!selectedCompany) return alert('Please select a company first');
     setSending(true);
     try {
-      await api.post('/api/invited-employees/invite', { 
-        ...singleData, 
+      await api.post('/api/invited-employees/invite', {
+        ...singleData,
         companyId: selectedCompany,
         requiredDocuments: selectedDocuments
       });
@@ -248,10 +250,10 @@ HR Team
       setSelectedDocuments([]);
       fetchHistory();
       alert("Invitation sent successfully!");
-    } catch (error) { 
-      alert(error.response?.data?.error || "Error"); 
-    } finally { 
-      setSending(false); 
+    } catch (error) {
+      alert(error.response?.data?.error || "Error");
+    } finally {
+      setSending(false);
     }
   };
 
@@ -266,9 +268,9 @@ HR Team
         requiredDocuments: bulkSelectedDocuments[index] || []
       }));
 
-      await api.post('/api/invited-employees/invite-bulk', { 
-        employees: employeesWithDocs, 
-        companyId: selectedCompany 
+      await api.post('/api/invited-employees/invite-bulk', {
+        employees: employeesWithDocs,
+        companyId: selectedCompany
       });
 
       for (let emp of validRows) {
@@ -283,10 +285,10 @@ HR Team
       setBulkSelectedDocuments({});
       fetchHistory();
       alert("Bulk emails sent!");
-    } catch (error) { 
-      console.error(error); 
-    } finally { 
-      setSending(false); 
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -295,8 +297,8 @@ HR Team
     try {
       await api.delete(`/api/invited-employees/${id}`);
       setSentHistory(prev => prev.filter(item => item._id !== id));
-    } catch (error) { 
-      alert("Delete failed"); 
+    } catch (error) {
+      alert("Delete failed");
     }
   };
 
@@ -368,7 +370,7 @@ HR Team
                 <div className="flex items-center gap-2 text-blue-600 font-bold uppercase text-xs tracking-widest">
                   <Paperclip size={16} /> Document Management
                 </div>
-                <button 
+                <button
                   onClick={() => setShowDocumentUpload(!showDocumentUpload)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-2"
                 >
@@ -382,8 +384,8 @@ HR Team
                     <Upload className="text-blue-600" size={32} />
                     <span className="text-sm font-semibold text-blue-700">Click to upload document</span>
                     <span className="text-xs text-slate-500">PDF, DOCX, JPG, PNG (Max 10MB)</span>
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                       onChange={handleDocumentUpload}
                       className="hidden"
@@ -426,15 +428,8 @@ HR Team
                           </div>
                         </div>
                         <div className="flex gap-1">
+
                           <button
-                            onClick={() => handleViewDocument(doc.fileUrl)}
-                            className="flex-1 px-3 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all text-xs font-semibold flex items-center justify-center gap-1"
-                            title="View Document"
-                          >
-                            <Eye size={14} />
-                            View
-                          </button>
-                          <button 
                             onClick={() => handleDownloadDocument(doc.fileUrl, doc.fileName)}
                             className="flex-1 px-3 py-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-all text-xs font-semibold flex items-center justify-center gap-1"
                             title="Download"
@@ -477,12 +472,46 @@ HR Team
                     <input required type="email" placeholder="employee@company.com" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.email} onChange={e => setSingleData({ ...singleData, email: e.target.value })} />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Full Name*</label>
-                    <input required placeholder="John Doe" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.name} onChange={e => setSingleData({ ...singleData, name: e.target.value })} />
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">
+                      Full Name*
+                    </label>
+                    <input
+                      required
+                      placeholder="John Doe"
+                      pattern="[A-Za-z\s]+"
+                      title="Only alphabets and spaces are allowed"
+                      onKeyPress={(e) => {
+                        if (!/[A-Za-z\s]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={singleData.name}
+                      onChange={e =>
+                        setSingleData({ ...singleData, name: e.target.value })
+                      }
+                    />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Role*</label>
-                    <input required placeholder="Software Engineer" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.role} onChange={e => setSingleData({ ...singleData, role: e.target.value })} />
+                    <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">
+                      Role*
+                    </label>
+                    <input
+                      required
+                      placeholder="Software Engineer"
+                      pattern="[A-Za-z\s]+"
+                      title="Only alphabets and spaces are allowed"
+                      onKeyPress={(e) => {
+                        if (!/[A-Za-z\s]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={singleData.role}
+                      onChange={e =>
+                        setSingleData({ ...singleData, role: e.target.value })
+                      }
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Department*</label>
@@ -503,7 +532,19 @@ HR Team
                   {singleData.employmentType && (
                     <div>
                       <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Salary (Optional)</label>
-                      <input type="number" placeholder="50000" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.salary} onChange={e => setSingleData({ ...singleData, salary: e.target.value })} />
+                      <input
+                        type="number"
+                        placeholder="50000"
+                        min="0"
+                        value={singleData.salary}
+                        onChange={(e) => setSingleData({ ...singleData, salary: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e') {
+                            e.preventDefault();
+                          }
+                        }}
+                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
                   )}
                 </div>
@@ -517,7 +558,7 @@ HR Team
                     <div className="space-y-2">
                       {documents.map(doc => (
                         <label key={doc._id} className="flex items-center gap-3 p-2 hover:bg-amber-100 rounded-lg cursor-pointer">
-                          <input 
+                          <input
                             type="checkbox"
                             checked={selectedDocuments.includes(doc._id)}
                             onChange={() => toggleDocumentSelection(doc._id)}
@@ -577,7 +618,24 @@ HR Team
                         {row.employmentType && (
                           <div className="w-20">
                             <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Sal</label>
-                            <input type="number" placeholder="Amt" className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none" value={row.salary} onChange={e => updateBulkRow(idx, 'salary', e.target.value)} />
+                            <input
+                              type="number"
+                              placeholder="Amt"
+                              min="0"
+                              value={row.salary}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value >= 0) {
+                                  updateBulkRow(idx, 'salary', value);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === 'e') {
+                                  e.preventDefault();
+                                }
+                              }}
+                              className="w-full p-2 text-sm border rounded-lg focus:ring-1 ring-blue-500 outline-none"
+                            />
                           </div>
                         )}
                         <button onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== idx))} className="mb-1 p-2 text-slate-300 hover:text-red-500 transition-colors">
@@ -592,7 +650,7 @@ HR Team
                           <div className="flex flex-wrap gap-2">
                             {documents.map(doc => (
                               <label key={doc._id} className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md hover:bg-blue-50 cursor-pointer text-xs">
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={(bulkSelectedDocuments[idx] || []).includes(doc._id)}
                                   onChange={() => toggleBulkDocumentSelection(idx, doc._id)}
@@ -649,18 +707,17 @@ HR Team
                         <Mail size={10} /> {item.email}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${
-                      item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
+                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${item.status === 'onboarded' ? 'bg-green-100 text-green-700' :
                       item.status === 'revoked' ? 'bg-orange-100 text-orange-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
+                        'bg-blue-100 text-blue-700'
+                      }`}>
                       {item.status}
                     </span>
                   </div>
 
                   <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 mb-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                      <Building2 size={12} className="text-blue-500" /> 
+                      <Building2 size={12} className="text-blue-500" />
                       {item.company?.name || 'Unknown Company'}
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
@@ -674,11 +731,10 @@ HR Team
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="flex items-center gap-2 text-[10px] font-bold mt-2 pt-2 border-t border-slate-200">
-                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] ${
-                        item.policyStatus === 'accepted' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
+                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] ${item.policyStatus === 'accepted' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
                         {item.policyStatus === 'accepted' ? <CheckCircle size={8} /> : <FileText size={8} />}
                         Policy: {item.policyStatus || 'not accepted'}
                       </span>

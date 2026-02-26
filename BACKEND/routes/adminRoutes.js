@@ -323,29 +323,20 @@ router.post("/request", async (req, res) => {
     await newRequest.save();
 
     // ----------------------------------------------------
-    // EMAIL NOTIFICATION LOGIC
+    // EMAIL NOTIFICATION LOGIC (UPDATED: DB ADMINS ONLY)
     // ----------------------------------------------------
     try {
-      // 1. Fetch all admins
+      // 1. Fetch all admins from Database
       const admins = await Admin.find().lean();
 
-      // 2. Prepare recipients list
-      const adminRecipients = admins.map(admin => ({ name: admin.name, email: admin.email }));
+      // 2. Prepare recipients list (Only from DB)
+      const adminRecipients = admins
+        .filter(admin => admin.email) // Only include if email exists
+        .map(admin => ({ name: admin.name, email: admin.email }));
 
-      // 3. Explicitly add 'oragantisagar041@gmail.com'
-      const specificAdminEmail = "oragantisagar041@gmail.com";
-      const alreadyIncluded = adminRecipients.some(a => a.email.toLowerCase() === specificAdminEmail.toLowerCase());
+      console.log(`📧 WorkMode Email Debug: Found ${adminRecipients.length} admins in DB.`);
 
-      console.log("📧 WorkMode Email Debug: Found Admins count:", admins.length);
-
-      if (!alreadyIncluded) {
-        console.log("📧 WorkMode Email Debug: Adding specific admin manually:", specificAdminEmail);
-        adminRecipients.push({ name: "Admin", email: specificAdminEmail });
-      }
-
-      console.log("📧 WorkMode Email Debug: Final Recipients:", adminRecipients.map(r => r.email));
-
-      // 4. Construct Email Content
+      // 3. Construct Email Content
       let dateInfo = "N/A";
       if (requestType === "Temporary") {
         dateInfo = `${new Date(fromDate).toLocaleDateString()} to ${new Date(toDate).toLocaleDateString()}`;
@@ -391,17 +382,16 @@ router.post("/request", async (req, res) => {
         </div>
       `;
 
-      // 5. Send Email
+      // 4. Send Email
       if (adminRecipients.length > 0) {
-        console.log("📧 WorkMode Email Debug: Attempting to send...");
         const response = await sendBrevoEmail({
           to: adminRecipients,
           subject: `Work Mode Request: ${employeeName} - ${requestType}`,
           htmlContent: emailHtml,
         });
-        console.log("📧 WorkMode Email Debug: Email Response:", response);
+        console.log("📧 WorkMode Email Debug: Notification sent to DB Admins.");
       } else {
-        console.log("📧 WorkMode Email Debug: No recipients to send to.");
+        console.log("📧 WorkMode Email Debug: No admins found in DB to notify.");
       }
     } catch (emailErr) {
       console.error("❌ Failed to send Work Mode Request email:", emailErr);

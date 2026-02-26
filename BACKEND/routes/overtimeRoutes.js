@@ -23,7 +23,6 @@ router.post("/apply", async (req, res) => {
   try {
     const { employeeId, employeeName, date, type } = req.body;
 
-    // We can get the employee's email from req.user if they are logged in
     // req.user is populated by the 'protect' middleware
     const employeeEmail = req.user?.email || "N/A";
 
@@ -48,21 +47,10 @@ router.post("/apply", async (req, res) => {
     // 🔥 Notify admins in real-time
     if (io) io.emit("overtime:new", newOT);
 
-    // 🔔 Notify all admins & Send Email
+    // 🔔 Fetch all admins from DB
     const admins = await Admin.find().lean();
 
-    // Prepare email recipients
-    const adminRecipients = admins.map(admin => ({ name: admin.name, email: admin.email }));
-
-    // ✅ Explicitly add 'oragantisagar041@gmail.com' to ensure they get the email
-    // (regardless of whether they are in the Admin database collection)
-    const specificAdminEmail = "oragantisagar041@gmail.com";
-    const alreadyIncluded = adminRecipients.some(a => a.email.toLowerCase() === specificAdminEmail.toLowerCase());
-
-    if (!alreadyIncluded) {
-      adminRecipients.push({ name: "Admin", email: specificAdminEmail });
-    }
-
+    // 1. Create In-App Notifications for all DB admins
     for (const admin of admins) {
       await Notification.create({
         userId: admin._id.toString(),
@@ -73,7 +61,14 @@ router.post("/apply", async (req, res) => {
       });
     }
 
-    // Send Email to Admins
+    // 2. Prepare Email Recipients (ONLY from DB Admins)
+    const adminRecipients = admins
+      .filter(admin => admin.email) // Ensure admin has an email address
+      .map(admin => ({ name: admin.name, email: admin.email }));
+
+    console.log(`📧 Overtime Email Debug: Sending to ${adminRecipients.length} admins from DB.`);
+
+    // 3. Send Email to Admins
     if (adminRecipients.length > 0) {
       const emailHtml = `
         <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; max-width: 600px;">

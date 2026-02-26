@@ -1036,23 +1036,29 @@ const PayrollManagement = () => {
               />
             </div>
 
-            <div className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
-              <span className="text-gray-500 font-bold text-xs">FROM</span>
-              <input
-                type="date"
-                value={summaryStartDate}
-                onChange={e => setSummaryStartDate(e.target.value)}
-                className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28"
-              />
-              <span className="text-gray-300">|</span>
-              <span className="text-gray-500 font-bold text-xs">TO</span>
-              <input
-                type="date"
-                value={summaryEndDate}
-                onChange={e => setSummaryEndDate(e.target.value)}
-                className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28"
-              />
-            </div>
+    <div className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
+  <span className="text-gray-500 font-bold text-xs">FROM</span>
+  <input
+    type="date"
+    value={summaryStartDate}
+    onChange={e => setSummaryStartDate(e.target.value)}
+    onKeyDown={(e) => e.preventDefault()}
+    onPaste={(e) => e.preventDefault()}
+    className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
+  />
+
+  <span className="text-gray-300">|</span>
+
+  <span className="text-gray-500 font-bold text-xs">TO</span>
+  <input
+    type="date"
+    value={summaryEndDate}
+    onChange={e => setSummaryEndDate(e.target.value)}
+    onKeyDown={(e) => e.preventDefault()}
+    onPaste={(e) => e.preventDefault()}
+    className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
+  />
+</div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">

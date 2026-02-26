@@ -373,9 +373,9 @@ const CurrentEmployeeProfile = () => {
 
           <Section title="Current Job Details">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               <Input label="Department" value={currentJob.department} onChange={(v) => handleCurrentJobChange("department", v)} editable={isEditing} icon={<FaBuilding/>} />
-               <Input label="Role" value={currentJob.role} onChange={(v) => handleCurrentJobChange("role", v)} editable={isEditing} />
-               <Input label="Joining Date" type="date" value={currentJob.joiningDate?.split("T")[0]} onChange={(v) => handleCurrentJobChange("joiningDate", v)} editable={isEditing} icon={<FaCalendarAlt/>} />
+               <Input label="Department" value={currentJob.department} onChange={(v) => handleCurrentJobChange("department", v)} editable={false}  icon={<FaBuilding/>} />
+               <Input label="Role" value={currentJob.role} editable={false} onChange={(v) => handleCurrentJobChange("role", v)}  />
+               <Input label="Joining Date" type="date" value={currentJob.joiningDate?.split("T")[0]} onChange={(v) => handleCurrentJobChange("joiningDate", v)} editable={false} icon={<FaCalendarAlt/>} />
                {/* ✅ UPDATED: Salary is now NOT editable from employee side */}
                <Input label="Salary (CTC)" type="number" value={currentJob.salary} onChange={(v) => handleCurrentJobChange("salary", v)} editable={false} icon={<FaMoneyBill/>} />
              </div>

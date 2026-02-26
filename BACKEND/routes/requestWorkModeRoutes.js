@@ -8,6 +8,7 @@ import { sendBrevoEmail } from "../Services/emailService.js";
 const router = express.Router();
 
 // 1. Submit a Request (Employee)
+// 1. Submit a Request (Employee)
 router.post("/request", async (req, res) => {
   try {
     const {
@@ -31,24 +32,20 @@ router.post("/request", async (req, res) => {
     await newRequest.save();
 
     // ----------------------------------------------------
-    // EMAIL NOTIFICATION LOGIC
+    // EMAIL NOTIFICATION LOGIC (UPDATED: DB ADMINS ONLY)
     // ----------------------------------------------------
     try {
-      // 1. Fetch all admins
+      // 1. Fetch all admins from Database
       const admins = await Admin.find().lean();
 
-      // 2. Prepare recipients list
-      const adminRecipients = admins.map(admin => ({ name: admin.name, email: admin.email }));
+      // 2. Prepare recipients list from DB records only
+      const adminRecipients = admins
+        .filter(admin => admin.email) // Ensure email exists
+        .map(admin => ({ name: admin.name, email: admin.email }));
 
-      // 3. Explicitly add 'oragantisagar041@gmail.com'
-      const specificAdminEmail = "oragantisagar041@gmail.com";
-      const alreadyIncluded = adminRecipients.some(a => a.email.toLowerCase() === specificAdminEmail.toLowerCase());
+      console.log(`📧 WorkMode Email Debug: Sending to ${adminRecipients.length} admins from database.`);
 
-      if (!alreadyIncluded) {
-        adminRecipients.push({ name: "Admin", email: specificAdminEmail });
-      }
-
-      // 4. Construct Email Content
+      // 3. Construct Email Content
       let dateInfo = "N/A";
       if (requestType === "Temporary") {
         dateInfo = `${new Date(fromDate).toLocaleDateString()} to ${new Date(toDate).toLocaleDateString()}`;
@@ -92,11 +89,10 @@ router.post("/request", async (req, res) => {
 
           <p style="margin-top: 20px;">Please login to the Admin Portal to approve or reject this request.</p>
           <p>Regards,<br/>HRMS System</p>
-          
         </div>
       `;
 
-      // 5. Send Email
+      // 4. Send Email
       if (adminRecipients.length > 0) {
         await sendBrevoEmail({
           to: adminRecipients,
@@ -106,7 +102,6 @@ router.post("/request", async (req, res) => {
       }
     } catch (emailErr) {
       console.error("❌ Failed to send Work Mode Request email:", emailErr);
-      // Don't block the request if email fails, just log it
     }
 
     res.status(201).json({ message: "Request submitted successfully" });

@@ -1,160 +1,109 @@
-// --- START OF FILE AdminProfile.jsx ---
-
 import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { updateUserProfile } from "../api";
-import { FaUserCircle, FaPhone, FaBriefcase } from "react-icons/fa";
+import { FaUserCircle, FaPhone, FaEnvelope, FaBuilding, FaUserTag, FaGlobe } from "react-icons/fa";
 
-const TABS = [
-  { key: "personal", label: "Personal Info", icon: <FaUserCircle /> },
-  { key: "contact", label: "Contact Info", icon: <FaPhone /> },
-  { key: "job", label: "Job Details", icon: <FaBriefcase /> },
+// Clean, essential fields only
+const FIELDS = [
+  { name: "name", label: "Full Name", icon: <FaUserCircle />, editable: true },
+  { name: "email", label: "Email Address", icon: <FaEnvelope />, editable: true },
+  { name: "phone", label: "Phone Number", icon: <FaPhone />, editable: true },
+  { name: "designation", label: "Designation", icon: <FaUserTag />, editable: true },
+  { name: "department", label: "Department", icon: <FaBuilding />, editable: true },
+  { name: "companyName", label: "Company Name", icon: <FaGlobe />, editable: true },
 ];
 
 const AdminProfile = () => {
   const { user, updateUser } = useContext(AuthContext);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({ ...user });
-  const [activeTab, setActiveTab] = useState("personal");
+  const [formData, setFormData] = useState({});
 
-  // Syncs the form data if the user object from context changes
   useEffect(() => {
-    setFormData({ ...user });
+    if (user) setFormData({ ...user });
   }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    // VALIDATION: Name should not accept numbers (only letters and spaces)
-    if (name === "name") {
-      const nameRegex = /^[A-Za-z\s]*$/;
-      if (!nameRegex.test(value)) return;
-    }
-
-    // VALIDATION: Phone number should not accept characters (only digits)
-    if (name === "phone") {
-      const phoneRegex = /^\d*$/;
-      if (!phoneRegex.test(value)) return;
-    }
-
+    // Basic validation for name and phone
+    if (name === "name" && !/^[A-Za-z\s]*$/.test(value)) return;
+    if (name === "phone" && !/^\d*$/.test(value)) return;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
-    // VALIDATION: Check for valid Email format (Gmail or generic valid email)
-    // If you strictly want ONLY @gmail.com, change regex to: /^[a-zA-Z0-9._%+-]+@gmail\.com$/
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    
-    if (formData.email && !emailRegex.test(formData.email)) {
-      alert("Please enter a valid email address (e.g., example@gmail.com).");
-      return;
-    }
-
     try {
       const { data } = await updateUserProfile(formData);
-      // Update the global context and sessionStorage with the fresh data from the server
       updateUser(data.user);
       setIsEditing(false);
+      alert("Profile updated successfully!");
     } catch (error) {
-      console.error("Failed to update profile:", error);
-      alert("Could not save changes. Please try again.");
+      alert("Failed to update profile.");
     }
   };
 
-  const handleCancel = () => {
-    setFormData(user); // Reset to original data from the context
-    setIsEditing(false);
-  };
-
-  if (!user) return <div className="p-6 text-center">Loading profile...</div>;
+  if (!user) return <div className="p-10 text-center">Loading...</div>;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto bg-white rounded-2xl shadow-xl">
-      <div className="flex flex-col items-center mb-6">
-        <FaUserCircle className="text-6xl text-blue-600 mb-2 drop-shadow" />
-        <h2 className="text-3xl font-bold text-blue-700 mb-2">Admin Profile</h2>
-        <div className="flex gap-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              className={`flex items-center gap-1 px-4 py-2 rounded-lg font-semibold transition-all duration-150 focus:outline-none text-base shadow-sm border-b-2 ${
-                activeTab === tab.key
-                  ? "bg-blue-600 text-white border-blue-700"
-                  : "bg-gray-100 text-gray-700 border-transparent hover:bg-blue-50"
-              }`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <span className="text-lg">{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+    <div className="max-w-3xl mx-auto my-10 bg-white shadow-xl rounded-2xl overflow-hidden border">
+      {/* Header */}
+      <div className="bg-blue-600 p-6 text-white text-center">
+        <FaUserCircle className="text-7xl mx-auto mb-2" />
+        <h2 className="text-2xl font-bold">{user.name}</h2>
+        <p className="text-blue-100">{user.email}</p>
       </div>
 
-      {!isEditing ? (
-        <div className="space-y-4 text-gray-800">
-          {activeTab === "personal" && (
-            <div className="space-y-2">
-              <p><strong>ID:</strong> {user._id}</p>
-              <p><strong>Name:</strong> {user.name}</p>
-            </div>
-          )}
-          {activeTab === "contact" && (
-            <div className="space-y-2">
-              <p><strong>Email:</strong> {user.email}</p>
-              <p><strong>Phone:</strong> {user.phone || 'N/A'}</p>
-            </div>
-          )}
-          {activeTab === "job" && (
-            <div className="space-y-2">
-              <p><strong>Role:</strong> {user.role}</p>
-              <p><strong>Department:</strong> {user.department}</p>
-            </div>
-          )}
-          <button onClick={() => setIsEditing(true)} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 shadow">
-            Edit Profile
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid gap-4">
-            {activeTab === "personal" && (
-              <label className="flex flex-col font-semibold">
-                Name:
-                <input name="name" value={formData.name || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" />
+      {/* Fields Grid - No Tabs */}
+      <div className="p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {FIELDS.map((field) => (
+            <div key={field.name} className="flex flex-col">
+              <label className="text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-2">
+                {field.icon} {field.label}
               </label>
-            )}
-            {activeTab === "contact" && (
-              <>
-                <label className="flex flex-col font-semibold">
-                  Email:
-                  <input name="email" value={formData.email || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" />
-                </label>
-                <label className="flex flex-col font-semibold">
-                  Phone:
-                  <input name="phone" value={formData.phone || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" maxLength={10} />
-                </label>
-              </>
-            )}
-            {activeTab === "job" && (
-              <>
-                <label className="flex flex-col font-semibold">
-                  Role:
-                  <input name="role" value={formData.role || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" />
-                </label>
-                <label className="flex flex-col font-semibold">
-                  Department:
-                  <input name="department" value={formData.department || ''} onChange={handleChange} className="w-full border px-3 py-2 rounded mt-1 font-normal" />
-                </label>
-              </>
-            )}
-          </div>
-          <div className="flex gap-4 mt-2">
-            <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 shadow">Save</button>
-            <button onClick={handleCancel} className="bg-gray-300 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400 shadow">Cancel</button>
-          </div>
+              
+              {isEditing ? (
+                <input
+                  name={field.name}
+                  value={formData[field.name] || ""}
+                  onChange={handleChange}
+                  className="w-full border-2 border-gray-100 rounded-lg px-3 py-2 focus:border-blue-500 outline-none transition-all"
+                />
+              ) : (
+                <div className="text-gray-800 font-medium py-2 px-1 border-b border-gray-50">
+                  {user[field.name] || "—"}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      )}
+
+        {/* Buttons */}
+        <div className="mt-10 flex gap-4">
+          {!isEditing ? (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors"
+            >
+              Edit Profile
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleSave}
+                className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setIsEditing(false); setFormData(user); }}
+                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

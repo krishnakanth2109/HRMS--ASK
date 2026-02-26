@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 // Import the functions we added to your api.js
-import { 
-    getPayrollCandidates, 
-    managePayrollCandidate, 
-    deletePayrollCandidate 
-} from '../api'; 
+import {
+    getPayrollCandidates,
+    managePayrollCandidate,
+    deletePayrollCandidate
+} from '../api';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
@@ -30,8 +30,8 @@ const PayrollPage = () => {
     const [files, setFiles] = useState({ profilePic: null, panDoc: null, aadhaarDoc: null });
     const [previewImage, setPreviewImage] = useState(null);
 
-    useEffect(() => { 
-        loadCandidates(); 
+    useEffect(() => {
+        loadCandidates();
     }, []);
 
     const loadCandidates = async () => {
@@ -40,7 +40,7 @@ const PayrollPage = () => {
             // ✅ Updated: Using api.js function instead of local axios
             const data = await getPayrollCandidates();
             setCandidates(data);
-        } catch (err) { 
+        } catch (err) {
             console.error("Error fetching", err);
             Swal.fire({
                 icon: 'error',
@@ -57,18 +57,18 @@ const PayrollPage = () => {
         const { name, value } = e.target;
         setFormData(prev => {
             const updated = { ...prev, [name]: value };
-            
+
             // Auto-calculate net salary when salary fields change
             if (name === 'agreedSalary' || name === 'pfDeduction' || name === 'ptDeduction' || name === 'otherDeductions') {
                 const agreedSalary = parseFloat(updated.agreedSalary) || 0;
                 const pfDeduction = parseFloat(updated.pfDeduction) || 0;
                 const ptDeduction = parseFloat(updated.ptDeduction) || 0;
                 const otherDeductions = parseFloat(updated.otherDeductions) || 0;
-                
+
                 const totalDeductions = pfDeduction + ptDeduction + otherDeductions;
                 updated.netSalary = (agreedSalary - totalDeductions).toFixed(2);
             }
-            
+
             return updated;
         });
     };
@@ -76,7 +76,7 @@ const PayrollPage = () => {
     const handleFileChange = (e, fileType) => {
         const file = e.target.files[0];
         setFiles(prev => ({ ...prev, [fileType]: file }));
-        
+
         if (fileType === 'profilePic' && file) {
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -88,7 +88,7 @@ const PayrollPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Show loading Swal
         Swal.fire({
             title: editId ? 'Updating Candidate...' : 'Saving Candidate...',
@@ -100,14 +100,14 @@ const PayrollPage = () => {
         });
 
         const data = new FormData();
-        
+
         // Append all text fields
         Object.keys(formData).forEach(key => {
             if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
                 data.append(key, formData[key]);
             }
         });
-        
+
         // Append files
         if (files.profilePic) data.append('profilePic', files.profilePic);
         if (files.panDoc) data.append('panDoc', files.panDoc);
@@ -116,7 +116,7 @@ const PayrollPage = () => {
         try {
             // ✅ Updated: Using api.js function (handles live URL and edit logic)
             await managePayrollCandidate(data, editId);
-            
+
             // Close Swal and show success message
             Swal.close();
             Swal.fire({
@@ -127,15 +127,15 @@ const PayrollPage = () => {
                 timer: 2000,
                 showConfirmButton: false
             });
-            
+
             setIsFormOpen(false);
             setEditId(null);
-            setFormData({ 
+            setFormData({
                 fullName: '', email: '', phone: '', gender: 'Male', dob: '', address: '', profilePic: '',
-                companyName: '', department: '', designation: '', employmentType: 'Full Time', 
+                companyName: '', department: '', designation: '', employmentType: 'Full Time',
                 joiningDate: '', agreedSalary: '', pfDeduction: '', ptDeduction: '', otherDeductions: '', netSalary: '',
-                bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '', branch: '', 
-                uanNumber: '', esiNumber: '' 
+                bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '', branch: '',
+                uanNumber: '', esiNumber: ''
             });
             setFiles({ profilePic: null, panDoc: null, aadhaarDoc: null });
             setPreviewImage(null);
@@ -175,10 +175,10 @@ const PayrollPage = () => {
                         Swal.showLoading();
                     }
                 });
-                
+
                 // ✅ Updated: Using api.js function
                 await deletePayrollCandidate(id);
-                
+
                 Swal.close();
                 Swal.fire({
                     icon: 'success',
@@ -188,7 +188,7 @@ const PayrollPage = () => {
                     timer: 1500,
                     showConfirmButton: false
                 });
-                
+
                 loadCandidates();
             } catch (err) {
                 console.error(err);
@@ -218,20 +218,20 @@ const PayrollPage = () => {
                     <h1 className="text-3xl font-bold text-gray-800">Payroll Candidates Management</h1>
                     <p className="text-gray-600 mt-1">Manage Payroll Candidates information and documents</p>
                 </div>
-                <button 
-                    onClick={() => { 
-                        setEditId(null); 
-                        setIsFormOpen(true); 
-                        setFormData({ 
+                <button
+                    onClick={() => {
+                        setEditId(null);
+                        setIsFormOpen(true);
+                        setFormData({
                             fullName: '', email: '', phone: '', gender: 'Male', dob: '', address: '', profilePic: '',
-                            companyName: '', department: '', designation: '', employmentType: 'Full Time', 
+                            companyName: '', department: '', designation: '', employmentType: 'Full Time',
                             joiningDate: '', agreedSalary: '', pfDeduction: '', ptDeduction: '', otherDeductions: '', netSalary: '',
-                            bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '', branch: '', 
-                            uanNumber: '', esiNumber: '' 
+                            bankName: '', accountHolderName: '', accountNumber: '', ifscCode: '', branch: '',
+                            uanNumber: '', esiNumber: ''
                         });
                         setFiles({ profilePic: null, panDoc: null, aadhaarDoc: null });
                         setPreviewImage(null);
-                    }} 
+                    }}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 font-semibold"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -246,7 +246,7 @@ const PayrollPage = () => {
                 <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
                     <h2 className="text-lg font-semibold text-gray-800">All Candidates ({candidates.length})</h2>
                 </div>
-                
+
                 {isTableLoading ? (
                     <div className="flex flex-col items-center justify-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
@@ -261,8 +261,8 @@ const PayrollPage = () => {
                         </div>
                         <h3 className="text-xl font-medium text-gray-700 mb-2">No candidates found</h3>
                         <p className="text-gray-500 mb-6">Add your first candidate to get started</p>
-                        <button 
-                            onClick={() => { setEditId(null); setIsFormOpen(true); }} 
+                        <button
+                            onClick={() => { setEditId(null); setIsFormOpen(true); }}
                             className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition"
                         >
                             Add First Candidate
@@ -289,7 +289,7 @@ const PayrollPage = () => {
                                         <tr key={user._id} className="hover:bg-blue-50 transition-colors duration-200">
                                             <td className="p-4 pl-6 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
-                                                    <div 
+                                                    <div
                                                         className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
                                                         onClick={() => {
                                                             setSelectedUser(user);
@@ -298,8 +298,8 @@ const PayrollPage = () => {
                                                         title="Click to view full size"
                                                     >
                                                         {user.profilePic ? (
-                                                            <img 
-                                                                src={user.profilePic} 
+                                                            <img
+                                                                src={user.profilePic}
                                                                 alt={user.fullName}
                                                                 className="w-full h-full rounded-full object-cover"
                                                             />
@@ -333,8 +333,8 @@ const PayrollPage = () => {
                                             </td>
                                             <td className="p-4 whitespace-nowrap">
                                                 <div className="flex justify-center gap-2">
-                                                    <button 
-                                                        onClick={() => { setSelectedUser(user); setIsViewOpen(true); }} 
+                                                    <button
+                                                        onClick={() => { setSelectedUser(user); setIsViewOpen(true); }}
                                                         className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                                                     >
                                                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -343,17 +343,17 @@ const PayrollPage = () => {
                                                         </svg>
                                                         View
                                                     </button>
-                                                    <button 
-                                                        onClick={() => { 
-                                                            setEditId(user._id); 
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditId(user._id);
                                                             setFormData({
                                                                 ...user,
                                                                 dob: user.dob?.split('T')[0],
                                                                 joiningDate: user.joiningDate?.split('T')[0]
-                                                            }); 
-                                                            setIsFormOpen(true); 
+                                                            });
+                                                            setIsFormOpen(true);
                                                             setPreviewImage(user.profilePic || null);
-                                                        }} 
+                                                        }}
                                                         className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                                                     >
                                                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -361,8 +361,8 @@ const PayrollPage = () => {
                                                         </svg>
                                                         Edit
                                                     </button>
-                                                    <button 
-                                                        onClick={() => deleteUser(user._id, user.fullName)} 
+                                                    <button
+                                                        onClick={() => deleteUser(user._id, user.fullName)}
                                                         className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                                                     >
                                                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -390,14 +390,14 @@ const PayrollPage = () => {
                                 <h2 className="text-2xl font-bold text-gray-800">{editId ? 'Edit Candidate' : 'Add New Candidate'}</h2>
                                 <p className="text-gray-600 text-sm mt-1">Fill in all required details below</p>
                             </div>
-                            <button 
-                                onClick={() => setIsFormOpen(false)} 
+                            <button
+                                onClick={() => setIsFormOpen(false)}
                                 className="text-3xl text-gray-400 hover:text-red-500 transition-colors duration-200"
                             >
                                 &times;
                             </button>
                         </div>
-                        
+
                         <form onSubmit={handleSubmit} className="space-y-8">
                             {/* Profile Picture Section */}
                             <div className="space-y-4">
@@ -409,9 +409,9 @@ const PayrollPage = () => {
                                     <div className="mb-4">
                                         <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center overflow-hidden">
                                             {previewImage || formData.profilePic ? (
-                                                <img 
-                                                    src={previewImage || formData.profilePic} 
-                                                    alt="Profile Preview" 
+                                                <img
+                                                    src={previewImage || formData.profilePic}
+                                                    alt="Profile Preview"
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
@@ -421,10 +421,10 @@ const PayrollPage = () => {
                                             )}
                                         </div>
                                     </div>
-                                    <input 
-                                        type="file" 
+                                    <input
+                                        type="file"
                                         onChange={(e) => handleFileChange(e, 'profilePic')}
-                                        className="hidden" 
+                                        className="hidden"
                                         id="profilePic"
                                         accept="image/*"
                                     />
@@ -444,7 +444,16 @@ const PayrollPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                                        <input name="fullName" placeholder="John Doe" value={formData.fullName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" required />
+                                        <input
+                                            name="fullName"
+                                            placeholder="John Doe"
+                                            value={formData.fullName}
+                                            onChange={handleInput}
+                                            pattern="[A-Za-z\s]+"
+                                            title="Only alphabets and spaces allowed"
+                                            required
+                                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
@@ -452,7 +461,17 @@ const PayrollPage = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-                                        <input name="phone" placeholder="+91 9876543210" value={formData.phone} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" required />
+                                        <input
+                                            name="phone"
+                                            placeholder="Enter 10 digit phone number"
+                                            value={formData.phone}
+                                            onChange={handleInput}
+                                            pattern="[0-9]{10}"
+                                            maxLength="10"
+                                            title="Enter valid 10 digit phone number"
+                                            required
+                                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -464,7 +483,14 @@ const PayrollPage = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                                        <input type="date" name="dob" value={formData.dob} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input
+                                            type="date"
+                                            name="dob"
+                                            value={formData.dob}
+                                            onChange={handleInput}
+                                            max={new Date().toISOString().split("T")[0]}
+                                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        />
                                     </div>
                                     <div className="md:col-span-3">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
@@ -482,7 +508,16 @@ const PayrollPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                                        <input name="companyName" placeholder="Company Name" value={formData.companyName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" required />
+                                        <input
+                                            name="companyName"
+                                            placeholder="Company Name"
+                                            value={formData.companyName}
+                                            onChange={handleInput}
+                                            pattern="[A-Za-z\s]+"
+                                            title="Only alphabets allowed"
+                                            required
+                                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
@@ -517,7 +552,16 @@ const PayrollPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Agreed Salary (₹)</label>
-                                        <input name="agreedSalary" type="number" placeholder="50000" value={formData.agreedSalary} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input
+                                            name="agreedSalary"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            placeholder="50000"
+                                            value={formData.agreedSalary}
+                                            onChange={handleInput}
+                                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">PF Deduction (₹)</label>
@@ -548,19 +592,24 @@ const PayrollPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                                        <input name="bankName" placeholder="Bank Name" value={formData.bankName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input name="bankName" placeholder="Bank Name" pattern="[A-Za-z\s]+"
+                                            title="Only alphabets allowed" value={formData.bankName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Account Holder Name</label>
-                                        <input name="accountHolderName" placeholder="Account Holder Name" value={formData.accountHolderName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input name="accountHolderName" pattern="[A-Za-z\s]+"
+                                            title="Only alphabets allowed" placeholder="Account Holder Name" value={formData.accountHolderName} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                                        <input name="accountNumber" placeholder="Account Number" value={formData.accountNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input name="accountNumber" pattern="[0-9]{9,18}"
+                                            title="Enter valid account number (9-18 digits)" placeholder="Account Number" value={formData.accountNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">IFSC Code</label>
-                                        <input name="ifscCode" placeholder="IFSC Code" value={formData.ifscCode} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                        <input name="ifscCode" pattern="^[A-Z]{4}0[A-Z0-9]{6}$"
+                                            title="Enter valid IFSC Code (e.g. SBIN0001234)"
+                                            style={{ textTransform: "uppercase" }} placeholder="IFSC Code" value={formData.ifscCode} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
@@ -580,10 +629,10 @@ const PayrollPage = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">PAN Card Upload</label>
                                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
-                                                <input 
-                                                    type="file" 
+                                                <input
+                                                    type="file"
                                                     onChange={(e) => setFiles({ ...files, panDoc: e.target.files[0] })}
-                                                    className="hidden" 
+                                                    className="hidden"
                                                     id="panDoc"
                                                 />
                                                 <label htmlFor="panDoc" className="cursor-pointer">
@@ -600,17 +649,18 @@ const PayrollPage = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">UAN Number</label>
-                                            <input name="uanNumber" placeholder="UAN Number" value={formData.uanNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                            <input name="uanNumber" pattern="[0-9]{12}"
+                                                title="Enter valid 12 digit UAN number" placeholder="UAN Number" value={formData.uanNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                         </div>
                                     </div>
                                     <div className="space-y-6">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Aadhaar Card Upload</label>
                                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
-                                                <input 
-                                                    type="file" 
+                                                <input
+                                                    type="file"
                                                     onChange={(e) => setFiles({ ...files, aadhaarDoc: e.target.files[0] })}
-                                                    className="hidden" 
+                                                    className="hidden"
                                                     id="aadhaarDoc"
                                                 />
                                                 <label htmlFor="aadhaarDoc" className="cursor-pointer">
@@ -627,22 +677,23 @@ const PayrollPage = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">ESI Number</label>
-                                            <input name="esiNumber" placeholder="ESI Number" value={formData.esiNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                            <input name="esiNumber" pattern="[0-9]{17}"
+                                                title="Enter valid 17 digit ESI number" placeholder="ESI Number" value={formData.esiNumber} onChange={handleInput} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setIsFormOpen(false)} 
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFormOpen(false)}
                                     className="bg-gray-100 text-gray-700 px-8 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200"
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-10 py-3 rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 font-semibold flex items-center gap-2"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -660,22 +711,22 @@ const PayrollPage = () => {
             {isProfilePicOpen && selectedUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 animate-fadeIn">
                     <div className="bg-white rounded-2xl w-full max-w-2xl p-8 relative shadow-2xl animate-slideUp">
-                        <button 
-                            onClick={() => setIsProfilePicOpen(false)} 
+                        <button
+                            onClick={() => setIsProfilePicOpen(false)}
                             className="absolute top-4 right-4 text-3xl text-gray-400 hover:text-red-500 transition-colors duration-200 z-10"
                         >
                             &times;
                         </button>
-                        
+
                         <div className="text-center">
                             <h2 className="text-2xl font-bold text-gray-800 mb-2">{selectedUser.fullName}</h2>
                             <p className="text-gray-600 mb-6">Profile Picture</p>
-                            
+
                             <div className="flex justify-center mb-6">
                                 <div className="w-64 h-64 rounded-full overflow-hidden border-4 border-white shadow-xl">
                                     {selectedUser.profilePic ? (
-                                        <img 
-                                            src={selectedUser.profilePic} 
+                                        <img
+                                            src={selectedUser.profilePic}
                                             alt={selectedUser.fullName}
                                             className="w-full h-full object-cover"
                                         />
@@ -686,10 +737,10 @@ const PayrollPage = () => {
                                     )}
                                 </div>
                             </div>
-                            
+
                             <div className="mt-4">
-                                <button 
-                                    onClick={() => setIsProfilePicOpen(false)} 
+                                <button
+                                    onClick={() => setIsProfilePicOpen(false)}
                                     className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
                                 >
                                     Close
@@ -704,16 +755,16 @@ const PayrollPage = () => {
             {isViewOpen && selectedUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fadeIn">
                     <div className="bg-white rounded-2xl w-full max-w-5xl p-8 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
-                        <button 
-                            onClick={() => setIsViewOpen(false)} 
+                        <button
+                            onClick={() => setIsViewOpen(false)}
                             className="absolute top-6 right-6 text-3xl text-gray-400 hover:text-red-500 transition-colors duration-200 z-10"
                         >
                             &times;
                         </button>
-                        
+
                         <div className="mb-8">
                             <div className="flex items-center gap-4 mb-4">
-                                <div 
+                                <div
                                     className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-3xl font-bold cursor-pointer hover:opacity-90 transition-opacity"
                                     onClick={() => {
                                         setIsViewOpen(false);
@@ -722,8 +773,8 @@ const PayrollPage = () => {
                                     title="Click to view full size"
                                 >
                                     {selectedUser.profilePic ? (
-                                        <img 
-                                            src={selectedUser.profilePic} 
+                                        <img
+                                            src={selectedUser.profilePic}
                                             alt={selectedUser.fullName}
                                             className="w-full h-full rounded-full object-cover"
                                         />
@@ -737,7 +788,7 @@ const PayrollPage = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Employee Details Card */}
                             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
@@ -892,10 +943,10 @@ const PayrollPage = () => {
                                         <p className="text-gray-600 mb-3">Uploaded Documents:</p>
                                         <div className="flex gap-3">
                                             {selectedUser.panDoc && (
-                                                <a 
-                                                    href={selectedUser.panDoc} 
-                                                    target="_blank" 
-                                                    rel="noreferrer" 
+                                                <a
+                                                    href={selectedUser.panDoc}
+                                                    target="_blank"
+                                                    rel="noreferrer"
                                                     className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-indigo-600 transition-colors duration-200 flex items-center gap-2"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -905,10 +956,10 @@ const PayrollPage = () => {
                                                 </a>
                                             )}
                                             {selectedUser.aadhaarDoc && (
-                                                <a 
-                                                    href={selectedUser.aadhaarDoc} 
-                                                    target="_blank" 
-                                                    rel="noreferrer" 
+                                                <a
+                                                    href={selectedUser.aadhaarDoc}
+                                                    target="_blank"
+                                                    rel="noreferrer"
                                                     className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-green-600 hover:to-emerald-600 transition-colors duration-200 flex items-center gap-2"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

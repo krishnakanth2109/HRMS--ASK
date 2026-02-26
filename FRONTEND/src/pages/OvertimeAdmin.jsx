@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { FaFilter, FaSearch, FaCalendarAlt, FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
-// ✅ IMPORT THE CENTRALIZED API FUNCTIONS (NO CHANGE)
+import { FaFilter, FaSearch, FaCalendarAlt, FaCheckCircle, FaClock, FaHourglassHalf, FaTimesCircle } from 'react-icons/fa';
 import { getAllOvertimeRequests, updateOvertimeStatus } from "../api";
 
 // --- START OF NEW UI COMPONENTS ---
@@ -112,6 +111,7 @@ const OvertimeAdmin = () => {
       return {
           approved: overtimeList.filter(ot => ot.status === 'APPROVED').length,
           pending: overtimeList.filter(ot => ot.status === 'PENDING').length,
+          rejected: overtimeList.filter(ot => ot.status === 'REJECTED').length, // ✅ ADDED: Rejected count
           workingToday: overtimeList.filter(ot => ot.status === 'APPROVED' && ot.date === today).length
       }
   }, [overtimeList]);
@@ -132,9 +132,12 @@ const OvertimeAdmin = () => {
         <h1 className="text-4xl font-bold text-indigo-900 mb-6">Overtime Dashboard</h1>
 
         {/* --- START OF NEW COUNT CONTAINERS UI --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* ✅ ADDED: Changed lg:grid-cols-3 to lg:grid-cols-4 to fit the 4th card nicely */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard icon={<FaCheckCircle />} title="Approved Overtime" value={counts.approved} color="text-green-500" />
             <StatCard icon={<FaHourglassHalf />} title="Pending Requests" value={counts.pending} color="text-yellow-500" />
+            {/* ✅ ADDED: Rejected StatCard */}
+            <StatCard icon={<FaTimesCircle />} title="Rejected Requests" value={counts.rejected} color="text-red-500" />
             <StatCard icon={<FaClock />} title="Working OT Today" value={counts.workingToday} color="text-blue-500" />
         </div>
         {/* --- END OF NEW COUNT CONTAINERS UI --- */}

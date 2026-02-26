@@ -687,6 +687,7 @@ const getBadgeCount = (link) => {
                   
                   {/* Parent Item */}
                   <div
+                    title={collapsed && !isMobile ? link.label : ""}
                     onClick={() => handleSubMenuClick(link.label)}
                     className={`flex items-center gap-4 px-4 py-2.5 rounded-lg text-base cursor-pointer
                       ${activeMenu === link.label ? "bg-slate-800 text-indigo-400" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"}
@@ -746,6 +747,7 @@ const getBadgeCount = (link) => {
               <li key={link.to}>
                 <NavLink 
                   to={link.to} 
+                  title={collapsed && !isMobile ? link.label : ""}
                   // ✅ FIXED: CLICKING SINGLE LINK CLOSES ANY OPEN NESTED MENUS
                   onClick={() => setActiveMenu(null)}
                   className={({ isActive }) => `flex items-center gap-4 px-4 py-2.5 rounded-lg text-base border-l-4 ${isActive ? "bg-slate-800 text-indigo-400 border-indigo-500" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border-transparent"} ${collapsed && !isMobile ? "justify-center px-2" : ""}`}

@@ -1,11 +1,13 @@
 // --- START OF FILE TodayOverview.jsx ---
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api, {
   getAttendanceByDateRange,
   getLeaveRequests,
   getEmployees,
-  getAllShifts
+  getAllShifts,
+  deactivateEmployeeById // ✅ IMPORTED deactivate function
 } from "../api";
 import {
   FaClock,
@@ -29,9 +31,12 @@ import {
   FaUserCheck,
   FaList,
   FaThLarge,
-  FaFilter
+  FaFilter,
+  FaMapMarkerAlt,
+  FaTrash // ✅ IMPORTED FaTrash
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
+import Swal from 'sweetalert2';
 
 // --- Helper functions ---
 const getSecureUrl = (url) => {
@@ -122,6 +127,58 @@ const calculateLoginStatus = (punchInTime, shiftData, apiStatus) => {
 };
 
 // --- Components ---
+
+// ✅ ADDED DeactivateModal (Copied from EmployeeManagement)
+const DeactivateModal = ({ open, employee, onClose, onSubmit }) => {
+  const [endDate, setEndDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setEndDate("");
+      setReason("");
+      setError("");
+    }
+  }, [open]);
+
+  if (!open || !employee) return null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!endDate || !reason.trim()) {
+      setError("All fields are required.");
+      return;
+    }
+    setError("");
+    onSubmit({ endDate, reason });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-xl font-bold mb-2 text-gray-900">Deactivate Employee</h3>
+        <p className="mb-4 text-gray-600">Deactivating <b>{employee.employeeName || employee.name}</b>.</p>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Date</label>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1 focus:ring-2 focus:ring-red-500 outline-none" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Reason</label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1 focus:ring-2 focus:ring-red-500 outline-none" rows={3} required />
+          </div>
+          {error && <div className="text-red-600 text-sm">{error}</div>}
+          <div className="flex gap-2 justify-end mt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 transition">Cancel</button>
+            <button type="submit" className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition">Deactivate</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 
 const LoginStatusBadge = ({ status }) => {
   const config = {
@@ -500,7 +557,8 @@ const MessageModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   );
 };
 
-const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick }) => {
+// ✅ ADDED onDeactivateClick prop to EmployeeCard
+const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick, onNameClick, onDeactivateClick }) => {
   const profilePic = employee.profilePic;
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -550,7 +608,11 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
             </div>
 
             <div className="overflow-hidden">
-              <h3 className="font-semibold text-slate-900 text-base truncate" title={employee.employeeName}>
+              <h3
+                className="font-semibold text-slate-900 text-base truncate cursor-pointer hover:text-blue-700 hover:underline"
+                title={employee.employeeName}
+                onClick={() => onNameClick(employee.employeeId)}
+              >
                 {employee.employeeName}
               </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -567,7 +629,6 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
           </div>
 
           <div className="relative">
-            {/* ✅ FIXED: REMOVED CHECK FOR PHONE NUMBER SO ICON ALWAYS SHOWS */}
             <button
               onClick={toggleDropdown}
               className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
@@ -581,7 +642,7 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                  className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden"
+                  className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="py-1">
@@ -604,6 +665,17 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                     >
                       <FaEnvelope className="text-xs" />
                       Message
+                    </button>
+                    {/* ✅ ADDED Deactivate Button to Card Menu */}
+                    <button
+                      onClick={() => {
+                        onDeactivateClick(employee);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <FaTrash className="text-xs" />
+                      Deactivate
                     </button>
                   </div>
                 </motion.div>
@@ -643,6 +715,7 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
             </div>
           </div>
 
+
           {category === 'WORKING' && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500">Duration</span>
@@ -662,11 +735,76 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
   );
 };
 
-// --- Table View Component ---
-const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
+// ✅ ADDED TableActionMenu component to handle dropdown in table view
+const TableActionMenu = ({ employee, onCall, onMessage, onDeactivate }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => { document.removeEventListener("mousedown", handleClickOutside); };
+  }, []);
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
+      >
+        <button
+          onClick={() => setOpen(!open)}
+          className="inline-flex items-center gap-1.5 bg-white text-gray-800 border border-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm hover:bg-gray-50 hover:border-gray-300 transition"
+        >
+          Actions
+          <svg
+            className={`w-4 h-4 transition-transform duration-200 ${isMenuOpen ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </button>
+      {isMenuOpen && (
+        <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-xl z-20 border border-slate-200 overflow-hidden origin-top-right">
+          <div className="py-1">
+            <button
+              onClick={() => { onCall(employee); setIsMenuOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+            >
+              <FaPhone className="text-xs" /> Call
+            </button>
+            <button
+              onClick={() => { onMessage(employee); setIsMenuOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+            >
+              <FaEnvelope className="text-xs" /> Message
+            </button>
+            <button
+              onClick={() => { onDeactivate(employee); setIsMenuOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+            >
+              <FaTrash className="text-xs" /> Deactivate
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Table View Component ---
+// ✅ UPDATED TableView to include TableActionMenu
+const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClick, onDeactivateClick }) => {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden" style={{ minHeight: "400px" }}> {/* Added minHeight to allow dropdowns to show near bottom */}
+      <div className="overflow-x-auto overflow-y-visible"> {/* Allow overflow for dropdowns */}
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -680,7 +818,7 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                 Punch In / Out
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Duration / Notes
+                Duration
               </th>
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Actions
@@ -705,7 +843,12 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                       )}
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-slate-900">{employee.employeeName}</div>
+                      <div
+                        className="text-sm font-medium text-slate-900 cursor-pointer hover:text-blue-700 hover:underline"
+                        onClick={() => onNameClick(employee.employeeId)}
+                      >
+                        {employee.employeeName}
+                      </div>
                       <div className="text-xs text-slate-500">{employee.department} • {employee.employeeId}</div>
                     </div>
                   </div>
@@ -745,23 +888,13 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {/* ✅ FIXED: REMOVED CHECK FOR PHONE NUMBER */}
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => onCallClick(employee)}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                      title="Call"
-                    >
-                      <FaPhoneAlt size={14} />
-                    </button>
-                    <button
-                      onClick={() => onMessageClick(employee)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-                      title="Message"
-                    >
-                      <FaComment size={14} />
-                    </button>
-                  </div>
+                  {/* ✅ Using TableActionMenu for actions */}
+                  <TableActionMenu
+                    employee={employee}
+                    onCall={onCallClick}
+                    onMessage={onMessageClick}
+                    onDeactivate={onDeactivateClick}
+                  />
                 </td>
               </tr>
             ))}
@@ -775,6 +908,8 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick }) => {
 
 // --- Main Component ---
 const TodayOverview = () => {
+  const navigate = useNavigate();
+
   // State
   const [attendanceData, setAttendanceData] = useState([]);
   const [leaveData, setLeaveData] = useState([]);
@@ -793,6 +928,8 @@ const TodayOverview = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [callModal, setCallModal] = useState({ isOpen: false, employee: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, employee: null });
+  // ✅ ADDED Deactivate Modal State
+  const [deactivateModal, setDeactivateModal] = useState({ isOpen: false, employee: null });
 
   // Optimized data fetch
   const fetchAllData = useCallback(async () => {
@@ -917,6 +1054,7 @@ const TodayOverview = () => {
         department: emp?.experienceDetails?.[0]?.department || 'Unassigned',
         punchIn: null,
         punchOut: null,
+        punchInLocation: null,
         loginStatus: { status: "--", isLate: false },
         profilePic: employeeImages[leave.employeeId],
         phoneNumber
@@ -940,6 +1078,7 @@ const TodayOverview = () => {
           department: emp?.experienceDetails?.[0]?.department || 'Unassigned',
           punchIn: null,
           punchOut: null,
+          punchInLocation: null,
           loginStatus: { status: "--", isLate: false },
           profilePic: employeeImages[id],
           phoneNumber
@@ -996,6 +1135,22 @@ const TodayOverview = () => {
       );
     }
 
+    // Sort by recent login (punchIn) descending - most recent at the top
+    filtered = [...filtered].sort((a, b) => {
+      if (!a.punchIn && !b.punchIn) return 0;
+      if (!a.punchIn) return 1;
+      if (!b.punchIn) return -1;
+
+      const timeA = new Date(a.punchIn).getTime();
+      const timeB = new Date(b.punchIn).getTime();
+
+      if (isNaN(timeA) && isNaN(timeB)) return 0;
+      if (isNaN(timeA)) return 1;
+      if (isNaN(timeB)) return -1;
+
+      return timeB - timeA;
+    });
+
     return filtered;
   }, [departmentFilteredData, filterType, searchTerm]);
 
@@ -1024,6 +1179,54 @@ const TodayOverview = () => {
   // Handlers
   const handleCallClick = (employee) => setCallModal({ isOpen: true, employee });
   const handleMessageClick = (employee) => setMessageModal({ isOpen: true, employee });
+  const handleNameClick = (employeeId) => navigate(`/employee/${employeeId}/profile`);
+
+  // ✅ ADDED Deactivate Handlers
+  const handleDeactivateClick = (employee) => setDeactivateModal({ isOpen: true, employee });
+
+const handleDeactivateSubmit = async ({ endDate, reason }) => {
+    if (!deactivateModal.employee) return;
+
+    // 1. Show Loading Alert
+    Swal.fire({
+      title: 'Deactivating...',
+      text: 'Please wait while we update the employee status.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      await deactivateEmployeeById(deactivateModal.employee.employeeId, { endDate, reason });
+      
+      // Close the React Modal
+      setDeactivateModal({ isOpen: false, employee: null });
+      
+      // Refresh data
+      fetchAllData();
+
+      // 2. Show Success Alert
+      Swal.fire({
+        icon: 'success',
+        title: 'Deactivated!',
+        text: `${deactivateModal.employee.employeeName} has been successfully deactivated.`,
+        confirmButtonColor: '#dc2626' // Red color to match context
+      });
+
+    } catch (e) {
+      console.error("Error deactivating employee", e);
+      const errorMessage = e.response?.data?.message || "An unexpected error occurred.";
+
+      // 3. Show Error Alert
+      Swal.fire({
+        icon: 'error',
+        title: 'Deactivation Failed',
+        text: errorMessage,
+        confirmButtonColor: '#374151'
+      });
+    }
+  };
 
   // Auto-refresh
   useEffect(() => {
@@ -1070,8 +1273,8 @@ const TodayOverview = () => {
                 onClick={fetchAllData}
                 disabled={loading}
                 className={`px-3.5 py-2.5 font-medium rounded-lg transition-all text-sm flex items-center gap-1.5 whitespace-nowrap ${loading
-                    ? 'bg-slate-300 text-slate-700 cursor-not-allowed'
-                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                  ? 'bg-slate-300 text-slate-700 cursor-not-allowed'
+                  : 'bg-slate-800 text-white hover:bg-slate-900'
                   }`}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
@@ -1219,6 +1422,8 @@ const TodayOverview = () => {
                   onImageClick={setPreviewImage}
                   onCallClick={handleCallClick}
                   onMessageClick={handleMessageClick}
+                  onNameClick={handleNameClick}
+                  onDeactivateClick={handleDeactivateClick} // ✅ PASSED DEACTIVATE HANDLER
                 />
               ))}
             </div>
@@ -1228,6 +1433,8 @@ const TodayOverview = () => {
               onImageClick={setPreviewImage}
               onCallClick={handleCallClick}
               onMessageClick={handleMessageClick}
+              onNameClick={handleNameClick}
+              onDeactivateClick={handleDeactivateClick} // ✅ PASSED DEACTIVATE HANDLER
             />
           )
         )}
@@ -1273,59 +1480,64 @@ const TodayOverview = () => {
       </main>
 
       {/* Modals */}
-{/* Modals */}
-<AnimatePresence>
-  {callModal.isOpen && (
-    <CallModal
-      isOpen={callModal.isOpen}
-      onClose={() => setCallModal({ isOpen: false, employee: null })}
-      employee={callModal.employee}
-      phoneNumber={callModal.employee?.phoneNumber}
-    />
-  )}
+      <AnimatePresence>
+        {callModal.isOpen && (
+          <CallModal
+            isOpen={callModal.isOpen}
+            onClose={() => setCallModal({ isOpen: false, employee: null })}
+            employee={callModal.employee}
+            phoneNumber={callModal.employee?.phoneNumber}
+          />
+        )}
 
-  {messageModal.isOpen && (
-    <MessageModal
-      isOpen={messageModal.isOpen}
-      onClose={() => setMessageModal({ isOpen: false, employee: null })}
-      employee={messageModal.employee}
-      phoneNumber={messageModal.employee?.phoneNumber}
-    />
-  )}
+        {messageModal.isOpen && (
+          <MessageModal
+            isOpen={messageModal.isOpen}
+            onClose={() => setMessageModal({ isOpen: false, employee: null })}
+            employee={messageModal.employee}
+            phoneNumber={messageModal.employee?.phoneNumber}
+          />
+        )}
 
-  {previewImage && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
-      onClick={() => setPreviewImage(null)}
-    >
-      <motion.div
-        initial={{ scale: 0.9 }}
-        animate={{ scale: 1 }}
-        exit={{ scale: 0.9 }}
-        onClick={e => e.stopPropagation()}
-        className="relative w-64 h-64"
-      >
-        {/* ❌ CLOSE BUTTON ON CIRCLE BORDER */}
-        <button
-          onClick={() => setPreviewImage(null)}
-          className="absolute -top-3 -right-3 bg-white text-black rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:scale-110 transition"
-        >
-          <FaTimes size={16} />
-        </button>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              onClick={e => e.stopPropagation()}
+              className="relative w-64 h-64"
+            >
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute -top-3 -right-3 bg-white text-black rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:scale-110 transition"
+              >
+                <FaTimes size={16} />
+              </button>
 
-        {/* PROFILE IMAGE */}
-        <img
-          src={previewImage}
-          alt="Profile"
-          className="w-full h-full rounded-full object-cover border-4 border-white shadow-2xl"
-        />
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+              <img
+                src={previewImage}
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover border-4 border-white shadow-2xl"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ✅ ADDED Deactivate Modal Render */}
+      <DeactivateModal
+        open={deactivateModal.isOpen}
+        employee={deactivateModal.employee}
+        onClose={() => setDeactivateModal({ isOpen: false, employee: null })}
+        onSubmit={handleDeactivateSubmit}
+      />
 
     </div>
   );

@@ -272,7 +272,7 @@ const fetchAllExpenses = async () => {
                       <td className="p-4">
                         <div>
                           {getStatusBadge(expense.status)}
-                          {formatActionDate(expense.actionDate)}
+                    
                         </div>
                       </td>
 
