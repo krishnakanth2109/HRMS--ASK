@@ -69,6 +69,9 @@ const DailySchema = new mongoose.Schema({
     adminComment: { type: String, default: null }
   },
 
+  // ✅ Track if employee did a final punch out (not just a break)
+  isFinalPunchOut: { type: Boolean, default: false },
+
   adminPunchOut: { type: Boolean, default: false },
   adminPunchOutBy: { type: String, default: null },
   adminPunchOutTimestamp: { type: Date, default: null },

@@ -10,6 +10,7 @@ import api, {
   getEmployees,
   approveLeaveRequestById,
   rejectLeaveRequestById,
+  getAttendanceByDateRange,
 } from "../api";
 import {
   FaFilter,
@@ -178,14 +179,128 @@ const AdminLeavePanel = () => {
     return enrichedLeaveList.filter((req) => req.status === "Approved" && today >= req.from && today <= req.to).length;
   }, [enrichedLeaveList]);
 
-  // ✅ ACTION HANDLER (Approve/Reject)
-  const handleAction = (id, action) => {
+  // ✅ Helper: Admin Punch Out API call (taken from AdminviewAttendance)
+  const adminPunchOut = async (employeeId, dateOfRecord) => {
+    const location = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error("Geolocation not supported")); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => reject(new Error("Unable to get location")),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+    const punchOutTime = new Date().toISOString();
+    const response = await api.post(`/api/attendance/admin-punch-out`, {
+      employeeId,
+      punchOutTime,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      adminId: 'Admin',
+      date: dateOfRecord,
+    });
+    return response;
+  };
+
+  // ✅ ACTION HANDLER (Approve/Reject) — with working-status punch-out check on approve
+  const handleAction = async (id, action) => {
     // 1. Close dropdown immediately
     setOpenDropdownId(null);
 
     const isApprove = action === 'approve';
 
-    // 2. Open Confirmation Alert
+    // 2. If approving, check if employee is currently working on a day that overlaps today
+    if (isApprove) {
+      const leave = enrichedLeaveList.find((l) => l._id === id);
+      if (leave) {
+        const today = new Date().toISOString().slice(0, 10);
+        const leaveCoversToday = today >= leave.from && today <= leave.to;
+
+        if (leaveCoversToday) {
+          try {
+            // Use the same getAttendanceByDateRange(today, today) and filter by employeeId
+            const todayRecords = await getAttendanceByDateRange(today, today);
+            const records = Array.isArray(todayRecords) ? todayRecords : [];
+            const todayRecord = records.find(
+              (r) => r.employeeId === leave.employeeId
+            );
+
+            const isWorking = todayRecord && todayRecord.punchIn && !todayRecord.punchOut;
+
+            if (isWorking) {
+              // Show custom SweetAlert with 3 action buttons
+              const result = await Swal.fire({
+                title: `⚠️ ${leave.employeeName} is Currently Working!`,
+                html: `<p style="color:#475569;font-size:14px;margin-top:4px;">This employee is punched in today but not punched out yet.<br/>What would you like to do?</p>`,
+                icon: 'warning',
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: '🕐 Punch Out & Approve',
+                denyButtonText: '✅ Approve Only',
+                cancelButtonText: '❌ Reject',
+                confirmButtonColor: '#3B82F6',
+                denyButtonColor: '#10B981',
+                cancelButtonColor: '#EF4444',
+                reverseButtons: false,
+                allowOutsideClick: false,
+              });
+
+              if (result.isDismissed && result.dismiss === Swal.DismissReason.backdrop) return;
+
+              if (result.isConfirmed) {
+                // Punch Out & Approve
+                try {
+                  Swal.fire({ title: 'Processing...', text: 'Punching out and approving leave...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  await adminPunchOut(leave.employeeId, today);
+                  await approveLeaveRequestById(id);
+                  await fetchAllData();
+                  Swal.fire('Done!', `${leave.employeeName} has been punched out and leave approved.`, 'success');
+                } catch (err) {
+                  console.error("Punch out & approve failed", err);
+                  Swal.fire('Error!', err.message || 'Failed to process. Please try again.', 'error');
+                }
+                return;
+              }
+
+              if (result.isDenied) {
+                // Approve only
+                try {
+                  Swal.fire({ title: 'Processing...', text: 'Approving leave...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  await approveLeaveRequestById(id);
+                  await fetchAllData();
+                  Swal.fire('Approved!', 'Leave request has been approved.', 'success');
+                } catch (err) {
+                  console.error("Approve failed", err);
+                  Swal.fire('Error!', 'Failed to approve. Please try again.', 'error');
+                }
+                return;
+              }
+
+              if (result.dismiss === Swal.DismissReason.cancel) {
+                // Reject
+                try {
+                  Swal.fire({ title: 'Processing...', text: 'Rejecting leave...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  await rejectLeaveRequestById(id);
+                  await fetchAllData();
+                  Swal.fire('Rejected!', 'Leave request has been rejected.', 'success');
+                } catch (err) {
+                  console.error("Reject failed", err);
+                  Swal.fire('Error!', 'Failed to reject. Please try again.', 'error');
+                }
+                return;
+              }
+
+              // If user closed the dialog somehow, just return
+              return;
+            }
+          } catch (err) {
+            // If attendance check fails, log it and fall through to normal flow
+            console.warn("Could not check today's attendance status:", err);
+          }
+        }
+      }
+    }
+
+    // 3. Standard Confirmation Alert (no working conflict or reject action)
     Swal.fire({
       title: isApprove ? 'Approve Request?' : 'Reject Request?',
       text: `Are you sure you want to ${action} this leave request?`,
@@ -197,35 +312,17 @@ const AdminLeavePanel = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          // 3. Show loading
-          Swal.fire({
-            title: 'Processing...',
-            text: 'Please wait',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
-          });
-
-          // 4. Call API
+          Swal.fire({ title: 'Processing...', text: 'Please wait', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           if (isApprove) {
             await approveLeaveRequestById(id);
           } else {
             await rejectLeaveRequestById(id);
           }
-
-          await fetchAllData(); // 5. Refresh Data
-
-          Swal.fire(
-            'Success!',
-            `Leave request has been ${action}d.`,
-            'success'
-          );
+          await fetchAllData();
+          Swal.fire('Success!', `Leave request has been ${action}d.`, 'success');
         } catch (error) {
           console.error("Action failed", error);
-          Swal.fire(
-            'Error!',
-            'Failed to update request. Please try again.',
-            'error'
-          );
+          Swal.fire('Error!', 'Failed to update request. Please try again.', 'error');
         }
       }
     });

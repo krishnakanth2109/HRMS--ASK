@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
 import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api";
-import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, FaExchangeAlt, FaCheck, FaHome } from "react-icons/fa";
+import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, FaExchangeAlt, FaCheck, FaHome, FaList, FaLayerGroup, FaChevronDown, FaChevronUp, FaInfoCircle } from "react-icons/fa";
 import { toBlob } from 'html-to-image';
 
 // ==========================================
@@ -38,7 +38,7 @@ const getShiftDurationInHours = (startTime, endTime) => {
 };
 
 const formatDecimalHours = (decimalHours) => {
-  if (decimalHours === undefined || decimalHours === null || isNaN(decimalHours)) return "--";
+  if (decimalHours === undefined || decimalHours === null || isNaN(decimalHours)) return "0h 0m";
   const hours = Math.floor(decimalHours);
   const minutes = Math.round((decimalHours - hours) * 60);
   if (minutes === 0) return `${hours}h`;
@@ -149,7 +149,7 @@ const LiveTimer = ({ startTime }) => {
 };
 
 // ==========================================
-// ✅ NEW COMPONENT: Attendance Comparison Modal
+// ✅ Attendance Comparison Modal
 // ==========================================
 const AttendanceComparisonModal = ({ isOpen, onClose, selectedStats, employeeImages, startDate, endDate }) => {
   if (!isOpen) return null;
@@ -307,6 +307,9 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
 
 const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holidays, dateRange, employeeImages }) => {
   const contentRef = useRef(null);
+  const [viewMode, setViewMode] = useState("daily"); // "daily" or "weekly"
+  const [expandedWeeks, setExpandedWeeks] = useState({});
+
   const completeHistory = useMemo(() => {
     if (!isOpen || !employeeData || !dateRange.startDate || !dateRange.endDate) return [];
     const history = [];
@@ -324,10 +327,17 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
       const isWeeklyOff = weeklyOffs.includes(dayOfWeek);
       const isWorkingDay = !holidayObj && !isWeeklyOff;
       let workedStatus = "--"; let loginStatus = "--"; let displayTime = "--"; let punchIn = null; let punchOut = null; let rowClass = ""; let shiftDuration = adminFullDayHours;
+      let actualWorkedHours = 0;
+
       if (record) {
         punchIn = record.punchIn; punchOut = record.punchOut; displayTime = record.displayTime;
         loginStatus = calculateLoginStatus(record.punchIn, shift, record.loginStatus);
         workedStatus = getWorkedStatus(record.punchIn, record.punchOut, record.status, adminFullDayHours, adminHalfDayHours);
+
+        if (punchIn && punchOut) {
+          actualWorkedHours = (new Date(punchOut) - new Date(punchIn)) / (1000 * 60 * 60);
+        }
+
         if (workedStatus === "Absent") rowClass = "bg-red-50/50 hover:bg-red-50";
         else if (workedStatus === "Half Day") rowClass = "bg-yellow-50/50 hover:bg-yellow-50";
         else rowClass = "hover:bg-gray-50";
@@ -336,10 +346,55 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
         else if (holidayObj) { workedStatus = `Holiday: ${holidayObj.name}`; rowClass = "bg-purple-50/50 text-purple-700 hover:bg-purple-50"; shiftDuration = 0; }
         else if (isWeeklyOff) { workedStatus = "Weekly Off"; rowClass = "bg-gray-100/50 text-gray-500 hover:bg-gray-100"; shiftDuration = 0; }
       }
-      history.push({ date: dateStr, punchIn, punchOut, shiftHours: shiftDuration, displayTime, loginStatus, workedStatus, isWorkingDay, isAbsent: workedStatus.includes("Absent"), isFullDay: workedStatus === "Full Day", isHalfDay: workedStatus === "Half Day", isPresent: !!punchIn, rowClass });
+      history.push({ date: dateStr, punchIn, punchOut, shiftHours: shiftDuration, actualWorkedHours, displayTime, loginStatus, workedStatus, isWorkingDay, isAbsent: workedStatus.includes("Absent"), isFullDay: workedStatus === "Full Day", isHalfDay: workedStatus === "Half Day", isPresent: !!punchIn, rowClass });
     }
     return history.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [isOpen, employeeData, shiftsMap, holidays, dateRange]);
+
+  const weeklyHistory = useMemo(() => {
+    if (viewMode !== "weekly") return [];
+
+    const weeks = {};
+    const sortedDaily = [...completeHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    sortedDaily.forEach(day => {
+      const date = new Date(day.date);
+      const dayOfWeek = date.getDay();
+      const diff = date.getDate() - dayOfWeek;
+      const weekStart = new Date(date.setDate(diff));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekKey = weekStart.toISOString().split('T')[0];
+
+      if (!weeks[weekKey]) {
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weeks[weekKey] = {
+          weekStart: weekKey,
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          days: [],
+          totalHours: 0,
+          stats: { full: 0, half: 0, absent: 0, late: 0 }
+        };
+      }
+
+      weeks[weekKey].days.push(day);
+      weeks[weekKey].totalHours += day.actualWorkedHours || 0;
+
+      // Update Weekly Stats
+      if (day.isWorkingDay) {
+        if (day.isFullDay) weeks[weekKey].stats.full++;
+        else if (day.isHalfDay) weeks[weekKey].stats.half++;
+        else if (day.isAbsent) weeks[weekKey].stats.absent++;
+        if (day.loginStatus === "LATE") weeks[weekKey].stats.late++;
+      }
+    });
+
+    return Object.values(weeks).sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+  }, [completeHistory, viewMode]);
+
+  const toggleWeekExpansion = (weekKey) => {
+    setExpandedWeeks(prev => ({ ...prev, [weekKey]: !prev[weekKey] }));
+  };
 
   const stats = useMemo(() => {
     return completeHistory.reduce((acc, curr) => {
@@ -397,6 +452,7 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
             <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2 hover:bg-slate-50 rounded-full"><FaTimes size={20} /></button>
           </div>
         </div>
+
         <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar" ref={contentRef}>
           <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4 sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm pb-6 border-b border-slate-200/50">
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow">
@@ -420,38 +476,154 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
               <span className="text-2xl font-bold text-slate-800">{stats.absent}</span>
             </div>
           </div>
+
+          <div className="px-5 mb-4">
+            <div className="flex bg-slate-200/50 p-1 rounded-xl w-fit border border-slate-200">
+              <button
+                onClick={() => setViewMode("daily")}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "daily" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                <FaList /> Daily History
+              </button>
+              <button
+                onClick={() => setViewMode("weekly")}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "weekly" ? "bg-white text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                <FaLayerGroup /> Weekly Report
+              </button>
+            </div>
+          </div>
+
           <div className="px-5 pb-10">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-                <table className="min-w-full text-sm text-left border-collapse">
-                  <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold sticky top-0 z-20 shadow-sm">
-                    <tr>
-                      <th className="px-6 py-4 whitespace-nowrap">Date</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Punch In</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Punch Out</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Assigned</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Duration</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Login Status</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Worked Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
-                      <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
-                        <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-50">
-                          {formatDateDMY(item.date)}
-                          <div className="text-[10px] font-normal text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}</div>
-                        </td>
-                        <td className="px-6 py-4 text-green-600 font-medium whitespace-nowrap">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-                        <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDecimalHours(item.shiftHours)}</td>
-                        <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">{item.displayTime}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{item.loginStatus !== "--" && (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"}`}>{item.loginStatus}</span>)}</td>
-                        <td className="px-6 py-4 font-semibold whitespace-nowrap"><span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : item.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{item.workedStatus}</span></td>
+
+                {viewMode === "daily" ? (
+                  <table className="min-w-full text-sm text-left border-collapse">
+                    <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold sticky top-0 z-20 shadow-sm">
+                      <tr>
+                        <th className="px-6 py-4 whitespace-nowrap">Date</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Punch In</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Punch Out</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Assigned</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Duration</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Login Status</th>
+                        <th className="px-6 py-4 whitespace-nowrap">Worked Status</th>
                       </tr>
-                    ))) : (<tr><td colSpan="7" className="text-center p-10 text-slate-500">No data for selected range.</td></tr>)}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
+                        <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
+                          <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-50">
+                            {formatDateDMY(item.date)}
+                            <div className="text-[10px] font-normal text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                          </td>
+                          <td className="px-6 py-4 text-green-600 font-medium whitespace-nowrap">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                          <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                          <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDecimalHours(item.shiftHours)}</td>
+                          <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">{item.displayTime}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.loginStatus !== "--" && (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"}`}>{item.loginStatus}</span>)}</td>
+                          <td className="px-6 py-4 font-semibold whitespace-nowrap"><span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : item.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{item.workedStatus}</span></td>
+                        </tr>
+                      ))) : (<tr><td colSpan="7" className="text-center p-10 text-slate-500">No data for selected range.</td></tr>)}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="space-y-6 p-4 bg-slate-50/50">
+                    {weeklyHistory.length > 0 ? (weeklyHistory.map((week, wIdx) => {
+                      const isExpanded = expandedWeeks[week.weekStart];
+                      return (
+                        <div key={wIdx} className="bg-white border border-slate-200 rounded-xl shadow-md overflow-hidden transition-all duration-300">
+                          <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+                            <div className="flex items-end gap-4">
+                              <div>
+                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-1">Weekly Range</span>
+                                <span className="font-bold">{formatDateDMY(week.weekStart)} — {formatDateDMY(week.weekEnd)}</span>
+                              </div>
+                              <button
+                                onClick={() => toggleWeekExpansion(week.weekStart)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-[10px] font-bold uppercase transition-colors"
+                              >
+                                <FaInfoCircle /> {isExpanded ? "Hide Report" : "View Detailed Report"} {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                              </button>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-1">Total Weekly Work Hours</span>
+                              <span className="text-xl font-black text-green-400 font-mono">{formatDecimalHours(week.totalHours)}</span>
+                            </div>
+                          </div>
+
+                          {/* ✅ NEW: Expandable Summary Section */}
+                          {isExpanded && (
+                            <div className="p-4 bg-slate-100 border-b border-slate-200 grid grid-cols-4 gap-4 animate-in slide-in-from-top duration-300">
+                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-green-500">
+                                <p className="text-[9px] font-black uppercase text-slate-400">Full Days</p>
+                                <p className="text-lg font-bold text-slate-800">{week.stats.full}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-yellow-500">
+                                <p className="text-[9px] font-black uppercase text-slate-400">Half Days</p>
+                                <p className="text-lg font-bold text-slate-800">{week.stats.half}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-red-500">
+                                <p className="text-[9px] font-black uppercase text-slate-400">Absents</p>
+                                <p className="text-lg font-bold text-slate-800">{week.stats.absent}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-purple-500">
+                                <p className="text-[9px] font-black uppercase text-slate-400">Late Logins</p>
+                                <p className="text-lg font-bold text-slate-800">{week.stats.late}</p>
+                              </div>
+                            </div>
+                          )}
+                          <table className="min-w-full text-xs text-left border-separate border-spacing-y-2">
+
+                            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                              <tr>
+                                <th className="px-4 py-3">Day</th>
+                                <th className="px-4 py-3">Punch In</th>
+                                <th className="px-5 py-3">Punch Out</th>
+                                {/* ✅ NEW: Login Status Column */}
+                                <th className="px-4 py-3 text-center">Login Status</th>
+                                <th className="px-4 py-3 text-right">Hours Worked</th>
+                                <th className="px-4 py-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody >
+                              {week.days.map((day, dIdx) => (
+                                <tr key={dIdx} className={day.rowClass}>
+                                  <td className="px-4 py-3 font-semibold">
+                                    {formatDateDMY(day.date)}
+                                    <span className="ml-2 text-slate-400 font-normal uppercase text-[9px]">{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                                  </td>
+                                  <td className="px-4 py-3">{day.punchIn ? new Date(day.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                                  <td className="px-4 py-3">{day.punchOut ? new Date(day.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+
+                                  {/* ✅ NEW: Login Status Table Data */}
+                                  <td className="px-4 py-3 text-center">
+                                    {day.loginStatus !== "--" && (
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${day.loginStatus === "LATE" ? "bg-red-50 text-red-600 border-red-100" : "bg-green-50 text-green-600 border-green-100"}`}>
+                                        {day.loginStatus}
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">{day.displayTime || "0h 0m"}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${day.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : day.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>
+                                      {day.workedStatus}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })) : (
+                      <div className="text-center p-10 text-slate-500">No weekly history available.</div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           </div>
@@ -489,7 +661,7 @@ const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, al
                     const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
                     return (
                       <tr key={emp.employeeId || index} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-5 font-semibold">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.name || emp.employeeName || "U").charAt(0)}</div>
                             <div><p className="font-semibold text-slate-800">{emp.name || emp.employeeName || employeeInfo.name}</p><p className="text-xs text-slate-500 font-mono">{emp.employeeId}</p></div>
@@ -912,7 +1084,7 @@ const AdminAttendance = () => {
             <div className="flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3"><FaUsers className="text-2xl text-purple-600" /><h2 className="text-xl font-bold text-slate-800">Employee Attendance Summary</h2></div>
-                {/* ✅ NEW: Comparison Action Buttons */}
+                {/* ✅ Comparison Action Buttons */}
                 <div className="flex items-center gap-3">
                   {!isCompareMode ? (
                     <button onClick={() => setIsCompareMode(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition-all active:scale-95"><FaExchangeAlt /> Compare Attendance</button>
@@ -998,7 +1170,7 @@ const AdminAttendance = () => {
                   const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
                   return (
                     <tr key={emp.employeeId} className={`transition-colors ${selectedCompareIds.includes(emp.employeeId) ? 'bg-blue-50' : 'hover:bg-purple-50/30'}`}>
-                      {/* ✅ NEW: Checkbox Cell in Compare Mode */}
+                      {/* ✅ Checkbox Cell in Compare Mode */}
                       {isCompareMode && (
                         <td className="px-6 py-4 text-center">
                           <input
@@ -1033,7 +1205,7 @@ const AdminAttendance = () => {
       <StatusListModal isOpen={statusListModal.isOpen} onClose={() => setStatusListModal({ ...statusListModal, isOpen: false })} title={statusListModal.title} employees={statusListModal.employees} employeeImages={employeeImages} allEmployees={allEmployees} />
       <AdminPunchOutModal isOpen={punchOutModal.isOpen} onClose={() => setPunchOutModal({ isOpen: false, employee: null })} employee={punchOutModal.employee} onPunchOut={handleAdminPunchOut} />
 
-      {/* ✅ NEW: Comparison Popup */}
+      {/* ✅ Comparison Popup */}
       <AttendanceComparisonModal
         isOpen={isComparisonModalOpen}
         onClose={() => setIsComparisonModalOpen(false)}

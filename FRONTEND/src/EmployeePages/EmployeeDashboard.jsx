@@ -658,11 +658,24 @@ useEffect(() => {
         await punchIn({ employeeId: user.employeeId, employeeName: user.name, latitude: location.latitude, longitude: location.longitude });
         speak(`${user.name}, punch in successful`);
         Swal.fire({ icon: 'success', title: 'Welcome!', text: 'Punch in recorded successfully.' });
+
+      } else if (action === "BREAK") {
+        // ✅ BREAK: call dedicated /punch-break route — NEVER sends any email
+        await api.post('/api/attendance/punch-break', {
+          employeeId: user.employeeId,
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
+        speak(`${user.name}, break started`);
+        Swal.fire({ icon: 'info', title: 'Break Started! ☕', text: 'Your session is paused. Click Punch In to resume work.' });
+
       } else {
+        // ✅ FINAL PUNCH OUT: calls existing punchOut — sends shortage email if applicable
         await punchOut({ employeeId: user.employeeId, latitude: location.latitude, longitude: location.longitude });
         speak(`${user.name}, punch out successful`);
         Swal.fire({ icon: 'success', title: 'Goodbye!', text: 'Punch out recorded successfully.' });
       }
+
       await loadAttendance(user.employeeId);
     } catch (err) {
       console.error("Punch error:", err);
@@ -731,6 +744,25 @@ useEffect(() => {
         if (result.isConfirmed) { performPunchAction("OUT"); }
       });
     }
+  };
+
+  // ✅ NEW: Handle Break - pauses session, allows re-punch-in, NO email sent
+  const handleBreak = async () => {
+    if (!user) return;
+    Swal.fire({
+      title: "Take a Break?",
+      text: "Your work session will be paused. You can Punch In again to resume working.",
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, take a break!',
+      cancelButtonText: 'Cancel'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        performPunchAction("BREAK");
+      }
+    });
   };
 
   const handleRequestSubmit = async (e) => {
@@ -886,7 +918,16 @@ const handleOpenLateRequestModal = () => {
     const spinner = <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />;
     if (punchStatus === "FETCHING") return <>{spinner} Extracting...</>;
     if (punchStatus === "PUNCHING") return <>{spinner} {action === "IN" ? "Punching In..." : "Punching Out..."}</>;
-    if (action === "IN") return todayLog?.punchIn ? "Resume Work" : "Punch In";
+    if (action === "IN") {
+      // Show "Resume Work" only after a break: has sessions, status COMPLETED, isFinalPunchOut is NOT true
+      const isOnBreak = todayLog?.punchIn &&
+        todayLog?.status !== "WORKING" &&
+        todayLog?.isFinalPunchOut !== true &&
+        todayLog?.adminPunchOut !== true &&
+        todayLog?.workedStatus !== "FULL_DAY" &&
+        (todayLog?.sessions || []).length > 0;
+      return isOnBreak ? "Resume Work" : "Punch In";
+    }
     return "Punch Out";
   };
 
@@ -1138,10 +1179,23 @@ const handleOpenLateRequestModal = () => {
   const { mode: currentWorkMode, description: workModeDesc } = calculateWorkModeStatus();
 
   const targetSeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
-  const isShiftCompleted = todayLog?.punchOut && (todayLog?.workedStatus === "FULL_DAY" || workedTime >= targetSeconds);
+
+  // ✅ Derive state from multiple signals so it works even for old records without isFinalPunchOut
+  // "Completed" = isFinalPunchOut explicitly true (set by punch-out route)
+  //             OR admin forced punch-out
+  //             OR workedStatus is FULL_DAY (shift fully done)
+  const isShiftCompleted =
+    todayLog?.isFinalPunchOut === true ||
+    todayLog?.adminPunchOut === true ||
+    todayLog?.workedStatus === "FULL_DAY";
 
   const isShiftReqCompleted = workedTime >= targetSeconds;
-  const showPunchInButton = !todayLog || todayLog.status !== "WORKING";
+
+  // ✅ Show Punch In button when:
+  //   - no log at all (new day)
+  //   - status is not WORKING (on break = COMPLETED + isFinalPunchOut false)
+  //   - AND it is NOT a final punch-out (not completed for the day)
+  const showPunchInButton = !todayLog || (todayLog.status !== "WORKING" && !isShiftCompleted);
 
   // Check if everyone is remote
   const isGlobalWFH = officeConfig?.globalWorkMode === 'WFH';
@@ -1367,19 +1421,40 @@ const gradients = [
                   {isShiftCompleted ? (
                     <span className="text-gray-500 font-bold text-xs bg-gray-200 px-3 py-1 rounded-full">Completed</span>
                   ) : showPunchInButton ? (
-                    <button className={`px-4 py-2 rounded-md mx-auto flex gap-2 shadow-sm text-white ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`} onClick={() => handlePunch("IN")} disabled={punchStatus !== "IDLE"}>{getPunchButtonContent("IN")}</button>
+                    // ✅ Show Punch In (or Resume Work after break)
+                    <button
+                      className={`px-4 py-2 rounded-md mx-auto flex gap-2 shadow-sm text-white ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`}
+                      onClick={() => handlePunch("IN")}
+                      disabled={punchStatus !== "IDLE"}
+                    >
+                      {getPunchButtonContent("IN")}
+                    </button>
                   ) : (
-                    isShiftReqCompleted ? (
-                      <button className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>
+                    // ✅ Currently WORKING: show BOTH Break and Punch Out buttons
+                    <div className="flex flex-col gap-2 items-center">
+                      {/* Punch Out button */}
+                      <button
+                        className={`px-4 py-2 rounded-md w-full flex items-center justify-center gap-2 shadow-sm text-white ${isShiftReqCompleted ? 'bg-red-500 hover:bg-red-600' : 'bg-orange-500 hover:bg-orange-600'} disabled:opacity-50`}
+                        onClick={() => handlePunch("OUT")}
+                        disabled={punchStatus !== "IDLE"}
+                      >
                         {punchStatus === "PUNCHING" ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : null}
                         {punchStatus === "PUNCHING" ? "Punching Out..." : "Punch Out"}
                       </button>
-                    ) : (
-                      <button className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 disabled:opacity-50 mx-auto flex gap-2 shadow-sm" onClick={() => handlePunch("OUT")} disabled={punchStatus !== "IDLE"}>
-                        {punchStatus === "PUNCHING" ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <FaCoffee />}
-                        {punchStatus === "PUNCHING" ? "Starting Break..." : "Break"}
+                      {/* Break button */}
+                      <button
+                        className="px-4 py-2 rounded-md w-full flex items-center justify-center gap-2 shadow-sm text-white bg-blue-400 hover:bg-blue-500 disabled:opacity-50"
+                        onClick={handleBreak}
+                        disabled={punchStatus !== "IDLE"}
+                      >
+                        {punchStatus === "FETCHING" || punchStatus === "PUNCHING" ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        ) : (
+                          <FaCoffee />
+                        )}
+                        Break
                       </button>
-                    )
+                    </div>
                   )}
                 </td>
               </tr>

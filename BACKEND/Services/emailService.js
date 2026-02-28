@@ -14,7 +14,7 @@ export const sendBrevoEmail = async ({ to, subject, htmlContent }) => {
     }
 
     const data = {
-      sender: { name: "HRMS Admin", email: senderEmail },
+      sender: {email: senderEmail },
       to: to, // Expects array of objects: [{ name: "Admin", email: "admin@example.com" }]
       subject: subject,
       htmlContent: htmlContent,

@@ -48,13 +48,20 @@ const AdminLateRequests = () => {
   // ✅ ADDED: State for attendance status correction count
   const [statusCorrectionCount, setStatusCorrectionCount] = useState(0);
 
-  // ✅ NEW: Fast fetch for the status correction badge count
+  // ✅ UPDATED: Fast fetch for the status correction badge count using the correct backend route
   const fetchStatusCorrectionCount = useCallback(async () => {
     try {
-      const response = await api.get("/api/attendance/correction-requests");
-      // Handle different possible API response structures
-      const allData = Array.isArray(response.data) ? response.data : (response.data.data || []);
-      const pendingCount = allData.filter(req => req.status === "PENDING" || req.status === "pending").length;
+      // Using the confirmed admin route to get the correction requests
+      const response = await api.get("/api/attendance/admin/status-correction-requests");
+      
+      // The backend returns { success: true, data: [...] }
+      const allData = response.data?.data || [];
+      
+      // Filter for PENDING status
+      const pendingCount = allData.filter(req => 
+        req.status === "PENDING" || req.status === "pending"
+      ).length;
+      
       setStatusCorrectionCount(pendingCount);
     } catch (err) {
       console.error("Error fetching status correction count:", err);
@@ -202,6 +209,13 @@ const AdminLateRequests = () => {
   useEffect(() => {
     fetchPendingRequests();
     fetchStatusCorrectionCount(); // ✅ Load count immediately
+
+    // ✅ Background Interval: Keep the status correction badge updated
+    const interval = setInterval(() => {
+        fetchStatusCorrectionCount();
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
   }, [fetchPendingRequests, fetchStatusCorrectionCount]);
 
   // ✅ OPTIMIZED: Memoize filtering
@@ -596,7 +610,7 @@ const bulkUpdateRequestLimits = async () => {
             <FaUsers /> Limits
           </button>
           
-          {/* ✅ UPDATED: Attendance Status Correction Button with Blinking Count Badge */}
+          {/* ✅ BUTTON: Attendance Status Correction Button with Persistent Count Badge */}
           <button 
             onClick={() => {
                 setRequestType("ATTENDANCE_STATUS");

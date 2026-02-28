@@ -181,7 +181,7 @@ export const createLeave = async (req, res) => {
 
       if (adminEmails.length > 0) {
         const mailOptions = {
-          from: `"Leave System" <${process.env.SMTP_USER}>`,
+          from: ` <${process.env.SMTP_USER}>`,
           to: adminEmails.join(','),
           subject: `New Leave Request: ${name}`,
           html: `<h3>New Leave Request Submitted</h3>

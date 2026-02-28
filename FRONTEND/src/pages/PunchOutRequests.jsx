@@ -1,9 +1,9 @@
 // --- START OF FILE PunchOutRequests.jsx ---
 
 import React, { useState, useEffect, useCallback } from "react";
+import Swal from "sweetalert2"; // Import SweetAlert2
+
 // ⚠️ CHECK THIS IMPORT PATH:
-// If this file is in 'src/pages', use '../api'
-// If this file is in 'src/components', use '../api'
 import api from "../api"; 
 import { 
   FaBell, FaCheckCircle, FaBan, FaCheck, FaTrash, FaSyncAlt 
@@ -79,6 +79,7 @@ const PunchOutRequests = () => {
     } catch (error) {
       console.error("Error fetching requests", error);
       setErrorMsg("Failed to load requests.");
+      Swal.fire("Error", "Failed to load requests", "error");
     } finally {
       setLoading(false);
     }
@@ -91,9 +92,35 @@ const PunchOutRequests = () => {
 
   // Handle Approve / Reject
   const handleRequestAction = async (requestId, status, request) => {
+    // Confirmation Dialog
+    const confirmResult = await Swal.fire({
+      title: `Are you sure?`,
+      text: `Do you want to ${status.toLowerCase()} this request?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: status === 'Approved' ? '#10b981' : '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: `Yes, ${status} it!`
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    // Show Loading Alert
+    Swal.fire({
+      title: 'Processing...',
+      text: `Please wait while we ${status.toLowerCase()} the request.`,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       if (status === 'Approved') {
-        if (!request) { alert("Request details not found!"); return; }
+        if (!request) { 
+          Swal.fire("Error", "Request details not found!", "error");
+          return; 
+        }
 
         const targetDate = normalizeDateStr(request.originalDate);
         const adminLocation = await getCurrentLocation();
@@ -116,7 +143,7 @@ const PunchOutRequests = () => {
           }
         } catch (punchOutError) {
           const errMsg = punchOutError.response?.data?.message || punchOutError.message;
-          alert(`Punch Out Failed: ${errMsg}`);
+          Swal.fire("Punch Out Failed", errMsg, "error");
           return; 
         }
 
@@ -126,7 +153,7 @@ const PunchOutRequests = () => {
             setRequests((prev) => 
                 prev.map((req) => req._id === requestId ? { ...req, status: 'Approved' } : req)
             );
-            alert(`✅ Request Approved!`);
+            Swal.fire("✅ Approved!", "The punch-out has been recorded.", "success");
         }
 
       } else {
@@ -135,20 +162,39 @@ const PunchOutRequests = () => {
         setRequests((prev) => 
              prev.map((req) => req._id === requestId ? { ...req, status: 'Rejected' } : req)
         );
-        alert(`Request ${status} Successfully`);
+        Swal.fire("Rejected", `Request ${status} successfully.`, "success");
       }
     } catch (error) {
-      alert("Action failed: " + (error.response?.data?.message || error.message));
+      Swal.fire("Action Failed", (error.response?.data?.message || error.message), "error");
     }
   };
 
   const handleDeleteRequest = async (requestId) => {
-    if (!window.confirm("Delete this request permanently?")) return;
+    const confirmDelete = await Swal.fire({
+      title: 'Delete Request?',
+      text: "This action cannot be undone!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (!confirmDelete.isConfirmed) return;
+
+    // Loading state for delete
+    Swal.fire({
+        title: 'Deleting...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
     try {
         await api.delete(`/api/punchoutreq/delete/${requestId}`);
         setRequests((prev) => prev.filter(req => req._id !== requestId));
+        Swal.fire("Deleted!", "The request has been removed.", "success");
     } catch (error) {
-        alert("Delete failed: " + (error.response?.data?.message || error.message));
+        Swal.fire("Delete Failed", (error.response?.data?.message || error.message), "error");
     }
   };
 

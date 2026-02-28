@@ -113,6 +113,7 @@ const navLinks = [
         label: "Attendance Adjustment",
         icon:  <FaUserCheck />,
         isLateRequests: true,
+        
       },
       {
         to: "/admin/workmode-requests",
@@ -125,7 +126,8 @@ const navLinks = [
         label: "Overtime Requests",
         icon: <FaBusinessTime />,
         isOvertime: true,
-      }
+      },
+
     ],
   },
 ];
@@ -564,20 +566,30 @@ const Sidebar = () => {
     }
   };
 
-  const getBadgeCount = (link) => {
-    let count = 0;
+// Locate this function in your Sidebar.jsx and update it:
+const getBadgeCount = (link) => {
+  let count = 0;
 
-    if (link.isLeave) count = pendingLeaves;
-    else if (link.isOvertime) count = pendingOvertime;
-    else if (link.isPunchOutRequests) count = punchOutRequestsCount;
-    else if (link.isLateRequests) count = lateRequestsCount;
-    else if (link.isWorkModeRequests) count = workModeRequestsCount;
-    else if (link.to === "/admin/attendance-requests") count = attendanceRequestsCount; // ADDED
-    else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
+  if (link.isLeave) count = pendingLeaves;
+  else if (link.isOvertime) count = pendingOvertime;
+  else if (link.isPunchOutRequests) count = punchOutRequestsCount;
+  
+  // ✅ CHANGE THIS: Add attendanceRequestsCount to LateRequests (Adjustment)
+  else if (link.isLateRequests) {
+    count = lateRequestsCount + attendanceRequestsCount; 
+  }
+  
+  else if (link.isWorkModeRequests) count = workModeRequestsCount;
+  
+  // ✅ CHANGE THIS: Use the flag for Attendance Requests child link
+  else if (link.isAttendanceRequests) {
+    count = attendanceRequestsCount;
+  }
+  
+  else if (link.isNotice && !tempHideNoticeBadge) count = unreadNoticeCount;
 
-    return count;
-  };
-
+  return count;
+};
   const renderBadge = (link) => {
     let count = 0;
 

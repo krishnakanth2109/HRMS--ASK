@@ -1,5 +1,3 @@
-// --- START OF FILE EmployeeattendanceRoutes.js ---
-
 import express from 'express';
 import Attendance from '../models/Attendance.js';
 import Shift from '../models/shiftModel.js';
@@ -15,17 +13,16 @@ const router = express.Router();
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+  secure: process.env.SMTP_PORT == 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
   tls: {
-    rejectUnauthorized: false // Prevents "socket close" issues on some networks
+    rejectUnauthorized: false
   }
 });
 
-// Verify connection configuration on startup
 transporter.verify((error, success) => {
   if (error) {
     console.error("❌ SMTP Verification Error:", error);
@@ -34,45 +31,32 @@ transporter.verify((error, success) => {
   }
 });
 
-/* ================= EMAIL TEMPLATE ================= */
+/* ================= EMAIL TEMPLATES ================= */
+
 const createInsufficientHoursEmail = (employeeData) => {
   const { employeeName, date, punchIn, punchOut, workedHours, workedMinutes, workedSeconds, requiredHours, loginStatus, workedStatus } = employeeData;
 
-const formatTime = (dateObj) => {
-  if (!dateObj) return '--';
+  const formatTime = (dateObj) => {
+    if (!dateObj) return '--';
+    const utcDate = new Date(dateObj);
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(utcDate.getTime() + istOffset);
+    let hours = istDate.getUTCHours();
+    const minutes = istDate.getUTCMinutes();
+    const seconds = istDate.getUTCSeconds();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
+  };
 
-  const utcDate = new Date(dateObj);
-
-  // Convert UTC → IST manually (+5:30)
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istDate = new Date(utcDate.getTime() + istOffset);
-
-  let hours = istDate.getUTCHours();
-  const minutes = istDate.getUTCMinutes();
-  const seconds = istDate.getUTCSeconds();
-
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-
-  return `${hours.toString().padStart(2, '0')}:${minutes
-    .toString()
-    .padStart(2, '0')}:${seconds
-    .toString()
-    .padStart(2, '0')} ${ampm}`;
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '--';
-
-  const utcDate = new Date(dateStr);
-
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istDate = new Date(utcDate.getTime() + istOffset);
-
-  return istDate.toDateString();
-};
-
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '--';
+    const utcDate = new Date(dateStr);
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(utcDate.getTime() + istOffset);
+    return istDate.toDateString();
+  };
 
   const getStatusBadge = (status) => {
     const colors = {
@@ -99,7 +83,7 @@ const formatDate = (dateStr) => {
           <tr>
             <td style="background:linear-gradient(135deg,#b91c1c,#ef4444); padding:35px 30px; text-align:center;">
               <h1 style="margin:0; font-size:26px; color:#ffffff; font-weight:700; letter-spacing:0.5px;">
-                ⚠ Early Punch-Out Notification
+                ⚠Shortage Of Working Hours
               </h1>
               <p style="margin:8px 0 0 0; color:#fecaca; font-size:14px;">
                 Attendance & Workforce Management System
@@ -112,12 +96,17 @@ const formatDate = (dateStr) => {
             <td style="padding:35px 30px;">
               
               <p style="margin:0 0 18px 0; font-size:16px; color:#1f2937;">
-                Dear <strong>${employeeName}</strong>,
+                Hi <strong>${employeeName}</strong>,
               </p>
 
               <p style="margin:0 0 25px 0; font-size:15px; color:#4b5563; line-height:1.7;">
-                Our records indicate that your working hours for today are below the required shift duration. 
-                Please review the details below.
+                Your are receiving this Email because we identified some irregularity in your attendance logs on ${formatDate(date)}. 
+                Your total worked hours for the day are less than the required ${requiredHours} hours. Please find the details below.
+
+              </p>
+
+                 <p style="margin:0 0 25px 0; font-size:15px; color:#4b5563; line-height:1.7;">
+                  
               </p>
 
               <!-- Info Card -->
@@ -135,6 +124,7 @@ const formatDate = (dateStr) => {
                         <td style="padding:10px 0; color:#6b7280;">🕘 First Punch-In</td>
                         <td style="padding:10px 0; text-align:right; font-weight:600;">
                           ${formatTime(punchIn)}
+                          
                         </td>
                       </tr>
                       <tr>
@@ -176,20 +166,17 @@ const formatDate = (dateStr) => {
 
               <!-- Warning Box -->
               <div style="background:#fff7ed; border:1px solid #fed7aa; border-left:5px solid #f97316; border-radius:8px; padding:16px; margin-bottom:25px;">
-                <p style="margin:0 0 10px 0; font-size:13px; color:#9a3412; line-height:1.6;">
-                  <strong>Important:</strong> Early punch-out without prior approval may impact your attendance compliance and salary processing.
-                  If this was pre-approved, please ignore this message.
-                </p>
-
                 <p style="margin:0; font-size:13px; color:#7c2d12; line-height:1.6;">
                   <strong>Note:</strong> If you do not punch in again today, this will be considered your final punch-out
                   and will be officially recorded in our management system.
                 </p>
+              
+              
+              <p style="margin:0 0 10px 0; font-size:13px; color:#9a3412; line-height:1.6;">
+                  <strong>Important:</strong> Early punch-out without prior approval may impact your attendance compliance and salary processing.
+                  Please reach out to your HR/reporting manager in case you need further clarification.
+                </p>
               </div>
-
-              <p style="margin:0; font-size:14px; color:#4b5563;">
-                For any clarification, please contact your reporting manager or HR department.
-              </p>
 
             </td>
           </tr>
@@ -210,23 +197,106 @@ const formatDate = (dateStr) => {
 </body>
 </html>
 `;
+};
+
+/* ================= ✅ NEW: UNINFORMED ABSENCE TEMPLATE ================= */
+const createUninformedAbsenceEmail = (employeeName, absentDate) => {
+return `
+<!DOCTYPE html>
+<html>
+<body style="margin:0; padding:0; background-color:#f4f7f6; font-family:'Segoe UI', Arial, sans-serif;">
+  <table width="100%" cellspacing="0" cellpadding="0" style="padding:40px 10px;">
+    <tr>
+      <td align="center">
+        <table width="600" style="background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#dc2626; padding:40px 20px; text-align:center;">
+              <h1 style="margin:0; color:#ffffff; font-size:24px; letter-spacing:1px;">ABSENCE ALERT</h1>
+              <p style="margin:10px 0 0 0; color:#fecaca; font-size:14px;">Attendance Management Notification</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px 30px;">
+              
+              <p style="font-size:17px; color:#1f2937; margin-bottom:20px;">
+                Hi <strong>${employeeName}</strong>,
+              </p>
+              
+              <div style="background:#fff1f2; border-left:5px solid #e11d48; padding:20px; margin-bottom:30px;">
+                <p style="margin:0; color:#9f1239; font-size:16px; line-height:1.6;">
+                  <strong>No Attendance Recorded on:</strong> ${new Date(absentDate).toDateString()}
+                </p>
+              </div>
+
+              <p style="color:#4b5563; font-size:15px; line-height:1.7;">
+                This is to inform you that an irregularity has been identified in your attendance records on ${new Date(absentDate).toDateString()}. Our records indicate that you were absent on this date without an approved leave request on file.
+                <br><br>
+                Please note that unreported or uninformed absences may impact team scheduling, project timelines, and overall workflow efficiency.
+              </p>
+
+              <!-- Next Steps -->
+              <table width="100%" style="margin:30px 0; border-top:1px solid #e5e7eb; padding-top:20px;">
+                <tr>
+                  <td>
+                    <p style="margin:0; font-size:13px; color:#6b7280;">
+                      <strong>Next Steps:</strong><br>
+                      1. Please discuss this absence with your Reporting Manager.<br>
+                      2. If this is a technical error, contact HR/IT support immediately.<br>
+                      3. Ensure all future leaves are applied and approved in advance.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f9fafb; padding:20px; text-align:center; color:#9ca3af; font-size:12px;">
+              © ${new Date().getFullYear()} Attendance System | Automated Message - Please do not reply.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
 
 };
 
-/* ================= SEND EMAIL FUNCTION ================= */
+/* ================= SEND EMAIL FUNCTIONS ================= */
 const sendInsufficientHoursEmail = async (employeeEmail, employeeData) => {
   try {
     const mailOptions = {
-      from: `"Attendance System" <${process.env.SMTP_USER}>`,
+      from: `<${process.env.SMTP_USER}>`,
       to: employeeEmail,
-      subject: `Early Punch-Out Notification - ${employeeData.date}`,
+      subject: `Shortage of Work Hours - ${employeeData.date}`,
       html: createInsufficientHoursEmail(employeeData),
     };
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Early punch-out email sent to ${employeeEmail}`);
-  } catch (error) {
-    console.error('❌ Error sending attendance email:', error);
-  }
+    console.log(`✅ Insufficient hours email sent to ${employeeEmail}`);
+  } catch (error) { console.error('❌ Error sending email:', error); }
+};
+
+const sendUninformedAbsenceEmail = async (employeeEmail, employeeName, absentDate) => {
+  try {
+    const mailOptions = {
+      from: `<${process.env.SMTP_USER}>`,
+      to: employeeEmail,
+      subject: `⚠ No Attendance Recorded - ${absentDate}`,
+      html: createUninformedAbsenceEmail(employeeName, absentDate),
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Absence alert email sent to ${employeeEmail} for date ${absentDate}`);
+  } catch (error) { console.error('❌ Error sending absence email:', error); }
 };
 
 // Apply protection to all routes
@@ -248,11 +318,14 @@ router.get('/all', onlyAdmin, async (req, res) => {
 
 /* ================= UTILITIES ================= */
 const getToday = () => {
-  return new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Kolkata"
-  });
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 };
 
+const getYesterdayDate = () => {
+  const date = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  date.setDate(date.getDate() - 1);
+  return date.toLocaleDateString("en-CA"); // Returns YYYY-MM-DD
+};
 
 const timeToMinutes = (timeStr) => {
   const [h, m] = timeStr.split(":").map(Number);
@@ -278,23 +351,51 @@ router.post('/punch-in', async (req, res) => {
     const today = getToday();
     const now = new Date();
 
-    const approvedLeave = await LeaveRequest.findOne({
+    /* ================= ✅ CHECK YESTERDAY'S ABSENCE WITHOUT LEAVE ================= */
+    const yesterday = getYesterdayDate();
+    let attendance = await Attendance.findOne({ employeeId });
+
+    if (attendance) {
+      // ✅ UNINFORMED ABSENCE email only fires on the very FIRST punch-in of the day.
+      // Guard 1: no todayRecord at all means no sessions yet.
+      // Guard 2: sessions.length === 0 as extra safety for edge cases.
+      const todayRecordCheck = attendance.attendance.find(a => a.date === today);
+      const isFirstPunchInToday = !todayRecordCheck || (todayRecordCheck.sessions && todayRecordCheck.sessions.length === 0);
+
+      if (isFirstPunchInToday) {
+        const yesterdayRecord = attendance.attendance.find(a => a.date === yesterday);
+
+        if (!yesterdayRecord) {
+          const approvedLeaveYesterday = await LeaveRequest.findOne({
+            employeeId: String(employeeId).trim(),
+            status: "Approved",
+            "details.date": yesterday
+          });
+
+          if (!approvedLeaveYesterday && req.user && req.user.email) {
+            sendUninformedAbsenceEmail(req.user.email, employeeName, yesterday);
+          }
+        }
+      }
+    }
+
+    // Existing Leave Logic for Today
+    const approvedLeaveToday = await LeaveRequest.findOne({
       employeeId: String(employeeId).trim(),
       status: "Approved",
       "details.date": today,
     }).lean();
 
-    if (approvedLeave) {
-      if (approvedLeave.leaveDayType === "Full Day") {
+    if (approvedLeaveToday) {
+      if (approvedLeaveToday.leaveDayType === "Full Day") {
         return res.status(403).json({ success: false, message: "Punch-in not allowed. You are on approved leave today." });
       }
-
-      if (approvedLeave.leaveDayType === "Half Day") {
+      if (approvedLeaveToday.leaveDayType === "Half Day") {
         const hour = now.getHours();
-        if (approvedLeave.halfDaySession === "Morning" && hour < 13) {
+        if (approvedLeaveToday.halfDaySession === "Morning" && hour < 13) {
           return res.status(403).json({ success: false, message: "Morning half-day leave. Punch-in allowed after 1 PM." });
         }
-        if (approvedLeave.halfDaySession === "Afternoon" && hour >= 13) {
+        if (approvedLeaveToday.halfDaySession === "Afternoon" && hour >= 13) {
           return res.status(403).json({ success: false, message: "Afternoon half-day leave. Punch-in not allowed after 1 PM." });
         }
       }
@@ -303,7 +404,6 @@ router.post('/punch-in', async (req, res) => {
     let address = "Unknown Location";
     try { address = await reverseGeocode(latitude, longitude); } catch { }
 
-    let attendance = await Attendance.findOne({ employeeId });
     if (!attendance) {
       attendance = new Attendance({ employeeId, employeeName, attendance: [] });
     }
@@ -348,6 +448,10 @@ router.post('/punch-in', async (req, res) => {
       if (todayRecord.workedStatus === "FULL_DAY") {
         return res.status(400).json({ message: "Your shift is completed. You cannot punch in again today." });
       }
+      // ✅ Block re-punch-in if employee did a final punch out (not just a break)
+      if (todayRecord.isFinalPunchOut) {
+        return res.status(400).json({ message: "You have punched out for the day. Re-punch-in is not allowed after a final punch out." });
+      }
       if (todayRecord.status === "WORKING") {
         return res.status(400).json({ message: "You are already Punched In." });
       }
@@ -376,7 +480,7 @@ router.post('/punch-in', async (req, res) => {
 });
 
 
-/* ================= PUNCH OUT (AUTO-EMAIL LOGIC INCLUDED) ================= */
+/* ================= PUNCH OUT (FINAL — sends shortage email if applicable) ================= */
 router.post('/punch-out', async (req, res) => {
   try {
     const { employeeId, latitude, longitude } = req.body;
@@ -396,16 +500,15 @@ router.post('/punch-out', async (req, res) => {
       return res.status(400).json({ message: "You are already Punched Out." });
     }
 
-    // 1. Close current session
     currentSession.punchOut = now;
     currentSession.durationSeconds = (new Date(now) - new Date(currentSession.punchIn)) / 1000;
 
-    // 2. Update Top-Level Data
     todayRecord.punchOut = now;
     todayRecord.punchOutLocation = { latitude, longitude, timestamp: now };
     todayRecord.status = "COMPLETED";
+    // ✅ FINAL punch-out: block re-punch-in
+    todayRecord.isFinalPunchOut = true;
 
-    // 3. Calculate Total Worked Time
     let totalSeconds = 0;
     todayRecord.sessions.forEach(sess => {
       if (sess.punchIn && sess.punchOut) {
@@ -422,7 +525,6 @@ router.post('/punch-out', async (req, res) => {
     todayRecord.workedSeconds = s;
     todayRecord.displayTime = `${h}h ${m}m ${s}s`;
 
-    // 4. Update Worked Status
     let shift = await Shift.findOne({ employeeId });
     if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
 
@@ -438,7 +540,7 @@ router.post('/punch-out', async (req, res) => {
 
     await attendance.save();
 
-    /* ================= ✅ NEW: AUTOMATED EARLY PUNCH-OUT EMAIL ================= */
+    // ✅ Send "Shortage Of Working Hours" email ONLY on final punch-out when hours are short
     if (h < shift.fullDayHours && req.user && req.user.email) {
       const emailData = {
         employeeName: attendance.employeeName,
@@ -452,13 +554,80 @@ router.post('/punch-out', async (req, res) => {
         loginStatus: todayRecord.loginStatus || 'ON_TIME',
         workedStatus: todayRecord.workedStatus
       };
-
-      // Asynchronous call so response is not delayed
       sendInsufficientHoursEmail(req.user.email, emailData);
     }
-    /* =========================================================================== */
 
     res.json({ success: true, message: `Punched out. Total: ${h}h ${m}m`, data: todayRecord });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ================= PUNCH BREAK (BREAK — no email, allows re-punch-in) ================= */
+router.post('/punch-break', async (req, res) => {
+  try {
+    const { employeeId, latitude, longitude } = req.body;
+    if (!employeeId) return res.status(400).json({ message: "Employee ID required" });
+
+    const today = getToday();
+    const now = new Date();
+
+    let attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "No record found" });
+
+    let todayRecord = attendance.attendance.find(a => a.date === today);
+    if (!todayRecord) return res.status(400).json({ message: "No attendance record for today" });
+
+    const currentSession = (todayRecord.sessions || []).find(s => !s.punchOut);
+    if (!currentSession) {
+      return res.status(400).json({ message: "You are already on a break." });
+    }
+
+    currentSession.punchOut = now;
+    currentSession.durationSeconds = (new Date(now) - new Date(currentSession.punchIn)) / 1000;
+
+    todayRecord.punchOut = now;
+    if (latitude && longitude) {
+      todayRecord.punchOutLocation = { latitude, longitude, timestamp: now };
+    }
+    todayRecord.status = "COMPLETED";
+    // ✅ BREAK: allow re-punch-in, NO email sent
+    todayRecord.isFinalPunchOut = false;
+
+    let totalSeconds = 0;
+    todayRecord.sessions.forEach(sess => {
+      if (sess.punchIn && sess.punchOut) {
+        totalSeconds += (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
+      }
+    });
+
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+
+    todayRecord.workedHours = h;
+    todayRecord.workedMinutes = m;
+    todayRecord.workedSeconds = s;
+    todayRecord.displayTime = `${h}h ${m}m ${s}s`;
+
+    let shift = await Shift.findOne({ employeeId });
+    if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
+
+    let attendanceCategory = "ABSENT";
+    let workedStatus = "ABSENT";
+
+    if (h >= shift.fullDayHours) { attendanceCategory = "FULL_DAY"; workedStatus = "FULL_DAY"; }
+    else if (h >= shift.halfDayHours) { attendanceCategory = "HALF_DAY"; workedStatus = "HALF_DAY"; }
+    else if (h >= shift.quarterDayHours) { workedStatus = "HALF_DAY"; }
+
+    todayRecord.workedStatus = workedStatus;
+    todayRecord.attendanceCategory = attendanceCategory;
+
+    await attendance.save();
+
+    // ✅ NO email sent for break — employee is expected to punch back in
+    res.json({ success: true, message: `Break started. Worked so far: ${h}h ${m}m`, data: todayRecord });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -764,6 +933,54 @@ router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
   }
 });
 
-export default router;
+/* ================= GET ALL STATUS CORRECTION REQUESTS (ADMIN) ================= */
+router.get('/admin/status-correction-requests', onlyAdmin, async (req, res) => {
+  try {
+    const allRecords = await Attendance.find({});
+    const requests = [];
 
-// --- END OF FILE EmployeeattendanceRoutes.js ---
+    allRecords.forEach(empRecord => {
+      empRecord.attendance.forEach(dayLog => {
+        if (dayLog.statusCorrectionRequest && dayLog.statusCorrectionRequest.hasRequest && dayLog.statusCorrectionRequest.status === "PENDING") {
+          requests.push({
+            employeeId: empRecord.employeeId,
+            employeeName: empRecord.employeeName,
+            date: dayLog.date,
+            punchIn: dayLog.punchIn,
+            currentStatus: dayLog.status,
+            requestedPunchOut: dayLog.statusCorrectionRequest.requestedPunchOut,
+            reason: dayLog.statusCorrectionRequest.reason,
+            status: dayLog.statusCorrectionRequest.status
+          });
+        }
+      });
+    });
+
+    requests.sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json({ success: true, data: requests });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+/* ================= REJECT STATUS CORRECTION ================= */
+router.post('/reject-status-correction', onlyAdmin, async (req, res) => {
+  try {
+    const { employeeId, date, adminComment } = req.body;
+    const attendance = await Attendance.findOne({ employeeId });
+    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+    const dayRecord = attendance.attendance.find(a => a.date === date);
+    if (!dayRecord || !dayRecord.statusCorrectionRequest) {
+      return res.status(404).json({ message: "No request found for this date" });
+    }
+    dayRecord.statusCorrectionRequest.status = "REJECTED";
+    dayRecord.statusCorrectionRequest.adminComment = adminComment || "Rejected by Admin";
+    await attendance.save();
+    res.json({ success: true, message: "Request rejected successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;
