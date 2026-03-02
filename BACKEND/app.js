@@ -299,6 +299,8 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/mail", mailRoutes);
 app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
+app.use('/api/idletime', idleTimeRoutes);
+
 
 // -------------------- 404 --------------------
 app.use("*", (req, res) => {

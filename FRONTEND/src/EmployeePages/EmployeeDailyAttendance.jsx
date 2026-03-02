@@ -579,15 +579,30 @@ const EmployeeDailyAttendance = () => {
     setShowStatusModal(true);
   };
 
+  // EmployeeDailyAttendance.jsx - Update submitStatusCorrection function
+
+  // EmployeeDailyAttendance.jsx - Update this function only
+
   const submitStatusCorrection = async () => {
     if (!requestedPunchOut || !statusReason) return alert("Please provide both time and reason.");
+
     try {
+      // Create a date string that preserves the local time
+      // requestedPunchOut is in format "HH:MM" from the time input
+      const [hours, minutes] = requestedPunchOut.split(':');
+
+      // Create date in YYYY-MM-DD format from correctionData.date
+      // Then append the time to create a local datetime string
+      const localDateTimeStr = `${correctionData.date}T${hours}:${minutes}:00`;
+
+      // Send as is - let the backend handle it as IST
       await requestStatusCorrection({
         employeeId: user.employeeId,
         date: correctionData.date,
-        requestedPunchOut: requestedPunchOut,
+        requestedPunchOut: localDateTimeStr, // Send full datetime string
         reason: statusReason
       });
+
       alert("Request submitted successfully!");
       setShowStatusModal(false);
       loadData(user.employeeId);
@@ -926,9 +941,9 @@ const EmployeeDailyAttendance = () => {
                           <td className="px-6 py-4 w-[14.2%]">
                             <div className="flex items-center justify-between">
                               <span className={`px-3 py-1 rounded-md text-xs font-bold ${isWeekend ? "bg-gray-100 text-gray-500" :
-                                  isAbsent ? "bg-red-50 text-red-500" :
-                                    row.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-600" :
-                                      "bg-blue-50 text-blue-600"
+                                isAbsent ? "bg-red-50 text-red-500" :
+                                  row.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-600" :
+                                    "bg-blue-50 text-blue-600"
                                 }`}>
                                 {isWeekend ? "Weekend" : row.workedStatus === "Full Day" ? "Full Day" : row.workedStatus}
                               </span>
@@ -991,8 +1006,8 @@ const EmployeeDailyAttendance = () => {
                           <td className="px-6 py-4 font-bold text-gray-700">{new Date(row.date).toLocaleDateString()}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.lateCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
-                                row.lateCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
-                                  'bg-yellow-50 text-yellow-600 border-yellow-200'
+                              row.lateCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
+                                'bg-yellow-50 text-yellow-600 border-yellow-200'
                               }`}>{row.lateCorrectionRequest.status}</span>
                           </td>
                           <td className="px-6 py-4 font-mono text-xs">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString() : '--'}</td>
@@ -1037,11 +1052,19 @@ const EmployeeDailyAttendance = () => {
                           <td className="px-6 py-4 font-bold text-gray-700">{new Date(row.date).toLocaleDateString()}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.statusCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
-                                row.statusCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
-                                  'bg-yellow-50 text-yellow-600 border-yellow-200'
+                              row.statusCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
+                                'bg-yellow-50 text-yellow-600 border-yellow-200'
                               }`}>{row.statusCorrectionRequest.status}</span>
                           </td>
-                          <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">{row.statusCorrectionRequest.requestedPunchOut}</td>
+                          <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">
+                            {(() => {
+                              // Convert UTC to IST for display
+                              const utcDate = new Date(row.statusCorrectionRequest.requestedPunchOut);
+                              // Add 5.5 hours (IST offset) to convert UTC to IST
+                              const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+                              return istDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            })()}
+                          </td>
                           <td className="px-6 py-4 max-w-xs truncate text-gray-500" title={row.statusCorrectionRequest.reason}>{row.statusCorrectionRequest.reason}</td>
                           <td className="px-6 py-4 italic text-gray-400">{row.statusCorrectionRequest.adminComment || "--"}</td>
                         </tr>
