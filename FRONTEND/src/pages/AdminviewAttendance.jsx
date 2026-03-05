@@ -676,7 +676,7 @@ const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, al
                 </tbody>
               </table>
             </div>
-          ) : <p className="text-center text-slate-500 py-8">No employees in this category.</p>}
+          ) : <p className="text-center text-slate-500 py-8">No employees is Shift Completed </p>}
         </div>
       </div>
     </div>
