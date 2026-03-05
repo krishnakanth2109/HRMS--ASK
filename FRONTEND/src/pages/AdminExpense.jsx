@@ -153,11 +153,11 @@ const fetchAllExpenses = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen  p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+        <div className="flex flex-col bg-gray-50 p-6 rounded-2xl border border-gray-200 md:flex-row justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
               <FaUserTie className="text-blue-600" /> Admin Expense Approvals

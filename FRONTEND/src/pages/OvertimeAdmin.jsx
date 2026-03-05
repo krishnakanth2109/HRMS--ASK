@@ -127,13 +127,13 @@ const OvertimeAdmin = () => {
   );
 
   return (
-    <div className="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold text-indigo-900 mb-6">Overtime Dashboard</h1>
+        <h1 className=" bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-6 text-4xl font-bold text-indigo-900 mb-6">Overtime Dashboard</h1>
 
         {/* --- START OF NEW COUNT CONTAINERS UI --- */}
         {/* ✅ ADDED: Changed lg:grid-cols-3 to lg:grid-cols-4 to fit the 4th card nicely */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 ">
             <StatCard icon={<FaCheckCircle />} title="Approved Overtime" value={counts.approved} color="text-green-500" />
             <StatCard icon={<FaHourglassHalf />} title="Pending Requests" value={counts.pending} color="text-yellow-500" />
             {/* ✅ ADDED: Rejected StatCard */}
@@ -143,7 +143,7 @@ const OvertimeAdmin = () => {
         {/* --- END OF NEW COUNT CONTAINERS UI --- */}
 
 
-        <div className="bg-white shadow-xl rounded-2xl p-6">
+        <div className=" bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Manage Requests</h2>
 
             {/* --- START OF NEW FILTERS UI --- */}

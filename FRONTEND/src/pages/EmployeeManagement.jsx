@@ -158,7 +158,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emp.email}&su=${mailSubject}&body=${mailBody}`;
 
   return (
-    <tr className={`border-t transition duration-150 ${isEven ? "bg-gray-50" : "bg-white"} hover:bg-blue-50`}>
+    <tr className={`border-t transition duration-150 hover:bg-blue-50`}>
       <td className="p-4 align-middle text-left font-mono font-semibold text-blue-700 text-sm pl-6">
         {emp.employeeId}
       </td>
@@ -177,7 +177,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
           </div>
           <span
             onClick={() => navigate(`/employee/${emp.employeeId}/profile`)}
-            className="font-semibold text-gray-900 cursor-pointer hover:text-blue-700 hover:underline text-sm"
+            className="font-bold text-gray-900 cursor-pointer hover:text-blue-700 hover:underline text-sm"
           >
             {emp.name}
           </span>
@@ -185,18 +185,18 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
       </td>
 
       <td className="p-4 align-middle text-left">
-        <span className="text-sm font-medium text-gray-900">
+        <span className="text-sm font-bold text-gray-900">
           {currentRole}
         </span>
       </td>
 
       <td className="p-4 align-middle text-left">
-        <span className="text-sm font-medium text-gray-900">
+        <span className="text-sm font-bold text-gray-900">
           {currentDepartment}
         </span>
       </td>
 
-      <td className="p-4 align-middle text-left text-gray-600 text-sm">
+   <td className="p-4 align-middle text-left text-gray-900 text-sm font-semibold">
         {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
         <a 
           href={gmailComposeUrl} 
@@ -281,18 +281,17 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
       </td>
 
       <td className="p-4 align-middle text-left">
-        <span className="text-sm font-medium text-gray-600">
+      <span className="text-sm font-semibold text-gray-700">
           {currentRole}
         </span>
       </td>
 
       <td className="p-4 align-middle text-left">
-        <span className="text-sm font-medium text-gray-600">
+      <span className="text-sm font-semibold text-gray-700">
           {currentDepartment}
         </span>
       </td>
-
-      <td className="p-4 align-middle text-left text-gray-500 text-sm line-through decoration-red-500">
+<td className="p-4 align-middle text-left text-gray-700 text-sm font-semibold line-through decoration-red-800">
         {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
         <a 
           href={gmailComposeUrl} 
@@ -615,7 +614,7 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className=" rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-5 flex justify-between items-center text-white shrink-0">
           <div>
             <h2 className="text-2xl font-bold tracking-wide flex items-center gap-3">
@@ -899,9 +898,9 @@ const EmployeeManagement = () => {
   }, [employees, searchQuery, selectedDept, selectedRole, selectedEmploymentType]);
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex flex-col items-center py-12">
+    <div className="min-h-screen w-full  flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+        <div className="flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
 
           <div>
             <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
@@ -931,26 +930,26 @@ const EmployeeManagement = () => {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-10 px-8">
-          <input type="text" placeholder="Search employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+        <div className="flex flex-col  md:flex-row gap-4 mb-10 px-8">
+          <input type="text" placeholder="Search employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-1/4 border bg-white border-gray-200 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full bg-white md:w-1/4 border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Departments</option>
             {departmentSet.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
           </select>
-          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full md:w-1/4 bg-white border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Roles</option>
             {roleSet.map((role) => (<option key={role} value={role}>{role}</option>))}
           </select>
-          <select value={selectedEmploymentType} onChange={(e) => setSelectedEmploymentType(e.target.value)} className="w-full md:w-1/4 border border-gray-300 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
+          <select value={selectedEmploymentType} onChange={(e) => setSelectedEmploymentType(e.target.value)} className="w-full bg-white md:w-1/4 border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
             <option value="All">All Employment Types</option>
             {employmentTypeSet.map((type) => (<option key={type} value={type}>{type}</option>))}
           </select>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 relative z-10">
+        <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10 overflow-hidden">
           <div className="overflow-x-auto min-h-[300px]">
-            <table className="min-w-full">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-600">
+            <table className="min-w-full rounded-2xl">
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">
                 <tr className="text-white uppercase text-sm font-semibold tracking-wide">
                   <th className="p-4 text-left pl-6">ID</th>
                   <th className="p-4 text-left">Name</th>
@@ -961,7 +960,7 @@ const EmployeeManagement = () => {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 divide-gray-100">
                 {loading ? (
                   <tr>
                     <td colSpan="6" className="p-8 text-center text-gray-500 font-medium text-lg">
@@ -974,7 +973,7 @@ const EmployeeManagement = () => {
                       <EmployeeRow key={emp.employeeId} emp={emp} idx={idx} navigate={navigate} onDeactivateClick={openDeactivateModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
                     ))}
                     {activeEmployees.length > 0 && inactiveEmployees.length > 0 && (
-                      <tr><td colSpan="6" className="bg-gray-100 p-2 text-center font-bold text-gray-500 text-xs tracking-widest uppercase">Inactive Employees</td></tr>
+                      <tr><td colSpan="6" className=" p-2 text-center font-bold text-white text-lg tracking-widest uppercase bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">Inactive Employees</td></tr>
                     )}
                     {inactiveEmployees.map((emp) => (
                       <InactiveEmployeeRow key={emp.employeeId} emp={emp} navigate={navigate} onReactivateClick={openReactivateModal} onViewDetailsClick={openViewDetailsModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
@@ -982,7 +981,7 @@ const EmployeeManagement = () => {
                   </>
                 ) : (
                   <tr>
-                    <td colSpan="6" className="p-8 text-center text-gray-400 font-medium">
+                    <td colSpan="6" className="p-8 text-center bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 text-gray-400 font-medium">
                       No employees found matching criteria.
                     </td>
                   </tr>

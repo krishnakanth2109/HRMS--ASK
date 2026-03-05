@@ -619,11 +619,11 @@ const EmployeeDailyAttendance = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans text-gray-800">
+    <div className="p-4 md:p-8  min-h-screen font-sans text-gray-800">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* --- Header Section --- */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col border border-gray-200 shadow-sm bg-white rounded-2xl py-6 px-4 md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Have a Great Day, {user?.name?.split(' ')[0] || "Employee"}!</h1>
             <p className="text-gray-500 text-sm mt-1">Here's Your attendance overview for {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>

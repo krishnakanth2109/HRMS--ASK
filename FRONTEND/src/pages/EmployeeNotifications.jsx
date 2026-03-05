@@ -72,7 +72,7 @@ const EmployeeNotifications = () => {
 
   // -------------------- Main UI --------------------
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen  p-4">
       <div className="max-w-6xl mx-auto flex gap-6 h-screen overflow-hidden">
         {/* ----------------- SIDE PANEL ----------------- */}
         <div className="w-60 bg-white shadow-md rounded-xl p-5 border">

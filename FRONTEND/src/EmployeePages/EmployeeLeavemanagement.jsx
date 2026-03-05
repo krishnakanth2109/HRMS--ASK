@@ -1199,13 +1199,13 @@ const EmployeeLeavemanagement = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8"
+          className="flex flex-col lg:flex-row items-start lg:items-center border border-gray-200 shadow-sm bg-white rounded-2xl p-4 justify-between mb-8"
         >
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Leave Management</h1>
