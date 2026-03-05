@@ -377,13 +377,13 @@ const NoticeList = () => {
   if (isInitialLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-bold">Loading Notices...</div>;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] overflow-hidden relative font-sans">
+    <div className="min-h-screen  overflow-hidden relative font-sans">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply blur-3xl opacity-30 animate-blob"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto px-4 py-12">
-        <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4   group relative bg-white/90 backdrop-blur-md rounded-2xl p-6 transition-all hover:shadow-xl border border-gray-200">
           <div>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">

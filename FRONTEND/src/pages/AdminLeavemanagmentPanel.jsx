@@ -312,14 +312,14 @@ const AdminLeavePanel = () => {
   );
 
   return (
-    <div className="p-6 md:p-8 bg-white min-h-screen font-sans max-w-[1400px] mx-auto relative">
+    <div className="p-6 md:p-8  min-h-screen font-sans max-w-[1400px] mx-auto relative">
       
       {openDropdownId && (
         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenDropdownId(null)}></div>
       )}
 
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className=" bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Leave Management</h2>
           <p className="text-slate-500 mt-1 text-sm">Oversee and manage employee leave requests efficiently.</p>

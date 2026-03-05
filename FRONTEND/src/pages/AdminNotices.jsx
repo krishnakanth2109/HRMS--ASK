@@ -894,9 +894,9 @@ Meeting Link: ${meetingLink}`;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-24">
+    <div className="min-h-screen  font-sans pb-24">
       {/* HEADER */}
-      <div className="relative bg-gradient-to-br from-emerald-50/50 to-white border-b border-emerald-100 z-30">
+      <div className="relative bg-white rounded-3xl border-emerald-100 z-10 max-w-4xl mx-auto px-4 mt-8 space-y-6 ">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-5 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className="relative">

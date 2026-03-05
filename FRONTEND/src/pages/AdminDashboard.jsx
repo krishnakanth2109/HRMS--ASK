@@ -1,10 +1,9 @@
 // --- START OF FILE AdminDashboard.jsx ---
 
 import React, { useState, useContext, useMemo, useEffect, useCallback } from "react";
-import { useNavigate ,Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   FaUsers,
-  FaLayerGroup,
   FaUserClock,
   FaCalendarCheck,
   FaFileAlt,
@@ -17,7 +16,8 @@ import {
   FaPlane,
   FaChevronRight,
   FaChevronLeft,
-  FaSyncAlt
+  FaSyncAlt,
+  FaChartLine // Added for Leave Summary
 } from "react-icons/fa";
 import {
   BarChart,
@@ -92,33 +92,21 @@ const formatWeekRange = (start, end) => {
   return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
 };
 
-// ─── Pie Active Shape ─────────────────────────────────────────────────────────
+// ─── Pie Active Shape (Updated for Hover Expansion) ───────────────────────────
 
 const renderActiveShape = (props) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
   return (
-    <g>
-      <text
-        x={cx}
-        y={cy}
-        dy={8}
-        textAnchor="middle"
-        fill="#111827"
-        className="text-xl font-bold"
-      >
-        100%
-      </text>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        cornerRadius={10}
-      />
-    </g>
+    <Sector
+      cx={cx}
+      cy={cy}
+      innerRadius={innerRadius}
+      outerRadius={outerRadius + 3} // Expands hovered slice slightly
+      startAngle={startAngle}
+      endAngle={endAngle}
+      fill={fill}
+      cornerRadius={10}
+    />
   );
 };
 
@@ -134,15 +122,26 @@ const AdminDashboard = () => {
   const [allEmployees, setAllEmployees] = useState([]);
   const[todayAttendance, setTodayAttendance] = useState([]);
   const [allLeaves, setAllLeaves] = useState([]);
-  const [employeeWorkModes, setEmployeeWorkModes] = useState({});
-  const [loadingData, setLoadingData] = useState(true);
+  const[employeeWorkModes, setEmployeeWorkModes] = useState({});
+  const[loadingData, setLoadingData] = useState(true);
 
   // --- Graph State ---
-  const [viewMode, setViewMode] = useState("week"); // 'week' or 'month'
+  const[viewMode, setViewMode] = useState("week"); // 'week' or 'month'
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [currentWeek, setCurrentWeek] = useState(0);
+  const[currentWeek, setCurrentWeek] = useState(0);
   const [chartRawData, setChartRawData] = useState([]);
   const[loadingGraph, setLoadingGraph] = useState(false);
+
+  // --- Pie Chart Hover State ---
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const onPieEnter = (_, index) => {
+    setActiveIndex(index);
+  };
+
+  const onPieLeave = () => {
+    setActiveIndex(-1); // Reset back to default (100% total)
+  };
 
   // Context-based stat cards
   const { statCards } = useMemo(
@@ -158,7 +157,7 @@ const AdminDashboard = () => {
       const[todayAtt, leavesData, empData] = await Promise.all([
         getAttendanceByDateRange(today, today).catch(() => []),
         getLeaveRequests().catch(() =>[]),
-        getEmployees().catch(() => []),
+        getEmployees().catch(() =>[]),
       ]);
 
       setTodayAttendance(Array.isArray(todayAtt) ? todayAtt :[]);
@@ -189,15 +188,14 @@ const AdminDashboard = () => {
 
   // ── Derived Data: Active Employees ───────────────────────────────────────
   const activeEmployees = useMemo(
-    () => allEmployees.filter((e) => e.isActive !== false && (e.status || "").toLowerCase() !== "deactive"),
-    [allEmployees]
+    () => allEmployees.filter((e) => e.isActive !== false && (e.status || "").toLowerCase() !== "deactive"),[allEmployees]
   );
 
   const empMap = useMemo(() => {
     const m = {};
     allEmployees.forEach((e) => { m[e.employeeId] = e; });
     return m;
-  },[allEmployees]);
+  }, [allEmployees]);
 
   // ── Date Range Logic ─────────────────────────────────────────────────────
   const weekDates = useMemo(() => {
@@ -334,7 +332,7 @@ const AdminDashboard = () => {
     }
 
     return data;
-  }, [chartRawData, activeEmployees, allLeaves, weekDates, viewMode]);
+  },[chartRawData, activeEmployees, allLeaves, weekDates, viewMode]);
 
   // ── Other Derived Stats (Today) ──────────────────────────────────────────
 
@@ -345,7 +343,7 @@ const AdminDashboard = () => {
     () => todayAttendance.filter((a) => !!a.punchIn),
     [todayAttendance]
   );
-  const presentIds = useMemo(() => new Set(todayAttendance.map((a) => a.employeeId)), [todayAttendance]);
+  const presentIds = useMemo(() => new Set(todayAttendance.map((a) => a.employeeId)),[todayAttendance]);
 
   // Today Leaves List
   const onLeaveTodayList = useMemo(() => {
@@ -369,7 +367,7 @@ const AdminDashboard = () => {
       });
   }, [allLeaves, empMap, todayStr]);
 
-  const onLeaveIds = useMemo(() => new Set(onLeaveTodayList.map((l) => l.employeeId)),[onLeaveTodayList]);
+  const onLeaveIds = useMemo(() => new Set(onLeaveTodayList.map((l) => l.employeeId)), [onLeaveTodayList]);
 
   // Today Absent
   const todayAbsentCount = useMemo(() => {
@@ -457,7 +455,7 @@ const AdminDashboard = () => {
       .slice(0, 5);
 
     return { todayBirthdays: todayB, upcomingBirthdays: upcoming };
-  },[activeEmployees]);
+  }, [activeEmployees]);
 
   // Employee Distribution (Dynamic Departments)
   const departmentData = useMemo(() => {
@@ -473,7 +471,9 @@ const AdminDashboard = () => {
       name: dept,
       value: counts[dept], // Recharts Pie expects 'value'
     }));
-  }, [activeEmployees]);
+  },[activeEmployees]);
+
+  const totalEmployeesCount = activeEmployees.length || 1; // Safely divide by this
 
   // Extended Color Palette for dynamic departments
   const COLORS =[
@@ -535,60 +535,60 @@ const AdminDashboard = () => {
         
         {/* 1. TOP STATS CARDS */}
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-  {/* Total Employees */}
-  <div className="relative bg-blue-500 rounded-[20px] p-5 shadow-lg overflow-hidden h-[130px] flex flex-col justify-between transition-transform hover:scale-[1.02]">
-    <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white opacity-10"></div>
-    <div className="absolute right-2 top-8 w-16 h-16 rounded-full bg-white opacity-10"></div>
-    <div className="w-11 h-11 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white text-xl z-10">
-      <FaUsers />
-    </div>
-    <div className="z-10 text-white">
-      <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Total Employees</p>
-      <h3 className="text-3xl font-bold tracking-tight">
-        {activeEmployees.length || statCards.totalEmployees}
-      </h3>
-    </div>
-  </div>
+          {/* Total Employees */}
+          <div className="relative bg-blue-500 rounded-[20px] p-5 shadow-lg overflow-hidden h-[130px] flex flex-col justify-between transition-transform hover:scale-[1.02]">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white opacity-10"></div>
+            <div className="absolute right-2 top-8 w-16 h-16 rounded-full bg-white opacity-10"></div>
+            <div className="w-11 h-11 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white text-xl z-10">
+              <FaUsers />
+            </div>
+            <div className="z-10 text-white">
+              <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Total Employees</p>
+              <h3 className="text-3xl font-bold tracking-tight">
+                {activeEmployees.length || statCards.totalEmployees}
+              </h3>
+            </div>
+          </div>
 
-  {/* Present - Clickable */}
-  <Link 
-    to="/admin/Today-overview" 
-    className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-blue-200 cursor-pointer"
-  >
-    <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-xl">
-      <FaLaptopCode />
-    </div>
-    <div>
-      <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today Present</p>
-      <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{todayPresent.length}</h3>
-    </div>
-  </Link>
+          {/* Present - Clickable (UPDATED ROUTE) */}
+          <Link 
+            to="/attendance" 
+            className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-blue-200 cursor-pointer"
+          >
+            <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-xl">
+              <FaLaptopCode />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today Present</p>
+              <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{todayPresent.length}</h3>
+            </div>
+          </Link>
 
-  {/* Absent - Clickable */}
-  <Link 
-    to="/admin/Today-overview" 
-    className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-red-100 cursor-pointer"
-  >
-    <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
-      <FaFileAlt />
-    </div>
-    <div>
-      <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today Absent</p>
-      <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{todayAbsentCount}</h3>
-    </div>
-  </Link>
+          {/* Absent - Clickable (UPDATED ROUTE) */}
+          <Link 
+            to="/attendance" 
+            className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-red-100 cursor-pointer"
+          >
+            <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
+              <FaFileAlt />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today Absent</p>
+              <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{todayAbsentCount}</h3>
+            </div>
+          </Link>
 
-  {/* Leave Requests */}
-  <div className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md">
-    <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
-      <FaPlane />
-    </div>
-    <div>
-      <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Leave Requests</p>
-      <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{totalPendingLeavesCount}</h3>
-    </div>
-  </div>
-</div>
+          {/* Leave Requests */}
+          <div className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md">
+            <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
+              <FaPlane />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Leave Requests</p>
+              <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{totalPendingLeavesCount}</h3>
+            </div>
+          </div>
+        </div>
 
         {/* 2. CHARTS SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -728,7 +728,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Employee Distribution Card */}
+          {/* Employee Distribution Card - DYNAMIC HOVER LOGIC ADDED HERE */}
           <div className="bg-white/70 backdrop-blur-md rounded-[24px] p-6 shadow-sm border border-white/50">
             <h3 className="text-[#2B3674] font-bold text-lg mb-4">
               Employee Distribution
@@ -743,8 +743,10 @@ const AdminDashboard = () => {
                     dataKey="value"
                     startAngle={90}
                     endAngle={-270}
-                    activeIndex={0}
+                    activeIndex={activeIndex}
                     activeShape={renderActiveShape}
+                    onMouseEnter={onPieEnter}
+                    onMouseLeave={onPieLeave}
                   >
                     {departmentData.map((_, i) => (
                       <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
@@ -752,6 +754,20 @@ const AdminDashboard = () => {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+
+              {/* Dynamic Center Text Overlay */}
+              <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[#2B3674] font-bold text-xl">
+                  {activeIndex === -1 || departmentData.length === 0
+                    ? "100%"
+                    : `${((departmentData[activeIndex].value / totalEmployeesCount) * 100).toFixed(0)}%`}
+                </span>
+                <span className="text-gray-400 text-[10px]">
+                  {activeIndex === -1 || departmentData.length === 0
+                    ? "Total"
+                    : departmentData[activeIndex].name}
+                </span>
+              </div>
               
               {/* Dynamic Legend */}
               <div className="absolute top-0 right-0 text-right space-y-1 h-[180px] overflow-y-auto pr-2 custom-scrollbar internal-scroll">
@@ -774,12 +790,12 @@ const AdminDashboard = () => {
             {/* Dynamic Percentage Bar */}
             <div className="mt-4 bg-[#F4F7FE] rounded-full h-4 w-full flex overflow-hidden">
                {departmentData.map((dept, idx) => {
-                 const percentage = ((dept.value / activeEmployees.length) * 100).toFixed(0);
+                 const percentage = ((dept.value / totalEmployeesCount) * 100).toFixed(0);
                  if(percentage === "0") return null;
                  return (
                     <div 
                       key={idx}
-                      className="flex items-center justify-center text-[8px] text-white font-bold"
+                      className="flex items-center justify-center text-[8px] text-white font-bold transition-all duration-300"
                       style={{ 
                         width: `${percentage}%`, 
                         backgroundColor: COLORS[idx % COLORS.length] 
@@ -792,6 +808,7 @@ const AdminDashboard = () => {
                })}
             </div>
           </div>
+          
         </div>
 
         {/* 3. MAIN CONTENT GRID */}
@@ -806,9 +823,10 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   Recent Leave Requests ({recentLeaves.length})
                 </h3>
+                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
-                  onClick={() => navigate("/leave-management")}
+                  onClick={() => navigate("/admin/admin-Leavemanage")}
                 >
                   View All
                 </button>
@@ -886,9 +904,10 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   On Leave Today ({onLeaveTodayList.length})
                 </h3>
+                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
-                  onClick={() => navigate("/leave-management")}
+                  onClick={() => navigate("/admin/admin-Leavemanage")}
                 >
                   View All
                 </button>
@@ -934,9 +953,10 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   Working Remotely ({remoteWorkers.length})
                 </h3>
+                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
-                  onClick={() => navigate("/employees-attendance")}
+                  onClick={() => navigate("/attendance")}
                 >
                   View All
                 </button>
@@ -980,19 +1000,19 @@ const AdminDashboard = () => {
           {/* RIGHT COLUMN (Span 1) */}
           <div className="xl:col-span-1 flex flex-col gap-8">
 
-            {/* QUICK ACTIONS */}
+            {/* QUICK ACTIONS - ALL ROUTES UPDATED FROM SIDEBAR MAP */}
             <div className="bg-white/70 backdrop-blur-md rounded-[24px] p-6 shadow-sm border border-white/50">
               <h3 className="text-[#2B3674] font-bold text-lg mb-6">Quick Actions</h3>
               <div className="flex flex-col gap-4">
                 {[
-                  { icon: FaUsers, label: "Employee Management", bg: "bg-blue-500", path: "/employee-management" },
-                  { icon: FaLayerGroup, label: "Group Management", bg: "bg-purple-500", path: "/group-management" },
-                  { icon: FaUserClock, label: "Employees Attendance", bg: "bg-green-500", path: "/employees-attendance" },
-                  { icon: FaCalendarCheck, label: "Leave Approvals", bg: "bg-yellow-500", path: "/leave-management" },
-                  { icon: FaFileAlt, label: "Payroll", bg: "bg-red-500", path: "/payroll" },
-                  { icon: FaBullhorn, label: "Announcements", bg: "bg-indigo-500", path: "/announcements" },
-                  { icon: FaCalendarAlt, label: "Holiday Calendar", bg: "bg-teal-500", path: "/holiday-calendar" },
-                  { icon: FaChartPie, label: "Shift Managements", bg: "bg-pink-500", path: "/shift-management" },
+                  { icon: FaUsers, label: "Employee Management", bg: "bg-blue-500", path: "/employees" },
+                  { icon: FaChartLine, label: "Leave Summary", bg: "bg-purple-500", path: "/admin/leave-summary" },
+                  { icon: FaUserClock, label: "Employees Attendance", bg: "bg-green-500", path: "/attendance" },
+                  { icon: FaCalendarCheck, label: "Leave Approvals", bg: "bg-yellow-500", path: "/admin/admin-Leavemanage" },
+                  { icon: FaFileAlt, label: "Payroll", bg: "bg-red-500", path: "/admin/payroll" },
+                  { icon: FaBullhorn, label: "Announcements", bg: "bg-indigo-500", path: "/admin/notices" },
+                  { icon: FaCalendarAlt, label: "Holiday Calendar", bg: "bg-teal-500", path: "/admin/holiday-calendar" },
+                  { icon: FaChartPie, label: "Shift Management", bg: "bg-pink-500", path: "/admin/settings" },
                 ].map((action, idx) => (
                   <button
                     key={idx}

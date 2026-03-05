@@ -139,7 +139,7 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// 3. Admin: Approve or Reject Request (WITH DEBUG CONSOLES)
+// 3. Admin: Approve or Reject Request
 router.post("/action", async (req, res) => {
   console.log("🚀 Punch-Out Action Started...");
   try {
@@ -147,11 +147,8 @@ router.post("/action", async (req, res) => {
     const request = await PunchOutRequest.findById(requestId);
 
     if (!request) {
-      console.log("❌ Request not found in database.");
       return res.status(404).json({ success: false, message: "Request not found" });
     }
-
-    console.log(`📝 Processing ${status} for Employee ID: ${request.employeeId}`);
 
     request.status = status;
 
@@ -178,26 +175,14 @@ router.post("/action", async (req, res) => {
           address: "Manual Request Approved (Admin)",
         };
         await attendanceRecord.save();
-        console.log("✅ Attendance record updated successfully.");
-      } else {
-        console.log("⚠️ No active attendance record found to update punch-out.");
       }
     }
 
     await request.save();
-    console.log(`✅ Request status updated to ${status} in DB.`);
 
-    /* ================= 📧 EMAIL DEBUG SECTION ================= */
-    console.log(`🔍 Looking up email for Employee ID: ${request.employeeId}...`);
+    // Send Email Notification
     const employee = await Employee.findOne({ employeeId: request.employeeId });
-
-    if (!employee) {
-      console.log("❌ Could not find employee details in the database.");
-    } else if (!employee.email) {
-      console.log(`❌ Employee found (${employee.name}), but no email address is registered.`);
-    } else {
-      console.log(`📧 Attempting to send email to: ${employee.email}`);
-
+    if (employee && employee.email) {
       const mailOptions = {
         from: `"Attendance System" <${process.env.SMTP_USER}>`,
         to: employee.email,
@@ -211,19 +196,11 @@ router.post("/action", async (req, res) => {
           adminComment: adminComment
         }),
       };
-
-      try {
-        const info = await transporter.sendMail(mailOptions);
-
-      } catch (emailErr) {
-        console.error('❌ ERROR: Nodemailer failed to send the email:', emailErr);
-      }
+      await transporter.sendMail(mailOptions).catch(err => console.error('Email failed:', err));
     }
-    /* ========================================================= */
 
     res.json({ success: true, message: `Request ${status} Successfully` });
   } catch (error) {
-    console.error("❌ SYSTEM ERROR in PunchOut Action:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -233,6 +210,27 @@ router.delete("/delete/:id", async (req, res) => {
   try {
     const result = await PunchOutRequest.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 5. Employee: Check Status of Specific Request (NEW ENDPOINT)
+router.get("/status", async (req, res) => {
+  try {
+    const { employeeId, date } = req.query;
+    
+    // Find the latest request for this date (in case there are multiple rejected ones)
+    const request = await PunchOutRequest.findOne({ 
+      employeeId, 
+      originalDate: date 
+    }).sort({ requestDate: -1 });
+
+    if (request) {
+      res.json({ found: true, status: request.status });
+    } else {
+      res.json({ found: false });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

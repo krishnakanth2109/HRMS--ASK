@@ -221,16 +221,16 @@ const EmployeeHolidays = () => {
   if (isLoading) return <div className="p-10 flex justify-center text-gray-500">Loading Calendar...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 md:p-8 font-sans">
+    <div className="min-h-screen  p-4 md:p-8 font-sans">
       <div className="max-w-[1800px] mx-auto space-y-8">
         
         {/* HEADER SECTION */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col border border-gray-200 shadow-sm bg-white rounded-2xl p-6 md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Company Holiday Calendar</h1>
             <p className="text-gray-600 mt-2">Track holidays & celebrate with your colleagues</p>
           </div>
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
             <FaCalendarDay className="text-blue-500" />
             <span className="text-sm font-medium text-gray-700">
               {new Date().toLocaleDateString('en-US', { 

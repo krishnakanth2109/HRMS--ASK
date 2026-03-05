@@ -259,7 +259,7 @@ const EmployeeWorkModeRequest = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans">
+    <div className="p-4 md:p-8  min-h-screen font-sans">
       <div className="max-w-6xl mx-auto">
         
         {/* 1. PINNED CURRENT STATUS */}

@@ -31,7 +31,7 @@ const formatDateDMY = (dateInput) => {
 const getShiftDurationInHours = (startTime, endTime) => {
   if (!startTime || !endTime) return 9;
   const [startH, startM] = startTime.split(':').map(Number);
-  const [endH, endM] = endTime.split(':').map(Number);
+  const[endH, endM] = endTime.split(':').map(Number);
   let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
   if (diffMinutes < 0) diffMinutes += 24 * 60;
   return Math.round((diffMinutes / 60) * 10) / 10;
@@ -79,12 +79,12 @@ const getWorkedStatus = (punchIn, punchOut, apiStatus, fullDayThreshold, halfDay
 
 const LocationViewButton = ({ location }) => {
   if (!location || !location.latitude || !location.longitude) {
-    return <span className="text-slate-400 text-xs">No Loc</span>;
+    return <span className="text-gray-400 text-xs font-medium">No Loc</span>;
   }
   const mapUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
   return (
-    <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-semibold mt-1" title={location.address || 'View on Google Maps'}>
-      <FaMapMarkerAlt /> View Map
+    <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-[11px] font-semibold mt-1 bg-blue-50 px-2 py-0.5 rounded-full transition-colors" title={location.address || 'View on Google Maps'}>
+      <FaMapMarkerAlt size={10} /> View Map
     </a>
   );
 };
@@ -127,7 +127,7 @@ const isHoliday = (dateStr, holidays) => {
 };
 
 const LiveTimer = ({ startTime }) => {
-  const [timeStr, setTimeStr] = useState("0h 0m 0s");
+  const[timeStr, setTimeStr] = useState("0h 0m 0s");
   useEffect(() => {
     if (!startTime) return;
     const updateTimer = () => {
@@ -145,7 +145,7 @@ const LiveTimer = ({ startTime }) => {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [startTime]);
-  return <span className="text-blue-600 font-mono font-bold animate-pulse">{timeStr}</span>;
+  return <span className="text-blue-600 font-mono font-bold animate-pulse bg-blue-50 px-2 py-1 rounded-md">{timeStr}</span>;
 };
 
 // ==========================================
@@ -155,68 +155,68 @@ const AttendanceComparisonModal = ({ isOpen, onClose, selectedStats, employeeIma
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex justify-center items-center p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
               <FaExchangeAlt className="text-blue-600" /> Attendance Comparison
             </h2>
-            <p className="text-slate-500 font-medium">{formatDateDMY(startDate)} to {formatDateDMY(endDate)}</p>
+            <p className="text-gray-500 font-medium text-sm mt-1">{formatDateDMY(startDate)} to {formatDateDMY(endDate)}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><FaTimes size={24} /></button>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"><FaTimes size={20} /></button>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 bg-slate-100">
+        <div className="flex-1 overflow-auto p-6 bg-gray-50/50">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {selectedStats.map(emp => (
-              <div key={emp.employeeId} className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-white flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-200 flex-shrink-0">
+              <div key={emp.employeeId} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                <div className="p-5 border-b border-gray-100 bg-white flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full border border-gray-200 overflow-hidden bg-gray-50 flex-shrink-0">
                     {employeeImages[emp.employeeId] ? (
                       <img src={employeeImages[emp.employeeId]} className="w-full h-full object-cover" alt="" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-slate-400">{emp.employeeName.charAt(0)}</div>
+                      <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-gray-400">{emp.employeeName.charAt(0)}</div>
                     )}
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg text-slate-800 leading-tight">{emp.employeeName}</h4>
-                    <p className="text-sm font-mono text-slate-500">{emp.employeeId}</p>
+                    <h4 className="font-bold text-lg text-gray-800 leading-tight">{emp.employeeName}</h4>
+                    <p className="text-sm font-mono text-gray-500 mt-0.5">{emp.employeeId}</p>
                   </div>
                 </div>
 
                 <div className="p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-blue-50 p-3 rounded-lg text-center">
-                      <p className="text-[10px] font-bold text-blue-600 uppercase">Present Days</p>
-                      <p className="text-2xl font-black text-blue-800">{emp.presentDays}</p>
+                    <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl text-center">
+                      <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Present Days</p>
+                      <p className="text-2xl font-black text-blue-700 mt-1">{emp.presentDays}</p>
                     </div>
-                    <div className="bg-red-50 p-3 rounded-lg text-center">
-                      <p className="text-[10px] font-bold text-red-600 uppercase">Absent Days</p>
-                      <p className="text-2xl font-black text-red-800">{emp.absentDays}</p>
+                    <div className="bg-red-50/50 border border-red-100 p-3 rounded-xl text-center">
+                      <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Absent Days</p>
+                      <p className="text-2xl font-black text-red-700 mt-1">{emp.absentDays}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-600">On Time</span>
-                      <span className="font-bold text-green-600">{emp.onTimeDays}</span>
+                  <div className="space-y-1 mt-4">
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-sm font-medium text-gray-500">On Time</span>
+                      <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">{emp.onTimeDays}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-600">Late Arrivals</span>
-                      <span className="font-bold text-orange-600">{emp.lateDays}</span>
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-sm font-medium text-gray-500">Late Arrivals</span>
+                      <span className="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{emp.lateDays}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-600">Full Days</span>
-                      <span className="font-bold text-slate-800">{emp.fullDays}</span>
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-sm font-medium text-gray-500">Full Days</span>
+                      <span className="font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">{emp.fullDays}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-600">Half Days</span>
-                      <span className="font-bold text-slate-800">{emp.halfDays}</span>
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-sm font-medium text-gray-500">Half Days</span>
+                      <span className="font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">{emp.halfDays}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-sm text-slate-600">Approved OT</span>
-                      <span className="font-bold text-indigo-600">{emp.approvedOT}</span>
+                    <div className="flex justify-between items-center py-2.5">
+                      <span className="text-sm font-medium text-gray-500">Approved OT</span>
+                      <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{emp.approvedOT}</span>
                     </div>
                   </div>
                 </div>
@@ -225,8 +225,8 @@ const AttendanceComparisonModal = ({ isOpen, onClose, selectedStats, employeeIma
           </div>
         </div>
 
-        <div className="p-4 border-t bg-white flex justify-end">
-          <button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors">Close Comparison</button>
+        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+          <button onClick={onClose} className="px-6 py-2.5 bg-gray-800 text-white font-semibold text-sm rounded-xl hover:bg-gray-900 transition-colors shadow-sm">Close Comparison</button>
         </div>
       </div>
     </div>
@@ -241,8 +241,8 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
   const [punchOutDateTime, setPunchOutDateTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [locationError, setLocationError] = useState('');
+  const[locationLoading, setLocationLoading] = useState(true);
+  const[locationError, setLocationError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -276,28 +276,28 @@ const AdminPunchOutModal = ({ isOpen, onClose, employee, onPunchOut }) => {
   if (!isOpen || !employee) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
-          <div><h3 className="text-xl font-bold text-slate-800">Admin Punch Out</h3><p className="text-sm text-slate-600 font-semibold">{employee.employeeName}</p></div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2"><FaTimes size={20} /></button>
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white">
+          <div><h3 className="text-xl font-bold text-gray-800">Admin Punch Out</h3><p className="text-sm text-gray-500 font-medium mt-0.5">{employee.employeeName}</p></div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-full transition-colors"><FaTimes size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg space-y-2">
-            <div className="flex justify-between text-sm"><span className="text-slate-600 font-medium">Record Date:</span><span className="text-slate-800 font-bold">{formatDateDMY(employee.date)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-slate-600 font-medium">Punch In Time:</span><span className="text-green-700 font-semibold">{new Date(employee.punchIn).toLocaleString()}</span></div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl space-y-3">
+            <div className="flex justify-between items-center text-sm"><span className="text-blue-800 font-medium">Record Date:</span><span className="text-blue-900 font-bold bg-blue-100/50 px-2 py-1 rounded-md">{formatDateDMY(employee.date)}</span></div>
+            <div className="flex justify-between items-center text-sm"><span className="text-blue-800 font-medium">Punch In Time:</span><span className="text-green-700 font-bold bg-green-50 px-2 py-1 rounded-md">{new Date(employee.punchIn).toLocaleString()}</span></div>
           </div>
-          <div className="bg-slate-50 p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2"><FaMapMarkerAlt className="text-blue-600" /><span className="text-sm font-semibold text-slate-700">Location Status</span></div>
-            {locationLoading ? <p className="text-sm text-slate-600">Getting location...</p> : locationError ? <p className="text-sm text-red-600">{locationError}</p> : <p className="text-sm text-green-600">✓ Location acquired</p>}
+          <div className="bg-gray-50 border border-gray-100 p-4 rounded-xl">
+            <div className="flex items-center gap-2 mb-2"><FaMapMarkerAlt className="text-blue-600" /><span className="text-sm font-bold text-gray-700">Location Status</span></div>
+            {locationLoading ? <p className="text-sm font-medium text-gray-500 animate-pulse">Getting location...</p> : locationError ? <p className="text-sm font-medium text-red-600">{locationError}</p> : <p className="text-sm font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-block">✓ Location acquired</p>}
           </div>
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700">Select Punch Out Time <span className="text-red-500">*</span></label>
-            <input type="datetime-local" value={punchOutDateTime} onChange={(e) => setPunchOutDateTime(e.target.value)} max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="block text-sm font-bold text-gray-700">Select Punch Out Time <span className="text-red-500">*</span></label>
+            <input type="datetime-local" value={punchOutDateTime} onChange={(e) => setPunchOutDateTime(e.target.value)} max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)} required className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-medium text-gray-700" />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50" disabled={loading}>Cancel</button>
-            <button type="submit" disabled={loading || locationLoading || !!locationError} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-400">{loading ? 'Processing...' : 'Confirm'}</button>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors" disabled={loading}>Cancel</button>
+            <button type="submit" disabled={loading || locationLoading || !!locationError} className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:bg-blue-300 transition-colors shadow-sm">{loading ? 'Processing...' : 'Confirm Punch Out'}</button>
           </div>
         </form>
       </div>
@@ -311,8 +311,8 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
   const [expandedWeeks, setExpandedWeeks] = useState({});
 
   const completeHistory = useMemo(() => {
-    if (!isOpen || !employeeData || !dateRange.startDate || !dateRange.endDate) return [];
-    const history = [];
+    if (!isOpen || !employeeData || !dateRange.startDate || !dateRange.endDate) return[];
+    const history =[];
     const start = new Date(dateRange.startDate);
     const end = new Date(dateRange.endDate);
     const shift = shiftsMap[employeeData.employeeId];
@@ -338,24 +338,24 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
           actualWorkedHours = (new Date(punchOut) - new Date(punchIn)) / (1000 * 60 * 60);
         }
 
-        if (workedStatus === "Absent") rowClass = "bg-red-50/50 hover:bg-red-50";
-        else if (workedStatus === "Half Day") rowClass = "bg-yellow-50/50 hover:bg-yellow-50";
-        else rowClass = "hover:bg-gray-50";
+        if (workedStatus === "Absent") rowClass = "bg-red-50/30 hover:bg-red-50";
+        else if (workedStatus === "Half Day") rowClass = "bg-yellow-50/30 hover:bg-yellow-50";
+        else rowClass = "bg-white hover:bg-gray-50/80";
       } else {
-        if (isWorkingDay) { workedStatus = "Absent (Not Logged In)"; rowClass = "bg-red-100/30 hover:bg-red-50"; }
-        else if (holidayObj) { workedStatus = `Holiday: ${holidayObj.name}`; rowClass = "bg-purple-50/50 text-purple-700 hover:bg-purple-50"; shiftDuration = 0; }
-        else if (isWeeklyOff) { workedStatus = "Weekly Off"; rowClass = "bg-gray-100/50 text-gray-500 hover:bg-gray-100"; shiftDuration = 0; }
+        if (isWorkingDay) { workedStatus = "Absent (Not Logged In)"; rowClass = "bg-red-50/50 hover:bg-red-50"; }
+        else if (holidayObj) { workedStatus = `Holiday: ${holidayObj.name}`; rowClass = "bg-purple-50/30 text-purple-700 hover:bg-purple-50"; shiftDuration = 0; }
+        else if (isWeeklyOff) { workedStatus = "Weekly Off"; rowClass = "bg-gray-50 text-gray-500 hover:bg-gray-100"; shiftDuration = 0; }
       }
       history.push({ date: dateStr, punchIn, punchOut, shiftHours: shiftDuration, actualWorkedHours, displayTime, loginStatus, workedStatus, isWorkingDay, isAbsent: workedStatus.includes("Absent"), isFullDay: workedStatus === "Full Day", isHalfDay: workedStatus === "Half Day", isPresent: !!punchIn, rowClass });
     }
     return history.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [isOpen, employeeData, shiftsMap, holidays, dateRange]);
+  },[isOpen, employeeData, shiftsMap, holidays, dateRange]);
 
   const weeklyHistory = useMemo(() => {
-    if (viewMode !== "weekly") return [];
+    if (viewMode !== "weekly") return[];
 
     const weeks = {};
-    const sortedDaily = [...completeHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sortedDaily =[...completeHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
 
     sortedDaily.forEach(day => {
       const date = new Date(day.date);
@@ -371,7 +371,7 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
         weeks[weekKey] = {
           weekStart: weekKey,
           weekEnd: weekEnd.toISOString().split('T')[0],
-          days: [],
+          days:[],
           totalHours: 0,
           stats: { full: 0, half: 0, absent: 0, late: 0 }
         };
@@ -390,7 +390,7 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
     });
 
     return Object.values(weeks).sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
-  }, [completeHistory, viewMode]);
+  },[completeHistory, viewMode]);
 
   const toggleWeekExpansion = (weekKey) => {
     setExpandedWeeks(prev => ({ ...prev, [weekKey]: !prev[weekKey] }));
@@ -434,198 +434,192 @@ const AttendanceDetailModal = ({ isOpen, onClose, employeeData, shiftsMap, holid
   const profilePic = employeeImages ? employeeImages[employeeData.employeeId] : null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-in fade-in duration-200" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-white shrink-0 z-20">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg overflow-hidden bg-slate-100">
+        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white shrink-0 z-20">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 font-bold text-xl overflow-hidden bg-gray-50">
               {profilePic ? <img src={profilePic} alt={employeeData.name} className="w-full h-full object-cover" /> : (employeeData.name || "U").charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Attendance History</h3>
-              <p className="text-slate-500 font-medium text-sm flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>{employeeData.name} ({employeeData.employeeId})</p>
+              <h3 className="text-xl font-bold text-gray-800">Attendance History</h3>
+              <p className="text-gray-500 font-medium text-sm flex items-center gap-2 mt-0.5"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>{employeeData.name} ({employeeData.employeeId})</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleShareImage} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors"><FaShareAlt /> Share</button>
-            <button onClick={downloadIndividualReport} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-colors shadow-sm"><FaFileExcel /> Download</button>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2 hover:bg-slate-50 rounded-full"><FaTimes size={20} /></button>
+            <button onClick={handleShareImage} className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-100 transition-colors border border-gray-200"><FaShareAlt /> Share</button>
+            <button onClick={downloadIndividualReport} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors shadow-sm"><FaFileExcel /> Download</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-full transition-colors ml-2"><FaTimes size={20} /></button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar" ref={contentRef}>
-          <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4 sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm pb-6 border-b border-slate-200/50">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow">
-              <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Working Days</span>
-              <span className="text-2xl font-bold text-slate-800">{stats.workingDays}</span>
+        <div className="flex-1 overflow-y-auto bg-gray-50/50 custom-scrollbar" ref={contentRef}>
+          <div className="p-6 grid grid-cols-2 md:grid-cols-5 gap-4 sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200/50">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Working Days</span>
+              <span className="text-2xl font-black text-gray-800">{stats.workingDays}</span>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-indigo-500">
-              <span className="text-xs font-bold uppercase text-indigo-500 tracking-wider">Present</span>
-              <span className="text-2xl font-bold text-slate-800">{stats.present}</span>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-indigo-500">
+              <span className="text-[10px] font-bold uppercase text-indigo-500 tracking-wider">Present</span>
+              <span className="text-2xl font-black text-gray-800">{stats.present}</span>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-green-500">
-              <span className="text-xs font-bold uppercase text-green-500 tracking-wider">Full Days</span>
-              <span className="text-2xl font-bold text-slate-800">{stats.fullDays}</span>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-green-500">
+              <span className="text-[10px] font-bold uppercase text-green-500 tracking-wider">Full Days</span>
+              <span className="text-2xl font-black text-gray-800">{stats.fullDays}</span>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-yellow-500">
-              <span className="text-xs font-bold uppercase text-yellow-600 tracking-wider">Half Days</span>
-              <span className="text-2xl font-bold text-slate-800">{stats.halfDays}</span>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-yellow-500">
+              <span className="text-[10px] font-bold uppercase text-yellow-600 tracking-wider">Half Days</span>
+              <span className="text-2xl font-black text-gray-800">{stats.halfDays}</span>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-red-500">
-              <span className="text-xs font-bold uppercase text-red-500 tracking-wider">Absent</span>
-              <span className="text-2xl font-bold text-slate-800">{stats.absent}</span>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1 hover:shadow-md transition-shadow border-b-4 border-b-red-500">
+              <span className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Absent</span>
+              <span className="text-2xl font-black text-gray-800">{stats.absent}</span>
             </div>
           </div>
 
-          <div className="px-5 mb-4">
-            <div className="flex bg-slate-200/50 p-1 rounded-xl w-fit border border-slate-200">
+          <div className="px-6 mb-6 mt-4">
+            <div className="flex bg-gray-200/50 p-1.5 rounded-xl w-fit border border-gray-200">
               <button
                 onClick={() => setViewMode("daily")}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "daily" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${viewMode === "daily" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
               >
                 <FaList /> Daily History
               </button>
               <button
                 onClick={() => setViewMode("weekly")}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "weekly" ? "bg-white text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${viewMode === "weekly" ? "bg-white text-purple-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
               >
                 <FaLayerGroup /> Weekly Report
               </button>
             </div>
           </div>
 
-          <div className="px-5 pb-10">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-
-                {viewMode === "daily" ? (
-                  <table className="min-w-full text-sm text-left border-collapse">
-                    <thead className="bg-slate-100 text-slate-500 uppercase text-xs font-bold sticky top-0 z-20 shadow-sm">
-                      <tr>
-                        <th className="px-6 py-4 whitespace-nowrap">Date</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Punch In</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Punch Out</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Assigned</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Duration</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Login Status</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Worked Status</th>
+          <div className="px-6 pb-10">
+            {viewMode === "daily" ? (
+              <div className="overflow-x-auto rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white">
+                <table className="min-w-full text-sm text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold tracking-wider border-b border-gray-200 sticky top-0 z-20">
+                    <tr>
+                      <th className="px-6 py-4">Date</th>
+                      <th className="px-6 py-4">Punch In</th>
+                      <th className="px-6 py-4">Punch Out</th>
+                      <th className="px-6 py-4">Assigned</th>
+                      <th className="px-6 py-4">Duration</th>
+                      <th className="px-6 py-4">Login Status</th>
+                      <th className="px-6 py-4">Worked Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
+                      <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
+                        <td className="px-6 py-4 font-semibold text-gray-800">
+                          {formatDateDMY(item.date)}
+                          <div className="text-[10px] font-medium text-gray-400 uppercase mt-0.5">{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                        </td>
+                        <td className="px-6 py-4 text-green-600 font-semibold">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                        <td className="px-6 py-4 text-red-600 font-semibold">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                        <td className="px-6 py-4 text-gray-500 font-medium">{formatDecimalHours(item.shiftHours)}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-gray-700">{item.displayTime}</td>
+                        <td className="px-6 py-4">{item.loginStatus !== "--" && (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{item.loginStatus}</span>)}</td>
+                        <td className="px-6 py-4 font-semibold"><span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${item.workedStatus === "Full Day" ? "bg-green-50 text-green-700 border-green-100" : item.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-700 border-yellow-100" : item.isAbsent ? "bg-red-50 text-red-700 border-red-100" : "bg-gray-50 text-gray-600 border-gray-200"}`}>{item.workedStatus}</span></td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {completeHistory.length > 0 ? (completeHistory.map((item, idx) => (
-                        <tr key={idx} className={`transition-all duration-200 ${item.rowClass}`}>
-                          <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-50">
-                            {formatDateDMY(item.date)}
-                            <div className="text-[10px] font-normal text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' })}</div>
-                          </td>
-                          <td className="px-6 py-4 text-green-600 font-medium whitespace-nowrap">{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-                          <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-                          <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDecimalHours(item.shiftHours)}</td>
-                          <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">{item.displayTime}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.loginStatus !== "--" && (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide border ${item.loginStatus === "LATE" ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"}`}>{item.loginStatus}</span>)}</td>
-                          <td className="px-6 py-4 font-semibold whitespace-nowrap"><span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : item.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{item.workedStatus}</span></td>
-                        </tr>
-                      ))) : (<tr><td colSpan="7" className="text-center p-10 text-slate-500">No data for selected range.</td></tr>)}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="space-y-6 p-4 bg-slate-50/50">
-                    {weeklyHistory.length > 0 ? (weeklyHistory.map((week, wIdx) => {
-                      const isExpanded = expandedWeeks[week.weekStart];
-                      return (
-                        <div key={wIdx} className="bg-white border border-slate-200 rounded-xl shadow-md overflow-hidden transition-all duration-300">
-                          <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
-                            <div className="flex items-end gap-4">
-                              <div>
-                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-1">Weekly Range</span>
-                                <span className="font-bold">{formatDateDMY(week.weekStart)} — {formatDateDMY(week.weekEnd)}</span>
-                              </div>
-                              <button
-                                onClick={() => toggleWeekExpansion(week.weekStart)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-[10px] font-bold uppercase transition-colors"
-                              >
-                                <FaInfoCircle /> {isExpanded ? "Hide Report" : "View Detailed Report"} {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
-                              </button>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-1">Total Weekly Work Hours</span>
-                              <span className="text-xl font-black text-green-400 font-mono">{formatDecimalHours(week.totalHours)}</span>
-                            </div>
-                          </div>
-
-                          {/* ✅ NEW: Expandable Summary Section */}
-                          {isExpanded && (
-                            <div className="p-4 bg-slate-100 border-b border-slate-200 grid grid-cols-4 gap-4 animate-in slide-in-from-top duration-300">
-                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-green-500">
-                                <p className="text-[9px] font-black uppercase text-slate-400">Full Days</p>
-                                <p className="text-lg font-bold text-slate-800">{week.stats.full}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-yellow-500">
-                                <p className="text-[9px] font-black uppercase text-slate-400">Half Days</p>
-                                <p className="text-lg font-bold text-slate-800">{week.stats.half}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-red-500">
-                                <p className="text-[9px] font-black uppercase text-slate-400">Absents</p>
-                                <p className="text-lg font-bold text-slate-800">{week.stats.absent}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-purple-500">
-                                <p className="text-[9px] font-black uppercase text-slate-400">Late Logins</p>
-                                <p className="text-lg font-bold text-slate-800">{week.stats.late}</p>
-                              </div>
-                            </div>
-                          )}
-                          <table className="min-w-full text-xs text-left border-separate border-spacing-y-2">
-
-                            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                              <tr>
-                                <th className="px-4 py-3">Day</th>
-                                <th className="px-4 py-3">Punch In</th>
-                                <th className="px-5 py-3">Punch Out</th>
-                                {/* ✅ NEW: Login Status Column */}
-                                <th className="px-4 py-3 text-center">Login Status</th>
-                                <th className="px-4 py-3 text-right">Hours Worked</th>
-                                <th className="px-4 py-3">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody >
-                              {week.days.map((day, dIdx) => (
-                                <tr key={dIdx} className={day.rowClass}>
-                                  <td className="px-4 py-3 font-semibold">
-                                    {formatDateDMY(day.date)}
-                                    <span className="ml-2 text-slate-400 font-normal uppercase text-[9px]">{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                                  </td>
-                                  <td className="px-4 py-3">{day.punchIn ? new Date(day.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-                                  <td className="px-4 py-3">{day.punchOut ? new Date(day.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
-
-                                  {/* ✅ NEW: Login Status Table Data */}
-                                  <td className="px-4 py-3 text-center">
-                                    {day.loginStatus !== "--" && (
-                                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${day.loginStatus === "LATE" ? "bg-red-50 text-red-600 border-red-100" : "bg-green-50 text-green-600 border-green-100"}`}>
-                                        {day.loginStatus}
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">{day.displayTime || "0h 0m"}</td>
-                                  <td className="px-4 py-3">
-                                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${day.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : day.isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>
-                                      {day.workedStatus}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )
-                    })) : (
-                      <div className="text-center p-10 text-slate-500">No weekly history available.</div>
-                    )}
-                  </div>
-                )}
-
+                    ))) : (<tr><td colSpan="7" className="text-center p-10 text-gray-500 font-medium bg-white">No data for selected range.</td></tr>)}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-6">
+                {weeklyHistory.length > 0 ? (weeklyHistory.map((week, wIdx) => {
+                  const isExpanded = expandedWeeks[week.weekStart];
+                  return (
+                    <div key={wIdx} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden transition-all duration-300">
+                      <div className="bg-gray-50 border-b border-gray-200 p-5 flex justify-between items-center">
+                        <div className="flex items-center gap-6">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase text-gray-400 tracking-widest block mb-1">Weekly Range</span>
+                            <span className="font-bold text-gray-800">{formatDateDMY(week.weekStart)} — {formatDateDMY(week.weekEnd)}</span>
+                          </div>
+                          <button
+                            onClick={() => toggleWeekExpansion(week.weekStart)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-[11px] font-bold uppercase text-gray-600 transition-colors shadow-sm"
+                          >
+                            <FaInfoCircle className="text-blue-500" /> {isExpanded ? "Hide Report" : "Detailed Report"} {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold uppercase text-gray-400 tracking-widest block mb-1">Total Work Hours</span>
+                          <span className="text-xl font-black text-green-600 font-mono bg-green-50 px-3 py-1 rounded-lg">{formatDecimalHours(week.totalHours)}</span>
+                        </div>
+                      </div>
+
+                      {/* Expandable Summary Section */}
+                      {isExpanded && (
+                        <div className="p-5 bg-gray-50/50 border-b border-gray-100 grid grid-cols-4 gap-4 animate-in slide-in-from-top duration-300">
+                          <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500 border-t border-r border-b border-gray-100">
+                            <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Full Days</p>
+                            <p className="text-xl font-black text-gray-800 mt-1">{week.stats.full}</p>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-yellow-500 border-t border-r border-b border-gray-100">
+                            <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Half Days</p>
+                            <p className="text-xl font-black text-gray-800 mt-1">{week.stats.half}</p>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500 border-t border-r border-b border-gray-100">
+                            <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Absents</p>
+                            <p className="text-xl font-black text-gray-800 mt-1">{week.stats.absent}</p>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500 border-t border-r border-b border-gray-100">
+                            <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Late Logins</p>
+                            <p className="text-xl font-black text-gray-800 mt-1">{week.stats.late}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-white text-gray-400 uppercase text-[11px] font-bold tracking-wider border-b border-gray-100">
+                            <tr>
+                              <th className="px-6 py-3">Day</th>
+                              <th className="px-6 py-3">Punch In</th>
+                              <th className="px-6 py-3">Punch Out</th>
+                              <th className="px-6 py-3 text-center">Login Status</th>
+                              <th className="px-6 py-3 text-right">Hours Worked</th>
+                              <th className="px-6 py-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {week.days.map((day, dIdx) => (
+                              <tr key={dIdx} className={day.rowClass}>
+                                <td className="px-6 py-3.5 font-semibold text-gray-700">
+                                  {formatDateDMY(day.date)}
+                                  <span className="ml-2 text-gray-400 font-medium uppercase text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                                </td>
+                                <td className="px-6 py-3.5 font-medium text-gray-600">{day.punchIn ? new Date(day.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                                <td className="px-6 py-3.5 font-medium text-gray-600">{day.punchOut ? new Date(day.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                                <td className="px-6 py-3.5 text-center">
+                                  {day.loginStatus !== "--" && (
+                                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold tracking-wide ${day.loginStatus === "LATE" ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+                                      {day.loginStatus}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-3.5 text-right font-mono font-bold text-gray-700">{day.displayTime || "0h 0m"}</td>
+                                <td className="px-6 py-3.5">
+                                  <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${day.workedStatus === "Full Day" ? "bg-green-50 text-green-700 border border-green-100" : day.isAbsent ? "bg-red-50 text-red-700 border border-red-100" : "bg-gray-100 text-gray-600 border border-gray-200"}`}>
+                                    {day.workedStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })) : (
+                  <div className="text-center p-10 bg-white rounded-2xl border border-gray-200 text-gray-500 font-medium shadow-sm">No weekly history available.</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -642,41 +636,41 @@ const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, al
   }, [allEmployees]);
   const isLoginRequired = title === "Login Required";
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
-          <div><h3 className="text-xl font-bold text-slate-800">{title}</h3><p className="text-sm text-slate-500 font-semibold">{employees.length} Employees</p></div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 p-2"><FaTimes size={20} /></button>
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
+          <div><h3 className="text-xl font-bold text-gray-800">{title}</h3><p className="text-sm text-gray-500 font-medium mt-0.5">{employees.length} Employees</p></div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-full transition-colors"><FaTimes size={20} /></button>
         </div>
-        <div className="p-5 overflow-y-auto">
+        <div className="p-6 overflow-y-auto bg-gray-50/50">
           {employees.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
-                  <tr><th className="px-4 py-3 text-left">Employee</th><th className="px-4 py-3 text-left">Role</th>{!isLoginRequired && <th className="px-4 py-3 text-left">Login Status</th>}{!isLoginRequired && <th className="px-4 py-3 text-left">Worked Status</th>}</tr>
+            <div className="overflow-x-auto rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white">
+              <table className="min-w-full text-sm text-left whitespace-nowrap">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200">
+                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Role</th>{!isLoginRequired && <th className="px-6 py-4">Login Status</th>}{!isLoginRequired && <th className="px-6 py-4">Worked Status</th>}</tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-100 bg-white">
                   {employees.map((emp, index) => {
                     const employeeInfo = employeeInfoMap[emp.employeeId] || {};
                     const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
                     return (
-                      <tr key={emp.employeeId || index} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-5 font-semibold">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-blue-700 font-bold border border-slate-300 overflow-hidden">{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.name || emp.employeeName || "U").charAt(0)}</div>
-                            <div><p className="font-semibold text-slate-800">{emp.name || emp.employeeName || employeeInfo.name}</p><p className="text-xs text-slate-500 font-mono">{emp.employeeId}</p></div>
+                      <tr key={emp.employeeId || index} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-gray-500 font-bold border border-gray-200 overflow-hidden bg-gray-50">{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.name || emp.employeeName || "U").charAt(0)}</div>
+                            <div><p className="font-bold text-gray-800">{emp.name || emp.employeeName || employeeInfo.name}</p><p className="text-xs text-gray-500 font-mono mt-0.5">{emp.employeeId}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className="text-sm font-medium text-slate-700 bg-blue-50 px-2 py-1 rounded">{employeeInfo.role || "N/A"}</span></td>
-                        {!isLoginRequired && (<td className="px-4 py-3">{emp.displayLoginStatus && (<span className={`text-xs px-3 py-1 rounded-full font-bold ${emp.displayLoginStatus === 'LATE' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>{emp.displayLoginStatus}</span>)}</td>)}
-                        {!isLoginRequired && (<td className="px-4 py-3">{emp.workedStatus && (<span className={`text-xs px-3 py-1 rounded-full font-bold ${emp.workedStatus === 'Full Day' ? 'bg-green-100 text-green-800 border border-green-200' : emp.workedStatus === 'Half Day' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' : emp.workedStatus.includes('Absent') ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-800 border border-slate-200'}`}>{emp.workedStatus}</span>)}</td>)}
+                        <td className="px-6 py-4"><span className="text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">{employeeInfo.role || "N/A"}</span></td>
+                        {!isLoginRequired && (<td className="px-6 py-4">{emp.displayLoginStatus && (<span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-md font-bold ${emp.displayLoginStatus === 'LATE' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{emp.displayLoginStatus}</span>)}</td>)}
+                        {!isLoginRequired && (<td className="px-6 py-4">{emp.workedStatus && (<span className={`text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold ${emp.workedStatus === 'Full Day' ? 'bg-green-50 text-green-700 border border-green-100' : emp.workedStatus === 'Half Day' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : emp.workedStatus.includes('Absent') ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-gray-50 text-gray-700 border border-gray-200'}`}>{emp.workedStatus}</span>)}</td>)}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          ) : <p className="text-center text-slate-500 py-8">No employees is Shift Completed </p>}
+          ) : <p className="text-center text-slate-500 py-8">No employees in this category.</p>}
         </div>
       </div>
     </div>
@@ -689,9 +683,22 @@ const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange, setIt
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
   if (totalItems === 0) return null;
   return (
-    <div className="flex items-center justify-between p-4 bg-white border-t border-slate-200 rounded-b-2xl">
-      <div className="flex items-center gap-2"><label className="text-sm font-medium text-slate-600">Rows:</label><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); onPageChange(1); }} className="bg-slate-50 border border-slate-300 text-sm rounded-md p-1.5"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></div>
-      <div className="flex items-center gap-4"><span className="text-sm font-medium text-slate-600">Showing {startItem}-{endItem} of {totalItems}</span><div><button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-r-0 border-slate-300 rounded-l-md hover:bg-slate-100 disabled:opacity-50">Previous</button><button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-r-md hover:bg-slate-100 disabled:opacity-50">Next</button></div></div>
+    <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-500">Rows per page:</label>
+        <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); onPageChange(1); }} className="bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg p-1.5 outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+      <div className="flex items-center gap-6">
+        <span className="text-sm font-medium text-gray-500">Showing {startItem}-{endItem} of {totalItems}</span>
+        <div className="flex rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="px-4 py-2 text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:bg-gray-50 border-r border-gray-200 transition-colors">Prev</button>
+          <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="px-4 py-2 text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:bg-gray-50 transition-colors">Next</button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -703,73 +710,73 @@ const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange, setIt
 const AdminAttendance = () => {
   const todayISO = new Date().toISOString().split("T")[0];
   const [startDate, setStartDate] = useState(todayISO);
-  const [endDate, setEndDate] = useState(todayISO);
-  const [rawDailyData, setRawDailyData] = useState([]);
+  const[endDate, setEndDate] = useState(todayISO);
+  const[rawDailyData, setRawDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [allEmployees, setAllEmployees] = useState([]);
+  const[allEmployees, setAllEmployees] = useState([]);
 
   const [summaryStartDate, setSummaryStartDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
-  const [summaryEndDate, setSummaryEndDate] = useState(todayISO);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [rawSummaryData, setRawSummaryData] = useState([]);
+  const[summaryEndDate, setSummaryEndDate] = useState(todayISO);
+  const[selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const[rawSummaryData, setRawSummaryData] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
-  const [overtimeData, setOvertimeData] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const[overtimeData, setOvertimeData] = useState([]);
+  const[isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [statusListModal, setStatusListModal] = useState({ isOpen: false, title: "", employees: [] });
-  const [shiftsMap, setShiftsMap] = useState({});
-  const [holidays, setHolidays] = useState([]);
+  const[statusListModal, setStatusListModal] = useState({ isOpen: false, title: "", employees: [] });
+  const[shiftsMap, setShiftsMap] = useState({});
+  const[holidays, setHolidays] = useState([]);
   const [dailyCurrentPage, setDailyCurrentPage] = useState(1);
-  const [dailyItemsPerPage, setDailyItemsPerPage] = useState(10);
-  const [summaryCurrentPage, setSummaryCurrentPage] = useState(1);
-  const [summaryItemsPerPage, setSummaryItemsPerPage] = useState(10);
+  const[dailyItemsPerPage, setDailyItemsPerPage] = useState(10);
+  const[summaryCurrentPage, setSummaryCurrentPage] = useState(1);
+  const[summaryItemsPerPage, setSummaryItemsPerPage] = useState(10);
   const [punchOutModal, setPunchOutModal] = useState({ isOpen: false, employee: null });
   const [dailySearchTerm, setDailySearchTerm] = useState("");
-  const [summarySearchTerm, setSummarySearchTerm] = useState("");
-  const [employeeImages, setEmployeeImages] = useState({});
+  const[summarySearchTerm, setSummarySearchTerm] = useState("");
+  const[employeeImages, setEmployeeImages] = useState({});
   const [previewImage, setPreviewImage] = useState(null);
 
   // ✅ NEW STATE FOR EMPLOYEE WORK MODES
-  const [employeeWorkModes, setEmployeeWorkModes] = useState({});
+  const[employeeWorkModes, setEmployeeWorkModes] = useState({});
 
   // ✅ NEW STATES FOR COMPARISON
-  const [isCompareMode, setIsCompareMode] = useState(false);
+  const[isCompareMode, setIsCompareMode] = useState(false);
   const [selectedCompareIds, setSelectedCompareIds] = useState([]);
-  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const[isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
 
   const fetchShifts = useCallback(async () => {
     try {
       const response = await getAllShifts();
-      const data = Array.isArray(response) ? response : response.data || [];
+      const data = Array.isArray(response) ? response : response.data ||[];
       const map = {}; data.forEach(shift => { if (shift.employeeId) map[shift.employeeId] = shift; });
       setShiftsMap(map);
     } catch (error) { console.error("Error fetching shifts:", error); }
-  }, []);
+  },[]);
 
   const fetchHolidays = useCallback(async () => {
-    try { const response = await getHolidays(); setHolidays(response || []); } catch (error) { console.error("Error fetching holidays:", error); }
-  }, []);
+    try { const response = await getHolidays(); setHolidays(response ||[]); } catch (error) { console.error("Error fetching holidays:", error); }
+  },[]);
 
   const fetchAllEmployees = useCallback(async () => {
     try { const data = await getEmployees(); setAllEmployees(data); } catch (error) { setAllEmployees([]); }
-  }, []);
+  },[]);
 
   const fetchOvertimeData = useCallback(async () => {
     try { const data = await getAllOvertimeRequests(); setOvertimeData(data); } catch (error) { setOvertimeData([]); }
-  }, []);
+  },[]);
 
   const fetchDailyData = useCallback(async (start, end) => {
     setLoading(true);
-    try { const data = await getAttendanceByDateRange(start, end); setRawDailyData(Array.isArray(data) ? data : []); } catch (error) { setRawDailyData([]); } finally { setLoading(false); }
-  }, []);
+    try { const data = await getAttendanceByDateRange(start, end); setRawDailyData(Array.isArray(data) ? data :[]); } catch (error) { setRawDailyData([]); } finally { setLoading(false); }
+  },[]);
 
   const fetchSummaryData = useCallback(async (start, end) => {
     setSummaryLoading(true);
-    try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data : []); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); }
-  }, []);
+    try { const data = await getAttendanceByDateRange(start, end); setRawSummaryData(Array.isArray(data) ? data :[]); } catch (error) { setRawSummaryData([]); } finally { setSummaryLoading(false); }
+  },[]);
 
   // ✅ NEW: Fetch employee work modes from the same endpoint used in AdminLocationSettings
   const fetchEmployeeWorkModes = useCallback(async () => {
@@ -788,21 +795,21 @@ const AdminAttendance = () => {
     } catch (error) {
       console.error("Error fetching employee work modes:", error);
     }
-  }, []);
+  },[]);
 
   useEffect(() => {
     fetchShifts();
     fetchHolidays();
     fetchDailyData(startDate, endDate);
     fetchEmployeeWorkModes(); // Fetch work modes
-  }, [startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays, fetchEmployeeWorkModes]);
+  },[startDate, endDate, fetchDailyData, fetchShifts, fetchHolidays, fetchEmployeeWorkModes]);
 
   useEffect(() => {
     fetchAllEmployees();
     fetchSummaryData(summaryStartDate, summaryEndDate);
     fetchOvertimeData();
     fetchEmployeeWorkModes(); // Also fetch when summary dates change
-  }, [summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees, fetchEmployeeWorkModes]);
+  },[summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees, fetchEmployeeWorkModes]);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -842,7 +849,7 @@ const AdminAttendance = () => {
 
   const empNameMap = useMemo(() => {
     return allEmployees.reduce((acc, emp) => { acc[emp.employeeId] = emp.name; return acc; }, {});
-  }, [allEmployees]);
+  },[allEmployees]);
 
   const processedDailyData = useMemo(() => {
     const mapped = rawDailyData.map(item => {
@@ -867,7 +874,7 @@ const AdminAttendance = () => {
     if (!dailySearchTerm) return mapped;
     const lowerTerm = dailySearchTerm.toLowerCase();
     return mapped.filter(item => (item.employeeName && item.employeeName.toLowerCase().includes(lowerTerm)) || (item.employeeId && item.employeeId.toLowerCase().includes(lowerTerm)));
-  }, [rawDailyData, shiftsMap, dailySearchTerm, empNameMap, employeeWorkModes]);
+  },[rawDailyData, shiftsMap, dailySearchTerm, empNameMap, employeeWorkModes]);
 
   const processedSummaryData = useMemo(() => {
     return rawSummaryData.map(item => {
@@ -884,10 +891,10 @@ const AdminAttendance = () => {
         workMode: workMode
       };
     });
-  }, [rawSummaryData, shiftsMap, empNameMap, employeeWorkModes]);
+  },[rawSummaryData, shiftsMap, empNameMap, employeeWorkModes]);
 
   const employeeSummaryStats = useMemo(() => {
-    if (!allEmployees.length) return [];
+    if (!allEmployees.length) return[];
     const attendanceMap = new Map();
     processedSummaryData.forEach(r => { const key = `${r.employeeId}_${normalizeDateStr(r.date)}`; attendanceMap.set(key, r); });
     const approvedOTCounts = overtimeData.reduce((acc, ot) => {
@@ -922,10 +929,10 @@ const AdminAttendance = () => {
     if (!summarySearchTerm) return sortedArray;
     const lowerTerm = summarySearchTerm.toLowerCase();
     return sortedArray.filter(item => (item.employeeName && item.employeeName.toLowerCase().includes(lowerTerm)) || (item.employeeId && item.employeeId.toLowerCase().includes(lowerTerm)));
-  }, [allEmployees, processedSummaryData, overtimeData, shiftsMap, holidays, summaryStartDate, summaryEndDate, summarySearchTerm]);
+  },[allEmployees, processedSummaryData, overtimeData, shiftsMap, holidays, summaryStartDate, summaryEndDate, summarySearchTerm]);
 
   const absentEmployees = useMemo(() => {
-    if (allEmployees.length === 0 || loading || startDate !== endDate) return [];
+    if (allEmployees.length === 0 || loading || startDate !== endDate) return[];
     const presentIds = new Set(rawDailyData.map(att => att.employeeId));
     return allEmployees.filter(emp => emp.isActive !== false && !presentIds.has(emp.employeeId));
   }, [allEmployees, rawDailyData, loading, startDate, endDate]);
@@ -946,16 +953,16 @@ const AdminAttendance = () => {
     const working = fullList.filter(item => item.punchIn && !item.punchOut);
     const completed = fullList.filter(item => item.punchIn && item.punchOut);
     return { workingList: working, workingCount: working.length, completedList: completed, completedCount: completed.length, absentCount: startDate === endDate ? absentEmployees.length : 0 };
-  }, [rawDailyData, shiftsMap, absentEmployees, startDate, endDate, empNameMap, employeeWorkModes]);
+  },[rawDailyData, shiftsMap, absentEmployees, startDate, endDate, empNameMap, employeeWorkModes]);
 
-  const paginatedDailyData = useMemo(() => processedDailyData.slice((dailyCurrentPage - 1) * dailyItemsPerPage, dailyCurrentPage * dailyItemsPerPage), [processedDailyData, dailyCurrentPage, dailyItemsPerPage]);
-  const paginatedSummaryData = useMemo(() => employeeSummaryStats.slice((summaryCurrentPage - 1) * summaryItemsPerPage, summaryCurrentPage * summaryItemsPerPage), [employeeSummaryStats, summaryCurrentPage, summaryItemsPerPage]);
+  const paginatedDailyData = useMemo(() => processedDailyData.slice((dailyCurrentPage - 1) * dailyItemsPerPage, dailyCurrentPage * dailyItemsPerPage),[processedDailyData, dailyCurrentPage, dailyItemsPerPage]);
+  const paginatedSummaryData = useMemo(() => employeeSummaryStats.slice((summaryCurrentPage - 1) * summaryItemsPerPage, summaryCurrentPage * summaryItemsPerPage),[employeeSummaryStats, summaryCurrentPage, summaryItemsPerPage]);
 
-  const exportDailyLogToExcel = () => exportToExcel(processedDailyData, `Daily_Log_${startDate}_to_${endDate}`, [
+  const exportDailyLogToExcel = () => exportToExcel(processedDailyData, `Daily_Log_${startDate}_to_${endDate}`,[
     { label: "Employee Name", value: item => item.employeeName }, { label: "Employee ID", value: item => item.employeeId }, { label: "Date", value: item => formatDateDMY(item.date) }, { label: "Punch In", value: item => item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, { label: "Punch Out", value: item => item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--" }, { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) }, { label: "Duration", value: item => item.displayTime || "0h 0m" }, { label: "Login Status", value: item => item.displayLoginStatus }, { label: "Worked Status", value: item => item.workedStatus }
   ]);
 
-  const exportSummaryToExcel = () => exportToExcel(employeeSummaryStats, `Attendance_Summary_${summaryStartDate}_to_${summaryEndDate}`, [
+  const exportSummaryToExcel = () => exportToExcel(employeeSummaryStats, `Attendance_Summary_${summaryStartDate}_to_${summaryEndDate}`,[
     { label: "Employee ID", value: item => item.employeeId }, { label: "Employee Name", value: item => item.employeeName }, { label: "Assigned Work Hours", value: item => formatDecimalHours(item.assignedHours) }, { label: "Present Days", value: item => item.presentDays }, { label: "On-Time Days", value: item => item.onTimeDays }, { label: "Late Days", value: item => item.lateDays }, { label: "Approved OT", value: item => item.approvedOT }, { label: "Full Days", value: item => item.fullDays }, { label: "Half Days", value: item => item.halfDays }, { label: "Absent Days", value: item => item.absentDays },
   ]);
 
@@ -984,43 +991,78 @@ const AdminAttendance = () => {
 
   const selectedStatsForComparison = useMemo(() => {
     return employeeSummaryStats.filter(s => selectedCompareIds.includes(s.employeeId));
-  }, [employeeSummaryStats, selectedCompareIds]);
+  },[employeeSummaryStats, selectedCompareIds]);
 
   const StatCard = ({ icon, title, value, colorClass, onClick }) => (
-    <div className={`relative flex-1 p-5 bg-white rounded-xl shadow-md flex items-center gap-5 border-l-4 ${colorClass} ${onClick ? 'cursor-pointer hover:bg-slate-50' : ''}`} onClick={onClick}>
-      {icon}<div><p className="text-sm text-slate-500 font-semibold uppercase">{title}</p><p className="text-3xl font-bold text-slate-800">{value}</p></div>
+    <div className={`relative flex-1 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm flex items-center gap-5 overflow-hidden group ${onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-300 transition-all duration-200' : ''}`} onClick={onClick}>
+      <div className={`absolute top-0 left-0 w-1.5 h-full ${colorClass}`}></div>
+      <div className="p-3 bg-gray-50 rounded-xl group-hover:scale-110 transition-transform duration-300">{icon}</div>
+      <div>
+        <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{title}</p>
+        <p className="text-3xl font-black text-gray-800 mt-1">{value}</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="p-4 md:p-8 bg-slate-100 min-h-screen font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 min-h-screen font-sans">
+      <div className="max-w-7xl mx-auto space-y-10">
 
+        {/* ========================================== */}
         {/* Daily Log Section */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
-          <div className="p-5 border-b border-slate-200 bg-slate-50/50">
-            <div className="mb-4">
-              <div className="flex items-center gap-2 text-xl font-bold text-slate-800"><FaCalendarAlt className="text-blue-600" /> Daily Attendance Log</div>
+        {/* ========================================== */}
+        <div className="flex flex-col space-y-6">
+          <div className="p-6 border border-gray-200 shadow-sm bg-white rounded-2xl flex flex-col gap-5">
+            <div className="flex items-center gap-3 text-xl font-bold text-gray-800">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FaCalendarAlt /></div>
+              Daily Attendance Log
             </div>
+            
             <div className="flex flex-wrap items-center gap-4">
-              <div className="relative group flex-grow-0"><FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" /><input type="text" placeholder="Search Name or ID..." value={dailySearchTerm} onChange={(e) => { setDailySearchTerm(e.target.value); setDailyCurrentPage(1); }} className="pl-10 pr-3 py-2 w-64 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" /></div>
-              <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden"><span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">From</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" /></div>
-              <div className="flex items-center bg-white shadow-sm border rounded-lg overflow-hidden"><span className="px-3 bg-slate-50 text-slate-500 text-sm font-bold border-r">To</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-2 pr-2 py-2 outline-none text-slate-700 font-medium" /></div>
-              <div className="flex items-center gap-3 ml-auto"><button onClick={exportDailyLogToExcel} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-transform active:scale-95"><FaFileExcel /><span>Export</span></button></div>
+              <div className="relative group flex-grow-0">
+                <FaSearch className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                <input type="text" placeholder="Search Name or ID..." value={dailySearchTerm} onChange={(e) => { setDailySearchTerm(e.target.value); setDailyCurrentPage(1); }} className="pl-10 pr-4 py-2.5 w-64 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-sm text-sm font-medium text-gray-700" />
+              </div>
+              <div className="w-64 bg-gray-50 border border-gray-200 rounded-xl outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:bg-white transition-all shadow-sm overflow-hidden flex items-center">
+                <span className="px-4 py-2.5 bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-wider border-r border-gray-200 h-full flex items-center">From</span>
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-3 pr-3 py-2.5 outline-none bg-transparent text-gray-700 font-medium text-sm" />
+              </div>
+              <div className="w-64 bg-gray-50 border border-gray-200 rounded-xl outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:bg-white transition-all shadow-sm overflow-hidden flex items-center">
+                <span className="px-4 py-2.5 bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-wider border-r border-gray-200 h-full flex items-center">To</span>
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-3 pr-3 py-2.5 outline-none bg-transparent text-gray-700 font-medium text-sm" />
+              </div>
+              <div className="flex items-center gap-3 ml-auto">
+                <button onClick={exportDailyLogToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all active:scale-95">
+                  <FaFileExcel size={16} /><span>Export CSV</span>
+                </button>
+              </div>
             </div>
           </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-            <StatCard icon={<FaClock className="text-orange-500 text-3xl" />} title="Currently Working" value={dailyStats.workingCount} colorClass="border-orange-500" onClick={() => handleOpenStatusModal('WORKING')} />
-            <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} title="Shift Completed" value={dailyStats.completedCount} colorClass="border-green-500" onClick={() => handleOpenStatusModal('COMPLETED')} />
-            {startDate === endDate && (<StatCard icon={<FaUserSlash className="text-red-500 text-3xl" />} title="Login Required" value={loading ? '...' : dailyStats.absentCount} colorClass="border-red-500" onClick={() => handleOpenStatusModal('ABSENT')} />)}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <StatCard icon={<FaClock className="text-orange-500 text-2xl" />} title="Currently Working" value={dailyStats.workingCount} colorClass="bg-orange-500" onClick={() => handleOpenStatusModal('WORKING')} />
+            <StatCard icon={<FaCheckCircle className="text-green-500 text-2xl" />} title="Shift Completed" value={dailyStats.completedCount} colorClass="bg-green-500" onClick={() => handleOpenStatusModal('COMPLETED')} />
+            {startDate === endDate && (<StatCard icon={<FaUserSlash className="text-red-500 text-2xl" />} title="Login Required" value={loading ? '...' : dailyStats.absentCount} colorClass="bg-red-500" onClick={() => handleOpenStatusModal('ABSENT')} />)}
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-800 text-slate-100 uppercase tracking-wider">
-                <tr><th className="px-6 py-4 text-left">Employee</th><th className="px-6 py-4 text-left">Date</th><th className="px-6 py-4 text-left">Punch In</th><th className="px-6 py-4 text-left">Punch Out</th><th className="px-6 py-4 text-left">Work Hrs</th><th className="px-6 py-4 text-left">Duration</th><th className="px-6 py-4 text-left">Login Status</th><th className="px-6 py-4 text-left">Worked Status</th><th className="px-6 py-4 text-left">Actions</th></tr>
+
+          {/* Wrapper specific classes requested */}
+          <div className="overflow-x-auto rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white">
+            <table className="min-w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-[11px] font-bold tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Employee</th>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Punch In</th>
+                  <th className="px-6 py-4">Punch Out</th>
+                  <th className="px-6 py-4">Work Hrs</th>
+                  <th className="px-6 py-4">Duration</th>
+                  <th className="px-6 py-4">Login Status</th>
+                  <th className="px-6 py-4">Worked Status</th>
+                  <th className="px-6 py-4">Actions</th>
+                </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                {loading ? (<tr><td colSpan="9" className="text-center p-10 font-medium text-slate-500">Loading daily log...</td></tr>) : paginatedDailyData.length === 0 ? (<tr><td colSpan="9" className="text-center p-10 text-slate-500">No records found.</td></tr>) : paginatedDailyData.map((item, idx) => {
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {loading ? (<tr><td colSpan="9" className="text-center p-10 font-medium text-gray-500">Loading daily log...</td></tr>) : paginatedDailyData.length === 0 ? (<tr><td colSpan="9" className="text-center p-10 text-gray-500 font-medium">No records found.</td></tr>) : paginatedDailyData.map((item, idx) => {
                   const isAbsent = item.status === "ABSENT" || item.workedStatus.includes("Absent");
                   const canPunchOut = item.punchIn && !item.punchOut;
                   const punchInColor = item.displayLoginStatus === 'LATE' ? 'text-red-600' : 'text-green-600';
@@ -1031,173 +1073,143 @@ const AdminAttendance = () => {
                   const isWorkFromHome = item.workMode === 'WFH';
 
                   return (
-                    <tr key={item._id || idx} className={`hover:bg-blue-50/60 transition-colors ${isAbsent ? "bg-red-50" : ""}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer" onClick={() => profilePic && setPreviewImage(profilePic)}>
+                    <tr key={item._id || idx} className={`hover:bg-gray-50 transition-colors ${isAbsent ? "bg-red-50/20" : "bg-white"}`}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 font-bold overflow-hidden bg-gray-50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => profilePic && setPreviewImage(profilePic)}>
                             {profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (item.employeeName || "U").charAt(0)}
                           </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-slate-800">{item.employeeName}</div>
-                            <div className="flex items-center">
-                              <span className="text-slate-500 font-mono text-xs">{item.employeeId}</span>
-                              {/* ✅ Home symbol for Work From Home employees - beside the ID */}
+                          <div>
+                            <div className="font-bold text-gray-800">{item.employeeName}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-gray-500 font-mono text-xs">{item.employeeId}</span>
                               {isWorkFromHome && (
-                                <span
-                                  className="w-10 h-5 flex items-center justify-center rounded-full overflow-hidden"
-                                  title="Working from Home"
-                                >
-                                  <img
-                                    src="https://image2url.com/r2/default/images/1771229256808-7f17d81e-c508-495b-91f1-f6fda3c6ac5b.png"
-                                    alt="Home"
-                                    className="w-12 h-12 object-contain"
-                                  />
+                                <span className="flex items-center justify-center" title="Working from Home">
+                                  <img src="https://image2url.com/r2/default/images/1771229256808-7f17d81e-c508-495b-91f1-f6fda3c6ac5b.png" alt="Home" className="w-5 h-5 object-contain" />
                                 </span>
-
-
-
                               )}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-600">{formatDateDMY(item.date)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><div className={`font-medium ${punchInColor}`}>{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchIn && <LocationViewButton location={item.punchInLocation} />}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><div className={`font-medium ${item.punchOut ? punchOutColor : 'text-slate-400'}`}>{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchOut && <LocationViewButton location={item.punchOutLocation} />}</td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-600">{formatDecimalHours(item.assignedHours)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{(!item.punchOut && item.punchIn) ? <LiveTimer startTime={item.punchIn} /> : (item.displayTime || "0h 0m 0s")}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.displayLoginStatus === "LATE" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>{item.displayLoginStatus}</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap font-semibold"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.workedStatus === "Full Day" ? "bg-green-100 text-green-800" : item.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-800" : isAbsent ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-800"}`}>{item.workedStatus}</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap">{canPunchOut ? <button onClick={() => setPunchOutModal({ isOpen: true, employee: item })} className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"><FaSignOutAlt /> Punch Out</button> : item.punchOut ? <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 text-xs font-semibold rounded-md"><FaCheckCircle /> Done</span> : <span className="text-slate-400 text-xs">--</span>}</td>
+                      <td className="px-6 py-4 font-semibold text-gray-600">{formatDateDMY(item.date)}</td>
+                      <td className="px-6 py-4"><div className={`font-bold ${punchInColor}`}>{item.punchIn ? new Date(item.punchIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchIn && <LocationViewButton location={item.punchInLocation} />}</td>
+                      <td className="px-6 py-4"><div className={`font-bold ${item.punchOut ? punchOutColor : 'text-gray-400'}`}>{item.punchOut ? new Date(item.punchOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}</div>{item.punchOut && <LocationViewButton location={item.punchOutLocation} />}</td>
+                      <td className="px-6 py-4 font-medium text-gray-500">{formatDecimalHours(item.assignedHours)}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-gray-700">{(!item.punchOut && item.punchIn) ? <LiveTimer startTime={item.punchIn} /> : (item.displayTime || "0h 0m 0s")}</td>
+                      <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase ${item.displayLoginStatus === "LATE" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{item.displayLoginStatus}</span></td>
+                      <td className="px-6 py-4 font-semibold"><span className={`px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold shadow-sm border ${item.workedStatus === "Full Day" ? "bg-green-50 text-green-700 border-green-100" : item.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-700 border-yellow-100" : isAbsent ? "bg-red-50 text-red-700 border-red-100" : "bg-gray-50 text-gray-700 border-gray-200"}`}>{item.workedStatus}</span></td>
+                      <td className="px-6 py-4">{canPunchOut ? <button onClick={() => setPunchOutModal({ isOpen: true, employee: item })} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm"><FaSignOutAlt /> Punch Out</button> : item.punchOut ? <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 text-[11px] font-bold rounded-lg"><FaCheckCircle className="text-green-500" /> Done</span> : <span className="text-gray-400 text-xs font-medium">--</span>}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+            <Pagination totalItems={processedDailyData.length} itemsPerPage={dailyItemsPerPage} currentPage={dailyCurrentPage} onPageChange={setDailyCurrentPage} setItemsPerPage={setDailyItemsPerPage} />
           </div>
-          <Pagination totalItems={processedDailyData.length} itemsPerPage={dailyItemsPerPage} currentPage={dailyCurrentPage} onPageChange={setDailyCurrentPage} setItemsPerPage={setDailyItemsPerPage} />
         </div>
 
+        {/* ========================================== */}
         {/* Employee Attendance Summary Section */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden mt-8">
-          <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3"><FaUsers className="text-2xl text-purple-600" /><h2 className="text-xl font-bold text-slate-800">Employee Attendance Summary</h2></div>
-                {/* ✅ Comparison Action Buttons */}
-                <div className="flex items-center gap-3">
-                  {!isCompareMode ? (
-                    <button onClick={() => setIsCompareMode(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition-all active:scale-95"><FaExchangeAlt /> Compare Attendance</button>
-                  ) : (
-                    <div className="flex items-center gap-2 animate-in slide-in-from-right duration-300">
-                      <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-full">{selectedCompareIds.length} Selected</span>
-                      <button onClick={() => { if (selectedCompareIds.length < 2) alert("Select at least 2 employees to compare."); else setIsComparisonModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition-all"><FaCheck /> Proceed Comparison</button>
-                      <button onClick={() => { setIsCompareMode(false); setSelectedCompareIds([]); }} className="px-4 py-2 bg-slate-400 text-white font-bold rounded-lg hover:bg-slate-500">Cancel</button>
-                    </div>
-                  )}
-                </div>
+        {/* ========================================== */}
+        <div className="flex flex-col space-y-6 mt-10">
+          <div className="p-6 border border-gray-200 shadow-sm bg-white rounded-2xl flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><FaUsers size={20} /></div>
+                <h2 className="text-xl font-bold text-gray-800">Employee Attendance Summary</h2>
               </div>
+              {/* ✅ Comparison Action Buttons */}
+              <div className="flex items-center gap-3">
+                {!isCompareMode ? (
+                  <button onClick={() => setIsCompareMode(true)} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all active:scale-95"><FaExchangeAlt className="text-blue-500" /> Compare Data</button>
+                ) : (
+                  <div className="flex items-center gap-3 animate-in slide-in-from-right duration-300">
+                    <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-full">{selectedCompareIds.length} Selected</span>
+                    <button onClick={() => { if (selectedCompareIds.length < 2) alert("Select at least 2 employees to compare."); else setIsComparisonModalOpen(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl shadow hover:bg-green-700 transition-all"><FaCheck /> Proceed Comparison</button>
+                    <button onClick={() => { setIsCompareMode(false); setSelectedCompareIds([]); }} className="px-5 py-2.5 bg-gray-100 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-                <div className="relative group w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Search Employee</label><FaSearch className="absolute left-3 top-[34px] text-slate-400" /><input type="text" placeholder="Name or ID..." value={summarySearchTerm} onChange={(e) => { setSummarySearchTerm(e.target.value); setSummaryCurrentPage(1); }} className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm" /></div>
-                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Select Month</label><div className="relative"><FaCalendarDay className="absolute left-3 top-2.5 text-slate-400" /><input type="month" value={selectedMonth} onChange={handleMonthChange} className="pl-10 pr-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div></div>
-                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">From</label><input type="date" value={summaryStartDate} onChange={(e) => setSummaryStartDate(e.target.value)} className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div>
-                <div className="w-full"><label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">To</label><input type="date" value={summaryEndDate} onChange={(e) => setSummaryEndDate(e.target.value)} className="px-3 py-2 w-full border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" /></div>
-                <div className="w-full"><button onClick={exportSummaryToExcel} className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-transform active:scale-95 h-[42px]"><FaFileExcel /> Export Summary</button></div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              <div className="relative group w-full"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">Search Employee</label><FaSearch className="absolute left-3.5 top-[35px] text-gray-400 group-focus-within:text-blue-500" /><input type="text" placeholder="Name or ID..." value={summarySearchTerm} onChange={(e) => { setSummarySearchTerm(e.target.value); setSummaryCurrentPage(1); }} className="pl-10 pr-4 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-sm text-sm font-medium" /></div>
+              <div className="w-full"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">Select Month</label><div className="relative"><FaCalendarDay className="absolute left-3.5 top-3 text-gray-400" /><input type="month" value={selectedMonth} onChange={handleMonthChange} className="pl-10 pr-4 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white shadow-sm text-sm font-medium" /></div></div>
+              <div className="w-full"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">From Date</label><input type="date" value={summaryStartDate} onChange={(e) => setSummaryStartDate(e.target.value)} className="px-4 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white shadow-sm text-sm font-medium text-gray-700" /></div>
+              <div className="w-full"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">To Date</label><input type="date" value={summaryEndDate} onChange={(e) => setSummaryEndDate(e.target.value)} className="px-4 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white shadow-sm text-sm font-medium text-gray-700" /></div>
+              <div className="w-full"><button onClick={exportSummaryToExcel} className="w-full flex justify-center items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl shadow-md hover:bg-blue-700 transition-transform active:scale-95 h-[46px]"><FaFileExcel size={16} /> Export Data</button></div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 
-                   text-white uppercase text-xs tracking-wider 
-                   sticky top-0 z-20 shadow-md backdrop-blur-md">
-                <tr className="divide-x divide-slate-600">
-
+          {/* Wrapper specific classes requested */}
+          <div className="overflow-x-auto rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white">
+            <table className="min-w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+                <tr>
                   {isCompareMode && (
-                    <th className="px-6 py-4 text-center font-semibold">
-                      Select
-                    </th>
+                    <th className="px-6 py-4 text-center">Select</th>
                   )}
-
-                  <th className="px-6 py-4 text-left font-semibold">
-                    Employee
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Assigned Hrs
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold 
-                  ">
-                    Present
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    On Time
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Late
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Approved OT
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Full Days
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Half Days
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Absent
-                  </th>
-
-                  <th className="px-6 py-4 text-center font-semibold">
-                    Actions
-                  </th>
-
+                  <th className="px-6 py-4">Employee</th>
+                  <th className="px-6 py-4 text-center">Assigned Hrs</th>
+                  <th className="px-6 py-4 text-center">Present</th>
+                  <th className="px-6 py-4 text-center">On Time</th>
+                  <th className="px-6 py-4 text-center">Late</th>
+                  <th className="px-6 py-4 text-center">Approved OT</th>
+                  <th className="px-6 py-4 text-center">Full Days</th>
+                  <th className="px-6 py-4 text-center">Half Days</th>
+                  <th className="px-6 py-4 text-center">Absent</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-200">
-                {summaryLoading ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500 font-medium">Loading summary...</td></tr>) : paginatedSummaryData.length === 0 ? (<tr><td colSpan="11" className="text-center p-10 text-slate-500">No summary data available.</td></tr>) : paginatedSummaryData.map((emp) => {
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {summaryLoading ? (<tr><td colSpan="11" className="text-center p-10 text-gray-500 font-medium">Loading summary...</td></tr>) : paginatedSummaryData.length === 0 ? (<tr><td colSpan="11" className="text-center p-10 text-gray-500 font-medium">No summary data available.</td></tr>) : paginatedSummaryData.map((emp) => {
                   const profilePic = employeeImages ? employeeImages[emp.employeeId] : null;
                   return (
-                    <tr key={emp.employeeId} className={`transition-colors ${selectedCompareIds.includes(emp.employeeId) ? 'bg-blue-50' : 'hover:bg-purple-50/30'}`}>
+                    <tr key={emp.employeeId} className={`transition-colors ${selectedCompareIds.includes(emp.employeeId) ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}>
                       {/* ✅ Checkbox Cell in Compare Mode */}
                       {isCompareMode && (
                         <td className="px-6 py-4 text-center">
                           <input
                             type="checkbox"
-                            className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                             checked={selectedCompareIds.includes(emp.employeeId)}
                             onChange={() => toggleSelection(emp.employeeId)}
                           />
                         </td>
                       )}
-                      <td className="px-6 py-4 whitespace-nowrap"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 font-bold overflow-hidden bg-white cursor-pointer" onClick={() => profilePic && setPreviewImage(profilePic)}>{profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.employeeName || "U").charAt(0)}</div><div><div className="font-bold text-slate-800">{emp.employeeName}</div><div className="text-slate-500 font-mono text-xs">{emp.employeeId}</div></div></div></td>
-                      <td className="px-6 py-4 text-center font-medium text-slate-600">{formatDecimalHours(emp.assignedHours)}</td>
-                      <td className="px-6 py-4 text-center font-bold text-blue-600 bg-blue-50/30 text-lg">{emp.presentDays}</td>
-                      <td className="px-6 py-4 text-center font-semibold text-green-600">{emp.onTimeDays}</td>
-                      <td className="px-6 py-4 text-center font-semibold text-red-600">{emp.lateDays}</td>
-                      <td className="px-6 py-4 text-center font-semibold text-indigo-600">{emp.approvedOT}</td>
-                      <td className="px-6 py-4 text-center">{emp.fullDays}</td>
-                      <td className="px-6 py-4 text-center">{emp.halfDays}</td>
-                      <td className="px-6 py-4 text-center text-red-500 font-bold">{emp.absentDays}</td>
-                      <td className="px-6 py-4 text-center"><button onClick={() => handleViewDetails(emp.employeeId, emp.employeeName)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"><FaEye /></button></td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 font-bold overflow-hidden bg-gray-50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => profilePic && setPreviewImage(profilePic)}>
+                            {profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (emp.employeeName || "U").charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-800">{emp.employeeName}</div>
+                            <div className="text-gray-500 font-mono text-xs mt-0.5">{emp.employeeId}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-gray-500">{formatDecimalHours(emp.assignedHours)}</td>
+                      <td className="px-6 py-4 text-center font-black text-blue-700 bg-blue-50/30 text-lg">{emp.presentDays}</td>
+                      <td className="px-6 py-4 text-center font-bold text-green-600">{emp.onTimeDays}</td>
+                      <td className="px-6 py-4 text-center font-bold text-red-600">{emp.lateDays}</td>
+                      <td className="px-6 py-4 text-center font-bold text-indigo-600">{emp.approvedOT}</td>
+                      <td className="px-6 py-4 text-center font-semibold text-gray-700">{emp.fullDays}</td>
+                      <td className="px-6 py-4 text-center font-semibold text-gray-700">{emp.halfDays}</td>
+                      <td className="px-6 py-4 text-center text-red-600 font-black">{emp.absentDays}</td>
+                      <td className="px-6 py-4 text-center">
+                        <button onClick={() => handleViewDetails(emp.employeeId, emp.employeeName)} className="p-2.5 rounded-xl bg-white border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                          <FaEye size={16} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+            <Pagination totalItems={employeeSummaryStats.length} itemsPerPage={summaryItemsPerPage} currentPage={summaryCurrentPage} onPageChange={setSummaryCurrentPage} setItemsPerPage={setSummaryItemsPerPage} />
           </div>
-          <Pagination totalItems={employeeSummaryStats.length} itemsPerPage={summaryItemsPerPage} currentPage={summaryCurrentPage} onPageChange={setSummaryCurrentPage} setItemsPerPage={setSummaryItemsPerPage} />
         </div>
       </div>
 
@@ -1215,7 +1227,7 @@ const AdminAttendance = () => {
         endDate={summaryEndDate}
       />
 
-      {previewImage && (<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}><button className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 backdrop-blur-sm"><FaTimes size={24} /></button><img src={previewImage} alt="Full Preview" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} /></div>)}
+      {previewImage && (<div className="fixed inset-0 z-[200] bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}><button className="absolute top-6 right-6 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-colors"><FaTimes size={24} /></button><img src={previewImage} alt="Full Preview" className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} /></div>)}
     </div>
   );
 };
