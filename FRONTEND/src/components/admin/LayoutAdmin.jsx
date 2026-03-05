@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import Sidebar from "./Sidebar";
+import Sidebar from "./Sidebar";  // now from admin folder
 import Navbar from "./Navbar";
 import { Outlet } from "react-router-dom";
 
@@ -86,6 +85,7 @@ const LayoutAdmin = () => {
             <Outlet />
           </div>
         </main>
+
       </div>
     </div>
   );

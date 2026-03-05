@@ -83,6 +83,7 @@ import WorkModeRequests from "./pages/WorkModeRequests";
 import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 import OnboardingEmailForm from "./pages/InviteEmployee";
 import PayrollManagement from "./pages/PayrollManagement";
+import AdminLiveTracking from "./pages/AdminLiveTracking";
 
 function App() {
   return (
@@ -164,6 +165,7 @@ function App() {
          <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
          <Route path="/admin/onboarding-email" element={<OnboardingEmailForm />} />
           <Route path="/admin/payrollcandidates" element={<PayrollManagement />} />
+          <Route path="/admin/idletime-tracking" element={<AdminLiveTracking />} />
        
       </Route>
 

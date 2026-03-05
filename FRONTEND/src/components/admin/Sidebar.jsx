@@ -90,6 +90,7 @@ const navLinks = [
     icon: <FaBullhorn />,
     isNotice: true,
   },
+  { to: "/admin/idletime-tracking", label: "Idle Time Tracking", icon: <FaClock /> },
 
   // 📥 EMPLOYEE REQUESTS
   {

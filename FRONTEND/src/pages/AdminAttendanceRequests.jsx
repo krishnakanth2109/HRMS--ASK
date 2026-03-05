@@ -28,29 +28,39 @@ const AdminAttendanceRequests = () => {
     fetchRequests();
   }, []);
 
-  const handleAction = async (action, req) => {
-    const comment = prompt(`Enter comment for ${action === 'approve' ? 'Approving' : 'Rejecting'}:`);
-    if (comment === null) return;
+ // AdminAttendanceRequests.jsx - Update handleAction function
 
-    try {
-      const payload = {
-        employeeId: req.employeeId,
-        date: req.date,
-        adminComment: comment
-      };
+const handleAction = async (action, req) => {
+  const comment = prompt(`Enter comment for ${action === 'approve' ? 'Approving' : 'Rejecting'}:`);
+  if (comment === null) return;
 
-      if (action === 'approve') {
-        await approveStatusCorrection(payload);
-        alert("Request Approved and Attendance Updated.");
-      } else {
-        await rejectStatusCorrection(payload);
-        alert("Request Rejected.");
-      }
-      fetchRequests(); // Refresh list
-    } catch (err) {
-      alert("Action failed: " + err.message);
+  try {
+    const payload = {
+      employeeId: req.employeeId,
+      date: req.date,
+      adminComment: comment
+    };
+
+    if (action === 'approve') {
+      const response = await approveStatusCorrection(payload);
+      alert(`✅ Request Approved! ${response.message || "Attendance Updated."}`);
+      
+      // Try to trigger a refresh in the employee's view if they're online
+      // You can use localStorage events to communicate between tabs
+      localStorage.setItem('attendance-update-trigger', Date.now().toString());
+      
+    } else {
+      await rejectStatusCorrection(payload);
+      alert("❌ Request Rejected.");
     }
-  };
+    
+    // Refresh the requests list
+    fetchRequests();
+    
+  } catch (err) {
+    alert("Action failed: " + err.message);
+  }
+};
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -100,7 +110,13 @@ const AdminAttendanceRequests = () => {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-lg font-bold text-blue-600">
-                        {new Date(req.requestedPunchOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {(() => {
+                          // Convert UTC to IST for display
+                          const utcDate = new Date(req.requestedPunchOut);
+                          // Add 5.5 hours (IST offset) to convert UTC to IST
+                          const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+                          return istDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        })()}
                       </p>
                     </td>
                     <td className="px-6 py-4 max-w-xs truncate" title={req.reason}>
