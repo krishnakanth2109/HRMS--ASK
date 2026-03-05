@@ -27,6 +27,8 @@ import {
 
 import { getAttendanceByDateRange } from "../api";
 
+
+
 // Helper to ensure URLs are always HTTPS (From EmployeeProfile reference)
 const getSecureUrl = (url) => {
   if (!url) return "";
@@ -123,6 +125,21 @@ const AdminNotices = () => {
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [viewUnassigned, setViewUnassigned] = useState(false);
+
+  //Ai States
+const [ghostText, setGhostText] = useState("");
+const [titleSuggestions, setTitleSuggestions] = useState([]);
+const [loadingSuggest, setLoadingSuggest] = useState(false);
+const [aiPaused, setAiPaused] = useState(false);
+
+
+const typingTimerRef = useRef(null);
+const spacePressedRef = useRef(false);
+
+
+
+
+
 
   const saveGroupsToBackend = async (updatedGroups) => {
     try {
@@ -836,6 +853,9 @@ Meeting Link: ${meetingLink}`;
     };
   };
 
+
+
+
   const getRecipientNamesList = (recipientIds) => {
     if (!recipientIds || recipientIds.length === 0) return [];
     return recipientIds.map(id => {
@@ -1216,10 +1236,52 @@ Meeting Link: ${meetingLink}`;
                       {/* ✅ FILE ATTACH BUTTON */}
                       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
                       <button onClick={() => fileInputRef.current.click()} className={`p-2 rounded-full hover:bg-slate-200 transition-colors ${selectedFile ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500'}`}><FaPaperclip /></button>
+<input
+  className="flex-1 bg-transparent px-4 py-2 outline-none text-slate-700 placeholder-slate-400"
+  placeholder="Type your message..."
+  value={replyText}
+  onChange={(e) => setReplyText(e.target.value)}
+  onKeyDown={(e) => e.key === "Enter" && handleAdminReply()}
+/>
 
-                      <input className="flex-1 bg-transparent px-4 py-2 outline-none text-slate-700 placeholder-slate-400" placeholder="Type your message..." value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdminReply()} />
-                      <button onClick={() => handleAdminReply()} disabled={(!replyText.trim() && !selectedFile) || sendingReply} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all">{sendingReply ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaPaperPlane />}</button>
-                    </div>
+{/* AI Generate Button */}
+<button
+  type="button"
+  onClick={async () => {
+    if (!replyText.trim()) return;
+
+    try {
+      const res = await api.post("http://127.0.0.1:8000/generate", {
+        prompt: replyText,
+      });
+
+      setReplyText(res.data.text);
+    } catch (error) {
+      console.error(error);
+      alert("AI generation failed");
+    }
+  }}
+  className="w-10 h-10 flex items-center justify-center bg-slate-200 text-slate-700 rounded-lg hover:bg-indigo-200 transition-all"
+>
+  <FaRobot />
+</button>
+
+{/* 📤 Send Button */}
+<button
+  onClick={() => handleAdminReply()}
+  disabled={(!replyText.trim() && !selectedFile) || sendingReply}
+  className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all"
+>
+  {sendingReply ? (
+    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+  ) : (
+    <FaPaperPlane />
+  )}
+</button>
+
+
+                    <button onClick={() => handleAdminReply()} ></button>
+                     </div>
                   </div>
                 </>
               )
@@ -1355,9 +1417,167 @@ Meeting Link: ${meetingLink}`;
               ) : (
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</label></div>
-                  <input type="text" name="title" placeholder="Enter announcement title..." value={noticeData.title} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm" required autoFocus />
+              <div className="space-y-1.9">
+
+
+<div className="relative w-full">
+
+  {/* 👻 Ghost Autocomplete (render ONLY if title has text) */}
+  {noticeData.title.trim() && ghostText && (
+    <div className="absolute inset-0 flex items-center px-4 pointer-events-none z-10 overflow-hidden">
+      <span className="invisible whitespace-nowrap">
+        {noticeData.title}
+      </span>
+      <span className="flex items-center gap-2 text-gray-400 whitespace-nowrap truncate">
+        <span className="opacity-40 select-none">•</span>
+        <span className="opacity-70 italic">
+          {ghostText}
+        </span>
+      </span>
+    </div>
+  )}
+
+  {/* ✍️ TITLE INPUT */}
+  <input
+    type="text"
+    value={noticeData.title}
+    placeholder="Enter announcement title..."
+    className="w-full border px-4 py-3 rounded-lg bg-transparent relative z-20"
+
+    onChange={(e) => {
+      const val = e.target.value;
+
+      setNoticeData(p => ({ ...p, title: val }));
+      clearTimeout(typingTimerRef.current);
+
+      // 🔒 HARD STOP WHEN EMPTY
+      if (!val.trim()) {
+        setGhostText("");
+        setTitleSuggestions([]);
+        setLoadingSuggest(false);
+        return;
+      }
+
+      typingTimerRef.current = setTimeout(async () => {
+        try {
+          /* 👻 AUTOCOMPLETE */
+          const auto = await api.get("/api/ai/autocomplete", {
+            params: { q: val }
+          });
+          setGhostText(auto.data.completion || "");
+        } catch {
+          setGhostText("");
+        }
+
+        try {
+          /* 📌 TITLE SUGGESTIONS */
+          setLoadingSuggest(true);
+          const sug = await api.get("/api/ai/suggest", {
+            params: { q: val }
+          });
+          setTitleSuggestions(sug.data.suggestions || []);
+        } catch {
+          setTitleSuggestions([]);
+        } finally {
+          setLoadingSuggest(false);
+        }
+      }, 250);
+    }}
+
+    onKeyDown={(e) => {
+      // TAB → accept autocomplete
+      if (e.key === "Tab" && ghostText) {
+        e.preventDefault();
+
+        setNoticeData(p => ({
+          ...p,
+          title: p.title + ghostText
+        }));
+
+        // 🔒 RESET AI UI
+        setGhostText("");
+        setTitleSuggestions([]);
+        setLoadingSuggest(false);
+      }
+    }}
+
+    onBlur={() => {
+      // 🔒 Cleanup when leaving input
+      setGhostText("");
+      setTitleSuggestions([]);
+      setLoadingSuggest(false);
+    }}
+  />
+
+  {/* 📌 TITLE SUGGESTIONS DROPDOWN (render ONLY if title has text) */}
+  {noticeData.title.trim() && titleSuggestions.length > 0 && (
+    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-30 overflow-hidden">
+      {titleSuggestions.map((s, i) => (
+        <div
+          key={i}
+          onMouseDown={(e) => e.preventDefault()} // prevent blur
+          onClick={() => {
+            setNoticeData(p => ({ ...p, title: s }));
+            setGhostText("");
+            setTitleSuggestions([]);
+            setLoadingSuggest(false);
+          }}
+          className="px-4 py-2 text-sm cursor-pointer hover:bg-indigo-50 transition"
+        >
+          {s}
+        </div>
+      ))}
+    </div>
+  )}
+
+</div>
+
+{/* ⏳ Optional loading text */}
+{noticeData.title.trim() && loadingSuggest && (
+  <p className="text-xs text-gray-400 mt-1">Thinking…</p>
+)}
+</div>
+
+
+
+{/* 🤖 Generate Button */}
+<button
+  type="button"
+  onClick={async () => {
+
+    const title = noticeData.title.trim();
+    if (!title) return alert("Enter title first");
+
+    // 🔒 pause AI after generation
+    setAiPaused(true);
+    setGhostText("");
+    setTitleSuggestions([]);
+
+    try {
+
+      const res = await api.post("/api/ai/generate", {
+        title: title
+      });
+
+      setNoticeData(p => ({
+        ...p,
+        description: res.data.description
+      }));
+
+    } catch (err) {
+      console.error(err);
+      alert("AI generation failed");
+    }
+  }}
+  className="mt-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+>
+  Generate with AI
+</button>
+
+
                 </div>
               )}
+
 
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</label></div>
@@ -1370,6 +1590,7 @@ Meeting Link: ${meetingLink}`;
                   className={`w-full border border-gray-300 rounded-lg px-4 py-3 text-sm h-32 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400 placeholder-gray-500 text-gray-900 transition-all duration-200 bg-white shadow-sm ${isMeetingMode ? 'bg-gray-100 text-gray-600' : ''}`}
                   required
                 />
+                
               </div>
 
               <div className="space-y-1.5"><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gradient-to-r from-violet-500 to-violet-400 shadow-sm"></div><label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Audience</label></div><div className="grid grid-cols-3 gap-2"><button type="button" onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'ALL', selectedGroupId: null }))} className={`p-2 rounded-lg border transition-all duration-200 text-center flex flex-col items-center justify-center gap-1 h-20 group ${noticeData.sendTo === 'ALL' ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-gray-300 hover:border-blue-300'}`}><div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${noticeData.sendTo === 'ALL' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{noticeData.sendTo === 'ALL' ? <FaCheck size={10} /> : <FaUsers size={12} />}</div><span className={`text-[10px] font-bold ${noticeData.sendTo === 'ALL' ? 'text-blue-700' : 'text-gray-600'}`}>All Employees</span></button><button type="button" onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'GROUP', recipients: [] }))} className={`p-2 rounded-lg border transition-all duration-200 text-center flex flex-col items-center justify-center gap-1 h-20 group ${noticeData.sendTo === 'GROUP' ? 'bg-indigo-50 border-indigo-300 shadow-sm' : 'bg-white border-gray-300 hover:border-indigo-300'}`}><div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${noticeData.sendTo === 'GROUP' ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{noticeData.sendTo === 'GROUP' ? <FaCheck size={10} /> : <FaLayerGroup size={12} />}</div><span className={`text-[10px] font-bold ${noticeData.sendTo === 'GROUP' ? 'text-indigo-700' : 'text-gray-600'}`}>Group Sending</span></button><button type="button" onClick={() => setNoticeData(prev => ({ ...prev, sendTo: 'SPECIFIC', selectedGroupId: null }))} className={`p-2 rounded-lg border transition-all duration-200 text-center flex flex-col items-center justify-center gap-1 h-20 group ${noticeData.sendTo === 'SPECIFIC' ? 'bg-purple-50 border-purple-300 shadow-sm' : 'bg-white border-gray-300 hover:border-purple-300'}`}><div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${noticeData.sendTo === 'SPECIFIC' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{noticeData.sendTo === 'SPECIFIC' ? <FaCheck size={10} /> : <FaUserTag size={12} />}</div><span className={`text-[10px] font-bold ${noticeData.sendTo === 'SPECIFIC' ? 'text-purple-700' : 'text-gray-600'}`}>Specific</span></button></div></div>
