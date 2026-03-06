@@ -6,23 +6,51 @@ const router = express.Router();
 
 // ------------------------------------------
 // LIVE STATUS POST (From Desktop Mouse Tracker)
+// Stores ONE document per employee, with each date as a sub-object
+// Now also automatically tracks timelines of working and idle states
 // ------------------------------------------
 router.post('/live-status', async (req, res) => {
   try {
-    const { employeeId, status, duration_seconds, timestamp } = req.body;
+    const { employeeId, status, duration_seconds, timestamp, total_work_seconds, total_idle_seconds } = req.body;
 
     // Ensure date is consistent (YYYY-MM-DD)
     const date = new Date().toISOString().split('T')[0];
+    const pingTime = new Date(timestamp * 1000);
+    const idleSinceTime = req.body.idle_since ? new Date(req.body.idle_since * 1000) : null;
 
-    await LiveTracking.findOneAndUpdate(
-      { employeeId: employeeId, date: date },
-      {
+    // Fetch the employee's document
+    let doc = await LiveTracking.findOne({ employeeId: employeeId });
+    if (!doc) {
+      doc = new LiveTracking({ employeeId: employeeId, dates: {} });
+    }
+
+    if (!doc.dates.has(date)) {
+      // Initialize today's date structure
+      const newDateData = {
         currentStatus: status,
-        lastPing: new Date(timestamp * 1000),
-        idleSince: req.body.idle_since ? new Date(req.body.idle_since * 1000) : null
-      },
-      { upsert: true }
-    );
+        lastPing: pingTime,
+        idleSince: idleSinceTime,
+        idleTimeline: [],
+        trackedWorkSeconds: total_work_seconds || 0,
+        trackedIdleSeconds: total_idle_seconds || 0
+      };
+
+      // Don't modify idleTimeline here anymore, wait for explicit save_idle_session POSTs
+      doc.dates.set(date, newDateData);
+    } else {
+      const todayData = doc.dates.get(date);
+      todayData.currentStatus = status;
+      todayData.lastPing = pingTime;
+      todayData.idleSince = idleSinceTime;
+      if (total_work_seconds !== undefined) todayData.trackedWorkSeconds = total_work_seconds;
+      if (total_idle_seconds !== undefined) todayData.trackedIdleSeconds = total_idle_seconds;
+
+      // Remove live-inference logic to avoid drift, instead we wait for 
+      // the tracker's explicit save_idle_session chunk POST to /api/idletime
+      doc.dates.set(date, todayData);
+    }
+
+    await doc.save();
 
     console.log(`📡 [Live Tracking] Telemetry received for employee ${employeeId}: Status=${status}, IdleSince=${req.body.idle_since}`);
     res.status(200).json({ message: "Telemetry Received" });
@@ -34,16 +62,37 @@ router.post('/live-status', async (req, res) => {
 
 // ------------------------------------------
 // LIVE STATUS GET (For Admin Dashboard)
+// Returns a flat array of today's employee data
+// so the frontend doesn't need to change
 // ------------------------------------------
 router.get('/live-status', async (req, res) => {
   try {
     // Ensure date is consistent (YYYY-MM-DD)
     const date = new Date().toISOString().split('T')[0];
 
-    // Fetch all live tracking data for today
-    const liveData = await LiveTracking.find({ date: date });
+    // Find all employee documents
+    const allDocs = await LiveTracking.find({});
 
-    res.status(200).json(liveData);
+    const liveArray = [];
+    allDocs.forEach((doc) => {
+      // Check if this employee has data for today
+      if (doc.dates && doc.dates.has(date)) {
+        const todayData = doc.dates.get(date);
+        liveArray.push({
+          _id: `${doc._id}_${date}`,
+          employeeId: doc.employeeId,
+          date: date,
+          currentStatus: todayData.currentStatus,
+          lastPing: todayData.lastPing,
+          idleSince: todayData.idleSince,
+          idleTimeline: todayData.idleTimeline, // Send only the idle timeline array
+          trackedWorkSeconds: todayData.trackedWorkSeconds || 0,
+          trackedIdleSeconds: todayData.trackedIdleSeconds || 0
+        });
+      }
+    });
+
+    res.status(200).json(liveArray);
   } catch (error) {
     console.error("Fetch Live Status Error:", error);
     res.status(500).json({ error: "Server Error" });
@@ -72,29 +121,33 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Missing required values" });
     }
 
-    // NEW idle session object
+    // NEW idle session object to insert into LiveTracking
     const idleEntry = {
-      idleStart: new Date(idleStart),
-      idleEnd: new Date(idleEnd),
+      startTime: new Date(idleStart),
+      endTime: new Date(idleEnd),
       idleDurationSeconds,
     };
 
-    // Atomic operation: create OR update the SAME document
-    const updatedRecord = await IdleTime.findOneAndUpdate(
-      { employeeId, date },
-      {
-        $setOnInsert: { employeeId, name, department, role, date },
-        $push: { idleTimeline: idleEntry },
-      },
-      {
-        new: true,
-        upsert: true, // This ensures no duplicates EVER
-      }
-    );
+    let doc = await LiveTracking.findOne({ employeeId });
+    if (!doc) {
+      doc = new LiveTracking({ employeeId, dates: {} });
+    }
+
+    if (!doc.dates.has(date)) {
+      doc.dates.set(date, { idleTimeline: [] });
+    }
+
+    const todayData = doc.dates.get(date);
+    const existingTimeline = todayData.idleTimeline || [];
+    existingTimeline.push(idleEntry);
+    todayData.idleTimeline = existingTimeline;
+    doc.dates.set(date, todayData);
+
+    await doc.save();
 
     return res.json({
-      message: "Idle session saved",
-      record: updatedRecord,
+      message: "Idle session saved directly to LiveTracking database",
+      record: doc,
     });
   } catch (err) {
     console.error("❌ Idle time save error:", err);

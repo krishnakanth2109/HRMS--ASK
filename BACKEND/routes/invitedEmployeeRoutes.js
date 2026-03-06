@@ -337,6 +337,8 @@ router.post('/invite-bulk', async (req, res) => {
 });
 
 
+/* --- Update in invitedEmployeeRoutes.js --- */
+
 router.post('/verify-email', async (req, res) => {
   try {
     const { email } = req.body;
@@ -346,26 +348,49 @@ router.post('/verify-email', async (req, res) => {
       email: email.toLowerCase()
     })
     .populate('company', 'name _id prefix')
-    .populate('requiredDocuments'); // Added to populate document details
+    .populate('requiredDocuments');
 
     if (!invite) {
       return res.status(404).json({ success: false, error: 'Email not found in invitation list' });
-    }
-
-    // Check if already onboarded
-    if (invite.status === 'onboarded') {
-      return res.status(400).json({ 
-        success: false, 
-        onboarded: true,
-        message: `Your email is already onboarded for ${invite.name || 'user'} in ${invite.company?.name || 'the company'}`,
-        data: invite
-      });
     }
 
     if (invite.status === 'revoked') {
       return res.status(400).json({ success: false, error: 'Your invitation has been revoked.' });
     }
 
+    // --- NEW LOGIC START ---
+    // If status is onboarded, check if they finished the compliance/policy step
+    if (invite.status === 'onboarded') {
+      if (invite.policyStatus === 'accepted') {
+        // Truly finished everything
+        return res.status(200).json({ 
+          success: false, 
+          alreadyOnboarded: true,
+          message: `Your account is already fully set up.`,
+          companyName: invite.company?.name,
+          name: invite.name
+        });
+      } else {
+        // Profile exists, but policies are missing -> Go to Compliance
+        return res.status(200).json({ 
+          success: true, 
+          needsComplianceOnly: true, // Flag for frontend
+          data: {
+            email: invite.email,
+            company: invite.company,
+            name: invite.name,
+            role: invite.role,
+            department: invite.department,
+            employmentType: invite.employmentType,
+            salary: invite.salary,
+            requiredDocuments: invite.requiredDocuments
+          }
+        });
+      }
+    }
+    // --- NEW LOGIC END ---
+
+    // Default: New user needs to fill the whole onboarding form
     res.status(200).json({ 
       success: true, 
       data: {
@@ -376,7 +401,7 @@ router.post('/verify-email', async (req, res) => {
         department: invite.department,
         employmentType: invite.employmentType,
         salary: invite.salary,
-        requiredDocuments: invite.requiredDocuments, // Added
+        requiredDocuments: invite.requiredDocuments,
         invitedAt: invite.invitedAt
       }
     });

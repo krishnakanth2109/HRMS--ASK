@@ -1,9 +1,10 @@
 import Sidebar from "./Sidebar";  // now from admin folder
 import Navbar from "./Navbar";
 import { Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 const LayoutAdmin = () => {
-  const[theme, setTheme] = useState(sessionStorage.getItem("adminTheme") || "bubbles");
+  const[theme, setTheme] = useState(sessionStorage.getItem("adminTheme") || "white");
   const[bubbles, setBubbles] = useState([]);
   
   const themeBgImage = "../../../public/image.png"; 

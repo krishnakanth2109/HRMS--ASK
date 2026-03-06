@@ -105,7 +105,9 @@ const EmployeeOnboarding = () => {
   };
 
   // --- EMAIL VERIFICATION ---
-  const handleVerifyEmail = async () => {
+/* --- Update in EmployeeOnboarding.jsx (handleVerifyEmail function) --- */
+
+const handleVerifyEmail = async () => {
     const email = formData.email.trim();
     if (!email || !email.includes('@')) {
       Swal.fire({
@@ -121,25 +123,28 @@ const EmployeeOnboarding = () => {
     try {
       const response = await api.post('/api/invited-employees/verify-email', { email });
 
+      // Handle users who finished everything
       if (response.data.alreadyOnboarded) {
         Swal.fire({
           icon: 'info',
           title: 'Already Onboarded',
-          html: `<p>This email is already registered for <b>${response.data.name}</b> at <b>${response.data.companyName}</b>.</p><p class="mt-2 text-sm text-gray-500">Please proceed to the login page.</p>`,
+          html: `<p>This email is already onboarded for <b>${response.data.name}</b> at <b>${response.data.companyName}</b>.Please contact your HR department.</p>`,
           confirmButtonText: 'Go to Login',
           confirmButtonColor: '#4f46e5',
-        }).then(() => { window.location.href = '/login'; });
+        }).then(() => { window.location.href = '/'; });
         return;
       }
 
       if (response.data.success) {
         const empData = response.data.data;
+        
+        // Update Local State with fetched data
         setEmailVerified(true);
         setVerifiedCompany(empData.company);
         setAssignedDocs(empData.requiredDocuments || []);
-
         setFormData(prev => ({
           ...prev,
+          email: empData.email, // Ensure email is set
           company: empData.company._id,
           name: empData.name || "",
           currentRole: empData.role || "",
@@ -147,6 +152,20 @@ const EmployeeOnboarding = () => {
           employmentType: empData.employmentType || "FULL TIME",
           currentSalary: empData.salary || 0
         }));
+
+        // --- NEW LOGIC START ---
+        if (response.data.needsComplianceOnly) {
+          Swal.fire({
+            icon: 'info',
+            title: 'Profile Found',
+            text: 'Your profile is already set up. Please review and accept the company policies to complete your onboarding.',
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          setStage('compliance'); // Skip onboarding form and go to Policies
+          return;
+        }
+        // --- NEW LOGIC END ---
 
         Swal.fire({
           icon: 'success',
@@ -168,22 +187,22 @@ const EmployeeOnboarding = () => {
         Swal.fire({
           icon: 'info',
           title: 'Already Onboarded',
-          html: `<p>This email is already registered.</p><p class="mt-2 text-sm text-gray-500">Please login to continue.</p>`,
+          html: `<p>This email is already registered.</p>`,
           confirmButtonText: 'Go to Login',
           confirmButtonColor: '#4f46e5',
         }).then(() => { window.location.href = '/login'; });
       } else {
         Swal.fire({
           icon: "warning",
-          title: "Verification Failed ",
-          text: errorMsg || "We Couldn't Find an active invitation for this email. Please check with your HR team.",
+          title: "Verification Failed",
+          text: errorMsg || "We couldn't find an active invitation.",
           confirmButtonColor: '#ef4444'
         });
       }
     } finally {
       setEmailCheckLoading(false);
     }
-  };
+};
 
   const validateForm = () => {
     if (!formData.company) return "Please verify your email/invitation first.";

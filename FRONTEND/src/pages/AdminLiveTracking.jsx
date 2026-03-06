@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import api, { getEmployees, getIdleTimeForEmployeeByDate, getAttendanceByDateRange } from "../api";
+import api, { getEmployees, getIdleTimeForEmployeeByDate, getAttendanceByDateRange } from ".././api";
 import {
-    FaUserFriends,
+    FaUserFriends, FaRegClock,
     FaCircle,
     FaSyncAlt,
     FaDesktop,
@@ -24,7 +24,7 @@ const AdminLiveTracking = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(new Date());
-    const [refreshCountdown, setRefreshCountdown] = useState(3);
+    const [refreshCountdown, setRefreshCountdown] = useState(10);
 
     // Modal State
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -37,11 +37,13 @@ const AdminLiveTracking = () => {
     const [weeklyDataLoading, setWeeklyDataLoading] = useState(false);
 
     useEffect(() => {
+        // Fetch all employees to map IDs to Names once when component loads
         const loadEmployees = async () => {
             try {
                 const employees = await getEmployees();
                 const map = {};
                 employees.forEach(emp => {
+                    // Employee ID mapping (handles formatting differences)
                     const empId = emp.employeeId || emp.empId || emp._id;
                     if (empId) map[empId] = emp.name;
                 });
@@ -55,9 +57,17 @@ const AdminLiveTracking = () => {
 
     const fetchLiveData = async () => {
         try {
+            // Added cache-busting timestamp to guarantee fresh data
             const response = await api.get(`/api/idletime/live-status?t=${new Date().getTime()}`);
             const data = response.data || [];
             setLiveData(data);
+
+            // Console log to verify heartbeat detection
+            const myStatus = data.find(d => String(d.employeeId).includes("INT2607"));
+            if (myStatus) {
+                console.log(`[Heartbeat] Pulse from backend: Formatted Date=${new Date().toISOString()} Status=${myStatus.currentStatus} IdleSince=${myStatus.idleSince}`);
+            }
+
             setError(null);
             setLastUpdated(new Date());
             setRefreshCountdown(10);
@@ -69,17 +79,19 @@ const AdminLiveTracking = () => {
         }
     };
 
+    // Main fetch interval (10 seconds)
     useEffect(() => {
         fetchLiveData();
         const interval = setInterval(() => {
             fetchLiveData();
-        }, 3000);
+        }, 10000);
         return () => clearInterval(interval);
     }, []);
 
+    // Countdown visual timer interval (1 second)
     useEffect(() => {
         const timer = setInterval(() => {
-            setRefreshCountdown((prev) => (prev <= 1 ? 3 : prev - 1));
+            setRefreshCountdown((prev) => (prev <= 1 ? 10 : prev - 1));
         }, 1000);
         return () => clearInterval(timer);
     }, []);
@@ -92,26 +104,26 @@ const AdminLiveTracking = () => {
         if (minutesSincePing > 3 || record.currentStatus === "OFFLINE") {
             return {
                 text: "Offline",
-                color: "text-red-600",
-                bg: "bg-red-50",
-                border: "border-red-200"
+                color: "text-red-500",
+                bg: "bg-red-500/10",
+                border: "border-red-500/20"
             };
         }
 
         if (record.currentStatus === "IDLE") {
             return {
                 text: "Idle",
-                color: "text-amber-600",
-                bg: "bg-amber-50",
-                border: "border-amber-200"
+                color: "text-amber-500",
+                bg: "bg-amber-500/10",
+                border: "border-amber-500/20"
             };
         }
 
         return {
             text: "Working",
-            color: "text-emerald-600",
-            bg: "bg-emerald-50",
-            border: "border-emerald-200"
+            color: "text-emerald-500",
+            bg: "bg-emerald-500/10",
+            border: "border-emerald-500/20"
         };
     };
 
@@ -137,6 +149,7 @@ const AdminLiveTracking = () => {
 
     const [currentTime, setCurrentTime] = useState(new Date());
 
+    // Effect to maintain a "Live" global clock for ticking calculations
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
@@ -144,40 +157,95 @@ const AdminLiveTracking = () => {
 
     const calculateReportStats = (record, idleData, attData) => {
         const dateStr = String(record.date || "").trim();
-        const idleTimeline = idleData?.idleTimeline || [];
-        const storedIdleSeconds = idleTimeline.reduce((total, span) => total + (span.idleDurationSeconds || 0), 0) || (idleData?.idleDurationSeconds || 0);
+        const employeeName = employeesMap[String(record.employeeId).trim()] || "Unknown Employee";
 
-        let activeIdleExtra = 0;
-        if (record.currentStatus === "IDLE" && record.idleSince) {
-            const idleStart = new Date(record.idleSince);
-            if (idleStart < currentTime) {
-                activeIdleExtra = (currentTime - idleStart) / 1000;
-            }
-        }
+        // 1. Get Stored Idle Time from Live DB (Synchronously connected)
+        const rawTimeline = record.idleTimeline || [];
+        const idleTimeline = rawTimeline.map(interval => {
+            const start = new Date(interval.startTime || interval.idleStart);
+            const end = new Date(interval.endTime || interval.idleEnd);
+            const diffSeconds = (end - start) / 1000;
+            return {
+                idleStart: start,
+                idleEnd: end,
+                idleDurationSeconds: diffSeconds
+            };
+        });
+        const storedIdleSeconds = idleTimeline.reduce((total, span) => total + (span.idleDurationSeconds || 0), 0);
 
-        const totalIdleSeconds = storedIdleSeconds + activeIdleExtra;
+        let totalIdleSeconds = 0;
         let workedSeconds = 0;
         let punchInTime = "N/A";
+        let activeIdleExtra = 0;
 
-        if (attData && attData.punchIn) {
-            try {
-                const OFFICE_START_HOUR = 10;
-                const OFFICE_END_HOUR = 18;
-                const pIn = new Date(attData.punchIn);
-                const pOutRaw = attData.punchOut ? new Date(attData.punchOut) : currentTime;
-                const officeStart = new Date(pIn);
-                officeStart.setHours(OFFICE_START_HOUR, 0, 0, 0);
-                const officeEnd = new Date(pIn);
-                officeEnd.setHours(OFFICE_END_HOUR, 0, 0, 0);
-                const effectiveStart = new Date(Math.max(pIn, officeStart));
-                const effectiveEnd = new Date(Math.min(pOutRaw, officeEnd));
-                punchInTime = pIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                if (effectiveStart < officeEnd && effectiveStart < effectiveEnd) {
-                    const totalElapsedSecs = (effectiveEnd - effectiveStart) / 1000;
-                    workedSeconds = Math.max(0, totalElapsedSecs - totalIdleSeconds);
+        // If explicitly exact tracked times are available directly from the desktop tracker, USE THEM!
+        if (record.trackedWorkSeconds !== undefined && record.trackedIdleSeconds !== undefined && record.trackedWorkSeconds > 0) {
+            workedSeconds = record.trackedWorkSeconds;
+            totalIdleSeconds = record.trackedIdleSeconds;
+
+            // Add live "ticking" since the last ping to keep the UI flowing smoothly
+            if (record.lastPing && record.currentStatus !== "OFFLINE") {
+                const lastPingDate = new Date(record.lastPing);
+                if (currentTime > lastPingDate) {
+                    const elapsedSincePing = (currentTime - lastPingDate) / 1000;
+
+                    // Cap the artificial tick at 120 seconds in case they went offline abruptly
+                    if (elapsedSincePing < 120) {
+                        if (record.currentStatus === "WORKING") {
+                            workedSeconds += elapsedSincePing;
+                        } else if (record.currentStatus === "IDLE") {
+                            totalIdleSeconds += elapsedSincePing;
+                        }
+                    }
                 }
-            } catch (e) {
-                console.error("Error calculating working time", e);
+            }
+
+            // Format punchIn if available
+            if (attData && attData.punchIn) {
+                punchInTime = new Date(attData.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+        } else {
+            // -- FALLBACK LEGACY CALCULATION --
+            if (record.currentStatus === "IDLE" && record.idleSince) {
+                const idleStart = new Date(record.idleSince);
+                if (idleStart < currentTime) {
+                    // Calculate how long they have been idle in this CURRENT session
+                    activeIdleExtra = (currentTime - idleStart) / 1000;
+                }
+            }
+
+            // Total Idle = Stored (Old) + Active (Ongoing)
+            totalIdleSeconds = storedIdleSeconds + activeIdleExtra;
+
+            if (attData && attData.punchIn) {
+                try {
+                    const OFFICE_START_HOUR = 10;
+                    const OFFICE_END_HOUR = 18;
+
+                    const pIn = new Date(attData.punchIn);
+                    // Total elapsed time from Punch In to NOW (capped at office hours)
+                    const pOutRaw = attData.punchOut ? new Date(attData.punchOut) : currentTime;
+
+                    const officeStart = new Date(pIn);
+                    officeStart.setHours(OFFICE_START_HOUR, 0, 0, 0);
+                    const officeEnd = new Date(pIn);
+                    officeEnd.setHours(OFFICE_END_HOUR, 0, 0, 0);
+
+                    const effectiveStart = new Date(Math.max(pIn, officeStart));
+                    const effectiveEnd = new Date(Math.min(pOutRaw, officeEnd));
+
+                    punchInTime = pIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                    if (effectiveStart < officeEnd && effectiveStart < effectiveEnd) {
+                        const totalElapsedSecs = (effectiveEnd - effectiveStart) / 1000;
+
+                        // CRITICAL SYNC: 
+                        // Worked Time = (Total Elapsed from PunchIn) - (Total Idle Time)
+                        workedSeconds = Math.max(0, totalElapsedSecs - totalIdleSeconds);
+                    }
+                } catch (e) {
+                    console.error("Error calculating working time", e);
+                }
             }
         }
 
@@ -192,29 +260,37 @@ const AdminLiveTracking = () => {
         };
     };
 
+    // Keep base API data for live ticking
     const [rawReportData, setRawReportData] = useState({ idle: null, attendance: null });
 
     const fetchReportData = async (record) => {
         const empId = String(record.employeeId || "").trim();
         const dateStr = String(record.date || "").trim();
-        const employeeName = employeesMap[empId] || "Loading...";
+        const employeeName = employeesMap[empId] || "Unknown Employee";
 
         try {
+            // Fetch both in parallel
             const [idleRes, attRes] = await Promise.all([
                 getIdleTimeForEmployeeByDate(empId, dateStr),
                 getAttendanceByDateRange(dateStr, dateStr)
             ]);
 
+            // Find matching attendance
             const attData = attRes?.length > 0 ? attRes.find(a =>
                 String(a.employeeId || "").trim() === empId ||
                 String(a.employeeName || "").toLowerCase().includes(employeeName.toLowerCase())
             ) : null;
 
+            // Store raw results
             setRawReportData({ idle: idleRes, attendance: attData });
+
+            // Initial calculation
             const stats = calculateReportStats(record, idleRes, attData);
             setReportData(stats);
+
         } catch (err) {
             console.error("Error fetching report data:", err);
+            // Fallback
             if (!reportData) {
                 setReportData({
                     idleSeconds: 0,
@@ -236,6 +312,7 @@ const AdminLiveTracking = () => {
             end.setDate(end.getDate() - (offset * 7));
             const start = new Date(end);
             start.setDate(end.getDate() - 6);
+
             const startStr = start.toISOString().split('T')[0];
             const endStr = end.toISOString().split('T')[0];
 
@@ -253,14 +330,18 @@ const AdminLiveTracking = () => {
             for (let i = 0; i < 7; i++) {
                 const dStr = d.toISOString().split('T')[0];
                 chartLabels.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+
                 const dailyAtt = attRes?.length > 0 ? attRes.find(a =>
                     (String(a.employeeId || "").trim() === empId || String(a.employeeName || "").toLowerCase().includes(empName.toLowerCase())) && a.date === dStr
                 ) : null;
+
                 const dailyIdle = allIdle.find(item => item.date === dStr) || { idleTimeline: [], idleDurationSeconds: 0 };
                 const dummyRecord = { date: dStr, employeeId: empId, currentStatus: "OFFLINE", idleSince: null };
                 const stats = calculateReportStats(dummyRecord, dailyIdle, dailyAtt);
+
                 workedData.push(parseFloat((stats.workedSeconds / 3600).toFixed(2)));
                 idleData.push(parseFloat((stats.idleSeconds / 3600).toFixed(2)));
+
                 d.setDate(d.getDate() + 1);
             }
 
@@ -270,20 +351,22 @@ const AdminLiveTracking = () => {
                     {
                         label: 'Working Hours',
                         data: workedData,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         borderWidth: 2,
-                        fill: true,
+                        fill: false,
                         tension: 0.3,
+                        pointBackgroundColor: 'rgba(16, 185, 129, 1)',
                     },
                     {
                         label: 'Idle Hours',
                         data: idleData,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderColor: 'rgba(245, 158, 11, 1)',
+                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
                         borderWidth: 2,
-                        fill: true,
+                        fill: false,
                         tension: 0.3,
+                        pointBackgroundColor: 'rgba(245, 158, 11, 1)',
                     }
                 ]
             });
@@ -301,18 +384,20 @@ const AdminLiveTracking = () => {
         }
     }, [weeklyOffset, selectedEmployee]);
 
+    // "Live Ticker" Effect: Recalculate modal stats every second while modal is open
     useEffect(() => {
         if (selectedEmployee && !reportLoading && rawReportData.idle !== undefined) {
+            // Find LATEST state from liveData periodically
             const latestRecord = liveData.find(r => String(r.employeeId).trim() === String(selectedEmployee.employeeId).trim()) || selectedEmployee;
             const stats = calculateReportStats(latestRecord, rawReportData.idle, rawReportData.attendance);
             setReportData(stats);
         }
-    }, [currentTime]);
+    }, [currentTime]); // Ticks every second
 
     const handleViewReport = (record) => {
         const empId = String(record.employeeId || "").trim();
         const latestRecord = liveData.find(r => String(r.employeeId).trim() === empId) || record;
-        const employeeName = employeesMap[empId] || "Loading...";
+        const employeeName = employeesMap[empId] || "Unknown Employee";
 
         setSelectedEmployee({ ...latestRecord, name: employeeName, statusInfo: getStatusInfo(latestRecord), employeeId: empId });
         setReportLoading(true);
@@ -322,12 +407,16 @@ const AdminLiveTracking = () => {
         fetchReportData(latestRecord);
     };
 
+    // Auto-sync status only if modal open
     useEffect(() => {
         if (selectedEmployee && !reportLoading) {
             const currentRecord = liveData.find(r => String(r.employeeId).trim() === String(selectedEmployee.employeeId).trim());
             if (currentRecord) {
+                // Keep selectedEmployee sync'd with latest status from liveData (IDLE/WORKING)
                 const employeeName = employeesMap[String(currentRecord.employeeId).trim()] || selectedEmployee.name;
                 setSelectedEmployee({ ...currentRecord, name: employeeName, statusInfo: getStatusInfo(currentRecord) });
+                // We don't call fetchReportData here, the [currentTime] effect handles the tick
+                // But we should refresh API data if liveData changed (maybe new finished session)
                 fetchReportData(currentRecord);
             }
         }
@@ -340,13 +429,19 @@ const AdminLiveTracking = () => {
 
     const generatePdf = () => {
         if (!selectedEmployee || !reportData) return;
+
         const doc = new jsPDF();
+
+        // Title
         doc.setFontSize(18);
         doc.text(`Daily Activity Report`, 14, 22);
+
         doc.setFontSize(12);
         doc.text(`Date: ${selectedEmployee.date}`, 14, 30);
         doc.text(`Employee: ${selectedEmployee.name} (${selectedEmployee.employeeId})`, 14, 36);
         doc.text(`Current Status: ${selectedEmployee.statusInfo.text}`, 14, 42);
+
+        // Summary Table
         autoTable(doc, {
             startY: 50,
             head: [['Metric', 'Value']],
@@ -357,14 +452,18 @@ const AdminLiveTracking = () => {
                 ['Total Tracked Time', formatDuration(reportData.totalElapsedSeconds)]
             ],
             theme: 'grid',
-            headStyles: { fillColor: [79, 70, 229] },
+            headStyles: { fillColor: [63, 81, 181] },
+            styles: { fontSize: 10 }
         });
+
+        // Idle Timeline Table
         if (reportData.idleTimeline && reportData.idleTimeline.length > 0) {
             const tableData = reportData.idleTimeline.map(interval => [
                 new Date(interval.idleStart).toLocaleTimeString(),
                 new Date(interval.idleEnd).toLocaleTimeString(),
                 formatDuration(interval.idleDurationSeconds)
             ]);
+
             autoTable(doc, {
                 startY: doc.lastAutoTable.finalY + 10,
                 head: [['Idle Start', 'Idle End', 'Duration']],
@@ -372,20 +471,23 @@ const AdminLiveTracking = () => {
                 theme: 'striped',
                 headStyles: { fillColor: [245, 158, 11] }
             });
+        } else {
+            doc.text("No idle sessions recorded for today.", 14, doc.lastAutoTable.finalY + 15);
         }
+
         doc.save(`Activity_Report_${selectedEmployee.employeeId}_${selectedEmployee.date}.pdf`);
     };
 
     return (
-        <div className="p-6 bg-white min-h-screen text-slate-800">
+        <div className="p-6 min-h-screen text-slate-800">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-                        <FaDesktop className="hidden sm:block text-indigo-600" />
-                        Live Status Tracker
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-3">
+
+                        Idle Time & Live Activity Tracking
                     </h1>
-                    <p className="text-slate-500 mt-2 flex items-center gap-2">
+                    <p className="text-slate-400 mt-2 flex items-center gap-2">
                         Monitor real-time desktop activity from employees
                     </p>
                 </div>
@@ -395,7 +497,7 @@ const AdminLiveTracking = () => {
                         setLoading(true);
                         fetchLiveData();
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 rounded-lg transition-all"
                 >
                     <FaSyncAlt className={loading ? "animate-spin" : ""} />
                     Auto-Refresh in {refreshCountdown}s
@@ -404,49 +506,61 @@ const AdminLiveTracking = () => {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-slate-500 font-medium">Total Tracked</h3>
-                        <FaUserFriends className="text-slate-400 text-xl" />
+                        <h3 className="text-gray-500 font-medium text-sm">Total Tracked</h3>
+                        <FaUserFriends className="text-gray-400 text-lg" />
                     </div>
-                    <p className="text-3xl font-bold text-slate-900">{liveData.length}</p>
+                    <p className="text-3xl font-semibold text-gray-900">{liveData.length}</p>
                 </div>
-                <div className="bg-emerald-50 rounded-xl p-5 border border-emerald-100 shadow-sm">
+
+                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-emerald-700 font-medium">Currently Working</h3>
-                        <FaCircle className="text-emerald-500 text-sm" />
+                        <h3 className="text-gray-500 font-medium text-sm">Currently Working</h3>
+                        <FaCircle className="text-emerald-500 text-xs" />
                     </div>
-                    <p className="text-3xl font-bold text-emerald-600">{getStatusSummaryCount("Working")}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-3xl font-semibold text-gray-900">{getStatusSummaryCount("Working")}</p>
+                        <span className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 font-medium rounded-full">Active</span>
+                    </div>
                 </div>
-                <div className="bg-amber-50 rounded-xl p-5 border border-amber-100 shadow-sm">
+
+                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-amber-700 font-medium">Currently Idle</h3>
-                        <FaCircle className="text-amber-500 text-sm" />
+                        <h3 className="text-gray-500 font-medium text-sm">Currently Idle</h3>
+                        <FaCircle className="text-amber-500 text-xs" />
                     </div>
-                    <p className="text-3xl font-bold text-amber-600">{getStatusSummaryCount("Idle")}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-3xl font-semibold text-gray-900">{getStatusSummaryCount("Idle")}</p>
+                        <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 font-medium rounded-full">Away</span>
+                    </div>
                 </div>
-                <div className="bg-red-50 rounded-xl p-5 border border-red-100 shadow-sm">
+
+                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-red-700 font-medium">Offline / Inactive</h3>
-                        <FaCircle className="text-red-500 text-sm" />
+                        <h3 className="text-gray-500 font-medium text-sm">Offline / Inactive</h3>
+                        <FaCircle className="text-red-500 text-xs" />
                     </div>
-                    <p className="text-3xl font-bold text-red-600">{getStatusSummaryCount("Offline")}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-3xl font-semibold text-gray-900">{getStatusSummaryCount("Offline")}</p>
+                        <span className="text-xs px-2 py-1 bg-red-50 text-red-700 font-medium rounded-full">Inactive</span>
+                    </div>
                 </div>
             </div>
 
             {/* Error Message */}
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">
+                <div className="bg-red-500/20 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6">
                     {error}
                 </div>
             )}
 
             {/* Data Grid */}
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-md">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                            <tr className="bg-gray-50 border-b border-gray-200 text-gray-700">
                                 <th className="p-4 font-semibold w-1/4">Employee</th>
                                 <th className="p-4 font-semibold w-1/4">Status</th>
                                 <th className="p-4 font-semibold w-1/6">Date</th>
@@ -454,50 +568,75 @@ const AdminLiveTracking = () => {
                                 <th className="p-4 font-semibold w-1/6 text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-gray-100">
                             {loading && liveData.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="text-center p-8 text-slate-400">
-                                        <FaSyncAlt className="animate-spin inline-block mr-2" /> Loading data...
+                                    <td colSpan="5" className="text-center py-12">
+                                        <div className="flex flex-col items-center justify-center text-gray-400">
+                                            <FaSyncAlt className="animate-spin text-2xl mb-3 text-indigo-500" />
+                                            <span className="text-sm font-medium">Loading data...</span>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : liveData.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="text-center p-8 text-slate-400">
-                                        No live tracking data available for today yet.
+                                    <td colSpan="5" className="text-center py-12">
+                                        <div className="flex flex-col items-center justify-center text-gray-400">
+                                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                                                <FaRegClock className="text-xl text-gray-400" />
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-500 mb-1">No data available</span>
+                                            <span className="text-xs text-gray-400">No live tracking data available for today yet. Make sure desktop trackers are running.</span>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 liveData.map((record) => {
                                     const statusInfo = getStatusInfo(record);
-                                    const employeeName = employeesMap[record.employeeId] || "Loading...";
+                                    const employeeName = employeesMap[record.employeeId] || "Unknown";
                                     return (
-                                        <tr key={record._id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                            <td className="p-4">
+                                        <tr key={record._id} className="group hover:bg-gray-50/80 transition-colors">
+                                            <td className="px-4 py-3">
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-900">{employeeName}</span>
-                                                    <span className="text-xs text-slate-500 font-mono mt-0.5">{record.employeeId}</span>
+                                                    <span className="font-medium text-gray-900">{employeeName}</span>
+                                                    <span className="text-xs text-gray-400 font-mono">{record.employeeId}</span>
                                                 </div>
                                             </td>
-                                            <td className="p-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${statusInfo.bg} ${statusInfo.color} border ${statusInfo.border}`}>
-                                                    <FaCircle className="text-[10px]" />
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${statusInfo.bg} ${statusInfo.color} border ${statusInfo.border}`}>
+                                                    <FaCircle className="text-[8px]" />
                                                     {statusInfo.text}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-slate-600">
-                                                {record.date}
+                                            <td className="px-4 py-3">
+                                                <span className="text-sm text-gray-500">{record.date}</span>
                                             </td>
-                                            <td className="p-4 text-slate-600 flex items-center gap-2 mt-2">
-                                                <FaClock className="text-slate-400" />
-                                                {formatTime(record.lastPing)}
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                    <FaClock className="text-gray-400 text-xs" />
+                                                    {formatTime(record.lastPing)}
+                                                </div>
                                             </td>
-                                            <td className="p-4 text-center">
+                                            <td className="px-4 py-3 text-right">
                                                 <button
                                                     onClick={() => handleViewReport(record)}
-                                                    className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-sm transition-all flex items-center gap-2 mx-auto font-medium"
+                                                    className="
+             px-4 py-2 
+             bg-white 
+             text-indigo-600 
+             border border-indigo-200 
+             rounded-lg 
+             text-sm font-semibold 
+             flex items-center gap-2 ml-auto
+             shadow-sm 
+             transition-all duration-200 
+             hover:bg-indigo-50 
+             hover:border-indigo-300 
+             hover:shadow-md 
+             hover:-translate-y-0.5"
                                                 >
-                                                    <FaSearch /> Details
+                                                    <FaSearch className="text-indigo-500 text-sm" />
+                                                    Details
                                                 </button>
                                             </td>
                                         </tr>
@@ -509,48 +648,51 @@ const AdminLiveTracking = () => {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Modal for Details & Report */}
             {selectedEmployee && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col">
-                        
-                        <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-slate-100 p-6 flex justify-between items-start z-10">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
+                    <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col">
+
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-slate-800/95 backdrop-blur border-b border-slate-700 p-6 flex justify-between items-start z-10">
                             <div>
-                                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
-                                    <FaChartPie className="text-indigo-600 shrink-0" />
+                                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent flex items-center gap-3">
+                                    <FaChartPie className="text-indigo-400 shrink-0" />
                                     Employee Activity Report
                                 </h2>
-                                <p className="text-slate-500 mt-1">
-                                    {selectedEmployee.name} <span className="text-xs ml-2 px-2 py-0.5 bg-slate-100 rounded-full text-slate-600 font-mono">{selectedEmployee.employeeId}</span>
+                                <p className="text-slate-400 mt-1">
+                                    {selectedEmployee.name} <span className="text-xs ml-2 px-2 py-0.5 bg-slate-700 rounded-full text-slate-300">{selectedEmployee.employeeId}</span>
                                 </p>
                             </div>
-                            <button onClick={closeReportModal} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-all">
+                            <button onClick={closeReportModal} className="text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 p-2 rounded-full transition-all">
                                 <FaTimes />
                             </button>
                         </div>
 
+                        {/* Modal Body */}
                         <div className="p-6">
                             {reportLoading ? (
                                 <div className="py-20 flex flex-col items-center justify-center text-slate-400">
                                     <FaSyncAlt className="animate-spin text-4xl mb-4 text-indigo-500" />
-                                    <p>Loading analytics...</p>
+                                    <p>Loading analytics from database...</p>
                                 </div>
                             ) : (
                                 reportData && (
                                     <>
+                                        {/* Quick Analytics Cards */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 flex flex-col">
-                                                <span className="text-emerald-700 text-sm font-semibold mb-1 uppercase tracking-wider">Exact Working Time</span>
-                                                <span className="text-3xl font-bold text-emerald-600">{formatDuration(reportData.workedSeconds)}</span>
+                                            <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-5 flex flex-col">
+                                                <span className="text-emerald-400/80 text-sm font-medium mb-1 uppercase tracking-wider">Exact Working Time</span>
+                                                <span className="text-3xl font-bold text-emerald-400">{formatDuration(reportData.workedSeconds)}</span>
                                             </div>
-                                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 flex flex-col">
-                                                <span className="text-amber-700 text-sm font-semibold mb-1 uppercase tracking-wider">Exact Idle Time</span>
-                                                <span className="text-3xl font-bold text-amber-600">{formatDuration(reportData.idleSeconds)}</span>
+                                            <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl p-5 flex flex-col">
+                                                <span className="text-amber-400/80 text-sm font-medium mb-1 uppercase tracking-wider">Exact Idle Time</span>
+                                                <span className="text-3xl font-bold text-amber-400">{formatDuration(reportData.idleSeconds)}</span>
                                             </div>
-                                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col items-center justify-center">
+                                            <div className="bg-slate-700/30 border border-slate-600 rounded-xl p-5 flex flex-col items-center justify-center">
                                                 <button
                                                     onClick={generatePdf}
-                                                    className="w-full flex items-center justify-center py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-all gap-2"
+                                                    className="w-full flex items-center justify-center py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg font-bold shadow-lg transition-all gap-2"
                                                 >
                                                     <FaFilePdf /> Download PDF
                                                 </button>
@@ -558,25 +700,27 @@ const AdminLiveTracking = () => {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4">
-                                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center">
-                                                <h3 className="text-lg font-bold text-slate-800 mb-4 self-start">Activity Ratio (Today)</h3>
+                                            {/* Chart View */}
+                                            <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700 flex flex-col items-center justify-center">
+                                                <h3 className="text-lg font-bold text-slate-300 mb-4 self-start">Activity Ratio (Today)</h3>
                                                 <div className="w-48 h-48">
                                                     {reportData.workedSeconds === 0 && reportData.idleSeconds === 0 ? (
-                                                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-full">No Data</div>
+                                                        <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm border-2 border-dashed border-slate-700 rounded-full">No Data</div>
                                                     ) : (
                                                         <Doughnut
                                                             data={{
                                                                 labels: ['Working', 'Idle'],
                                                                 datasets: [{
                                                                     data: [reportData.workedSeconds, reportData.idleSeconds],
-                                                                    backgroundColor: ['#10b981', '#f59e0b'],
-                                                                    borderWidth: 0,
+                                                                    backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)'],
+                                                                    borderColor: ['rgba(16, 185, 129, 1)', 'rgba(245, 158, 11, 1)'],
+                                                                    borderWidth: 1,
                                                                     cutout: '70%'
                                                                 }]
                                                             }}
                                                             options={{
                                                                 plugins: {
-                                                                    legend: { position: 'bottom', labels: { color: '#475569', font: { weight: '600' } } }
+                                                                    legend: { position: 'bottom', labels: { color: '#cbd5e1' } }
                                                                 },
                                                                 maintainAspectRatio: false
                                                             }}
@@ -585,43 +729,45 @@ const AdminLiveTracking = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden max-h-72 shadow-sm">
-                                                <h3 className="text-lg font-bold text-slate-800 p-4 border-b border-slate-100 sticky top-0 bg-white">Idle Intervals Log</h3>
+                                            {/* Timeline Table */}
+                                            <div className="bg-slate-900/50 rounded-xl border border-slate-700 flex flex-col overflow-hidden max-h-72">
+                                                <h3 className="text-lg font-bold text-slate-300 p-4 border-b border-slate-700 sticky top-0 bg-slate-900">Idle Intervals log</h3>
                                                 <div className="overflow-y-auto">
                                                     {reportData.idleTimeline && reportData.idleTimeline.length > 0 ? (
                                                         <table className="w-full text-left text-sm">
-                                                            <thead className="bg-slate-50 sticky top-0">
+                                                            <thead className="bg-white sticky top-0">
                                                                 <tr>
-                                                                    <th className="px-4 py-2 text-slate-600 font-semibold">Idle Start</th>
-                                                                    <th className="px-4 py-2 text-slate-600 font-semibold">Idle End</th>
-                                                                    <th className="px-4 py-2 text-slate-600 font-semibold">Duration</th>
+                                                                    <th className="px-4 py-2 text-slate-400 font-medium">Idle Start</th>
+                                                                    <th className="px-4 py-2 text-slate-400 font-medium">Idle End</th>
+                                                                    <th className="px-4 py-2 text-slate-400 font-medium">Duration</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {reportData.idleTimeline.map((item, idx) => (
-                                                                    <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50">
-                                                                        <td className="px-4 py-2 text-slate-700">{new Date(item.idleStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                                                                        <td className="px-4 py-2 text-slate-700">{new Date(item.idleEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                                                                        <td className="px-4 py-2 text-amber-600 font-mono font-bold">{formatDuration(item.idleDurationSeconds)}</td>
+                                                                    <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800">
+                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                                        <td className="px-4 py-2 text-amber-500 font-mono">{formatDuration(item.idleDurationSeconds)}</td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
                                                         </table>
                                                     ) : (
-                                                        <div className="p-8 text-center text-slate-400">
+                                                        <div className="p-8 text-center text-slate-500">
                                                             <FaClock className="text-4xl mx-auto mb-2 opacity-20" />
-                                                            No idle sessions recorded yet.
+                                                            No idle sessions recorded for this user today yet.
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col mt-4">
+                                        {/* Weekly Chart View */}
+                                        <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700 flex flex-col mt-4">
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-bold text-slate-800">Weekly Summary (Past 7 Days)</h3>
+                                                <h3 className="text-lg font-bold text-slate-300">Weekly Summary (Past 7 Days)</h3>
                                                 <select
-                                                    className="bg-white text-slate-700 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm shadow-sm"
+                                                    className="bg-slate-800 text-slate-300 border border-slate-600 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 text-sm"
                                                     value={weeklyOffset}
                                                     onChange={(e) => setWeeklyOffset(Number(e.target.value))}
                                                 >
@@ -633,7 +779,7 @@ const AdminLiveTracking = () => {
                                                 </select>
                                             </div>
 
-                                            <div className="w-full h-64 relative bg-white p-4 rounded-lg border border-slate-100">
+                                            <div className="w-full h-64 relative">
                                                 {weeklyDataLoading ? (
                                                     <div className="absolute inset-0 flex items-center justify-center text-slate-400 gap-2">
                                                         <FaSyncAlt className="animate-spin text-xl" /> Fetching history...
@@ -645,22 +791,22 @@ const AdminLiveTracking = () => {
                                                             responsive: true,
                                                             maintainAspectRatio: false,
                                                             plugins: {
-                                                                legend: { labels: { color: '#475569', font: { weight: '600' } } },
-                                                                tooltip: { backgroundColor: '#1e293b' }
+                                                                legend: { labels: { color: '#cbd5e1' } },
+                                                                tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} hrs` } }
                                                             },
                                                             scales: {
-                                                                x: { ticks: { color: '#64748b' }, grid: { display: false } },
+                                                                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.5)' } },
                                                                 y: {
                                                                     beginAtZero: true,
-                                                                    ticks: { color: '#64748b' },
-                                                                    grid: { color: '#f1f5f9' },
+                                                                    ticks: { color: '#94a3b8' },
+                                                                    grid: { color: 'rgba(51, 65, 85, 0.5)' },
                                                                     title: { display: true, text: 'Hours', color: '#64748b' }
                                                                 }
                                                             }
                                                         }}
                                                     />
                                                 ) : (
-                                                    <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                                                    <div className="absolute inset-0 flex items-center justify-center text-slate-500">
                                                         Data could not be loaded
                                                     </div>
                                                 )}

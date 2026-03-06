@@ -11,7 +11,7 @@ import {
   FaUser,
   FaKey,
   FaCog,
-  FaPaintBrush,
+  FaPalette,
   FaCheck,
 } from "react-icons/fa";
 import { CurrentEmployeeNotificationContext } from "../../EmployeeContext/CurrentEmployeeNotificationContext";
@@ -81,7 +81,7 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
             className="cursor-pointer group p-1" 
             onClick={() => setShowThemeDropdown(!showThemeDropdown)}
           >
-            <FaPaintBrush className="text-xl text-white group-hover:text-yellow-300 transition" />
+            <FaPalette className="text-xl text-white group-hover:text-yellow-300 transition" />
           </div>
 
           {showThemeDropdown && (

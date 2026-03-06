@@ -51,7 +51,7 @@ const getInitials = (name = "") =>
     .join("")
     .toUpperCase();
 
-const avatarColors =[
+const avatarColors = [
   "bg-blue-500",
   "bg-purple-500",
   "bg-green-500",
@@ -67,7 +67,7 @@ const pickColor = (name = "") =>
 const getDeptRole = (emp) => {
   const exp = Array.isArray(emp.experienceDetails)
     ? emp.experienceDetails.find((e) => e.lastWorkingDate === "Present") ||
-      emp.experienceDetails[0]
+    emp.experienceDetails[0]
     : null;
   return {
     department: emp.currentDepartment || exp?.department || "Unassigned",
@@ -120,17 +120,17 @@ const AdminDashboard = () => {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [allEmployees, setAllEmployees] = useState([]);
-  const[todayAttendance, setTodayAttendance] = useState([]);
+  const [todayAttendance, setTodayAttendance] = useState([]);
   const [allLeaves, setAllLeaves] = useState([]);
-  const[employeeWorkModes, setEmployeeWorkModes] = useState({});
-  const[loadingData, setLoadingData] = useState(true);
+  const [employeeWorkModes, setEmployeeWorkModes] = useState({});
+  const [loadingData, setLoadingData] = useState(true);
 
   // --- Graph State ---
-  const[viewMode, setViewMode] = useState("week"); // 'week' or 'month'
+  const [viewMode, setViewMode] = useState("week"); // 'week' or 'month'
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const[currentWeek, setCurrentWeek] = useState(0);
+  const [currentWeek, setCurrentWeek] = useState(0);
   const [chartRawData, setChartRawData] = useState([]);
-  const[loadingGraph, setLoadingGraph] = useState(false);
+  const [loadingGraph, setLoadingGraph] = useState(false);
 
   // --- Pie Chart Hover State ---
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -145,7 +145,7 @@ const AdminDashboard = () => {
 
   // Context-based stat cards
   const { statCards } = useMemo(
-    () => getDashboardData(ctxEmployees, ctxLeaveRequests),[ctxEmployees, ctxLeaveRequests, getDashboardData]
+    () => getDashboardData(ctxEmployees, ctxLeaveRequests), [ctxEmployees, ctxLeaveRequests, getDashboardData]
   );
 
   // ── Fetch General Dashboard Data ──────────────────────────────────────────
@@ -154,15 +154,15 @@ const AdminDashboard = () => {
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const[todayAtt, leavesData, empData] = await Promise.all([
+      const [todayAtt, leavesData, empData] = await Promise.all([
         getAttendanceByDateRange(today, today).catch(() => []),
-        getLeaveRequests().catch(() =>[]),
-        getEmployees().catch(() =>[]),
+        getLeaveRequests().catch(() => []),
+        getEmployees().catch(() => []),
       ]);
 
-      setTodayAttendance(Array.isArray(todayAtt) ? todayAtt :[]);
-      setAllLeaves(Array.isArray(leavesData) ? leavesData :[]);
-      setAllEmployees(Array.isArray(empData) ? empData :[]);
+      setTodayAttendance(Array.isArray(todayAtt) ? todayAtt : []);
+      setAllLeaves(Array.isArray(leavesData) ? leavesData : []);
+      setAllEmployees(Array.isArray(empData) ? empData : []);
 
       // Fetch work modes for remote detection
       try {
@@ -174,21 +174,21 @@ const AdminDashboard = () => {
           });
           setEmployeeWorkModes(modeMap);
         }
-      } catch (_) {}
+      } catch (_) { }
     } catch (err) {
       console.error("AdminDashboard fetchDashboardData error:", err);
     } finally {
       setLoadingData(false);
     }
-  },[]);
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
-  },[]);
+  }, []);
 
   // ── Derived Data: Active Employees ───────────────────────────────────────
   const activeEmployees = useMemo(
-    () => allEmployees.filter((e) => e.isActive !== false && (e.status || "").toLowerCase() !== "deactive"),[allEmployees]
+    () => allEmployees.filter((e) => e.isActive !== false && (e.status || "").toLowerCase() !== "deactive"), [allEmployees]
   );
 
   const empMap = useMemo(() => {
@@ -240,7 +240,7 @@ const AdminDashboard = () => {
       startDateObj: monday,
       endDateObj: sunday
     };
-  },[currentWeek, viewMode, selectedMonth]);
+  }, [currentWeek, viewMode, selectedMonth]);
 
   // ── Fetch Chart Data (Dynamic) ───────────────────────────────────────────
   useEffect(() => {
@@ -248,7 +248,7 @@ const AdminDashboard = () => {
       setLoadingGraph(true);
       try {
         const data = await getAttendanceByDateRange(weekDates.start, weekDates.end);
-        setChartRawData(Array.isArray(data) ? data :[]);
+        setChartRawData(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching attendance graph data:", error);
         setChartRawData([]);
@@ -262,15 +262,15 @@ const AdminDashboard = () => {
   // ── Chart Data Processing ────────────────────────────────────────────────
   const weeklyChartData = useMemo(() => {
     const totalActive = activeEmployees.length || 1;
-    const data =[];
-    
+    const data = [];
+
     // Normalize "Today" to midnight for comparison
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     // Strictly use 7 days for 'week' mode to avoid 8th day
-    const iterations = viewMode === 'week' 
-      ? 7 
+    const iterations = viewMode === 'week'
+      ? 7
       : Math.ceil((weekDates.endDateObj - weekDates.startDateObj) / (1000 * 3600 * 24)) + 1;
 
     const startObj = new Date(weekDates.startDateObj);
@@ -278,9 +278,9 @@ const AdminDashboard = () => {
     for (let i = 0; i < iterations; i++) {
       const loopDate = new Date(startObj);
       loopDate.setDate(startObj.getDate() + i);
-      
+
       const loopDateNormalized = new Date(loopDate);
-      loopDateNormalized.setHours(0,0,0,0);
+      loopDateNormalized.setHours(0, 0, 0, 0);
 
       const offset = loopDate.getTimezoneOffset() * 60000;
       const dateStr = new Date(loopDate.getTime() - offset).toISOString().slice(0, 10);
@@ -291,33 +291,33 @@ const AdminDashboard = () => {
 
       // Check if date is in future (Don't show bars)
       if (loopDateNormalized > today) {
-         data.push({
-           name: dayName,
-           Present: 0,
-           Absent: 0 
-         });
-         continue;
+        data.push({
+          name: dayName,
+          Present: 0,
+          Absent: 0
+        });
+        continue;
       }
 
       // Count Present for this specific date
       let presentCount = 0;
       chartRawData.forEach(att => {
-         const attDate = att.date 
-           ? att.date.split("T")[0] 
-           : (att.punchIn ? new Date(att.punchIn).toISOString().split("T")[0] : null);
-         
-         if (attDate === dateStr && att.punchIn) {
-            // Ensure employee is active
-            if (activeEmployees.some(e => e.employeeId === att.employeeId)) {
-                presentCount++;
-            }
-         }
+        const attDate = att.date
+          ? att.date.split("T")[0]
+          : (att.punchIn ? new Date(att.punchIn).toISOString().split("T")[0] : null);
+
+        if (attDate === dateStr && att.punchIn) {
+          // Ensure employee is active
+          if (activeEmployees.some(e => e.employeeId === att.employeeId)) {
+            presentCount++;
+          }
+        }
       });
 
       // Calculate Leaves for this date
-      const onLeaveCount = allLeaves.filter(l => 
-        l.status === 'Approved' && 
-        dateStr >= l.from && 
+      const onLeaveCount = allLeaves.filter(l =>
+        l.status === 'Approved' &&
+        dateStr >= l.from &&
         dateStr <= l.to
       ).length;
 
@@ -332,7 +332,7 @@ const AdminDashboard = () => {
     }
 
     return data;
-  },[chartRawData, activeEmployees, allLeaves, weekDates, viewMode]);
+  }, [chartRawData, activeEmployees, allLeaves, weekDates, viewMode]);
 
   // ── Other Derived Stats (Today) ──────────────────────────────────────────
 
@@ -343,7 +343,7 @@ const AdminDashboard = () => {
     () => todayAttendance.filter((a) => !!a.punchIn),
     [todayAttendance]
   );
-  const presentIds = useMemo(() => new Set(todayAttendance.map((a) => a.employeeId)),[todayAttendance]);
+  const presentIds = useMemo(() => new Set(todayAttendance.map((a) => a.employeeId)), [todayAttendance]);
 
   // Today Leaves List
   const onLeaveTodayList = useMemo(() => {
@@ -374,7 +374,7 @@ const AdminDashboard = () => {
     return activeEmployees.filter(
       (e) => !presentIds.has(e.employeeId) && !onLeaveIds.has(e.employeeId)
     ).length;
-  },[activeEmployees, presentIds, onLeaveIds]);
+  }, [activeEmployees, presentIds, onLeaveIds]);
 
   // Total Pending Count
   const totalPendingLeavesCount = useMemo(() => {
@@ -397,7 +397,7 @@ const AdminDashboard = () => {
             dateLabel: `${l.leaveType || "Leave"}, ${formatLeaveDate(l.from)}`,
           };
         })
-        .slice(0, 4),[allLeaves, empMap]
+        .slice(0, 4), [allLeaves, empMap]
   );
 
   // Working Remotely
@@ -413,7 +413,7 @@ const AdminDashboard = () => {
           role,
         };
       });
-  },[todayPresent, employeeWorkModes, empMap]);
+  }, [todayPresent, employeeWorkModes, empMap]);
 
   // Birthdays
   const { todayBirthdays, upcomingBirthdays } = useMemo(() => {
@@ -471,12 +471,12 @@ const AdminDashboard = () => {
       name: dept,
       value: counts[dept], // Recharts Pie expects 'value'
     }));
-  },[activeEmployees]);
+  }, [activeEmployees]);
 
   const totalEmployeesCount = activeEmployees.length || 1; // Safely divide by this
 
   // Extended Color Palette for dynamic departments
-  const COLORS =[
+  const COLORS = [
     "#4f46e5", // Indigo
     "#0ea5e9", // Sky
     "#10b981", // Emerald
@@ -507,11 +507,11 @@ const AdminDashboard = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
 
-    <div 
+    <div
       className="relative w-full font-sans text-gray-800 overflow-hidden flex flex-col"
       style={{ height: "calc(100vh - 70px)" }} // Adjust this 70px offset if your layout header is taller/shorter
     >
-      
+
       {/* ================= INJECT CUSTOM CSS FOR SCROLLBAR ================= */}
       <style>{`
         /* Custom nice scrollbar for the internal content container */
@@ -532,9 +532,9 @@ const AdminDashboard = () => {
 
       {/* ================= MAIN CONTENT (Internally Scrollable Area) ================= */}
       <div className="relative z-10 w-full h-full overflow-y-auto p-6 pb-20 internal-scroll">
-        
+
         {/* 1. TOP STATS CARDS */}
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Employees */}
           <div className="relative bg-blue-500 rounded-[20px] p-5 shadow-lg overflow-hidden h-[130px] flex flex-col justify-between transition-transform hover:scale-[1.02]">
             <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white opacity-10"></div>
@@ -551,8 +551,8 @@ const AdminDashboard = () => {
           </div>
 
           {/* Present - Clickable (UPDATED ROUTE) */}
-          <Link 
-            to="/attendance" 
+          <Link
+            to="/admin/today-overview"
             className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-blue-200 cursor-pointer"
           >
             <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-xl">
@@ -565,8 +565,8 @@ const AdminDashboard = () => {
           </Link>
 
           {/* Absent - Clickable (UPDATED ROUTE) */}
-          <Link 
-            to="/attendance" 
+          <Link
+            to="/admin/today-overview"
             className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-red-100 cursor-pointer"
           >
             <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
@@ -592,16 +592,26 @@ const AdminDashboard = () => {
 
         {/* 2. CHARTS SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          
+
           {/* Attendance Graph (Dynamic Week/Month) */}
           <div className="lg:col-span-2 bg-[#111C44] rounded-[24px] p-6 shadow-xl flex flex-col">
-            
+
             {/* Header & Controls */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-              <h3 className="text-white font-bold text-lg">
-                {viewMode === 'week' ? "Weekly Attendance" : "Monthly Attendance"}
-              </h3>
-              
+              <div className="flex flex-col">
+                <h3 className="text-white font-bold text-lg">
+                  {viewMode === 'week' ? "Weekly Attendance" : "Monthly Attendance"}
+                </h3>
+                {/* Updated: Peak Day/Date Logic */}
+                {!loadingGraph && weeklyChartData.length > 0 && (
+                  <p className="text-[#39B8FF] text-[10px] font-bold uppercase tracking-wider mt-1">
+                    Peak {viewMode === 'week' ? "Day" : "Date"}: {
+                      weeklyChartData.reduce((prev, current) => (prev.Present >= current.Present) ? prev : current).name
+                    }
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center gap-2 md:gap-4">
                 {/* View Toggle */}
                 <select
@@ -623,7 +633,7 @@ const AdminDashboard = () => {
                       <FaChevronLeft size={10} />
                     </button>
                     <span className="text-white text-[10px] min-w-[120px] text-center font-medium">
-                       {formatWeekRange(weekDates.start, weekDates.end)}
+                      {formatWeekRange(weekDates.start, weekDates.end)}
                     </span>
                     <button
                       onClick={() => setCurrentWeek(currentWeek + 1)}
@@ -633,9 +643,9 @@ const AdminDashboard = () => {
                       <FaChevronRight size={10} />
                     </button>
                     {currentWeek !== 0 && (
-                       <button onClick={() => setCurrentWeek(0)} className="ml-1 p-1.5 text-indigo-400 hover:text-indigo-300" title="Reset to Current Week">
-                          <FaSyncAlt size={10} />
-                       </button>
+                      <button onClick={() => setCurrentWeek(0)} className="ml-1 p-1.5 text-indigo-400 hover:text-indigo-300" title="Reset to Current Week">
+                        <FaSyncAlt size={10} />
+                      </button>
                     )}
                   </div>
                 ) : (
@@ -661,69 +671,73 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-
+x
             {/* Chart Area */}
             <div className="h-[250px] w-full">
               {loadingGraph ? (
-                 <div className="flex items-center justify-center h-full text-white opacity-50 text-sm">Loading Data...</div>
+                <div className="flex items-center justify-center h-full text-white opacity-50 text-sm">Loading Data...</div>
               ) : weeklyChartData.length === 0 ? (
-                 <div className="flex items-center justify-center h-full text-white opacity-50 text-sm">No data available</div>
+                <div className="flex items-center justify-center h-full text-white opacity-50 text-sm">No data available</div>
               ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyChartData} barGap={4}>
-                  <defs>
-                    <linearGradient id="pGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#86DBFF" />
-                      <stop offset="100%" stopColor="#E0F7FF" />
-                    </linearGradient>
-                    <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#AD6DFF" />
-                      <stop offset="100%" stopColor="#7B2CFF" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="rgba(255,255,255,0.1)"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#fff", fontSize: 10 }}
-                    dy={10}
-                    interval={viewMode === 'month' ? 2 : 0} 
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#fff", fontSize: 10 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    contentStyle={{
-                      background: "#111C44",
-                      border: "none",
-                      color: "#fff",
-                      fontSize: "12px",
-                      borderRadius: "8px",
-                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)"
-                    }}
-                  />
-                  <Bar
-                    dataKey="Present"
-                    fill="url(#pGrad)"
-                    radius={[4, 4, 4, 4]}
-                    barSize={viewMode === 'month' ? 6 : 12}
-                  />
-                  <Bar
-                    dataKey="Absent"
-                    fill="url(#aGrad)"
-                    radius={[4, 4, 4, 4]}
-                    barSize={viewMode === 'month' ? 6 : 12}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyChartData} barGap={4}>
+                    <defs>
+                      <linearGradient id="pGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#86DBFF" />
+                        <stop offset="100%" stopColor="#E0F7FF" />
+                      </linearGradient>
+                      <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#AD6DFF" />
+                        <stop offset="100%" stopColor="#7B2CFF" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="rgba(255,255,255,0.1)"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#fff", fontSize: 10 }}
+                      dy={10}
+                      interval={viewMode === 'month' ? 2 : 0}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#fff", fontSize: 10 }}
+                    />
+
+                    {/* UPDATED: Added itemSorter to show Present first */}
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                      itemSorter={(item) => (item.dataKey === 'Present' ? -1 : 1)}
+                      contentStyle={{
+                        background: "#111C44",
+                        border: "none",
+                        color: "#fff",
+                        fontSize: "12px",
+                        borderRadius: "8px",
+                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)"
+                      }}
+                    />
+
+                    <Bar
+                      dataKey="Present"
+                      fill="url(#pGrad)"
+                      radius={[4, 4, 4, 4]}
+                      barSize={viewMode === 'month' ? 6 : 12}
+                    />
+                    <Bar
+                      dataKey="Absent"
+                      fill="url(#aGrad)"
+                      radius={[4, 4, 4, 4]}
+                      barSize={viewMode === 'month' ? 6 : 12}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               )}
             </div>
           </div>
@@ -768,12 +782,12 @@ const AdminDashboard = () => {
                     : departmentData[activeIndex].name}
                 </span>
               </div>
-              
+
               {/* Dynamic Legend */}
               <div className="absolute top-0 right-0 text-right space-y-1 h-[180px] overflow-y-auto pr-2 custom-scrollbar internal-scroll">
                 <div>
-                   <p className="text-xs font-bold text-[#2B3674]">Total</p>
-                   <p className="text-[10px] text-gray-400">{activeEmployees.length} members</p>
+                  <p className="text-xs font-bold text-[#2B3674]">Total</p>
+                  <p className="text-[10px] text-gray-400">{activeEmployees.length} members</p>
                 </div>
                 {departmentData.map((dept, idx) => (
                   <div key={idx}>
@@ -789,26 +803,26 @@ const AdminDashboard = () => {
 
             {/* Dynamic Percentage Bar */}
             <div className="mt-4 bg-[#F4F7FE] rounded-full h-4 w-full flex overflow-hidden">
-               {departmentData.map((dept, idx) => {
-                 const percentage = ((dept.value / totalEmployeesCount) * 100).toFixed(0);
-                 if(percentage === "0") return null;
-                 return (
-                    <div 
-                      key={idx}
-                      className="flex items-center justify-center text-[8px] text-white font-bold transition-all duration-300"
-                      style={{ 
-                        width: `${percentage}%`, 
-                        backgroundColor: COLORS[idx % COLORS.length] 
-                      }}
-                      title={`${dept.name}: ${percentage}%`}
-                    >
-                      {percentage}%
-                    </div>
-                 );
-               })}
+              {departmentData.map((dept, idx) => {
+                const percentage = ((dept.value / totalEmployeesCount) * 100).toFixed(0);
+                if (percentage === "0") return null;
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-center text-[8px] text-white font-bold transition-all duration-300"
+                    style={{
+                      width: `${percentage}%`,
+                      backgroundColor: COLORS[idx % COLORS.length]
+                    }}
+                    title={`${dept.name}: ${percentage}%`}
+                  >
+                    {percentage}%
+                  </div>
+                );
+              })}
             </div>
           </div>
-          
+
         </div>
 
         {/* 3. MAIN CONTENT GRID */}
@@ -882,11 +896,10 @@ const AdminDashboard = () => {
                           </>
                         ) : (
                           <span
-                            className={`text-xs font-bold px-3 py-1 rounded-full ${
-                              item.status === "Approved"
+                            className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === "Approved"
                                 ? "bg-[#E6F9F3] text-[#05CD99]"
                                 : "bg-[#FEEFEE] text-[#EE5D50]"
-                            }`}
+                              }`}
                           >
                             {item.status}
                           </span>

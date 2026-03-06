@@ -1195,7 +1195,7 @@ const EmployeeDashboard = () => {
       )}
 
       {/* Profile Section - SaaS Glassmorphism style */}
-      <div className="bg-white/60 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-6 mb-8 flex flex-col md:flex-row items-center gap-6 relative z-10 overflow-hidden">
+      <div className="bg-white/60 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-6 mb-8 flex flex-col md:flex-row items-center gap-6 relative z-10 overflow-visible">
         <div className="flex flex-col items-center">
           <img 
             src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} 
@@ -1328,7 +1328,7 @@ const EmployeeDashboard = () => {
       </div>
 
       {/* ✨ FIX: Screen Effect applied here for the Attendance Table */}
-      <div className="rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white mb-8 animate-fade-in">
+      <div className="rounded-2xl shadow-lg border border-gray-200 relative bg-white mb-8 animate-fade-in">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-white/40">
           <div className="flex items-center gap-3">
              <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FaRegClock size={18} /></div>
