@@ -1,8 +1,9 @@
 // --- START OF FILE AdminNotices.jsx ---
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useContext } from "react";
 import { getAllNoticesForAdmin, addNotice, getEmployees, deleteNoticeById, updateNotice, sendAdminReplyWithImage } from "../api";
 import api from "../api";
+import { AuthContext } from "../context/AuthContext";
 import Swal from 'sweetalert2';
 import {
   FaEdit, FaTrash, FaPlus, FaTimes, FaSearch, FaCheck,
@@ -40,9 +41,12 @@ const getSecureUrl = (url) => {
 
 const AdminNotices = () => {
   // --- STATE ---
+  const { user } = useContext(AuthContext); // current admin/employee user
   const initialFormState = { title: "", description: "", recipients: [], sendTo: 'ALL', selectedGroupId: null };
   const [noticeData, setNoticeData] = useState(initialFormState);
   const [notices, setNotices] = useState([]);
+  const [isLoadingNotices, setIsLoadingNotices] = useState(true);
+  const initialLoadRef = useRef(true); // track first-time fetch
   const [employees, setEmployees] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,6 +62,9 @@ const AdminNotices = () => {
   const DEFAULT_MEETING_LINK = "https://meet.google.com/tsn-vrih-zvx";
   const [isMeetingMode, setIsMeetingMode] = useState(false);
   const [meetingParams, setMeetingParams] = useState({ date: "", time: "" });
+
+  // flag for manual edits to the description during meeting mode
+  const [meetingDescManual, setMeetingDescManual] = useState(false);
 
   // ✅ NEW: Meeting Link State
   const [meetingLink, setMeetingLink] = useState(DEFAULT_MEETING_LINK);
@@ -230,6 +237,8 @@ const spacePressedRef = useRef(false);
 
   // --- API CALLS ---
   const fetchNotices = useCallback(async () => {
+    // only show full loader on first fetch
+    if (initialLoadRef.current) setIsLoadingNotices(true);
     try {
       const data = await getAllNoticesForAdmin();
       if (!Array.isArray(data)) return;
@@ -282,6 +291,11 @@ const spacePressedRef = useRef(false);
 
     } catch (error) {
       console.error("Error fetching notices:", error);
+    } finally {
+      if (initialLoadRef.current) {
+        setIsLoadingNotices(false);
+        initialLoadRef.current = false;
+      }
     }
   }, [repliesNotice, viewedByNotice, sendingReply]); // ✅ Added sendingReply to deps
 
@@ -417,6 +431,10 @@ const spacePressedRef = useRef(false);
   // --- HANDLERS ---
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // mark manual description edits when in meeting mode
+    if (isMeetingMode && name === 'description') {
+      setMeetingDescManual(true);
+    }
     setNoticeData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -453,8 +471,17 @@ const spacePressedRef = useRef(false);
         });
         setMeetingLink(detectedLink);
         setIsLinkEditable(false);
+
+        // determine if the existing description matches the auto template
+        const generated = `Dear Employee,
+
+You are requested to join the scheduled meeting ${dateMatch[1]} at ${timeMatch[1]} as per the shared details. Please ensure you join on time and stay available for discussion.
+
+Meeting Link: ${detectedLink}`;
+        setMeetingDescManual(notice.description.trim() !== generated.trim());
       } else {
         setIsMeetingMode(false);
+        setMeetingDescManual(false);
       }
 
       const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
@@ -489,10 +516,14 @@ const spacePressedRef = useRef(false);
     setMeetingLink(DEFAULT_MEETING_LINK);
     setIsLinkEditable(false);
     setIsMeetingMode(true);
+    setMeetingDescManual(false); // reset manual flag when starting fresh
     setIsModalOpen(true);
   };
 
   const updateMeetingDescription = (date, time, link) => {
+    // if the user has manually edited the description, don't stomp their changes
+    if (meetingDescManual) return;
+
     const desc = `Dear Candidate,
 
 You are requested to join the scheduled meeting ${date || '{date}'} at ${time || '{time}'} as per the shared details. Please ensure you join on time and stay available for discussion.
@@ -583,15 +614,8 @@ Meeting Link: ${link || '{link}'}`;
         finalRecipients = noticeData.recipients;
       }
 
-      // Ensure description is up to date for meetings
+      // description already kept current by state; do not overwrite so manual edits persist
       let finalDescription = noticeData.description;
-      if (isMeetingMode) {
-        finalDescription = `Dear Candidate,
-
-You are requested to join the scheduled meeting ${meetingParams.date} at ${meetingParams.time} as per the shared details. Please ensure you join on time and stay available for discussion.
-
-Meeting Link: ${meetingLink}`;
-      }
 
       if (editingNoticeId) {
         const updatePayload = {
@@ -920,7 +944,12 @@ Meeting Link: ${meetingLink}`;
 
       {/* NOTICE FEED */}
       <div className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
-        {notices.length === 0 ? (
+        {isLoadingNotices && notices.length === 0 ? (
+          <div className="text-center py-24">
+
+            <p className="mt-4 text-gray-600">Loading notices...</p>
+          </div>
+        ) : notices.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-300 mx-4"><div className="text-5xl mb-4 grayscale opacity-30">📯</div><p className="text-slate-400 text-lg font-medium">No active notices.</p><p className="text-slate-300 text-sm">Create one to notify your team.</p></div>
         ) : (
           notices.map((notice, index) => {
@@ -964,7 +993,7 @@ Meeting Link: ${meetingLink}`;
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-slate-200">
-                          By: {notice.createdBy?.name || "System"} ({notice.createdBy?.employeeId || "Admin"})
+                          By: {notice.createdBy?.name || user?.name || "System"} ({notice.createdBy?.employeeId || user?.employeeId || "Admin"})
                         </span>
                         {isMeeting && (
                           <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-rose-200"><FaVideo /> Meeting</span>

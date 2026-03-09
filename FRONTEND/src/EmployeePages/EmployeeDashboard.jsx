@@ -56,10 +56,10 @@ import api, {
   getProfilePic,
   deleteProfilePic,
   getShiftByEmployeeId,
-  getHolidays, 
+  getHolidays,
   getLeaveRequestsForEmployee,
 } from "../api";
-import { useNavigate, Link } from "react-router-dom"; 
+import { useNavigate, Link } from "react-router-dom";
 import ImageCropModal from "./ImageCropModal";
 
 // ✅ Registering Chart Components
@@ -91,7 +91,7 @@ const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
 const formatDateDDMMYYYY = (dateString) => {
   if (!dateString) return "--";
   const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB"); 
+  return date.toLocaleDateString("en-GB");
 };
 
 // ✅ Helper: Format Date for Comparison (YYYY-MM-DD) - Local Time
@@ -106,32 +106,32 @@ const toISODateString = (date) => {
 const EmployeeDashboard = () => {
   const { user } = useContext(AuthContext);
   const { notices } = useContext(NoticeContext);
-  
-  // ✅ OPTIMIZATION: Split loading state
-  const [loading, setLoading] = useState(true); 
-  const [loadingTeamData, setLoadingTeamData] = useState(true); 
 
-  const[attendance, setAttendance] = useState([]);
+  // ✅ OPTIMIZATION: Split loading state
+  const [loading, setLoading] = useState(true);
+  const [loadingTeamData, setLoadingTeamData] = useState(true);
+
+  const [attendance, setAttendance] = useState([]);
   const [todayLog, setTodayLog] = useState(null);
-  const[profileImage, setProfileImage] = useState(
+  const [profileImage, setProfileImage] = useState(
     sessionStorage.getItem("profileImage") || null
   );
   const [uploadingImage, setUploadingImage] = useState(false);
-  const[punchStatus, setPunchStatus] = useState("IDLE");
+  const [punchStatus, setPunchStatus] = useState("IDLE");
   const [shiftTimings, setShiftTimings] = useState(null);
 
   // ✅ Office Settings State
   const [officeConfig, setOfficeConfig] = useState(null);
 
   // ✅ NEW: Today's Birthdays and On Leave Today States
-  const[todaysBirthdays, setTodaysBirthdays] = useState([]);
-  const[onLeaveToday, setOnLeaveToday] = useState([]);
-  
+  const [todaysBirthdays, setTodaysBirthdays] = useState([]);
+  const [onLeaveToday, setOnLeaveToday] = useState([]);
+
   // ✅ NEW: Remote Workers & Leave Balance States
-  const[remoteWorkers, setRemoteWorkers] = useState([]);
-  const [leaveBalance, setLeaveBalance] = useState({ available: 1, taken: 0 }); 
-  const[showAllRemoteEmp, setShowAllRemoteEmp] = useState(false); 
-  
+  const [remoteWorkers, setRemoteWorkers] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState({ available: 1, taken: 0 });
+  const [showAllRemoteEmp, setShowAllRemoteEmp] = useState(false);
+
   // ✅ NEW: Full Holidays and Leaves for Graph Accuracy
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -144,16 +144,16 @@ const EmployeeDashboard = () => {
 
   // ✅ Missed Punch Logic State
   const [missedPunchLog, setMissedPunchLog] = useState(null);
-  const [missedPunchRequestStatus, setMissedPunchRequestStatus] = useState(null); 
+  const [missedPunchRequestStatus, setMissedPunchRequestStatus] = useState(null);
   const [showReqModal, setShowReqModal] = useState(false);
-  const[reqData, setReqData] = useState({ date: "", time: "", reason: "" });
-  const[reqLoading, setReqLoading] = useState(false);
+  const [reqData, setReqData] = useState({ date: "", time: "", reason: "" });
+  const [reqLoading, setReqLoading] = useState(false);
 
   // ✅ Late Correction State
-  const[showLateReqModal, setShowLateReqModal] = useState(false);
+  const [showLateReqModal, setShowLateReqModal] = useState(false);
   const [lateReqData, setLateReqData] = useState({ time: "", reason: "" });
   const [lateReqLoading, setLateReqLoading] = useState(false);
-  
+
   // ✅ NEW: Request Limit State
   const [requestLimit, setRequestLimit] = useState({ limit: 5, used: 0 });
 
@@ -161,12 +161,12 @@ const EmployeeDashboard = () => {
   const breakDropdownRef = useRef(null);
   const navigate = useNavigate();
 
-  const[showCropModal, setShowCropModal] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
   const [workedTime, setWorkedTime] = useState(0);
   const alarmPlayedRef = useRef(false);
 
-  const todayIso = new Date().toISOString().split("T")[0]; 
+  const todayIso = new Date().toISOString().split("T")[0];
 
   // --- Voice Feedback ---
   const speak = (text) => {
@@ -244,17 +244,17 @@ const EmployeeDashboard = () => {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
-  },[]);
+  }, []);
 
   // ✅ OPTIMIZED: Fetch all team data
   const fetchOptimizedTeamData = async () => {
     setLoadingTeamData(true);
     try {
-      const[
-        employeesRes, 
-        leavesRes, 
-        officeConfigRes, 
-        employeeModesRes, 
+      const [
+        employeesRes,
+        leavesRes,
+        officeConfigRes,
+        employeeModesRes,
         myLeavesRes
       ] = await Promise.all([
         api.get("/api/employees"),
@@ -264,19 +264,23 @@ const EmployeeDashboard = () => {
         api.get("/api/leaves", { params: { employeeId: user.employeeId } })
       ]);
 
-      const allEmployees = employeesRes.data || [];
-      const allLeaves = leavesRes.data ||[];
-      const configData = officeConfigRes.data;
-      setOfficeConfig(configData); 
-      
-      const empModes = employeeModesRes.data?.employees ||[];
-      const myLeaves = Array.isArray(myLeavesRes.data) ? myLeavesRes.data : (myLeavesRes.data?.leaves ||[]);
+      // ✅ FIX: Filter active employees immediately so they don't show in birthdays
+      const allEmployeesRaw = employeesRes.data || [];
+      const allEmployees = allEmployeesRaw.filter(emp => emp.isActive !== false);
 
-      // --- LOGIC 1: BIRTHDAYS ---
+      const allLeaves = leavesRes.data || [];
+      const configData = officeConfigRes.data;
+      setOfficeConfig(configData);
+
+      const empModes = employeeModesRes.data?.employees || [];
+      const myLeavesRaw = myLeavesRes.data;
+      const myLeaves = Array.isArray(myLeavesRaw) ? myLeavesRaw : (myLeavesRaw?.leaves || []);
+
       const today = new Date();
-      const todayMonth = today.getMonth() + 1; 
+      const todayMonth = today.getMonth() + 1;
       const todayDate = today.getDate();
 
+      // --- LOGIC 1: BIRTHDAYS (Active Only) ---
       const birthdays = allEmployees.filter(emp => {
         if (!emp.personalDetails?.dob) return false;
         const dob = new Date(emp.personalDetails.dob);
@@ -285,104 +289,64 @@ const EmployeeDashboard = () => {
         name: emp.name,
         employeeId: emp.employeeId,
         department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
-        role: emp.role || emp.experienceDetails?.[0]?.role || "N/A"
       }));
       setTodaysBirthdays(birthdays);
 
-      // --- LOGIC 2: ON LEAVE TODAY ---
+      // --- LOGIC 2: ON LEAVE TODAY (Active Only) ---
       const employeeMap = new Map();
       allEmployees.forEach(emp => {
         employeeMap.set(emp.employeeId, {
           name: emp.name,
           employeeId: emp.employeeId,
-          department: emp.department || emp.experienceDetails?.[0]?.department || "N/A",
-          role: emp.role || emp.experienceDetails?.[0]?.role || "N/A"
+          department: emp.department || "N/A",
         });
       });
 
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-
       const todayLeaves = allLeaves.filter(leave => {
         if (leave.status !== 'Approved') return false;
+        if (!employeeMap.has(leave.employeeId)) return false;
         const fromDate = new Date(leave.from);
         const toDate = new Date(leave.to);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(23, 59, 59, 999);
+        fromDate.setHours(0, 0, 0, 0); toDate.setHours(23, 59, 59, 999);
         return todayStart >= fromDate && todayStart <= toDate;
       });
 
       const onLeave = todayLeaves.map(leave => {
-        const empDetails = employeeMap.get(leave.employeeId) || {
-          name: leave.employeeName || "Unknown",
-          employeeId: leave.employeeId,
-          department: "N/A", role: "N/A"
-        };
-        return { ...empDetails, leaveType: leave.leaveType || "Casual", leaveReason: leave.reason };
+        const empDetails = employeeMap.get(leave.employeeId);
+        return { ...empDetails, leaveType: leave.leaveType || "Casual" };
       });
       setOnLeaveToday(Array.from(new Map(onLeave.map(item => [item.employeeId, item])).values()));
 
       // --- LOGIC 3: REMOTE WORKERS ---
       const currentGlobalMode = configData.globalWorkMode || 'WFO';
-      const currentDay = today.getDay();
-      
-      let remoteList =[];
+      let remoteList = [];
       empModes.forEach(emp => {
         const basicInfo = employeeMap.get(emp.employeeId);
-        if(!basicInfo) return;
-
-        let effectiveMode = currentGlobalMode;
-        if (emp.ruleType === "Permanent") {
-          effectiveMode = emp.config.permanentMode;
-        } else if (emp.ruleType === "Temporary" && emp.config.temporary) {
-          const from = new Date(emp.config.temporary.fromDate);
-          const to = new Date(emp.config.temporary.toDate);
-          from.setHours(0, 0, 0, 0);
-          to.setHours(23, 59, 59, 999);
-          if (todayStart >= from && todayStart <= to) effectiveMode = emp.config.temporary.mode;
-        } else if (emp.ruleType === "Recurring" && emp.config.recurring) {
-          if (emp.config.recurring.days.includes(currentDay)) effectiveMode = emp.config.recurring.mode;
-        }
-
-        if (effectiveMode === 'WFH') {
-          remoteList.push({
-            name: basicInfo.name,
-            employeeId: basicInfo.employeeId,
-            department: basicInfo.department || "N/A"
-          });
-        }
+        if (!basicInfo) return;
+        let mode = currentGlobalMode;
+        if (emp.ruleType === "Permanent") mode = emp.config.permanentMode;
+        if (mode === 'WFH') remoteList.push(basicInfo);
       });
       setRemoteWorkers(remoteList);
 
-      // --- LOGIC 4: LEAVE BALANCE ---
-      const currentMonth = today.getMonth();
-      const currentYear = today.getFullYear();
-      const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-      
-      const hasApprovedLeaveThisMonth = myLeaves.some(leave => {
-        if (leave.status !== 'Approved') return false;
-        const leaveFrom = new Date(leave.from);
-        return leaveFrom >= firstDayOfMonth;
-      });
-      
+      // Leave Balance Logic
       let totalDaysTaken = 0;
       myLeaves.forEach(leave => {
         if (leave.status === 'Approved') {
-          const leaveFrom = new Date(leave.from);
-          const leaveTo = new Date(leave.to);
-          if (leaveFrom >= firstDayOfMonth) {
-            const diffTime = Math.abs(leaveTo - leaveFrom);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            if (leave.halfDaySession && leave.from === leave.to) totalDaysTaken += 0.5;
-            else totalDaysTaken += diffDays;
+          const lFrom = new Date(leave.from);
+          if (lFrom >= new Date(today.getFullYear(), today.getMonth(), 1)) {
+            const diffDays = Math.ceil(Math.abs(new Date(leave.to) - lFrom) / 86400000) + 1;
+            totalDaysTaken += (leave.halfDaySession && leave.from === leave.to) ? 0.5 : diffDays;
           }
         }
       });
-      const available = hasApprovedLeaveThisMonth ? 0 : 1;
-      setLeaveBalance({ available, taken: totalDaysTaken, extra: Math.max(0, totalDaysTaken - 1) });
+      setLeaveBalance({ available: totalDaysTaken > 0 ? 0 : 1, taken: totalDaysTaken, extra: Math.max(0, totalDaysTaken - 1) });
 
     } catch (error) {
       console.error("Error fetching background data:", error);
     } finally {
+      // ✅ This block fixes the "Missing catch or finally" Vite error
       setLoadingTeamData(false);
     }
   };
@@ -397,20 +361,20 @@ const EmployeeDashboard = () => {
       console.error("Failed to load request limit", err);
       setRequestLimit({ limit: 5, used: 0 });
     }
-  },[]);
+  }, []);
 
   const loadHolidaysAndLeaves = useCallback(async (empId) => {
     try {
-        const[hRes, lRes] = await Promise.all([
-            getHolidays().catch(e => []),
-            getLeaveRequestsForEmployee(empId).catch(e =>[])
-        ]);
-        setHolidays(Array.isArray(hRes) ? hRes : (hRes.data ||[]));
-        setLeaves(Array.isArray(lRes) ? lRes : (lRes.data ||[]));
+      const [hRes, lRes] = await Promise.all([
+        getHolidays().catch(e => []),
+        getLeaveRequestsForEmployee(empId).catch(e => [])
+      ]);
+      setHolidays(Array.isArray(hRes) ? hRes : (hRes.data || []));
+      setLeaves(Array.isArray(lRes) ? lRes : (lRes.data || []));
     } catch (e) {
-        console.error("Failed to load holidays/leaves", e);
+      console.error("Failed to load holidays/leaves", e);
     }
-  },[]);
+  }, []);
 
   const loadShiftTimings = useCallback(async (empId) => {
     try {
@@ -428,18 +392,18 @@ const EmployeeDashboard = () => {
         isDefault: true
       });
     }
-  },[]);
+  }, []);
 
   const loadAttendance = useCallback(async (empId) => {
     try {
       const data = await getAttendanceForEmployee(empId);
-      const attendanceData = Array.isArray(data) ? data : (data.data ||[]);
+      const attendanceData = Array.isArray(data) ? data : (data.data || []);
       setAttendance(attendanceData);
       const todayStr = new Date().toISOString().split("T")[0];
       const todayEntry = attendanceData.find((d) => d.date === todayStr);
       setTodayLog(todayEntry || null);
     } catch (err) { console.error("Attendance fetch error:", err); }
-  },[]);
+  }, []);
 
   // ✅ UPDATED: Fetch request status from Backend (No localStorage)
   useEffect(() => {
@@ -453,17 +417,17 @@ const EmployeeDashboard = () => {
       if (prevLog && prevLog.punchIn && !prevLog.punchOut) {
         setMissedPunchLog(prevLog);
         setReqData(prev => ({ ...prev, date: yesterdayStr }));
-        
+
         // Fetch status dynamically from backend
         const fetchStatus = async () => {
           try {
             const { data } = await api.get("/api/punchoutreq/status", {
-               params: { employeeId: user.employeeId, date: yesterdayStr }
+              params: { employeeId: user.employeeId, date: yesterdayStr }
             });
             if (data.found) {
-               setMissedPunchRequestStatus(data.status);
+              setMissedPunchRequestStatus(data.status);
             } else {
-               setMissedPunchRequestStatus(null);
+              setMissedPunchRequestStatus(null);
             }
           } catch (error) {
             console.error("Failed to check request status:", error);
@@ -486,18 +450,18 @@ const EmployeeDashboard = () => {
           loadAttendance(user.employeeId),
           loadShiftTimings(user.employeeId),
           loadProfilePic(),
-          loadRequestLimit(user.employeeId), 
+          loadRequestLimit(user.employeeId),
         ]);
         setLoading(false);
 
-        fetchOptimizedTeamData(); 
+        fetchOptimizedTeamData();
         loadHolidaysAndLeaves(user.employeeId);
-      } else { 
-        setLoading(false); 
+      } else {
+        setLoading(false);
       }
     };
     bootstrap();
-  },[user, loadAttendance, loadShiftTimings, loadHolidaysAndLeaves, loadRequestLimit]); 
+  }, [user, loadAttendance, loadShiftTimings, loadHolidaysAndLeaves, loadRequestLimit]);
 
   const loadProfilePic = async () => {
     try {
@@ -520,7 +484,7 @@ const EmployeeDashboard = () => {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => { document.removeEventListener("mousedown", handleClickOutside); };
-  },[]);
+  }, []);
 
   const { name, email, phone, employeeId } = user || {};
   const latestExp = user?.experienceDetails?.[user.experienceDetails.length - 1];
@@ -593,9 +557,9 @@ const EmployeeDashboard = () => {
 
     if (empConfig.ruleType === "Recurring" && empConfig.recurring) {
       const currentDay = new Date().getDay();
-      const daysMap =["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+      const daysMap = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
       const modeText = empConfig.recurring.mode === "WFH" ? "Remote" : "Work From Office";
-      const sortedDays =[...(empConfig.recurring.days || [])].sort((a, b) => a - b);
+      const sortedDays = [...(empConfig.recurring.days || [])].sort((a, b) => a - b);
       const allDaysStr = sortedDays.map(d => daysMap[d]).join(", ");
 
       if (empConfig.recurring.days.includes(currentDay)) {
@@ -762,7 +726,7 @@ const EmployeeDashboard = () => {
           icon: "error",
           title: "Invalid Time",
           text: `Requested punch-out time must be after your actual punch-in time (${punchInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).`,
-          confirmButtonColor: "#3b82f6" 
+          confirmButtonColor: "#3b82f6"
         });
         return;
       }
@@ -780,7 +744,7 @@ const EmployeeDashboard = () => {
       };
       await api.post('/api/punchoutreq/create', payload);
       Swal.fire("Success", "Request sent successfully! Once approved, your record will be updated.", "success");
-      
+
       // Update state to Pending instantly
       setMissedPunchRequestStatus("Pending");
 
@@ -796,7 +760,7 @@ const EmployeeDashboard = () => {
 
   const handleLateRequestSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (requestLimit.limit - requestLimit.used <= 0) {
       Swal.fire({
         title: "Limit Reached",
@@ -833,16 +797,16 @@ const EmployeeDashboard = () => {
 
       setShowLateReqModal(false);
       setLateReqData({ time: "", reason: "" });
-      
+
       await loadAttendance(user.employeeId);
-      
+
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message;
-      
+
       if (err.response?.data?.limitReached) {
-        await loadRequestLimit(user.employeeId); 
+        await loadRequestLimit(user.employeeId);
       }
-      
+
       Swal.fire({
         title: "Submission Failed",
         text: errorMsg,
@@ -864,10 +828,10 @@ const EmployeeDashboard = () => {
         icon: "warning",
         confirmButtonColor: "#d33"
       });
-      return; 
+      return;
     }
 
-    setShowLateReqModal(true); 
+    setShowLateReqModal(true);
   };
 
   const handleImageSelect = (e) => {
@@ -919,7 +883,7 @@ const EmployeeDashboard = () => {
         todayLog?.isFinalPunchOut !== true &&
         todayLog?.adminPunchOut !== true &&
         todayLog?.workedStatus !== "FULL_DAY" &&
-        (todayLog?.sessions ||[]).length > 0;
+        (todayLog?.sessions || []).length > 0;
       return isOnBreak ? "Resume Work" : "Punch In";
     }
     return "Punch Out";
@@ -946,7 +910,7 @@ const EmployeeDashboard = () => {
     return `${h}h ${m}m`;
   };
 
-  const getDayNames = (dayNumbers =[]) => { const days =['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; return dayNumbers.map(day => days[day]).join(', ') || 'None'; };
+  const getDayNames = (dayNumbers = []) => { const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; return dayNumbers.map(day => days[day]).join(', ') || 'None'; };
 
   const getWorkedStatusBadge = () => {
     if (!todayLog?.punchIn) return { label: "--", color: "text-gray-500" };
@@ -995,9 +959,9 @@ const EmployeeDashboard = () => {
         {status === "LATE" && isRejected && (
           <span className="text-[10px] text-red-600 font-semibold mt-0.5">Request Rejected</span>
         )}
-         {status === "LATE" && !isPending && !isRejected && (
+        {status === "LATE" && !isPending && !isRejected && (
           <button
-            onClick={handleOpenLateRequestModal} 
+            onClick={handleOpenLateRequestModal}
             className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold mt-1"
           >
             Request On-Time Login ({requestLimit.limit - requestLimit.used} left)
@@ -1009,7 +973,7 @@ const EmployeeDashboard = () => {
 
   const shouldShowCorrectionButton = () => {
     if (!todayLog?.punchIn) return false;
-    let status = "ON_TIME"; 
+    let status = "ON_TIME";
 
     if (shiftTimings) {
       const punchTime = new Date(todayLog.punchIn);
@@ -1036,8 +1000,8 @@ const EmployeeDashboard = () => {
 
     const currentWorked = Math.max(0, workedTime);
     const remaining = Math.max(0, targetSeconds - currentWorked);
-    return { labels: ["Worked", "Pending"], datasets:[{ data: [currentWorked, remaining], backgroundColor:["#3b82f6", "#e5e7eb"], borderWidth: 0, cutout: "75%", circumference: 180, rotation: -90, },], rawValues: { currentWorked, remaining, targetSeconds } };
-  },[workedTime, shiftTimings]);
+    return { labels: ["Worked", "Pending"], datasets: [{ data: [currentWorked, remaining], backgroundColor: ["#3b82f6", "#e5e7eb"], borderWidth: 0, cutout: "75%", circumference: 180, rotation: -90, },], rawValues: { currentWorked, remaining, targetSeconds } };
+  }, [workedTime, shiftTimings]);
 
   const commonChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true } } };
   const meterChartOptions = { ...commonChartOptions, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (context) { const val = context.raw; const h = Math.floor(val / 3600); const m = Math.floor((val % 3600) / 60); return `${context.label}: ${h}h ${m}m`; } } } } };
@@ -1045,12 +1009,12 @@ const EmployeeDashboard = () => {
   const leaveBarData = useMemo(() => {
     const adminFullDayHours = shiftTimings?.fullDayHours || 9;
     const adminHalfDayHours = shiftTimings?.halfDayHours || 4.5;
-    const weeklyOffDays = shiftTimings?.weeklyOffDays || [0]; 
+    const weeklyOffDays = shiftTimings?.weeklyOffDays || [0];
 
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
-    
+
     const currentDayDate = today.getDate();
 
     let fullDayCount = 0;
@@ -1059,30 +1023,30 @@ const EmployeeDashboard = () => {
 
     for (let day = 1; day <= currentDayDate; day++) {
       const checkDate = new Date(currentYear, currentMonth, day);
-      const checkDateISO = toISODateString(checkDate); 
+      const checkDateISO = toISODateString(checkDate);
       const isToday = (day === currentDayDate);
       const dayOfWeek = checkDate.getDay();
 
       const record = attendance.find((a) => a.date === checkDateISO);
 
       const isHoliday = holidays.some(h => {
-        const start = new Date(h.startDate); start.setHours(0,0,0,0);
-        const end = new Date(h.endDate || h.startDate); end.setHours(23,59,59,999);
+        const start = new Date(h.startDate); start.setHours(0, 0, 0, 0);
+        const end = new Date(h.endDate || h.startDate); end.setHours(23, 59, 59, 999);
         const check = new Date(currentYear, currentMonth, day);
         return check >= start && check <= end;
       });
 
       const isLeave = leaves.some(l => {
-        if(l.status !== 'Approved') return false;
-        const start = new Date(l.from); start.setHours(0,0,0,0);
-        const end = new Date(l.to); end.setHours(23,59,59,999);
+        if (l.status !== 'Approved') return false;
+        const start = new Date(l.from); start.setHours(0, 0, 0, 0);
+        const end = new Date(l.to); end.setHours(23, 59, 59, 999);
         const check = new Date(currentYear, currentMonth, day);
         return check >= start && check <= end;
       });
 
       if (record && record.punchIn) {
         let workedHours = 0;
-        
+
         if (record.punchOut) {
           const start = new Date(record.punchIn);
           const end = new Date(record.punchOut);
@@ -1102,26 +1066,26 @@ const EmployeeDashboard = () => {
         }
 
       } else {
-        if (isToday) continue; 
-        if (weeklyOffDays.includes(dayOfWeek)) continue; 
-        if (isHoliday) continue; 
-        if (isLeave) continue; 
+        if (isToday) continue;
+        if (weeklyOffDays.includes(dayOfWeek)) continue;
+        if (isHoliday) continue;
+        if (isLeave) continue;
         absentCount++;
       }
     }
 
     return {
-      labels:["Full Day", "Half Day", "Absent"],
-      datasets:[
+      labels: ["Full Day", "Half Day", "Absent"],
+      datasets: [
         {
           label: "Days",
-          data:[fullDayCount, halfDayCount, absentCount],
-          backgroundColor:["#22c55e", "#facc15", "#ef4444"],
+          data: [fullDayCount, halfDayCount, absentCount],
+          backgroundColor: ["#22c55e", "#facc15", "#ef4444"],
           borderRadius: 6,
         },
       ],
     };
-  },[attendance, shiftTimings, holidays, leaves]);
+  }, [attendance, shiftTimings, holidays, leaves]);
 
   if (loading) return <div className="p-8 text-center text-lg font-semibold animate-pulse text-gray-500">Loading Dashboard...</div>;
   if (!user) return <div className="p-8 text-center text-red-600 font-semibold">Could not load employee data.</div>;
@@ -1145,7 +1109,7 @@ const EmployeeDashboard = () => {
 
   const isGlobalWFH = officeConfig?.globalWorkMode === 'WFH';
 
-  const gradients =[
+  const gradients = [
     "from-blue-400 to-indigo-500",
     "from-pink-400 to-rose-500",
     "from-emerald-400 to-teal-500",
@@ -1167,21 +1131,21 @@ const EmployeeDashboard = () => {
                 You did not punch out on <b>{formatDateDDMMYYYY(missedPunchLog.date)}</b>.
                 You cannot Punch In for today until this is resolved.
               </p>
-              
+
               {/* ✅ NEW: Pending Status Logic */}
               {missedPunchRequestStatus === 'Pending' && (
-                 <span className="text-orange-600 font-bold text-xs bg-orange-100 border border-orange-200 px-2 py-1 rounded mt-2 inline-flex items-center gap-1">
-                   <FaRegClock /> Request Pending Approval
-                 </span>
+                <span className="text-orange-600 font-bold text-xs bg-orange-100 border border-orange-200 px-2 py-1 rounded mt-2 inline-flex items-center gap-1">
+                  <FaRegClock /> Request Pending Approval
+                </span>
               )}
               {missedPunchRequestStatus === 'Rejected' && (
-                 <span className="text-red-600 font-bold text-xs bg-red-100 border border-red-200 px-2 py-1 rounded mt-2 inline-block">
-                   Request Rejected - Please submit again
-                 </span>
+                <span className="text-red-600 font-bold text-xs bg-red-100 border border-red-200 px-2 py-1 rounded mt-2 inline-block">
+                  Request Rejected - Please submit again
+                </span>
               )}
             </div>
           </div>
-          
+
           {/* ✅ NEW: Button Logic based on Status */}
           {missedPunchRequestStatus !== 'Pending' && (
             <button
@@ -1197,30 +1161,30 @@ const EmployeeDashboard = () => {
       {/* Profile Section - SaaS Glassmorphism style */}
       <div className="bg-white/60 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-6 mb-8 flex flex-col md:flex-row items-center gap-6 relative z-10 overflow-visible">
         <div className="flex flex-col items-center">
-          <img 
-            src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`} 
-            alt="Profile" 
-            className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover relative z-0" 
+          <img
+            src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`}
+            alt="Profile"
+            className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover relative z-0"
           />
-          
-          <div className="flex justify-center gap-2 -mt-5 relative z-10"> 
-            <label 
-              htmlFor="profile-upload" 
+
+          <div className="flex justify-center gap-2 -mt-5 relative z-10">
+            <label
+              htmlFor="profile-upload"
               className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg border-2 border-white ${uploadingImage ? "opacity-50" : ""}`}
-            > 
-              {uploadingImage ? <div className="animate-spin text-sm">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />} 
+            >
+              {uploadingImage ? <div className="animate-spin text-sm">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />}
             </label>
 
             {profileImage && (
-              <button 
-                onClick={handleDeleteProfilePic} 
+              <button
+                onClick={handleDeleteProfilePic}
                 className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg border-2 border-white"
-              > 
-                <FaTrash size={14} /> 
+              >
+                <FaTrash size={14} />
               </button>
             )}
           </div>
-          
+
           <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
         </div>
 
@@ -1260,7 +1224,7 @@ const EmployeeDashboard = () => {
               <div className="flex gap-2 items-start flex-wrap justify-end">
                 {showCorrectionBtn && (
                   <button
-                    onClick={handleOpenLateRequestModal} 
+                    onClick={handleOpenLateRequestModal}
                     className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-xl shadow-sm hover:bg-red-50 transition-all text-sm font-bold animate-pulse-slow"
                   >
                     <div className="flex flex-col items-start leading-tight">
@@ -1279,7 +1243,7 @@ const EmployeeDashboard = () => {
                     <button onClick={() => setIsBreakDropdownOpen(!isBreakDropdownOpen)} className="flex items-center gap-2 bg-white text-orange-700 border border-orange-200 px-4 py-2 rounded-xl shadow-sm hover:bg-orange-50 transition-all text-sm font-bold h-[42px]"> <FaHistory /> Breaks & Sessions <FaChevronDown className={`transform transition-transform ${isBreakDropdownOpen ? 'rotate-180' : ''}`} size={12} /> </button>
                     {isBreakDropdownOpen && (
                       <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 z-50 p-5 animate-fade-in-down"
-                            onClick={(e) => e.stopPropagation()}>
+                        onClick={(e) => e.stopPropagation()}>
                         <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 uppercase text-[11px] tracking-wider">Today's Sessions</h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
                           {todayLog.sessions.map((sess, idx) => (
@@ -1331,8 +1295,8 @@ const EmployeeDashboard = () => {
       <div className="rounded-2xl shadow-lg border border-gray-200 relative bg-white mb-8 animate-fade-in">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-white/40">
           <div className="flex items-center gap-3">
-             <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FaRegClock size={18} /></div>
-             <h2 className="font-bold text-lg text-gray-800">Daily Attendance</h2>
+            <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FaRegClock size={18} /></div>
+            <h2 className="font-bold text-lg text-gray-800">Daily Attendance</h2>
           </div>
           <button onClick={() => navigate("/employee/my-attendence")} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition shadow-sm">View History →</button>
         </div>
@@ -1363,8 +1327,8 @@ const EmployeeDashboard = () => {
                 </td>
                 <td className="px-6 py-4 font-mono font-bold text-blue-600">{todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}</td>
                 <td className="px-6 py-4">{displayLoginStatusContent}</td>
-                <td className="px-6 py-4"> 
-                  {todayLog?.punchIn ? (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border shadow-sm ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span>) : (<span className="text-gray-400 font-medium">--</span>)} 
+                <td className="px-6 py-4">
+                  {todayLog?.punchIn ? (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border shadow-sm ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span>) : (<span className="text-gray-400 font-medium">--</span>)}
                 </td>
                 <td className="px-6 py-4 font-mono font-medium text-purple-600"> {todayLog?.totalBreakSeconds ? formatWorkedTime(todayLog.totalBreakSeconds) : "0h 0m 0s"} </td>
 
@@ -1409,8 +1373,8 @@ const EmployeeDashboard = () => {
           </table>
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
-            {todayLog?.punchInLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")} className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-blue-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> In Location</button>)}
-            {todayLog?.punchOutLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")} className="bg-white border border-red-200 text-red-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-red-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> Out Location</button>)}
+          {todayLog?.punchInLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")} className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-blue-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> In Location</button>)}
+          {todayLog?.punchOutLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")} className="bg-white border border-red-200 text-red-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-red-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> Out Location</button>)}
         </div>
       </div>
 
@@ -1419,7 +1383,7 @@ const EmployeeDashboard = () => {
         <div className="rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white p-6 h-80 flex flex-col">
           <h2 className="font-bold flex items-center gap-2 mb-4 text-gray-800"><FaCalendarAlt className="text-blue-500" /> Attendance Summary</h2>
           <div className="flex-1 relative">
-             {loadingTeamData && attendance.length === 0 ? <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium text-sm">Loading Stats...</div> : <Bar data={leaveBarData} options={commonChartOptions} />}
+            {loadingTeamData && attendance.length === 0 ? <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium text-sm">Loading Stats...</div> : <Bar data={leaveBarData} options={commonChartOptions} />}
           </div>
         </div>
         <div className="rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white p-6 h-80 flex flex-col">
@@ -1441,17 +1405,17 @@ const EmployeeDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
         {/* 🎂 DYNAMIC BIRTHDAYS SECTION */}
-        <div className="relative overflow-hidden bg-white rounded-2xl shadow-lg border border-gray-200 p-6 group z-10">
-          <div className="absolute top-0 right-0 -mr-10 -mt-10 w-32 h-32 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
-          <div className="flex items-center justify-between mb-6 relative z-10">
+        <div className="bg-white rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.08)] border border-gray-100 p-6 relative z-10 h-full flex flex-col">
+          <div className="flex items-center justify-between mb-8 relative z-10">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-orange-50 border border-orange-100 rounded-xl text-orange-500 shadow-sm">
+              <div className="p-2 bg-orange-50 rounded-lg text-orange-500">
                 <FaBirthdayCake className="text-lg animate-bounce-slow" />
               </div>
               <h2 className="font-bold text-lg text-gray-800">Birthdays</h2>
             </div>
-            <span className="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] uppercase tracking-wider font-bold px-3 py-1 rounded-full shadow-sm">
-              {todaysBirthdays.length} Today
+            {/* Matches the Red/Pink "1 TODAY" badge in your screenshot */}
+            <span className="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-sm tracking-wider">
+              {todaysBirthdays.length} TODAY
             </span>
           </div>
 
@@ -1460,24 +1424,29 @@ const EmployeeDashboard = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
             </div>
           ) : todaysBirthdays.length > 0 ? (
-            <div className="flex flex-wrap gap-6 relative z-10 pl-2">
+            <div className="flex flex-wrap gap-8 relative z-10 px-2">
               {todaysBirthdays.map((person, index) => (
                 <div key={index} className="group/avatar flex flex-col items-center cursor-pointer relative">
                   <div className="relative">
-                    <div className="absolute -inset-1 bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 rounded-full opacity-80 group-hover/avatar:opacity-100 blur-[1px] group-hover/avatar:blur-[2px] transition-all duration-300"></div>
-                    <div className="relative w-14 h-14 bg-white rounded-full flex items-center justify-center border-2 border-white shadow-sm group-hover/avatar:scale-105 transition-transform duration-300">
+                    {/* The Gradient Ring from screenshot */}
+                    <div className="absolute -inset-1 bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 rounded-full opacity-80 blur-[1px]"></div>
+                    <div className="relative w-14 h-14 bg-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                       <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-orange-500 to-pink-600 text-lg">
                         {person.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm text-xs">🎉</div>
+                    {/* Small Party Popper at bottom right */}
+                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm text-[10px] border border-gray-100">🎉</div>
                   </div>
-                  <p className="mt-2 text-xs font-bold text-gray-700 text-center w-20 truncate group-hover/avatar:text-orange-600 transition-colors">
-                    {person.name.split(' ')[0]}
+                  {/* Name below avatar as seen in screenshot */}
+                  <p className="mt-2 text-[11px] font-bold text-gray-700 text-center w-24 truncate">
+                    {person.name}
                   </p>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover/avatar:opacity-100 transform translate-y-2 group-hover/avatar:translate-y-0 transition-all duration-200 pointer-events-none z-20 shadow-xl">
-                    <p className="font-semibold">{person.name}</p>
-                    <p className="text-gray-300 text-[10px]">{person.department || 'Team Member'}</p>
+
+                  {/* Tooltip on hover */}
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-900 text-white text-[10px] rounded-lg opacity-0 group-hover/avatar:opacity-100 transition-opacity pointer-events-none z-20 shadow-xl">
+                    <p className="font-bold">{person.name}</p>
+                    <p className="text-gray-400">{person.department}</p>
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                   </div>
                 </div>
@@ -1491,7 +1460,7 @@ const EmployeeDashboard = () => {
         </div>
 
         {/* 🏖️ DYNAMIC ON LEAVE SECTION */}
-        <div className="relative overflow-hidden bg-white rounded-2xl shadow-lg border border-gray-200 p-6 z-10">
+        <div className="relative overflow-hidden bg-white rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.08)] border border-gray-200 p-6 z-10 h-full flex flex-col">
           <div className="absolute top-0 left-0 -ml-10 -mt-10 w-32 h-32 bg-gradient-to-br from-blue-400 to-cyan-300 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
           <div className="flex items-center justify-between mb-6 relative z-10">
             <div className="flex items-center gap-3">
@@ -1546,99 +1515,99 @@ const EmployeeDashboard = () => {
 
       {/* ✅ NEW SECTIONS: Remote Work & Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        
+
         {/* 🏠 Working Remotely Section */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 flex flex-col relative z-10 overflow-visible group transition-all duration-300">
-           <div className="flex items-center justify-between mb-6 z-10">
-             <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-sm">
-                 <FaLaptopHouse className="text-lg" />
-               </div>
-               <h2 className="font-bold text-gray-800 text-lg">Working Remotely</h2>
-             </div>
-             <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider shadow-sm ${isGlobalWFH ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                  <span className={`w-2 h-2 rounded-full ${isGlobalWFH ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                  {isGlobalWFH ? 'Global Remote' : 'Hybrid Mode'}
-                </span>
-             </div>
-           </div>
-           
-           <div className="flex-1 flex flex-col justify-center z-10">
-              {loadingTeamData ? (
-                 <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-                 </div>
-              ) : isGlobalWFH ? (
-                <div className="flex flex-col items-center justify-center py-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 border-dashed">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 border border-indigo-100">
-                    <FaLaptopHouse className="text-xl text-indigo-500" />
-                  </div>
-                  <h3 className="font-bold text-indigo-800 text-sm">Full Remote Day</h3>
-                  <p className="text-xs text-indigo-500 mt-1 font-medium">Everyone is working from home.</p>
+          <div className="flex items-center justify-between mb-6 z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-sm">
+                <FaLaptopHouse className="text-lg" />
+              </div>
+              <h2 className="font-bold text-gray-800 text-lg">Working Remotely</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider shadow-sm ${isGlobalWFH ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                <span className={`w-2 h-2 rounded-full ${isGlobalWFH ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                {isGlobalWFH ? 'Global Remote' : 'Hybrid Mode'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center z-10">
+            {loadingTeamData ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+              </div>
+            ) : isGlobalWFH ? (
+              <div className="flex flex-col items-center justify-center py-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 border-dashed">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 border border-indigo-100">
+                  <FaLaptopHouse className="text-xl text-indigo-500" />
                 </div>
-              ) : remoteWorkers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-2xl border border-gray-200 border-dashed">
-                   <FaBuilding className="text-3xl text-gray-300 mb-2" />
-                   <p className="text-sm font-bold text-gray-500">Full Office Attendance</p>
-                   <p className="text-[11px] text-gray-400">No one is working remotely today.</p>
-                </div>
-              ) : (
-                <div className="w-full flex flex-col items-center pt-2">
-                  <div className="flex -space-x-4 items-end justify-center py-4 min-h-[80px]">
-                    {(showAllRemoteEmp ? remoteWorkers : remoteWorkers.slice(0, 5)).map((worker, i) => (
-                      <div key={i} className="group/avatar relative transition-all duration-300 hover:-translate-y-2 hover:z-20 z-0">
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max opacity-0 group-hover/avatar:opacity-100 transform translate-y-2 group-hover/avatar:translate-y-0 transition-all duration-200 pointer-events-none z-50">
-                          <div className="bg-gray-900 text-white text-[10px] font-bold py-1.5 px-3 rounded-md shadow-xl relative">
-                            {worker.name}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        </div>
-                        <div className={`relative w-12 h-12 rounded-full ring-4 ring-white bg-gradient-to-tr ${gradients[i % gradients.length]} flex items-center justify-center shadow-md cursor-pointer border border-white`}>
-                          <span className="text-white font-bold text-sm text-shadow-sm">{worker.name.charAt(0)}</span>
+                <h3 className="font-bold text-indigo-800 text-sm">Full Remote Day</h3>
+                <p className="text-xs text-indigo-500 mt-1 font-medium">Everyone is working from home.</p>
+              </div>
+            ) : remoteWorkers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-2xl border border-gray-200 border-dashed">
+                <FaBuilding className="text-3xl text-gray-300 mb-2" />
+                <p className="text-sm font-bold text-gray-500">Full Office Attendance</p>
+                <p className="text-[11px] text-gray-400">No one is working remotely today.</p>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col items-center pt-2">
+                <div className="flex -space-x-4 items-end justify-center py-4 min-h-[80px]">
+                  {(showAllRemoteEmp ? remoteWorkers : remoteWorkers.slice(0, 5)).map((worker, i) => (
+                    <div key={i} className="group/avatar relative transition-all duration-300 hover:-translate-y-2 hover:z-20 z-0">
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max opacity-0 group-hover/avatar:opacity-100 transform translate-y-2 group-hover/avatar:translate-y-0 transition-all duration-200 pointer-events-none z-50">
+                        <div className="bg-gray-900 text-white text-[10px] font-bold py-1.5 px-3 rounded-md shadow-xl relative">
+                          {worker.name}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                         </div>
                       </div>
-                    ))}
-                    {!showAllRemoteEmp && remoteWorkers.length > 5 && (
-                      <button onClick={() => setShowAllRemoteEmp(true)} className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer">
-                         <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-50 border border-gray-200 flex items-center justify-center font-bold text-gray-600 text-xs shadow-sm">
-                           +{remoteWorkers.length - 5}
-                         </div>
-                      </button>
-                    )}
-                    {showAllRemoteEmp && remoteWorkers.length > 5 && (
-                      <button onClick={() => setShowAllRemoteEmp(false)} className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer">
-                         <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-50 border border-gray-200 flex items-center justify-center font-bold text-gray-600 text-xs shadow-sm">
-                           −
-                         </div>
-                      </button>
-                    )}
-                  </div>
-                  {showAllRemoteEmp && (
-                    <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                      {remoteWorkers.map((w, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                          <span className="text-xs font-bold text-gray-700">{w.name}</span>
-                          <span className="text-[10px] uppercase font-semibold tracking-wider text-gray-500">{w.department}</span>
-                        </div>
-                      ))}
-                      <button onClick={() => setShowAllRemoteEmp(false)} className="col-span-full text-center text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg py-2 uppercase tracking-wider mt-1 hover:bg-indigo-100 transition shadow-sm">
-                        Show Less
-                      </button>
+                      <div className={`relative w-12 h-12 rounded-full ring-4 ring-white bg-gradient-to-tr ${gradients[i % gradients.length]} flex items-center justify-center shadow-md cursor-pointer border border-white`}>
+                        <span className="text-white font-bold text-sm text-shadow-sm">{worker.name.charAt(0)}</span>
+                      </div>
                     </div>
+                  ))}
+                  {!showAllRemoteEmp && remoteWorkers.length > 5 && (
+                    <button onClick={() => setShowAllRemoteEmp(true)} className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer">
+                      <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-50 border border-gray-200 flex items-center justify-center font-bold text-gray-600 text-xs shadow-sm">
+                        +{remoteWorkers.length - 5}
+                      </div>
+                    </button>
                   )}
-                  <p className="text-center text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                    <span className="text-indigo-600 text-xs">{remoteWorkers.length}</span> Remote Today
-                  </p>
+                  {showAllRemoteEmp && remoteWorkers.length > 5 && (
+                    <button onClick={() => setShowAllRemoteEmp(false)} className="relative z-0 hover:z-10 transition-transform hover:scale-105 cursor-pointer">
+                      <div className="w-12 h-12 rounded-full ring-4 ring-white bg-gray-50 border border-gray-200 flex items-center justify-center font-bold text-gray-600 text-xs shadow-sm">
+                        −
+                      </div>
+                    </button>
+                  )}
                 </div>
-              )}
-           </div>
+                {showAllRemoteEmp && (
+                  <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    {remoteWorkers.map((w, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="text-xs font-bold text-gray-700">{w.name}</span>
+                        <span className="text-[10px] uppercase font-semibold tracking-wider text-gray-500">{w.department}</span>
+                      </div>
+                    ))}
+                    <button onClick={() => setShowAllRemoteEmp(false)} className="col-span-full text-center text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg py-2 uppercase tracking-wider mt-1 hover:bg-indigo-100 transition shadow-sm">
+                      Show Less
+                    </button>
+                  </div>
+                )}
+                <p className="text-center text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                  <span className="text-indigo-600 text-xs">{remoteWorkers.length}</span> Remote Today
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 🌿 Quick Actions Section */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden group transition-all duration-300 z-10">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-cyan-50 to-transparent rounded-bl-full opacity-30 transition-transform duration-700 group-hover:scale-110 pointer-events-none"></div>
-          
+
           <div className="flex items-center justify-between mb-6 z-10 relative">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-500 shadow-sm">
@@ -1773,7 +1742,7 @@ const EmployeeDashboard = () => {
               <button onClick={() => setShowLateReqModal(false)} className="text-white hover:text-orange-200 transition"><FaTimes size={18} /></button>
             </div>
             <div className="p-6">
-              
+
               <div className="mb-5 bg-purple-50 border border-purple-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Monthly Request Limit</span>
@@ -1782,7 +1751,7 @@ const EmployeeDashboard = () => {
                   </span>
                 </div>
                 <div className="w-full bg-purple-200/50 rounded-full h-2 border border-purple-200">
-                  <div 
+                  <div
                     className="bg-purple-500 h-1.5 rounded-full transition-all duration-300 m-[1px]"
                     style={{ width: `${Math.min(((requestLimit.limit - requestLimit.used) / requestLimit.limit) * 100, 100)}%` }}
                   ></div>
@@ -1799,7 +1768,7 @@ const EmployeeDashboard = () => {
               <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider mb-5 bg-orange-50 border border-orange-100 p-3 rounded-lg leading-relaxed">
                 You are marked as <b>LATE</b>. If you arrived on time but missed punching in, or have a valid reason, raise a correction request.
               </p>
-              
+
               <form onSubmit={handleLateRequestSubmit} className="space-y-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Today's Date</label>
@@ -1832,21 +1801,21 @@ const EmployeeDashboard = () => {
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-3">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowLateReqModal(false)} 
+                  <button
+                    type="button"
+                    onClick={() => setShowLateReqModal(false)}
                     className="px-5 py-2.5 text-gray-600 bg-white border border-gray-200 font-bold text-sm hover:bg-gray-50 rounded-xl transition shadow-sm"
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
-                    disabled={lateReqLoading || (requestLimit.limit - requestLimit.used) === 0} 
+                  <button
+                    type="submit"
+                    disabled={lateReqLoading || (requestLimit.limit - requestLimit.used) === 0}
                     className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition active:scale-95"
                   >
-                    {lateReqLoading ? "Sending..." : 
-                     (requestLimit.limit - requestLimit.used) === 0 ? "Limit Reached" : 
-                     "Submit Request"}
+                    {lateReqLoading ? "Sending..." :
+                      (requestLimit.limit - requestLimit.used) === 0 ? "Limit Reached" :
+                        "Submit Request"}
                   </button>
                 </div>
               </form>

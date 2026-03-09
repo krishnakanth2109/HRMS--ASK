@@ -157,6 +157,34 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
+// GET role/department suggestions from existing employees (nested array-safe)
+// Must be defined BEFORE /:id to avoid route conflict
+// GET role/department suggestions from existing employees
+router.get("/suggestions", protect, async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    if (!field || !query || query.trim().length < 2) {
+      return res.status(200).json([]);
+    }
+
+    // Map frontend field names to backend schema paths
+    // In your schema, these are inside the experienceDetails array
+    const fieldPath = `experienceDetails.${field}`;
+    const regex = new RegExp(query.trim(), "i");
+
+    // Use MongoDB distinct with a filter
+    const results = await Employee.distinct(fieldPath, { [fieldPath]: regex });
+
+    // Limit and filter
+    const suggestions = results.filter(Boolean).slice(0, 8);
+    res.status(200).json(suggestions);
+  } catch (err) {
+    console.error("Suggestions fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET employee by ID → Authenticated users allowed
 router.get("/:id", protect, async (req, res) => {
   try {
@@ -628,58 +656,64 @@ router.post("/forgot-password-otp", async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
+    // 1. Check if employee exists
     const employee = await Employee.findOne({ email });
     if (!employee) {
       return res.status(404).json({ message: "Email not found in our records." });
     }
 
+    // 2. Generate and Save OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
     await Otp.findOneAndUpdate(
       { email },
       { otp: otpCode, createdAt: new Date() },
       { upsert: true, new: true }
     );
 
-    // Check if SMTP credentials are configured
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.warn("⚠️ SMTP credentials not configured. Password reset OTP will not be sent via email.");
-      console.log(`Password reset OTP for ${email}: ${otpCode}`);
-      
-      if (process.env.NODE_ENV !== 'production') {
-        return res.status(200).json({ 
-          message: "OTP generated (SMTP not configured)", 
-          otp: otpCode,
-          devMode: true 
-        });
-      }
-    }
+    // 3. Create Transporter inside the route (The Fix)
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS, // Your 16-character app password
+      },
+    });
 
+    // 4. Send the Email
     try {
       await transporter.sendMail({
-        from: `"HRMS Support" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
+        from: `"HRMS Support" <${process.env.SMTP_USER}>`,
         to: email,
         subject: "Password Reset Request",
         html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Password Reset</h2>
-            <p>We received a request to reset your password.</p>
-            <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626;">${otpCode}</strong></p>
-            <p>If you did not request this, please ignore this email.</p>
+          <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="color: #1e40af;">Password Reset</h2>
+            <p>We received a request to reset your password for the HRMS portal.</p>
+            <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626; letter-spacing: 2px;">${otpCode}</strong></p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
           </div>
         `,
       });
+
+      console.log(`✅ Forgot Password OTP sent to: ${email}`);
+      
+      return res.status(200).json({ 
+        message: "OTP sent to your email.",
+        // Only include OTP in response for development testing
+        ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
+      });
+
     } catch (emailError) {
-      console.error("Failed to send password reset email:", emailError);
+      console.error("❌ Nodemailer Error (Forgot Pwd):", emailError.message);
+      return res.status(500).json({ 
+        message: "Failed to send email. Please try again later.",
+        error: emailError.message 
+      });
     }
 
-    res.status(200).json({ 
-      message: "OTP sent to your email.",
-      ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
-    });
   } catch (error) {
-    console.error("Forgot Password OTP Error:", error);
-    res.status(500).json({ error: "Failed to send OTP." });
+    console.error("❌ Forgot Password Global Error:", error);
+    res.status(500).json({ error: "Failed to process request." });
   }
 });
 
@@ -739,11 +773,17 @@ router.post("/reset-password", async (req, res) => {
 
 router.post("/change-password-otp", protect, async (req, res) => {
   try {
-    const email = req.user.email;
+    const email = req.user?.email;
+    if (!email) return res.status(400).json({ message: "User email not found." });
 
-    if (!email) {
-      return res.status(400).json({ message: "User email not found." });
-    }
+    // CREATE TRANSPORTER (Use these specific settings for Gmail)
+    const transporter = nodemailer.createTransport({
+      service: "gmail", // Let Nodemailer handle host/port automatically
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS, // 16-character App Password
+      },
+    });
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -753,47 +793,22 @@ router.post("/change-password-otp", protect, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.warn("⚠️ SMTP credentials not configured. Change password OTP will not be sent.");
-      console.log(`Change password OTP for ${email}: ${otpCode}`);
-      
-      if (process.env.NODE_ENV !== 'production') {
-        return res.status(200).json({ 
-          message: "OTP generated (SMTP not configured)", 
-          otp: otpCode,
-          devMode: true 
-        });
-      }
-    }
-
-    try {
-      await transporter.sendMail({
-        from: `"HRMS Security" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
-        to: email,
-        subject: "Change Password Verification",
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Security Verification</h2>
-            <p>You requested to change your password.</p>
-            <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
-            <p>If you did not make this request, please contact admin immediately.</p>
-          </div>
-        `,
-      });
-    } catch (emailError) {
-      console.error("Failed to send change password email:", emailError);
-    }
-
-    res.status(200).json({ 
-      message: "OTP sent to your registered email.",
-      ...(process.env.NODE_ENV !== 'production' && { devOtp: otpCode })
+    // SEND MAIL
+    const info = await transporter.sendMail({
+      from: `"HRMS Team" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Change Password Verification",
+      html: `<h3>Your OTP is: ${otpCode}</h3>`,
     });
+
+    console.log("✅ Email Sent: " + info.response);
+    res.status(200).json({ message: "OTP sent to your registered email." });
+
   } catch (error) {
-    console.error("Change Password OTP Error:", error);
-    res.status(500).json({ error: "Failed to send OTP." });
+    console.error("❌ Send OTP Error:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
-
 router.post("/change-password-verify", protect, async (req, res) => {
   try {
     const { otp, newPassword } = req.body;

@@ -160,17 +160,24 @@ const AdminLiveTracking = () => {
         const employeeName = employeesMap[String(record.employeeId).trim()] || "Unknown Employee";
 
         // 1. Get Stored Idle Time from Live DB (Synchronously connected)
-        const rawTimeline = record.idleTimeline || [];
-        const idleTimeline = rawTimeline.map(interval => {
+        // For live view it might be in `record.idleTimeline`, for history/weekly it's in `idleData.idleTimeline`
+        const rawTimeline = (record.idleTimeline && record.idleTimeline.length > 0)
+            ? record.idleTimeline
+            : (idleData?.idleTimeline || []);
+        // Deduplicate the raw timeline based on exact start time
+        const uniqueTimelineMap = new Map();
+        rawTimeline.forEach(interval => {
             const start = new Date(interval.startTime || interval.idleStart);
             const end = new Date(interval.endTime || interval.idleEnd);
             const diffSeconds = (end - start) / 1000;
-            return {
+
+            uniqueTimelineMap.set(start.getTime(), {
                 idleStart: start,
                 idleEnd: end,
                 idleDurationSeconds: diffSeconds
-            };
+            });
         });
+        const idleTimeline = Array.from(uniqueTimelineMap.values());
         const storedIdleSeconds = idleTimeline.reduce((total, span) => total + (span.idleDurationSeconds || 0), 0);
 
         let totalIdleSeconds = 0;
@@ -178,10 +185,41 @@ const AdminLiveTracking = () => {
         let punchInTime = "N/A";
         let activeIdleExtra = 0;
 
-        // If explicitly exact tracked times are available directly from the desktop tracker, USE THEM!
-        if (record.trackedWorkSeconds !== undefined && record.trackedIdleSeconds !== undefined && record.trackedWorkSeconds > 0) {
-            workedSeconds = record.trackedWorkSeconds;
-            totalIdleSeconds = record.trackedIdleSeconds;
+        // Calculate active, ongoing Idle time to display in the UI timeline table
+        if (record.currentStatus === "IDLE" && record.idleSince) {
+            const idleStart = new Date(record.idleSince);
+            if (idleStart < currentTime) {
+                activeIdleExtra = (currentTime - idleStart) / 1000;
+
+                // Visually append the ongoing session to the log array so the user can see it live
+                const existingOngoing = idleTimeline.find(item =>
+                    item.idleStart.getTime() === idleStart.getTime()
+                );
+
+                if (!existingOngoing) {
+                    idleTimeline.push({
+                        idleStart: idleStart,
+                        idleEnd: currentTime, // Ticking live end time
+                        idleDurationSeconds: activeIdleExtra,
+                        isLive: true
+                    });
+                } else if (existingOngoing.isLive) {
+                    existingOngoing.idleEnd = currentTime;
+                    existingOngoing.idleDurationSeconds = activeIdleExtra;
+                }
+            }
+        }
+
+        // -- USE EXACT TRACKER SECONDS --
+        // The desktop tracker constantly sends its exact calculated Work and Idle seconds.
+        // We will use these exact values so the Admin Dashboard matches the Tracker UI perfectly.
+
+        const explicitWorkSeconds = record.trackedWorkSeconds ?? idleData?.trackedWorkSeconds ?? idleData?.trackedWorkSeconds;
+        const explicitIdleSeconds = record.trackedIdleSeconds ?? idleData?.trackedIdleSeconds ?? idleData?.trackedIdleSeconds;
+
+        if (explicitWorkSeconds !== undefined && explicitIdleSeconds !== undefined && explicitWorkSeconds >= 0) {
+            workedSeconds = explicitWorkSeconds;
+            totalIdleSeconds = explicitIdleSeconds;
 
             // Add live "ticking" since the last ping to keep the UI flowing smoothly
             if (record.lastPing && record.currentStatus !== "OFFLINE") {
@@ -205,47 +243,34 @@ const AdminLiveTracking = () => {
                 punchInTime = new Date(attData.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             }
         } else {
-            // -- FALLBACK LEGACY CALCULATION --
-            if (record.currentStatus === "IDLE" && record.idleSince) {
-                const idleStart = new Date(record.idleSince);
-                if (idleStart < currentTime) {
-                    // Calculate how long they have been idle in this CURRENT session
-                    activeIdleExtra = (currentTime - idleStart) / 1000;
-                }
-            }
-
-            // Total Idle = Stored (Old) + Active (Ongoing)
+            // -- FALLBACK: ATTENDANCE MINUS IDLE TIME CALCULATION --
             totalIdleSeconds = storedIdleSeconds + activeIdleExtra;
+            const hasTrackerData = record.hasTrackerData !== undefined ? record.hasTrackerData : true;
 
-            if (attData && attData.punchIn) {
+            if (attData && attData.punchIn && hasTrackerData) {
                 try {
-                    const OFFICE_START_HOUR = 10;
-                    const OFFICE_END_HOUR = 18;
-
                     const pIn = new Date(attData.punchIn);
-                    // Total elapsed time from Punch In to NOW (capped at office hours)
-                    const pOutRaw = attData.punchOut ? new Date(attData.punchOut) : currentTime;
+                    const endOfDayCutoff = new Date(pIn);
+                    endOfDayCutoff.setHours(19, 0, 0, 0);
 
-                    const officeStart = new Date(pIn);
-                    officeStart.setHours(OFFICE_START_HOUR, 0, 0, 0);
-                    const officeEnd = new Date(pIn);
-                    officeEnd.setHours(OFFICE_END_HOUR, 0, 0, 0);
-
-                    const effectiveStart = new Date(Math.max(pIn, officeStart));
-                    const effectiveEnd = new Date(Math.min(pOutRaw, officeEnd));
+                    let pOutRaw;
+                    if (attData.punchOut) {
+                        pOutRaw = new Date(attData.punchOut);
+                    } else {
+                        pOutRaw = currentTime > endOfDayCutoff ? endOfDayCutoff : currentTime;
+                    }
 
                     punchInTime = pIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-                    if (effectiveStart < officeEnd && effectiveStart < effectiveEnd) {
-                        const totalElapsedSecs = (effectiveEnd - effectiveStart) / 1000;
-
-                        // CRITICAL SYNC: 
-                        // Worked Time = (Total Elapsed from PunchIn) - (Total Idle Time)
+                    if (pIn < pOutRaw) {
+                        const totalElapsedSecs = (pOutRaw - pIn) / 1000;
                         workedSeconds = Math.max(0, totalElapsedSecs - totalIdleSeconds);
                     }
                 } catch (e) {
-                    console.error("Error calculating working time", e);
+                    console.error("Error calculating working time:", e);
                 }
+            } else {
+                workedSeconds = 0;
             }
         }
 
@@ -335,8 +360,9 @@ const AdminLiveTracking = () => {
                     (String(a.employeeId || "").trim() === empId || String(a.employeeName || "").toLowerCase().includes(empName.toLowerCase())) && a.date === dStr
                 ) : null;
 
-                const dailyIdle = allIdle.find(item => item.date === dStr) || { idleTimeline: [], idleDurationSeconds: 0 };
-                const dummyRecord = { date: dStr, employeeId: empId, currentStatus: "OFFLINE", idleSince: null };
+                const trackerFound = allIdle.find(item => item.date === dStr);
+                const dailyIdle = trackerFound || { idleTimeline: [], idleDurationSeconds: 0 };
+                const dummyRecord = { date: dStr, employeeId: empId, currentStatus: "OFFLINE", idleSince: null, hasTrackerData: !!trackerFound };
                 const stats = calculateReportStats(dummyRecord, dailyIdle, dailyAtt);
 
                 workedData.push(parseFloat((stats.workedSeconds / 3600).toFixed(2)));

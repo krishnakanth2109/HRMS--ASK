@@ -69,7 +69,7 @@ const ForgotPassword = () => {
     try {
       await resetUserPassword(email, userOtp, newPassword);
       alert("Password reset successful! You can now log in.");
-      navigate("/login"); 
+      navigate("/"); 
     } catch (err) {
       setError(err.message || "Failed to reset password.");
     } finally {

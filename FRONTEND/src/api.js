@@ -102,6 +102,10 @@ export const loginUser = async (email, password) => {
    EMPLOYEE MANAGEMENT
 ============================================================================= */
 export const getEmployees = async () => (await api.get("/api/employees")).data;
+// autocomplete helper which returns a flat array of unique role/department strings
+export const getEmployeeSuggestions = async (field, query) =>
+  (await api.get("/api/employees/suggestions", { params: { field, query } })).data;
+
 export const getEmployeeById = async (id) =>
   (await api.get(`/api/employees/${id}`)).data;
 export const addEmployee = async (data) =>

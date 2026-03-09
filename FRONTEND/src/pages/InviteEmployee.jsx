@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Send, Plus, X, Trash2, RefreshCw, Briefcase, Mail, Building2, UserPlus, History, Banknote,
   CheckCircle, Clock, FileText, Upload, Download, File, Paperclip, Eye, ExternalLink
 } from 'lucide-react';
-import { getAllCompanies } from '../api';
+import { getAllCompanies, getEmployeeSuggestions } from '../api';
 import api from '../api';
 
 const SendOnboardingForm = () => {
@@ -47,9 +47,23 @@ HR Team
   const [sending, setSending] = useState(false);
   const [sentHistory, setSentHistory] = useState([]);
 
+  // role suggestion state (single invite)
+  const [showRoleSugg, setShowRoleSugg] = useState(false);
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
+  const roleRef = useRef(null);
+
   useEffect(() => {
     fetchCompanies();
     fetchHistory();
+  }, []);
+
+  // close suggestions when clicking outside the role input
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (roleRef.current && !roleRef.current.contains(e.target)) setShowRoleSugg(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -78,6 +92,33 @@ HR Team
       setSentHistory(response.data.data);
     } catch (error) {
       console.error("History fetch error", error);
+    }
+  };
+
+  // helper used by both components when requesting autocomplete
+  const fetchSuggestionsFromDB = async (field, query) => {
+    try {
+      const results = await getEmployeeSuggestions(field, query);
+      return Array.isArray(results) ? results : [];
+    } catch (err) {
+      console.error("Suggestion fetch error:", err);
+      return [];
+    }
+  };
+
+  const handleSingleChange = async (e) => {
+    const { name, value } = e.target;
+    setSingleData(prev => ({ ...prev, [name]: value }));
+
+    if (name === "role") {
+      if (value.trim().length >= 2) {
+        setShowRoleSugg(true);
+        const results = await fetchSuggestionsFromDB("role", value);
+        setRoleSuggestions(results);
+      } else {
+        setShowRoleSugg(false);
+        setRoleSuggestions([]);
+      }
     }
   };
 
@@ -492,12 +533,13 @@ HR Team
                       }
                     />
                   </div>
-                  <div>
+                  <div className="relative" ref={roleRef}>
                     <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">
                       Role*
                     </label>
                     <input
                       required
+                      name="role"
                       placeholder="Software Engineer"
                       pattern="[A-Za-z\s]+"
                       title="Only alphabets and spaces are allowed"
@@ -508,10 +550,27 @@ HR Team
                       }}
                       className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                       value={singleData.role}
-                      onChange={e =>
-                        setSingleData({ ...singleData, role: e.target.value })
-                      }
+                      onChange={handleSingleChange}
+                      onFocus={() => {
+                        if (singleData.role.trim().length >= 2) setShowRoleSugg(true);
+                      }}
                     />
+                    {showRoleSugg && roleSuggestions.length > 0 && (
+                      <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-48 overflow-y-auto">
+                        {roleSuggestions.map((s, i) => (
+                          <li
+                            key={i}
+                            onMouseDown={() => {
+                              setSingleData(prev => ({ ...prev, role: s }));
+                              setShowRoleSugg(false);
+                            }}
+                            className="px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-gray-700 text-sm border-b last:border-b-0 transition-colors"
+                          >
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Department*</label>
@@ -524,7 +583,7 @@ HR Team
                     <label className="text-xs font-semibold text-slate-500 ml-1 block mb-1">Employment Type*</label>
                     <select required className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={singleData.employmentType} onChange={e => setSingleData({ ...singleData, employmentType: e.target.value })}>
                       <option value="">Select Type</option>
-                      <option value="Full-time">Full-time</option>
+                      <option value="Full-Time">Full-Time</option>
                       <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
