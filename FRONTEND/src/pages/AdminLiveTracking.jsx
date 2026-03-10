@@ -129,7 +129,7 @@ const AdminLiveTracking = () => {
 
     const formatTime = (dateString) => {
         if (!dateString) return "N/A";
-        return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return new Date(dateString).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
     };
 
     const formatDuration = (totalSeconds) => {
@@ -160,24 +160,17 @@ const AdminLiveTracking = () => {
         const employeeName = employeesMap[String(record.employeeId).trim()] || "Unknown Employee";
 
         // 1. Get Stored Idle Time from Live DB (Synchronously connected)
-        // For live view it might be in `record.idleTimeline`, for history/weekly it's in `idleData.idleTimeline`
-        const rawTimeline = (record.idleTimeline && record.idleTimeline.length > 0)
-            ? record.idleTimeline
-            : (idleData?.idleTimeline || []);
-        // Deduplicate the raw timeline based on exact start time
-        const uniqueTimelineMap = new Map();
-        rawTimeline.forEach(interval => {
+        const rawTimeline = record.idleTimeline || [];
+        const idleTimeline = rawTimeline.map(interval => {
             const start = new Date(interval.startTime || interval.idleStart);
             const end = new Date(interval.endTime || interval.idleEnd);
             const diffSeconds = (end - start) / 1000;
-
-            uniqueTimelineMap.set(start.getTime(), {
+            return {
                 idleStart: start,
                 idleEnd: end,
                 idleDurationSeconds: diffSeconds
-            });
+            };
         });
-        const idleTimeline = Array.from(uniqueTimelineMap.values());
         const storedIdleSeconds = idleTimeline.reduce((total, span) => total + (span.idleDurationSeconds || 0), 0);
 
         let totalIdleSeconds = 0;
@@ -185,50 +178,26 @@ const AdminLiveTracking = () => {
         let punchInTime = "N/A";
         let activeIdleExtra = 0;
 
-        // Calculate active, ongoing Idle time to display in the UI timeline table
-        if (record.currentStatus === "IDLE" && record.idleSince) {
-            const idleStart = new Date(record.idleSince);
-            if (idleStart < currentTime) {
-                activeIdleExtra = (currentTime - idleStart) / 1000;
-
-                // Visually append the ongoing session to the log array so the user can see it live
-                const existingOngoing = idleTimeline.find(item =>
-                    item.idleStart.getTime() === idleStart.getTime()
-                );
-
-                if (!existingOngoing) {
-                    idleTimeline.push({
-                        idleStart: idleStart,
-                        idleEnd: currentTime, // Ticking live end time
-                        idleDurationSeconds: activeIdleExtra,
-                        isLive: true
-                    });
-                } else if (existingOngoing.isLive) {
-                    existingOngoing.idleEnd = currentTime;
-                    existingOngoing.idleDurationSeconds = activeIdleExtra;
-                }
-            }
+        // Ensure we retrieve the punchIn time for the report display
+        if (attData && attData.punchIn) {
+            punchInTime = new Date(attData.punchIn).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        // -- USE EXACT TRACKER SECONDS --
-        // The desktop tracker constantly sends its exact calculated Work and Idle seconds.
-        // We will use these exact values so the Admin Dashboard matches the Tracker UI perfectly.
+        // 2. EXCLUSIVE TRACKER LOGIC
+        // Only use the explicitly tracked times sent by the desktop tracker.
+        // If the tracker hasn't sent data yet, it stays 0. No more "guessing" based on punch-in.
+        if (record.trackedWorkSeconds !== undefined && record.trackedIdleSeconds !== undefined) {
+            workedSeconds = record.trackedWorkSeconds;
+            totalIdleSeconds = record.trackedIdleSeconds;
 
-        const explicitWorkSeconds = record.trackedWorkSeconds ?? idleData?.trackedWorkSeconds ?? idleData?.trackedWorkSeconds;
-        const explicitIdleSeconds = record.trackedIdleSeconds ?? idleData?.trackedIdleSeconds ?? idleData?.trackedIdleSeconds;
-
-        if (explicitWorkSeconds !== undefined && explicitIdleSeconds !== undefined && explicitWorkSeconds >= 0) {
-            workedSeconds = explicitWorkSeconds;
-            totalIdleSeconds = explicitIdleSeconds;
-
-            // Add live "ticking" since the last ping to keep the UI flowing smoothly
+            // Add smooth ticking between backend refreshes (capped at 30s to match heartbeat interval)
+            // This only fills the visual gap so the timer "flows" — values are still tracker-driven
             if (record.lastPing && record.currentStatus !== "OFFLINE") {
                 const lastPingDate = new Date(record.lastPing);
                 if (currentTime > lastPingDate) {
                     const elapsedSincePing = (currentTime - lastPingDate) / 1000;
-
-                    // Cap the artificial tick at 120 seconds in case they went offline abruptly
-                    if (elapsedSincePing < 120) {
+                    // Cap at 30s — if more time has passed, the tracker is offline/lagging
+                    if (elapsedSincePing < 30) {
                         if (record.currentStatus === "WORKING") {
                             workedSeconds += elapsedSincePing;
                         } else if (record.currentStatus === "IDLE") {
@@ -237,41 +206,11 @@ const AdminLiveTracking = () => {
                     }
                 }
             }
-
-            // Format punchIn if available
-            if (attData && attData.punchIn) {
-                punchInTime = new Date(attData.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            }
         } else {
-            // -- FALLBACK: ATTENDANCE MINUS IDLE TIME CALCULATION --
-            totalIdleSeconds = storedIdleSeconds + activeIdleExtra;
-            const hasTrackerData = record.hasTrackerData !== undefined ? record.hasTrackerData : true;
-
-            if (attData && attData.punchIn && hasTrackerData) {
-                try {
-                    const pIn = new Date(attData.punchIn);
-                    const endOfDayCutoff = new Date(pIn);
-                    endOfDayCutoff.setHours(19, 0, 0, 0);
-
-                    let pOutRaw;
-                    if (attData.punchOut) {
-                        pOutRaw = new Date(attData.punchOut);
-                    } else {
-                        pOutRaw = currentTime > endOfDayCutoff ? endOfDayCutoff : currentTime;
-                    }
-
-                    punchInTime = pIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-                    if (pIn < pOutRaw) {
-                        const totalElapsedSecs = (pOutRaw - pIn) / 1000;
-                        workedSeconds = Math.max(0, totalElapsedSecs - totalIdleSeconds);
-                    }
-                } catch (e) {
-                    console.error("Error calculating working time:", e);
-                }
-            } else {
-                workedSeconds = 0;
-            }
+            // If they are offline or tracker hasn't sent telemetry yet, just show 0 for exact work
+            workedSeconds = 0;
+            // Still display historical stored idle time for the day if they logged off
+            totalIdleSeconds = storedIdleSeconds;
         }
 
         return {
@@ -346,7 +285,8 @@ const AdminLiveTracking = () => {
                 api.get(`/api/idletime/employee/${empId}`)
             ]);
 
-            const allIdle = idleRes.data || [];
+            const _allIdleData = (idleRes && idleRes.data) ? idleRes.data : idleRes;
+            const allIdle = Array.isArray(_allIdleData) ? _allIdleData : [];
             const chartLabels = [];
             const workedData = [];
             const idleData = [];
@@ -360,10 +300,25 @@ const AdminLiveTracking = () => {
                     (String(a.employeeId || "").trim() === empId || String(a.employeeName || "").toLowerCase().includes(empName.toLowerCase())) && a.date === dStr
                 ) : null;
 
-                const trackerFound = allIdle.find(item => item.date === dStr);
-                const dailyIdle = trackerFound || { idleTimeline: [], idleDurationSeconds: 0 };
-                const dummyRecord = { date: dStr, employeeId: empId, currentStatus: "OFFLINE", idleSince: null, hasTrackerData: !!trackerFound };
-                const stats = calculateReportStats(dummyRecord, dailyIdle, dailyAtt);
+                // The new backend endpoint now returns the tracked metrics directly in the idle payload
+                const dailyIdle = allIdle.find(item => item.date === dStr) || {
+                    idleTimeline: [],
+                    trackedWorkSeconds: 0,
+                    trackedIdleSeconds: 0
+                };
+
+                // Merge the dummy frame with the actual tracked metrics from the backend
+                const historicalRecord = {
+                    date: dStr,
+                    employeeId: empId,
+                    currentStatus: "OFFLINE",
+                    idleSince: null,
+                    trackedWorkSeconds: dailyIdle.trackedWorkSeconds || 0,
+                    trackedIdleSeconds: dailyIdle.trackedIdleSeconds || 0,
+                    idleTimeline: dailyIdle.idleTimeline || []
+                };
+
+                const stats = calculateReportStats(historicalRecord, dailyIdle, dailyAtt);
 
                 workedData.push(parseFloat((stats.workedSeconds / 3600).toFixed(2)));
                 idleData.push(parseFloat((stats.idleSeconds / 3600).toFixed(2)));
@@ -485,8 +440,8 @@ const AdminLiveTracking = () => {
         // Idle Timeline Table
         if (reportData.idleTimeline && reportData.idleTimeline.length > 0) {
             const tableData = reportData.idleTimeline.map(interval => [
-                new Date(interval.idleStart).toLocaleTimeString(),
-                new Date(interval.idleEnd).toLocaleTimeString(),
+                new Date(interval.idleStart).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                new Date(interval.idleEnd).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
                 formatDuration(interval.idleDurationSeconds)
             ]);
 
@@ -771,8 +726,8 @@ const AdminLiveTracking = () => {
                                                             <tbody>
                                                                 {reportData.idleTimeline.map((item, idx) => (
                                                                     <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800">
-                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleStart).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                                        <td className="px-4 py-2 text-slate-300">{new Date(item.idleEnd).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                                                         <td className="px-4 py-2 text-amber-500 font-mono">{formatDuration(item.idleDurationSeconds)}</td>
                                                                     </tr>
                                                                 ))}
