@@ -579,15 +579,23 @@ const AdminDashboard = () => {
           </Link>
 
           {/* Leave Requests */}
-          <div className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md">
-            <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
-              <FaPlane />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Leave Requests</p>
-              <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">{totalPendingLeavesCount}</h3>
-            </div>
-          </div>
+     <div
+  onClick={() => navigate("/admin/admin-Leavemanage")}
+  className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md cursor-pointer"
+>
+  <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
+    <FaPlane />
+  </div>
+
+  <div>
+    <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
+      Leave Requests
+    </p>
+    <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">
+      {totalPendingLeavesCount}
+    </h3>
+  </div>
+</div>
         </div>
 
         {/* 2. CHARTS SECTION */}
@@ -671,7 +679,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-x
+            x
             {/* Chart Area */}
             <div className="h-[250px] w-full">
               {loadingGraph ? (
@@ -897,8 +905,8 @@ x
                         ) : (
                           <span
                             className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === "Approved"
-                                ? "bg-[#E6F9F3] text-[#05CD99]"
-                                : "bg-[#FEEFEE] text-[#EE5D50]"
+                              ? "bg-[#E6F9F3] text-[#05CD99]"
+                              : "bg-[#FEEFEE] text-[#EE5D50]"
                               }`}
                           >
                             {item.status}
@@ -1075,9 +1083,7 @@ x
                         </p>
                       </div>
                     </div>
-                    <button className="bg-[#FF8F8F] text-white text-[10px] font-bold py-1 px-3 rounded-lg shadow-sm">
-                      Send Wishes
-                    </button>
+
                   </div>
                 ))
               )}
@@ -1093,10 +1099,14 @@ x
                   {upcomingBirthdays.map((b, i) => (
                     <div
                       key={i}
-                      className={`w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold -ml-2 first:ml-0 ${pickColor(b.name)}`}
-                      title={`${b.name} — ${b.role}`}
+                      className={`group relative w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold -ml-2 first:ml-0 cursor-pointer transition-transform duration-200 hover:scale-125 ${pickColor(b.name)}`}
                     >
                       {getInitials(b.name)}
+
+                      {/* Hover Name Box */}
+                      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 hidden group-hover:block bg-white text-[#2B3674] text-xs px-3 py-1 rounded shadow-lg whitespace-nowrap">
+                        {b.name} — {b.role}
+                      </div>
                     </div>
                   ))}
                 </div>

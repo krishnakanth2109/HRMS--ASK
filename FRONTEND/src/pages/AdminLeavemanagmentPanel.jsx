@@ -61,7 +61,7 @@ const formatDateTime = (dateStr) => {
   const minutes = String(d.getMinutes()).padStart(2, "0");
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
-  hours = hours ? hours : 12; 
+  hours = hours ? hours : 12;
   return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 };
 
@@ -82,14 +82,14 @@ const AdminLeavePanel = () => {
   const [loading, setLoading] = useState(true);
 
   // --- UI States for Filters & Actions ---
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); 
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filterDept, setFilterDept] = useState("All");
   const [filterStatus, setFilterStatus] = useState(
     location.state?.defaultStatus || "All"
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [openDropdownId, setOpenDropdownId] = useState(null);
-  
+
   const [employeeImages, setEmployeeImages] = useState({});
 
   // ✅ Fetch all data (Logic aligned with AdminDashboard)
@@ -297,13 +297,22 @@ const AdminLeavePanel = () => {
     return <span className={`px-4 py-1.5 rounded-md text-xs font-bold ${isApproved ? "bg-green-100 text-green-500" : "bg-red-100 text-red-500"}`}>{status}</span>;
   };
 
+  const monthFilteredLeaves = useMemo(() => {
+    return enrichedLeaveList.filter((leave) => {
+      if (!filterMonth) return true;
+      return leave.from.startsWith(filterMonth);
+    });
+  }, [enrichedLeaveList, filterMonth]);
+  const pendingCount = enrichedLeaveList.filter(l => l.status === "Pending").length;
   const pendingRequests = filteredRequests.filter(l => l.status === "Pending");
   const recentDecisions = filteredRequests.filter(l => l.status !== "Pending");
-  
+
   // ✅ Correct count using activeEmployees list
-  const totalEmployeesCount = activeEmployees.length; 
-  const approvedCount = filteredRequests.filter(l => l.status === "Approved").length;
-  const rejectedCount = filteredRequests.filter(l => l.status === "Rejected").length;
+  const totalEmployeesCount = activeEmployees.length;
+
+  const approvedCount = monthFilteredLeaves.filter(l => l.status === "Approved").length;
+
+  const rejectedCount = monthFilteredLeaves.filter(l => l.status === "Rejected").length;
 
   if (loading) return (
     <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -313,7 +322,7 @@ const AdminLeavePanel = () => {
 
   return (
     <div className="p-6 md:p-8  min-h-screen font-sans max-w-[1400px] mx-auto relative">
-      
+
       {openDropdownId && (
         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenDropdownId(null)}></div>
       )}
@@ -344,7 +353,7 @@ const AdminLeavePanel = () => {
             <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-2">
               <FaClock size={14} />
             </div>
-            <div className="text-3xl font-bold text-slate-800">{pendingRequests.length}</div>
+            <div className="text-3xl font-bold text-slate-800">{pendingCount}</div>
             <div className="text-sm font-semibold text-slate-500">Pending Request</div>
           </div>
         </div>
@@ -401,9 +410,9 @@ const AdminLeavePanel = () => {
       <div className="border border-slate-200 rounded-2xl bg-white mb-10 overflow-hidden shadow-sm">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/30">
           <h3 className="text-xl font-bold text-slate-800">Pending Requests</h3>
-          <span className="bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded-full text-xs">{pendingRequests.length} Pending</span>
+          <span className="bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded-full text-xs">{pendingCount} Pending</span>
         </div>
-        
+
         <div className="flex flex-col">
           {pendingRequests.length === 0 ? (
             <div className="p-10 text-center text-slate-500 font-medium">No pending leave requests found.</div>
@@ -433,7 +442,7 @@ const AdminLeavePanel = () => {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 mb-1">Duration</span>
-                          <span className="text-sm font-semibold text-slate-700">{getDayCount(lv.from, lv.to)} Day{getDayCount(lv.from, lv.to)>1?'s':''}</span>
+                          <span className="text-sm font-semibold text-slate-700">{getDayCount(lv.from, lv.to)} Day{getDayCount(lv.from, lv.to) > 1 ? 's' : ''}</span>
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 mb-2 w-full xl:max-w-md">
@@ -441,7 +450,7 @@ const AdminLeavePanel = () => {
                         <span className="text-sm text-slate-700 font-medium">{lv.reason}</span>
                       </div>
                       <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1">
-                        <FaClock size={10}/> Applied on {formatDateTime(lv.createdAt || lv.appliedDate)}
+                        <FaClock size={10} /> Applied on {formatDateTime(lv.createdAt || lv.appliedDate)}
                       </span>
                     </div>
                   </div>
@@ -482,7 +491,9 @@ const AdminLeavePanel = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs font-medium text-slate-400">
                         <span>{formatDateShort(lv.from)} - {formatDateShort(lv.to)} ({getDayCount(lv.from, lv.to)} days)</span>
                         <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-300"></span>
-                        <span className="truncate max-w-[200px]">Reason: {lv.reason}</span>
+                        <span className="text-xs text-slate-400">
+                          Reason: {lv.reason}
+                        </span>
                       </div>
                     </div>
                   </div>

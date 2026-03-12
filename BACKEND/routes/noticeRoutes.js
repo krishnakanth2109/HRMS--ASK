@@ -18,9 +18,7 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-/* ============================================================================
-   📌 ADMIN → GET ALL NOTICES
-============================================================================ */
+// --- ADMIN GET ALL NOTICES ---
 router.get("/all", protect, onlyAdmin, async (req, res) => {
   try {
     const allNotices = await Notice.find()
@@ -28,24 +26,25 @@ router.get("/all", protect, onlyAdmin, async (req, res) => {
       .populate("readBy.employeeId", "name employeeId")
       .populate("replies.employeeId", "name employeeId empId")
       .populate("replies.adminId", "name")
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .limit(50) // 🟢 Only fetch the latest 50 notices to prevent crashing
+      .lean();   // 🟢 MASSIVE SPEED BOOST: Returns raw JSON
+
     res.json(allNotices);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch notices" });
   }
 });
 
-/* ============================================================================
-   👤 EMPLOYEE → GET Notices (FIXED: Show ALL replies for notices user has access to)
-============================================================================ */
+// --- EMPLOYEE GET NOTICES ---
 router.get("/", protect, async (req, res) => {
   try {
     const userId = req.user._id.toString();
 
-    let notices = await Notice.find({
+    const notices = await Notice.find({
       $or: [
         { recipients: "ALL" },
-        { recipients: { $in: [userId] } },
+        { recipients: { $in: [userId] } }, // Ensure userId is passed correctly
         { createdBy: userId } 
       ]
     })
@@ -53,21 +52,18 @@ router.get("/", protect, async (req, res) => {
       .populate("recipients", "name employeeId")
       .populate("replies.employeeId", "name employeeId empId")
       .populate("replies.adminId", "name")
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .limit(50) // 🟢 Fetch latest 50
+      .lean();   // 🟢 MASSIVE SPEED BOOST
 
-    // ✅ FIXED: Don't filter replies - show ALL messages in notices the user can access
-    notices = notices.map(notice => {
-      const noticeObj = notice.toObject();
-      // Keep all replies intact - no filtering
-      return noticeObj;
-    });
+    // 🔴 REMOVED the expensive .map() and .toObject() loop! 
+    // .lean() already did this job much faster.
 
     res.json(notices);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch notices" });
   }
 });
-
 /* ============================================================================
    ✉️ CREATE NOTICE (Handles Group Sending for both Admin & Employee)
 ============================================================================ */

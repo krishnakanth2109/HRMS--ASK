@@ -2,12 +2,12 @@ import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { getEmployeeExpenses, addExpense } from '../api';
-import { 
-  FaMoneyBillWave, 
-  FaFileUpload, 
-  FaPaperPlane, 
-  FaHistory, 
-  FaCalendarAlt, 
+import {
+  FaMoneyBillWave,
+  FaFileUpload,
+  FaPaperPlane,
+  FaHistory,
+  FaCalendarAlt,
   FaPaperclip,
   FaPlus,
   FaTimes,
@@ -29,10 +29,10 @@ const AddExpense = () => {
     date: new Date().toISOString().split('T')[0], // Default to today
     description: ''
   });
-  
+
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+
   // New State for Modal visibility
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -50,7 +50,7 @@ const AddExpense = () => {
   // --- FETCH EXPENSES FUNCTION ---
   const fetchExpenses = async () => {
     if (!user || !user._id) return;
-    
+
     try {
       const res = await getEmployeeExpenses(user._id); // Use API function
       if (res.success) {
@@ -83,7 +83,7 @@ const AddExpense = () => {
         e.target.value = null;
         return;
       }
-      
+
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
@@ -91,7 +91,7 @@ const AddExpense = () => {
         e.target.value = null;
         return;
       }
-      
+
       setReceipt(file);
     }
   };
@@ -123,7 +123,7 @@ const AddExpense = () => {
       Swal.fire("Error", "Please select a category", "error");
       return;
     }
-    
+
     if (!formData.amount || Number(formData.amount) <= 0) {
       Swal.fire("Error", "Please enter a valid amount", "error");
       return;
@@ -132,14 +132,14 @@ const AddExpense = () => {
     setLoading(true);
 
     const data = new FormData();
-    data.append('employeeId', user._id); 
-    data.append('employeeCustomId', user.employeeId); 
+    data.append('employeeId', user._id);
+    data.append('employeeCustomId', user.employeeId);
     data.append('employeeName', user.name);
     data.append('category', formData.category);
     data.append('amount', formData.amount);
     data.append('date', formData.date);
     data.append('description', formData.description);
-    
+
     if (receipt) {
       data.append('receipt', receipt);
     }
@@ -156,7 +156,7 @@ const AddExpense = () => {
           timer: 2000,
           showConfirmButton: false
         });
-        
+
         // Reset Form & Close Modal
         setFormData({
           category: '',
@@ -172,9 +172,9 @@ const AddExpense = () => {
       }
     } catch (err) {
       console.error("Submission error:", err);
-      
+
       let errorMessage = "Failed to submit expense. Please try again.";
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = "Request timeout. Please check your internet connection and try again.";
       } else if (err.response?.data?.message) {
@@ -182,10 +182,10 @@ const AddExpense = () => {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       Swal.fire(
-        "Submission Failed", 
-        errorMessage, 
+        "Submission Failed",
+        errorMessage,
         "error"
       );
     } finally {
@@ -203,7 +203,7 @@ const AddExpense = () => {
     // Check file type
     const fileExtension = receiptUrl.split('.').pop().toLowerCase();
     const isPDF = fileExtension === 'pdf';
-    
+
     setReceiptPreview({
       isOpen: true,
       url: receiptUrl,
@@ -214,7 +214,7 @@ const AddExpense = () => {
   // --- Helper: Get file type icon ---
   const getFileIcon = (receiptUrl) => {
     if (!receiptUrl) return null;
-    
+
     const fileExtension = receiptUrl.split('.').pop().toLowerCase();
     return fileExtension === 'pdf' ? <FaFilePdf className="text-red-500" /> : <FaFileImage className="text-blue-500" />;
   };
@@ -226,7 +226,7 @@ const AddExpense = () => {
       Rejected: "bg-red-100 text-red-700 border-red-200",
       Pending: "bg-yellow-100 text-yellow-700 border-yellow-200"
     };
-    
+
     const icons = {
       Approved: <FaCheckCircle className="inline mr-1" />,
       Rejected: <FaTimes className="inline mr-1" />,
@@ -243,12 +243,12 @@ const AddExpense = () => {
   // --- Helper: Format action date ---
   const formatActionDate = (actionDate, status) => {
     if (!actionDate || status === 'Pending') return null;
-    
+
     return (
       <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
         <FaCalendarCheck size={10} />
-        {new Date(actionDate).toLocaleDateString()} 
-        <span className="text-gray-400 ml-1">({new Date(actionDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})</span>
+        {new Date(actionDate).toLocaleDateString()}
+        <span className="text-gray-400 ml-1">({new Date(actionDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
       </div>
     );
   };
@@ -262,15 +262,15 @@ const AddExpense = () => {
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 flex items-center gap-3">
 
-                 
-          
+
+
                 My Expenses
               </h1>
               <p className="text-gray-500 mt-2">Track and manage your submitted expenses</p>
             </div>
 
             {/* Add Expense Button */}
-            <button 
+            <button
               onClick={() => setIsModalOpen(true)}
               className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
             >
@@ -279,40 +279,40 @@ const AddExpense = () => {
           </div>
 
           {/* Summary Cards */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-  {/* Total Spent */}
-  <div className="bg-blue-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
-    <div className="flex justify-between items-center">
-      <div>
-        <p className="text-sm font-medium text-blue-500">Total Spent</p>
-        <p className="text-3xl font-bold mt-1 text-gray-800">₹{totalSpent.toLocaleString()}</p>
-      </div>
-      <FaMoneyBillWave size={32} className="text-blue-300" />
-    </div>
-  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            {/* Total Spent */}
+            <div className="bg-blue-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-blue-500">Total Spent</p>
+                  <p className="text-3xl font-bold mt-1 text-gray-800">₹{totalSpent.toLocaleString()}</p>
+                </div>
+                <FaMoneyBillWave size={32} className="text-blue-300" />
+              </div>
+            </div>
 
-  {/* Pending */}
-  <div className="bg-yellow-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
-    <div className="flex justify-between items-center">
-      <div>
-        <p className="text-sm font-medium text-yellow-500">Pending</p>
-        <p className="text-3xl font-bold mt-1 text-gray-800">{pendingCount}</p>
-      </div>
-      <FaHourglassHalf size={32} className="text-yellow-300" />
-    </div>
-  </div>
+            {/* Pending */}
+            <div className="bg-yellow-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-yellow-500">Pending</p>
+                  <p className="text-3xl font-bold mt-1 text-gray-800">{pendingCount}</p>
+                </div>
+                <FaHourglassHalf size={32} className="text-yellow-300" />
+              </div>
+            </div>
 
-  {/* Approved */}
-  <div className="bg-green-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
-    <div className="flex justify-between items-center">
-      <div>
-        <p className="text-sm font-medium text-green-500">Approved</p>
-        <p className="text-3xl font-bold mt-1 text-gray-800">{approvedCount}</p>
-      </div>
-      <FaCheckCircle size={32} className="text-green-300" />
-    </div>
-  </div>
-</div>
+            {/* Approved */}
+            <div className="bg-green-50 rounded-xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-green-500">Approved</p>
+                  <p className="text-3xl font-bold mt-1 text-gray-800">{approvedCount}</p>
+                </div>
+                <FaCheckCircle size={32} className="text-green-300" />
+              </div>
+            </div>
+          </div>
 
 
         </div>
@@ -333,7 +333,7 @@ const AddExpense = () => {
             <div className="text-center py-12">
               <FaHistory className="mx-auto text-gray-300" size={64} />
               <p className="text-gray-500 mt-4 text-lg">No expenses submitted yet.</p>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(true)}
                 className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition"
               >
@@ -369,17 +369,20 @@ const AddExpense = () => {
                       <td className="p-4">
                         <div>
                           {getStatusBadge(expense.status)}
-                          {formatActionDate(expense.actionDate, expense.status)}
                         </div>
                       </td>
                       <td className="p-4 text-sm text-gray-600">
                         {expense.actionDate ? (
-                          <div className="flex items-center gap-2">
-                            <FaCalendarCheck className="text-gray-400" />
-                            {new Date(expense.actionDate).toLocaleDateString()}
-                            <span className="text-xs text-gray-400">
-                              {new Date(expense.actionDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </span>
+                          <div className="flex items-start gap-2">
+                            <FaCalendarCheck className="text-gray-400 mt-1" />
+                            <div className="flex flex-col">
+                              <span>
+                                {new Date(expense.actionDate).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(expense.actionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -387,7 +390,7 @@ const AddExpense = () => {
                       </td>
                       <td className="p-4">
                         {expense.receiptUrl ? (
-                          <button 
+                          <button
                             onClick={() => handleViewReceipt(expense.receiptUrl)}
                             className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm transition"
                           >
@@ -411,19 +414,19 @@ const AddExpense = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" 
+          <div
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
             onClick={() => setIsModalOpen(false)}
           ></div>
 
           {/* Modal Content */}
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
-            
+
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 flex justify-between items-center text-white">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-lg">
-                   <FaMoneyBillWave />
+                  <FaMoneyBillWave />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">Add Expense</h2>
@@ -441,11 +444,11 @@ const AddExpense = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Category *</label>
-                    <select 
-                      name="category" 
-                      value={formData.category} 
-                      onChange={handleInputChange} 
-                      required 
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      required
                       className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm"
                     >
                       <option value="">Select...</option>
@@ -458,12 +461,12 @@ const AddExpense = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Amount (₹) *</label>
-                    <input 
-                      type="number" 
-                      name="amount" 
-                      value={formData.amount} 
-                      onChange={handleInputChange} 
-                      required 
+                    <input
+                      type="number"
+                      name="amount"
+                      value={formData.amount}
+                      onChange={handleInputChange}
+                      required
                       min="1"
                       step="0.01"
                       placeholder="0.00"
@@ -474,22 +477,22 @@ const AddExpense = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date *</label>
-                  <input 
-                    type="date" 
-                    name="date" 
-                    value={formData.date} 
-                    onChange={handleInputChange} 
-                    required 
+                  <input
+                    type="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    required
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                  <textarea 
-                    name="description" 
-                    value={formData.description} 
-                    onChange={handleInputChange} 
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
                     placeholder="Brief description..."
                     rows="2"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm resize-none"
@@ -500,17 +503,17 @@ const AddExpense = () => {
                 <div className="relative group">
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Receipt (Optional)</label>
                   <div className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${receipt ? 'border-green-300 bg-green-50' : 'border-gray-300 hover:bg-blue-50 hover:border-blue-300'}`}>
-                    <input 
+                    <input
                       id="receiptInput"
-                      type="file" 
-                      accept="image/*,application/pdf" 
-                      onChange={handleFileChange} 
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={handleFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <div className="flex flex-col items-center justify-center gap-2 text-gray-500 group-hover:text-blue-600">
                       <FaFileUpload size={24} className={receipt ? 'text-green-500' : ''} />
                       <span className="text-sm font-medium truncate w-60">
-                         {receipt ? receipt.name : "Click to upload file (JPG, PNG, PDF)"}
+                        {receipt ? receipt.name : "Click to upload file (JPG, PNG, PDF)"}
                       </span>
                       <span className="text-xs text-gray-400">
                         Max size: 5MB
@@ -522,7 +525,7 @@ const AddExpense = () => {
                       <span className="text-xs text-green-600 font-medium">
                         ✓ File selected: {receipt.type.includes('pdf') ? 'PDF' : 'Image'}
                       </span>
-                      <button 
+                      <button
                         type="button"
                         onClick={clearReceipt}
                         className="text-xs text-red-600 hover:text-red-800 font-medium"
@@ -535,15 +538,15 @@ const AddExpense = () => {
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-4">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
                     className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={loading}
                     className={`flex-1 py-3 rounded-xl text-white font-bold shadow-md transition-all flex items-center justify-center gap-2 ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg hover:to-indigo-700'}`}
                   >
@@ -572,7 +575,7 @@ const AddExpense = () => {
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-bold text-gray-800">Receipt Preview</h3>
-              <button 
+              <button
                 onClick={() => setReceiptPreview({ isOpen: false, url: '', type: '' })}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -581,15 +584,15 @@ const AddExpense = () => {
             </div>
             <div className="p-4 overflow-auto max-h-[70vh] flex justify-center">
               {receiptPreview.type === 'pdf' ? (
-                <iframe 
+                <iframe
                   src={receiptPreview.url}
                   className="w-full h-[60vh] border-0"
                   title="Receipt PDF"
                 />
               ) : (
-                <img 
-                  src={receiptPreview.url} 
-                  alt="Receipt" 
+                <img
+                  src={receiptPreview.url}
+                  alt="Receipt"
                   className="max-w-full max-h-[60vh] object-contain rounded-lg shadow"
                   onError={(e) => {
                     e.target.onerror = null;
@@ -599,15 +602,15 @@ const AddExpense = () => {
               )}
             </div>
             <div className="p-4 border-t flex justify-between">
-              <a 
-                href={receiptPreview.url} 
-                target="_blank" 
+              <a
+                href={receiptPreview.url}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center gap-2"
               >
                 <FaPlus /> Open in New Tab
               </a>
-              <button 
+              <button
                 onClick={() => setReceiptPreview({ isOpen: false, url: '', type: '' })}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
               >

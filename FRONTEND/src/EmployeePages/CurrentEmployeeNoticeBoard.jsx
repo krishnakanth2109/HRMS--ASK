@@ -140,7 +140,7 @@ const NoticeList = () => {
   useEffect(() => {
     const interval = setInterval(() => {
         fetchNotices(true); 
-    }, 3000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [fetchNotices]);
 

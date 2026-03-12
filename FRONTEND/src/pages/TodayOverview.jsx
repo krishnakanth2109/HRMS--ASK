@@ -557,8 +557,8 @@ const MessageModal = ({ isOpen, onClose, employee, phoneNumber }) => {
   );
 };
 
-// ✅ ADDED onDeactivateClick prop to EmployeeCard
-const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick, onNameClick, onDeactivateClick }) => {
+// ✅ UPDATED EmployeeCard to receive onProfileClick prop and display in Dropdown
+const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessageClick, onNameClick, onProfileClick, onDeactivateClick }) => {
   const profilePic = employee.profilePic;
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -646,6 +646,17 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="py-1">
+                    {/* ✅ ADDED Profile Button to Card Menu */}
+                    <button
+                      onClick={() => {
+                        onProfileClick(employee.employeeId);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                    >
+                      <FaIdBadge className="text-xs" />
+                      Profile
+                    </button>
                     <button
                       onClick={() => {
                         onCallClick(employee);
@@ -666,7 +677,6 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
                       <FaEnvelope className="text-xs" />
                       Message
                     </button>
-                    {/* ✅ ADDED Deactivate Button to Card Menu */}
                     <button
                       onClick={() => {
                         onDeactivateClick(employee);
@@ -735,8 +745,8 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
   );
 };
 
-// ✅ ADDED TableActionMenu component to handle dropdown in table view
-const TableActionMenu = ({ employee, onCall, onMessage, onDeactivate }) => {
+// ✅ UPDATED TableActionMenu component to include onProfile option and fix formatting
+const TableActionMenu = ({ employee, onCall, onMessage, onProfile, onDeactivate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -754,26 +764,28 @@ const TableActionMenu = ({ employee, onCall, onMessage, onDeactivate }) => {
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
         onClick={() => setIsMenuOpen(!isMenuOpen)}
-        className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
+        className="inline-flex items-center gap-1.5 bg-white text-gray-800 border border-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm hover:bg-gray-50 hover:border-gray-300 transition"
       >
-        <button
-          onClick={() => setOpen(!open)}
-          className="inline-flex items-center gap-1.5 bg-white text-gray-800 border border-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm hover:bg-gray-50 hover:border-gray-300 transition"
+        Actions
+        <svg
+          className={`w-4 h-4 transition-transform duration-200 ${isMenuOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          Actions
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${isMenuOpen ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9l6 6 6-6" />
+        </svg>
       </button>
       {isMenuOpen && (
         <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-xl z-20 border border-slate-200 overflow-hidden origin-top-right">
           <div className="py-1">
+            {/* ✅ ADDED Profile Option Here */}
+            <button
+              onClick={() => { onProfile(employee.employeeId); setIsMenuOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+            >
+              <FaIdBadge className="text-xs" /> Profile
+            </button>
             <button
               onClick={() => { onCall(employee); setIsMenuOpen(false); }}
               className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
@@ -800,8 +812,8 @@ const TableActionMenu = ({ employee, onCall, onMessage, onDeactivate }) => {
 };
 
 // --- Table View Component ---
-// ✅ UPDATED TableView to include TableActionMenu
-const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClick, onDeactivateClick }) => {
+// ✅ UPDATED TableView to accept onProfileClick prop and pass it down
+const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClick, onProfileClick, onDeactivateClick }) => {
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden" style={{ minHeight: "400px" }}> {/* Added minHeight to allow dropdowns to show near bottom */}
       <div className="overflow-x-auto overflow-y-visible"> {/* Allow overflow for dropdowns */}
@@ -888,11 +900,11 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClic
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {/* ✅ Using TableActionMenu for actions */}
                   <TableActionMenu
                     employee={employee}
                     onCall={onCallClick}
                     onMessage={onMessageClick}
+                    onProfile={onProfileClick} // ✅ Pass onProfile handler
                     onDeactivate={onDeactivateClick}
                   />
                 </td>
@@ -928,7 +940,7 @@ const TodayOverview = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [callModal, setCallModal] = useState({ isOpen: false, employee: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, employee: null });
-  // ✅ ADDED Deactivate Modal State
+  // Deactivate Modal State
   const [deactivateModal, setDeactivateModal] = useState({ isOpen: false, employee: null });
 
   // Optimized data fetch
@@ -1179,12 +1191,17 @@ const TodayOverview = () => {
   // Handlers
   const handleCallClick = (employee) => setCallModal({ isOpen: true, employee });
   const handleMessageClick = (employee) => setMessageModal({ isOpen: true, employee });
-  const handleNameClick = (employeeId) => navigate(`/employee/${employeeId}/profile`);
+  
+  // ✅ UPDATED: Clicking name now redirects to /attendance
+  const handleNameClick = (employeeId) => navigate(`/attendance`);
+  
+  // ✅ ADDED: Function to handle redirection to employee profile via three-dots menu
+  const handleProfileClick = (employeeId) => navigate(`/employee/${employeeId}/profile`);
 
-  // ✅ ADDED Deactivate Handlers
+  // Deactivate Handlers
   const handleDeactivateClick = (employee) => setDeactivateModal({ isOpen: true, employee });
 
-const handleDeactivateSubmit = async ({ endDate, reason }) => {
+  const handleDeactivateSubmit = async ({ endDate, reason }) => {
     if (!deactivateModal.employee) return;
 
     // 1. Show Loading Alert
@@ -1423,7 +1440,8 @@ const handleDeactivateSubmit = async ({ endDate, reason }) => {
                   onCallClick={handleCallClick}
                   onMessageClick={handleMessageClick}
                   onNameClick={handleNameClick}
-                  onDeactivateClick={handleDeactivateClick} // ✅ PASSED DEACTIVATE HANDLER
+                  onProfileClick={handleProfileClick}
+                  onDeactivateClick={handleDeactivateClick}
                 />
               ))}
             </div>
@@ -1434,7 +1452,8 @@ const handleDeactivateSubmit = async ({ endDate, reason }) => {
               onCallClick={handleCallClick}
               onMessageClick={handleMessageClick}
               onNameClick={handleNameClick}
-              onDeactivateClick={handleDeactivateClick} // ✅ PASSED DEACTIVATE HANDLER
+              onProfileClick={handleProfileClick} // ✅ ADDED Profile click handler
+              onDeactivateClick={handleDeactivateClick}
             />
           )
         )}
@@ -1531,7 +1550,7 @@ const handleDeactivateSubmit = async ({ endDate, reason }) => {
         )}
       </AnimatePresence>
 
-      {/* ✅ ADDED Deactivate Modal Render */}
+      {/* Deactivate Modal Render */}
       <DeactivateModal
         open={deactivateModal.isOpen}
         employee={deactivateModal.employee}
