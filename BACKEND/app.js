@@ -36,6 +36,7 @@ import payrollRoutes from "./routes/payroll.js";
 import mailRoutes from "./routes/mailRoutes.js";
 import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
 import payrollcandidatesRoutes from "./routes/payrollcandidatesRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 
 
 // -------------------- APP SETUP --------------------
@@ -300,6 +301,7 @@ app.use("/api/mail", mailRoutes);
 app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
 app.use('/api/idletime', idleTimeRoutes);
+app.use("/api/ai", aiRoutes); 
 
 
 // -------------------- 404 --------------------

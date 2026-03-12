@@ -211,6 +211,10 @@ const EmployeeLeavemanagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+
+  // ✅ ADDED: AI Optimize specific states
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isOptimized, setIsOptimized] = useState(false);
   
   // Sandwich leave warning state
   const [sandwichWarning, setSandwichWarning] = useState(null);
@@ -781,6 +785,10 @@ const EmployeeLeavemanagement = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    if (name === "reason") {
+      setIsOptimized(false);
+    }
+
     setForm((prev) => {
       let updated = {
         ...prev,
@@ -933,6 +941,98 @@ const EmployeeLeavemanagement = () => {
       setSandwichWarning(null);
     }
   }, [filteredLeaveList, holidays, selectedMonth, form.halfDaySession, form.from, form.to, shiftDetails]);
+
+  // ✅ ADDED: AI Optimize Reason Handler (Using Gemini API with Robust Fallback & Load Balancing)
+  const handleOptimizeReason = async () => {
+    if (!form.reason.trim() || isOptimizing) return;
+    
+    setIsOptimizing(true);
+    try {
+      const key1 = import.meta.env.VITE_AI_API_KEY_1;
+      const key2 = import.meta.env.VITE_AI_API_KEY_2;
+      const fallbackKey = import.meta.env.VITE_AI_API_KEY;
+      
+      // Collect valid keys
+      let availableKeys = [key1, key2, fallbackKey].filter(k => 
+        Boolean(k) && 
+        k !== "your_api_key_here" && 
+        k !== "your_first_gemini_api_key_here" && 
+        k !== "your_second_gemini_api_key_here"
+      );
+
+      if (availableKeys.length === 0) {
+        throw new Error("AI API Keys are missing. Please add VITE_AI_API_KEY_1 to your .env file.");
+      }
+
+      // Randomize array to load balance
+      availableKeys = availableKeys.sort(() => Math.random() - 0.5);
+
+      // We use exact model names found on Google's API for the v1beta endpoint.
+      // E.g., gemini-2.5-flash or gemini-2.0-flash-lite (which is sometimes gemini-2.0-flash-lite-001)
+      const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
+      let optimizedText = null;
+      let lastError = null;
+
+      // Try each key and each model until one succeeds
+      for (const apiKey of availableKeys) {
+        if (optimizedText) break;
+        
+        for (const modelName of modelsToTry) {
+          try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                system_instruction: { 
+                  parts: { 
+                    text: "You are an HR assistant. Convert the user's short input into a formal, complete sentence explaining why they need leave. Keep it under 90 characters so it fits perfectly. Examples: 'Requesting leave because my friend was in an accident.' or 'I need time off due to family matters.' Return ONLY the finished sentence, no quotes, no extra words." 
+                  } 
+                },
+                contents: [{ parts: [{ text: form.reason }] }]
+              })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error?.message || "Failed to optimize reason via AI.");
+            }
+            
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              optimizedText = text;
+              break; // Success! Break out of model loop
+            }
+          } catch (err) {
+            console.warn(`Attempt with ${modelName} failed:`, err.message);
+            lastError = err;
+          }
+        }
+      }
+
+      if (optimizedText) {
+        setForm(prev => ({
+          ...prev,
+          reason: optimizedText.trim().slice(0, REASON_LIMIT)
+        }));
+        setIsOptimized(true);
+      } else {
+        throw new Error(lastError?.message || "All keys and models were exhausted or returned empty.");
+      }
+    } catch (error) {
+      console.error("AI Optimization failed:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Optimization Failed',
+        text: error.message.includes("exceeded your current quota") || error.message.includes("quota")
+          ? "API limit reached for ALL your keys today. Please try again tomorrow, or add a fresh key to your .env file."
+          : (error.message || "Failed to connect to AI service. Please check your config."),
+        confirmButtonColor: '#3085d6'
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   // ✅ UPDATED: Submit leave with LOP check
   const handleSubmit = async (e) => {
@@ -1836,18 +1936,56 @@ const EmployeeLeavemanagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Reason <span className="text-gray-400 text-xs">({form.reason.length}/{REASON_LIMIT})</span>
-                  </label>
-                  <input
-                    type="text"
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Reason <span className="text-gray-400 text-xs font-normal ml-1">({form.reason.length}/{REASON_LIMIT})</span>
+                    </label>
+                    {isOptimized && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eef2ff] text-indigo-600">
+                        ✨ Optimized
+                      </span>
+                    )}
+                  </div>
+                  <textarea
                     name="reason"
                     value={form.reason}
                     onChange={handleChange}
                     maxLength={REASON_LIMIT}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
+                    rows="3"
+                    className={`w-full border-2 rounded-xl px-4 py-3 transition duration-200 resize-none ${
+                        isOptimized 
+                          ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200" 
+                          : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    }`}
                     placeholder="Brief reason for your leave"
-                  />
+                  ></textarea>
+
+                  <div className="mt-2 flex flex-col items-start gap-1">
+                    <button
+                      type="button"
+                      onClick={handleOptimizeReason}
+                      disabled={!form.reason.trim() || isOptimizing}
+                      className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 ${
+                        !form.reason.trim()
+                          ? "bg-gray-300 cursor-not-allowed text-gray-500"
+                          : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
+                      }`}
+                      style={{ fontFamily: 'Segoe UI, system-ui, sans-serif' }}
+                    >
+                      {isOptimizing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Optimizing...
+                        </>
+                      ) : (
+                        <>✨Auto Generate</>
+                      )}
+                    </button>
+                    <span className="text-[10px] text-gray-500 mt-1">Let AI rewrite your reason in professional HR language</span>
+                  </div>
                 </div>
 
                 {submitError && (
