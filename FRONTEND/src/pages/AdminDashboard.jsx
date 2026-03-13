@@ -566,7 +566,7 @@ const AdminDashboard = () => {
 
           {/* Absent - Clickable (UPDATED ROUTE) */}
           <Link
-            to="/admin/today-overview"
+              to="/admin/today-overview?type=absent"
             className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-red-100 cursor-pointer"
           >
             <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
