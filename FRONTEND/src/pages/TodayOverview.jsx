@@ -1,7 +1,7 @@
 // --- START OF FILE TodayOverview.jsx ---
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api, {
   getAttendanceByDateRange,
   getLeaveRequests,
@@ -921,6 +921,9 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClic
 // --- Main Component ---
 const TodayOverview = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+const type = queryParams.get("type");
 
   // State
   const [attendanceData, setAttendanceData] = useState([]);
@@ -934,6 +937,15 @@ const TodayOverview = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("card"); // 'card' or 'table'
   const [filterType, setFilterType] = useState("WORKING"); // Default "Working"
+  useEffect(() => {
+  if (type === "present") {
+    setFilterType("WORKING");
+  }
+
+  if (type === "absent") {
+    setFilterType("NOT_LOGGED_IN");
+  }
+}, [type]);
   const [departmentFilter, setDepartmentFilter] = useState("All");
 
   // Modals
