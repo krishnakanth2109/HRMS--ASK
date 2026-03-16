@@ -384,6 +384,76 @@ router.get('/all', onlyAdmin, async (req, res) => {
   }
 });
 
+/* ================= ADMIN DATE RANGE — Flat daily records with ALL fields ================= */
+// Used by AdminviewAttendance for Daily Log and Summary tables
+// Returns each day as a flat object so isOnBreak, isFinalPunchOut, breakSessions etc. are always present
+router.get('/admin/date-range', onlyAdmin, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ message: "start and end query params are required" });
+
+    const startDate = start; // YYYY-MM-DD
+    const endDate = end;     // YYYY-MM-DD
+
+    const records = await Attendance.find({});
+    const flatRecords = [];
+
+    records.forEach(empRecord => {
+      empRecord.attendance.forEach(day => {
+        // Only include days within the requested range
+        if (day.date >= startDate && day.date <= endDate) {
+          flatRecords.push({
+            // ── Identity ──────────────────────────────
+            employeeId:              empRecord.employeeId,
+            employeeName:            empRecord.employeeName,
+            // ── Day fields ────────────────────────────
+            date:                    day.date,
+            punchIn:                 day.punchIn,
+            punchOut:                day.punchOut,
+            punchInLocation:         day.punchInLocation,
+            punchOutLocation:        day.punchOutLocation,
+            sessions:                day.sessions || [],
+            // ── Break fields (NEW) ────────────────────
+            isOnBreak:               day.isOnBreak     || false,
+            breakSessions:           day.breakSessions || [],
+            // ── Worked time ───────────────────────────
+            workedHours:             day.workedHours   || 0,
+            workedMinutes:           day.workedMinutes || 0,
+            workedSeconds:           day.workedSeconds || 0,
+            totalBreakSeconds:       day.totalBreakSeconds || 0,
+            displayTime:             day.displayTime   || "0h 0m 0s",
+            // ── Status flags (used by count cards) ────
+            status:                  day.status        || "NOT_STARTED",
+            isFinalPunchOut:         day.isFinalPunchOut || false,
+            adminPunchOut:           day.adminPunchOut   || false,
+            adminPunchOutBy:         day.adminPunchOutBy || null,
+            adminPunchOutTimestamp:  day.adminPunchOutTimestamp || null,
+            // ── Attendance classification ─────────────
+            loginStatus:             day.loginStatus        || "NOT_APPLICABLE",
+            workedStatus:            day.workedStatus       || "NOT_APPLICABLE",
+            attendanceCategory:      day.attendanceCategory || "NOT_APPLICABLE",
+            // ── Correction requests ───────────────────
+            lateCorrectionRequest:   day.lateCorrectionRequest   || null,
+            statusCorrectionRequest: day.statusCorrectionRequest || null,
+          });
+        }
+      });
+    });
+
+    // Sort by date desc, then punchIn desc
+    flatRecords.sort((a, b) => {
+      if (b.date !== a.date) return b.date.localeCompare(a.date);
+      const tA = a.punchIn ? new Date(a.punchIn).getTime() : 0;
+      const tB = b.punchIn ? new Date(b.punchIn).getTime() : 0;
+      return tB - tA;
+    });
+
+    res.status(200).json(flatRecords);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ================= UTILITIES ================= */
 const getToday = () => {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -563,6 +633,17 @@ router.post('/punch-in', async (req, res) => {
         todayRecord.totalBreakSeconds += breakDiff;
       }
 
+      // ✅ NEW: Close the open break session (record break end time)
+      if (todayRecord.isOnBreak && todayRecord.breakSessions && todayRecord.breakSessions.length > 0) {
+        const openBreak = [...todayRecord.breakSessions].reverse().find(b => !b.to);
+        if (openBreak) {
+          openBreak.to = now;
+          openBreak.durationSeconds = (now - new Date(openBreak.from)) / 1000;
+        }
+      }
+      // ✅ NEW: Clear on-break flag
+      todayRecord.isOnBreak = false;
+
       todayRecord.sessions.push({ punchIn: now, punchOut: null, durationSeconds: 0 });
       todayRecord.status = "WORKING";
       todayRecord.punchOut = null;
@@ -609,6 +690,8 @@ router.post('/punch-out', async (req, res) => {
     todayRecord.status = "COMPLETED";
     // ✅ FINAL punch-out: block re-punch-in
     todayRecord.isFinalPunchOut = true;
+    // ✅ NEW: Ensure on-break flag is cleared on final punch-out
+    todayRecord.isOnBreak = false;
 
     let totalSeconds = 0;
     todayRecord.sessions.forEach(sess => {
@@ -701,6 +784,11 @@ router.post('/punch-break', async (req, res) => {
     // ✅ BREAK: allow re-punch-in, NO email sent
     todayRecord.isFinalPunchOut = false;
 
+    // ✅ NEW: Mark employee as on break and record break start time
+    todayRecord.isOnBreak = true;
+    if (!todayRecord.breakSessions) todayRecord.breakSessions = [];
+    todayRecord.breakSessions.push({ from: now, to: null, durationSeconds: 0 });
+
     let totalSeconds = 0;
     todayRecord.sessions.forEach(sess => {
       if (sess.punchIn && sess.punchOut) {
@@ -779,6 +867,10 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
     dayRecord.adminPunchOut = true;
     dayRecord.adminPunchOutBy = req.user.name;
     dayRecord.adminPunchOutTimestamp = new Date();
+    // ✅ Mark as final so frontend Shift Completed count picks it up correctly
+    dayRecord.isFinalPunchOut = true;
+    // ✅ Clear on-break flag in case admin punches out an employee who was on break
+    dayRecord.isOnBreak = false;
 
     let totalSeconds = 0;
     dayRecord.sessions.forEach(sess => {

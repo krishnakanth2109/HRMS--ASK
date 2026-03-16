@@ -1104,7 +1104,7 @@ const AdminDashboard = () => {
                       {getInitials(b.name)}
 
                       {/* Hover Name Box */}
-                      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 hidden group-hover:block bg-white text-[#2B3674] text-xs px-3 py-1 rounded shadow-lg whitespace-nowrap">
+                      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 hidden group-hover:block bg-black text-[#ffffff] text-xs px-3 py-1 rounded shadow-lg whitespace-nowrap">
                         {b.name} — {b.role}
                       </div>
                     </div>

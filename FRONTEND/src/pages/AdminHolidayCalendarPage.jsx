@@ -408,7 +408,11 @@ const AdminHolidayCalendarPage = () => {
               <Calendar
                 tileClassName={tileClassName}
                 tileContent={tileContent}
-                onActiveStartDateChange={({ activeStartDate }) => setActiveDate(activeStartDate)}
+               onActiveStartDateChange={({ activeStartDate }) => {
+  setActiveDate(activeStartDate);
+  setHolidayCursor(activeStartDate);
+  setBirthdayCursor(activeStartDate);
+}}
                 className="best-ui-calendar"
                 next2Label={null}
                 prev2Label={null}

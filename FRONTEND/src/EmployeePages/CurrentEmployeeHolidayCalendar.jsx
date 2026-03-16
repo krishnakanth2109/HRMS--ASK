@@ -84,31 +84,23 @@ const EmployeeHolidays = () => {
 
   // --- LOGIC: CALCULATIONS ---
 
-  // 1. Next Upcoming Holiday
+  // 1. Next Upcoming Holiday (Global next from today)
   const upcomingHoliday = holidays
     .filter(h => h.start >= new Date())
     .sort((a, b) => a.start - b.start)[0];
 
-  // 2. Filtered Lists
-  const allUpcomingHolidays = holidays
-    .filter(h => h.start >= new Date())
+  // 2. Filtered Lists - Based on the currently selected Month & Year
+  const selectedMonthHolidays = holidays
+    .filter(h => h.start.getMonth() === activeDate.getMonth() && h.start.getFullYear() === activeDate.getFullYear())
     .sort((a, b) => a.start - b.start);
 
   const displayHolidays = expandedHolidays 
-    ? allUpcomingHolidays 
-    : allUpcomingHolidays.slice(0, 4);
+    ? selectedMonthHolidays 
+    : selectedMonthHolidays.slice(0, 4);
 
-  // Filter Birthdays: Match Month AND (if current month, day >= today)
+  // Filter Birthdays: Match Month
   const currentMonthBirthdays = birthdays
     .filter(b => b.dob.getMonth() === activeDate.getMonth())
-    .filter(b => {
-      const today = new Date();
-      // If viewing the current real-time month, filter out passed days
-      if (activeDate.getMonth() === today.getMonth() && activeDate.getFullYear() === today.getFullYear()) {
-        return b.dob.getDate() >= today.getDate();
-      }
-      return true;
-    })
     .sort((a, b) => a.dob.getDate() - b.dob.getDate());
 
   const displayBirthdays = expandedBirthdays
@@ -131,7 +123,7 @@ const EmployeeHolidays = () => {
   const currentMonth = activeDate.getMonth();
   
   const stats = {
-    holidays: holidays.filter(h => h.start.getMonth() === currentMonth && h.start.getFullYear() === currentYear).length,
+    holidays: selectedMonthHolidays.length,
     weekends: getWeekendsInMonth(currentYear, currentMonth),
     birthdays: currentMonthBirthdays.length,
   };
@@ -221,7 +213,7 @@ const EmployeeHolidays = () => {
   if (isLoading) return <div className="p-10 flex justify-center text-gray-500">Loading Calendar...</div>;
 
   return (
-    <div className="min-h-screen  p-4 md:p-8 font-sans">
+    <div className="min-h-screen p-4 md:p-8 font-sans">
       <div className="max-w-[1800px] mx-auto space-y-8">
         
         {/* HEADER SECTION */}
@@ -250,7 +242,7 @@ const EmployeeHolidays = () => {
               <div>
                 <p className="text-gray-500 text-sm font-medium">Holidays</p>
                 <h3 className="text-2xl font-bold text-gray-800 mt-1">{stats.holidays}</h3>
-                <span className="text-xs text-gray-400">This month</span>
+                <span className="text-xs text-gray-400">Selected month</span>
               </div>
               <div className="p-3 rounded-full bg-blue-50">
                 <FaUmbrellaBeach className="text-blue-500 text-xl" />
@@ -263,7 +255,7 @@ const EmployeeHolidays = () => {
               <div>
                 <p className="text-gray-500 text-sm font-medium">Weekends</p>
                 <h3 className="text-2xl font-bold text-gray-800 mt-1">{stats.weekends}</h3>
-                <span className="text-xs text-gray-400">This month</span>
+                <span className="text-xs text-gray-400">Selected month</span>
               </div>
               <div className="p-3 rounded-full bg-indigo-50">
                 <FaCalendarCheck className="text-indigo-500 text-xl" />
@@ -276,7 +268,7 @@ const EmployeeHolidays = () => {
               <div>
                 <p className="text-gray-500 text-sm font-medium">Birthdays</p>
                 <h3 className="text-2xl font-bold text-gray-800 mt-1">{stats.birthdays}</h3>
-                <span className="text-xs text-gray-400">Upcoming</span>
+                <span className="text-xs text-gray-400">Selected month</span>
               </div>
               <div className="p-3 rounded-full bg-orange-50">
                 <FaBirthdayCake className="text-orange-500 text-xl" />
@@ -284,7 +276,7 @@ const EmployeeHolidays = () => {
             </div>
           </div>
 
-          {/* Next Holiday Card */}
+          {/* Next Holiday Card (Globally from today) */}
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-sm text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -313,18 +305,51 @@ const EmployeeHolidays = () => {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-800">Calendar</h3>
-    
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <button 
                   onClick={() => setActiveDate(new Date(activeDate.getFullYear(), activeDate.getMonth() - 1, 1))}
                   className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"
                 >
                   <FaChevronLeft />
                 </button>
-                <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium">
-                  {activeDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                
+                {/* SELECTABLE MONTH & YEAR */}
+                <div className="flex gap-1 bg-gray-50 rounded-lg p-1 text-sm font-medium">
+                  <select 
+                    value={activeDate.getMonth()}
+                    onChange={(e) => {
+                      const newDate = new Date(activeDate);
+                      newDate.setDate(1); // prevent month overflow
+                      newDate.setMonth(parseInt(e.target.value));
+                      setActiveDate(newDate);
+                    }}
+                    className="bg-transparent outline-none cursor-pointer text-gray-700 hover:text-blue-600 px-1"
+                  >
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <option key={i} value={i}>
+                        {new Date(2000, i, 1).toLocaleString('default', { month: 'short' })}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <select
+                    value={activeDate.getFullYear()}
+                    onChange={(e) => {
+                      const newDate = new Date(activeDate);
+                      newDate.setDate(1); // prevent month overflow
+                      newDate.setFullYear(parseInt(e.target.value));
+                      setActiveDate(newDate);
+                    }}
+                    className="bg-transparent outline-none cursor-pointer text-gray-700 hover:text-blue-600 px-1"
+                  >
+                    {Array.from({ length: 21 }).map((_, i) => {
+                      const year = new Date().getFullYear() - 10 + i; // 10 years past and future options
+                      return <option key={year} value={year}>{year}</option>
+                    })}
+                  </select>
                 </div>
+
                 <button 
                   onClick={() => setActiveDate(new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 1))}
                   className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"
@@ -431,7 +456,7 @@ const EmployeeHolidays = () => {
             </div>
           </div>
 
-          {/* MIDDLE: UPCOMING HOLIDAYS */}
+          {/* MIDDLE: MONTH'S HOLIDAYS */}
           <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-all duration-300 flex flex-col ${expandedHolidays ? 'h-auto' : 'h-full'}`}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -439,8 +464,8 @@ const EmployeeHolidays = () => {
                   <FaUmbrellaBeach className="text-blue-500 text-xl" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-800 text-lg">Upcoming Holidays</h3>
-                  <p className="text-gray-500 text-sm">Next holidays</p>
+                  <h3 className="font-bold text-gray-800 text-lg">Month's Holidays</h3>
+                  <p className="text-gray-500 text-sm">Holidays in selected month</p>
                 </div>
               </div>
             </div>
@@ -449,7 +474,7 @@ const EmployeeHolidays = () => {
               {displayHolidays.length === 0 ? (
                 <div className="text-center py-8">
                   <FaUmbrellaBeach className="text-gray-300 text-3xl mx-auto mb-3" />
-                  <p className="text-gray-400">No upcoming holidays</p>
+                  <p className="text-gray-400">No holidays this month</p>
                 </div>
               ) : (
                 displayHolidays.map((h, i) => (
@@ -478,7 +503,7 @@ const EmployeeHolidays = () => {
               )}
             </div>
             
-            {allUpcomingHolidays.length > 4 && (
+            {selectedMonthHolidays.length > 4 && (
               <div className="pt-4 mt-auto">
                 <button 
                   onClick={() => setExpandedHolidays(!expandedHolidays)}
@@ -492,7 +517,7 @@ const EmployeeHolidays = () => {
                   ) : (
                     <>
                       <FaChevronDown size={12} />
-                      Show All ({allUpcomingHolidays.length - 4} more)
+                      Show All ({selectedMonthHolidays.length - 4} more)
                     </>
                   )}
                 </button>
@@ -508,8 +533,8 @@ const EmployeeHolidays = () => {
                   <FaBirthdayCake className="text-purple-500 text-xl" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-800 text-lg">Upcoming Birthdays</h3>
-                  <p className="text-gray-500 text-sm">{currentMonthBirthdays.length} upcoming</p>
+                  <h3 className="font-bold text-gray-800 text-lg">Month's Birthdays</h3>
+                  <p className="text-gray-500 text-sm">{currentMonthBirthdays.length} in selected month</p>
                 </div>
               </div>
             </div>
@@ -518,7 +543,7 @@ const EmployeeHolidays = () => {
               {displayBirthdays.length === 0 ? (
                 <div className="text-center py-8">
                   <FaBirthdayCake className="text-gray-300 text-3xl mx-auto mb-3" />
-                  <p className="text-gray-400">No upcoming birthdays</p>
+                  <p className="text-gray-400">No birthdays this month</p>
                 </div>
               ) : (
                 displayBirthdays.map((b, i) => (

@@ -91,20 +91,20 @@ const EmployeeNotifications = () => {
             </button>
 
             {/* HIDE ALL */}
-            <button
+            {/* <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition"
               onClick={clearAllLocal}
             >
               <FaTrash /> Hide All
-            </button>
+            </button> */}
 
             {/* RESTORE */}
-            <button
+            {/* <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition"
               onClick={restoreAll}
             >
               <FaUndo /> Restore Hidden
-            </button>
+            </button> */}
           </div>
         </div>
 

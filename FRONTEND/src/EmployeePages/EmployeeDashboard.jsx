@@ -164,6 +164,8 @@ const EmployeeDashboard = () => {
   const [showCropModal, setShowCropModal] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
   const [workedTime, setWorkedTime] = useState(0);
+  // ✅ NEW: Live break time counter (seconds)
+  const [breakTime, setBreakTime] = useState(0);
   const alarmPlayedRef = useRef(false);
 
   const todayIso = new Date().toISOString().split("T")[0];
@@ -533,6 +535,40 @@ const EmployeeDashboard = () => {
     }
     return () => { if (interval) clearInterval(interval); };
   }, [todayLog, shiftTimings]);
+
+  // ✅ NEW: Live break time counter
+  // - When isOnBreak=true: ticks every second from the open breakSession.from + already accumulated totalBreakSeconds
+  // - When not on break: just shows the static totalBreakSeconds from DB
+  useEffect(() => {
+    let interval;
+    const isOnBreak = todayLog?.isOnBreak === true;
+
+    if (isOnBreak) {
+      const updateBreakTimer = () => {
+        const now = new Date();
+        // Already completed break seconds (from previous breaks, stored in DB)
+        const alreadyDone = todayLog.totalBreakSeconds || 0;
+
+        // Find the current open break session (the one with no `to`)
+        const breakSessions = todayLog.breakSessions || [];
+        const openBreak = [...breakSessions].reverse().find(b => !b.to);
+
+        let currentBreakSeconds = 0;
+        if (openBreak && openBreak.from) {
+          currentBreakSeconds = (now - new Date(openBreak.from)) / 1000;
+        }
+
+        setBreakTime(Math.floor(alreadyDone + currentBreakSeconds));
+      };
+      updateBreakTimer();
+      interval = setInterval(updateBreakTimer, 1000);
+    } else {
+      // Not on break — just show the static accumulated break seconds
+      setBreakTime(Math.floor(todayLog?.totalBreakSeconds || 0));
+    }
+
+    return () => { if (interval) clearInterval(interval); };
+  }, [todayLog]);
 
   const calculateWorkModeStatus = useCallback(() => {
     const defaults = {
@@ -914,6 +950,12 @@ const EmployeeDashboard = () => {
 
   const getWorkedStatusBadge = () => {
     if (!todayLog?.punchIn) return { label: "--", color: "text-gray-500" };
+
+    // ✅ NEW: If employee is currently on break, show ON_BREAK status
+    if (todayLog?.isOnBreak === true) {
+      return { label: "On Break", color: "bg-amber-100 text-amber-800 animate-pulse border border-amber-200" };
+    }
+
     if (!todayLog.punchOut) { return { label: "Working...", color: "bg-blue-100 text-blue-800 animate-pulse border border-blue-200" }; }
 
     const fullDaySeconds = shiftTimings ? (shiftTimings.fullDayHours * 3600) : (9 * 3600);
@@ -1293,14 +1335,153 @@ const EmployeeDashboard = () => {
 
       {/* ✨ FIX: Screen Effect applied here for the Attendance Table */}
       <div className="rounded-2xl shadow-lg border border-gray-200 relative bg-white mb-8 animate-fade-in">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-white/40">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FaRegClock size={18} /></div>
-            <h2 className="font-bold text-lg text-gray-800">Daily Attendance</h2>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 bg-white/40">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-blue-50 p-1.5 sm:p-2 rounded-lg text-blue-600">
+              <FaRegClock size={16} className="sm:w-[18px] sm:h-[18px]" />
+            </div>
+            <h2 className="font-bold text-base sm:text-lg text-gray-800">Daily Attendance</h2>
           </div>
-          <button onClick={() => navigate("/employee/my-attendence")} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition shadow-sm">View History →</button>
+          <button
+            onClick={() => navigate("/employee/my-attendence")}
+            className="text-[10px] sm:text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-blue-100 transition shadow-sm whitespace-nowrap"
+          >
+            View History →
+          </button>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile View - Card Layout */}
+        <div className="block sm:hidden p-4">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* Date Header */}
+            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+              <span className="font-bold text-gray-800">{formatDateDDMMYYYY(todayIso)}</span>
+              <span className={`px-2 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border shadow-sm ${workedStatusBadge.color}`}>
+                {workedStatusBadge.label}
+              </span>
+            </div>
+
+            {/* Time Details Grid */}
+            <div className="p-4 space-y-3">
+              {/* First Row - First In & Last Out */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50/30 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">First In</div>
+                  <div className="font-semibold text-gray-800">
+                    {todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}
+                  </div>
+                </div>
+                <div className="bg-purple-50/30 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Last Out</div>
+                  <div className="font-semibold text-gray-800">
+                    {todayLog?.status === "WORKING" ? (
+                      <span className="bg-green-50 border border-green-200 text-green-700 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold animate-pulse inline-block">
+                        Active
+                      </span>
+                    ) : todayLog?.isOnBreak ? (
+                      <span className="bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold animate-pulse inline-block">
+                        On Break
+                      </span>
+                    ) : (
+                      <span>{todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Second Row - Worked & Break Time */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50/30 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Worked</div>
+                  <div className="font-mono font-bold text-blue-600">
+                    {todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}
+                  </div>
+                </div>
+                <div className="bg-orange-50/30 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Break Time</div>
+                  <div className={`font-mono font-medium ${todayLog?.isOnBreak ? 'text-amber-600 animate-pulse' : 'text-purple-600'}`}>
+                    {formatWorkedTime(breakTime)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Login Status */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Login Status</div>
+                <div>{displayLoginStatusContent}</div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2">
+                {isShiftCompleted ? (
+                  <div className="text-center py-3 bg-gray-100 rounded-xl border border-gray-200">
+                    <span className="text-gray-500 font-bold text-xs uppercase tracking-wider">Shift Completed</span>
+                  </div>
+                ) : showPunchInButton ? (
+                  <button
+                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 shadow-sm text-white font-bold text-sm transition transform active:scale-95 ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                    onClick={() => handlePunch("IN")}
+                    disabled={punchStatus !== "IDLE"}
+                  >
+                    {getPunchButtonContent("IN")}
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 shadow-sm text-white font-bold text-sm transition transform active:scale-95 ${isShiftReqCompleted ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'
+                        } disabled:opacity-50`}
+                      onClick={() => handlePunch("OUT")}
+                      disabled={punchStatus !== "IDLE"}
+                    >
+                      {punchStatus === "PUNCHING" && (
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                      )}
+                      {punchStatus === "PUNCHING" ? "Punching Out..." : "Punch Out"}
+                    </button>
+                    <button
+                      className="w-full py-4 rounded-xl flex items-center justify-center gap-2 shadow-sm text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 font-bold text-sm transition transform active:scale-95 disabled:opacity-50"
+                      onClick={handleBreak}
+                      disabled={punchStatus !== "IDLE"}
+                    >
+                      {punchStatus === "FETCHING" || punchStatus === "PUNCHING" ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-blue-700 border-t-transparent rounded-full" />
+                      ) : (
+                        <FaCoffee size={16} />
+                      )}
+                      Take Break
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Location Buttons */}
+              {(todayLog?.punchInLocation || todayLog?.punchOutLocation) && (
+                <div className="flex gap-2 pt-2">
+                  {todayLog?.punchInLocation && (
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")}
+                      className="flex-1 bg-white border border-blue-200 text-blue-700 px-3 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-blue-50 flex items-center justify-center gap-1.5 transition"
+                    >
+                      <FaMapMarkerAlt size={12} /> In
+                    </button>
+                  )}
+                  {todayLog?.punchOutLocation && (
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")}
+                      className="flex-1 bg-white border border-red-200 text-red-600 px-3 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-red-50 flex items-center justify-center gap-1.5 transition"
+                    >
+                      <FaMapMarkerAlt size={12} /> Out
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop View - Table (hidden on mobile) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full text-sm text-left whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-[10px] font-bold tracking-wider">
               <tr>
@@ -1317,27 +1498,51 @@ const EmployeeDashboard = () => {
             <tbody className="bg-white divide-y divide-gray-100">
               <tr className="hover:bg-gray-50 transition-colors duration-200">
                 <td className="px-6 py-4 font-semibold text-gray-800">{formatDateDDMMYYYY(todayIso)}</td>
-                <td className="px-6 py-4 font-medium text-gray-600">{todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}</td>
+                <td className="px-6 py-4 font-medium text-gray-600">
+                  {todayLog?.punchIn ? new Date(todayLog.punchIn).toLocaleTimeString() : "--"}
+                </td>
                 <td className="px-6 py-4">
                   {todayLog?.status === "WORKING" ? (
-                    <span className="bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold animate-pulse">Active</span>
+                    <span className="bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold animate-pulse">
+                      Active
+                    </span>
+                  ) : todayLog?.isOnBreak ? (
+                    <span className="bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold animate-pulse">
+                      On Break
+                    </span>
                   ) : (
-                    <span className="font-medium text-gray-600">{todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"}</span>
+                    <span className="font-medium text-gray-600">
+                      {todayLog?.punchOut ? new Date(todayLog.punchOut).toLocaleTimeString() : "--"}
+                    </span>
                   )}
                 </td>
-                <td className="px-6 py-4 font-mono font-bold text-blue-600">{todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}</td>
+                <td className="px-6 py-4 font-mono font-bold text-blue-600">
+                  {todayLog?.punchIn ? formatWorkedTime(workedTime) : "0h 0m 0s"}
+                </td>
                 <td className="px-6 py-4">{displayLoginStatusContent}</td>
                 <td className="px-6 py-4">
-                  {todayLog?.punchIn ? (<span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border shadow-sm ${workedStatusBadge.color}`}> {workedStatusBadge.label} </span>) : (<span className="text-gray-400 font-medium">--</span>)}
+                  {todayLog?.punchIn ? (
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border shadow-sm ${workedStatusBadge.color}`}>
+                      {workedStatusBadge.label}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 font-medium">--</span>
+                  )}
                 </td>
-                <td className="px-6 py-4 font-mono font-medium text-purple-600"> {todayLog?.totalBreakSeconds ? formatWorkedTime(todayLog.totalBreakSeconds) : "0h 0m 0s"} </td>
-
+                <td className="px-6 py-4 font-mono font-medium">
+                  <span className={todayLog?.isOnBreak ? 'text-amber-600 animate-pulse' : 'text-purple-600'}>
+                    {formatWorkedTime(breakTime)}
+                  </span>
+                </td>
                 <td className="px-6 py-4 text-center">
                   {isShiftCompleted ? (
-                    <span className="text-gray-500 font-bold text-[10px] uppercase tracking-wider bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm">Shift Completed</span>
+                    <span className="text-gray-500 font-bold text-[10px] uppercase tracking-wider bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm">
+                      Shift Completed
+                    </span>
                   ) : showPunchInButton ? (
                     <button
-                      className={`px-5 py-2.5 rounded-xl mx-auto flex items-center justify-center gap-2 shadow-sm text-white font-bold text-xs transition transform active:scale-95 w-full max-w-[140px] ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                      className={`px-5 py-2.5 rounded-xl mx-auto flex items-center justify-center gap-2 shadow-sm text-white font-bold text-xs transition transform active:scale-95 w-full max-w-[140px] ${missedPunchLog ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                        }`}
                       onClick={() => handlePunch("IN")}
                       disabled={punchStatus !== "IDLE"}
                     >
@@ -1346,11 +1551,14 @@ const EmployeeDashboard = () => {
                   ) : (
                     <div className="flex flex-col gap-2 items-center w-full max-w-[140px] mx-auto">
                       <button
-                        className={`px-4 py-2 rounded-xl w-full flex items-center justify-center gap-2 shadow-sm text-white font-bold text-xs transition transform active:scale-95 ${isShiftReqCompleted ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'} disabled:opacity-50`}
+                        className={`px-4 py-2 rounded-xl w-full flex items-center justify-center gap-2 shadow-sm text-white font-bold text-xs transition transform active:scale-95 ${isShiftReqCompleted ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'
+                          } disabled:opacity-50`}
                         onClick={() => handlePunch("OUT")}
                         disabled={punchStatus !== "IDLE"}
                       >
-                        {punchStatus === "PUNCHING" ? <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" /> : null}
+                        {punchStatus === "PUNCHING" && (
+                          <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                        )}
                         {punchStatus === "PUNCHING" ? "Punching Out..." : "Punch Out"}
                       </button>
                       <button
@@ -1372,9 +1580,25 @@ const EmployeeDashboard = () => {
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
-          {todayLog?.punchInLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")} className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-blue-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> In Location</button>)}
-          {todayLog?.punchOutLocation && (<button onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")} className="bg-white border border-red-200 text-red-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-red-50 flex items-center gap-1.5 transition"><FaMapMarkerAlt /> Out Location</button>)}
+
+        {/* Location Buttons - Desktop */}
+        <div className="hidden sm:flex px-6 py-4 bg-gray-50 border-t border-gray-200 items-center gap-3">
+          {todayLog?.punchInLocation && (
+            <button
+              onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchInLocation.latitude},${todayLog.punchInLocation.longitude}`, "_blank")}
+              className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-blue-50 flex items-center gap-1.5 transition"
+            >
+              <FaMapMarkerAlt /> In Location
+            </button>
+          )}
+          {todayLog?.punchOutLocation && (
+            <button
+              onClick={() => window.open(`https://www.google.com/maps?q=${todayLog.punchOutLocation.latitude},${todayLog.punchOutLocation.longitude}`, "_blank")}
+              className="bg-white border border-red-200 text-red-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-red-50 flex items-center gap-1.5 transition"
+            >
+              <FaMapMarkerAlt /> Out Location
+            </button>
+          )}
         </div>
       </div>
 

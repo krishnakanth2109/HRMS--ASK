@@ -1,11 +1,11 @@
 // pages/AdminNotifications.jsx
 import { useContext, useEffect, useState, useCallback } from "react";
 import { NotificationContext } from "../context/NotificationContext";
-import { useNavigate } from "react-router-dom"; // ADDED: Import useNavigate
+import { useNavigate } from "react-router-dom";
 import { 
   FaBell, FaCheckCircle, FaTrash, FaUndo, 
   FaExclamationCircle, FaClock, FaMapMarkerAlt, FaSignOutAlt, FaUserClock, 
-  FaArrowLeft // ADDED: Import Back arrow icon
+  FaArrowLeft 
 } from "react-icons/fa";
 import api, { getAllOvertimeRequests } from "../api"; 
 
@@ -14,7 +14,7 @@ const HIDDEN_KEY = "admin_hidden_notifications";
 const READ_SYSTEM_KEY = "admin_read_system_notifications";
 
 const AdminNotifications = () => {
-  const navigate = useNavigate(); // ADDED: Initialize navigate function
+  const navigate = useNavigate();
   const { notifications, markAsRead, markAllAsRead: markContextAllRead } = useContext(NotificationContext);
 
   const [localNotifications, setLocalNotifications] = useState([]);
@@ -39,7 +39,6 @@ const AdminNotifications = () => {
     if (!current.includes(id)) {
       const updated = [...current, id];
       sessionStorage.setItem(READ_SYSTEM_KEY, JSON.stringify(updated));
-      // Trigger UI update immediately
       updateLocalNotifications();
     }
   };
@@ -50,7 +49,6 @@ const AdminNotifications = () => {
       .map(n => n._id);
     
     const current = getReadSystemIds();
-    // Merge new IDs with existing ones, removing duplicates
     const updated = [...new Set([...current, ...allSystemIds])];
     sessionStorage.setItem(READ_SYSTEM_KEY, JSON.stringify(updated));
     updateLocalNotifications();
@@ -60,17 +58,56 @@ const AdminNotifications = () => {
     if (n.type === 'system') {
       markSystemAsRead(n._id);
     } else {
-      markAsRead(n._id); // Call Context function for DB notifications
+      markAsRead(n._id); 
     }
   };
 
   const handleMarkAllAsReadWrapper = () => {
-    markAllSystemAsRead(); // Mark local system alerts
-    markContextAllRead();  // Mark database notifications
+    markAllSystemAsRead(); 
+    markContextAllRead();  
+  };
+
+  // --- REDIRECTION LOGIC ---
+  const handleNotificationClick = (n) => {
+    // 1. Mark notification as read
+    handleMarkAsReadWrapper(n);
+
+    // 2. Redirect based on notification type / ID
+    if (n.type === "system") {
+      if (n._id.startsWith("sys-ot-")) {
+        navigate("/admin/admin-overtime");
+      } else if (n._id.startsWith("sys-po-")) {
+        navigate("/admin/punchout-requests");
+      } else if (n._id.startsWith("sys-late-")) {
+        navigate("/admin/late-requests");
+      } else if (n._id.startsWith("sys-wm-")) {
+        navigate("/admin/workmode-requests");
+      }
+    } else {
+      // Handle Context (Database) Notifications
+      if (n.link) {
+        navigate(n.link);
+      } else {
+        // Fallback routing by checking keywords in the message or type
+        const msg = (n.message || "").toLowerCase();
+        const type = (n.type || "").toLowerCase();
+
+        if (msg.includes("leave") || type.includes("leave")) {
+          navigate("/admin/admin-Leavemanage");
+        } else if (msg.includes("overtime") || type.includes("overtime")) {
+          navigate("/admin/admin-overtime");
+        } else if (msg.includes("punch") || type.includes("punch")) {
+          navigate("/admin/punchout-requests");
+        } else if (msg.includes("late") || msg.includes("attendance") || type.includes("attendance")) {
+          navigate("/admin/late-requests");
+        } else if (msg.includes("work mode") || type.includes("workmode")) {
+          navigate("/admin/workmode-requests");
+        }
+      }
+    }
   };
 
   // --- FETCHING LOGIC ---
-
   const fetchOvertimeRequests = useCallback(async () => {
     try {
       const data = await getAllOvertimeRequests();
@@ -93,12 +130,10 @@ const AdminNotifications = () => {
 
   const fetchLateRequests = useCallback(async () => {
     try {
-      // NOTE: fetching '/all' is heavy. If backend supports filtering, use that instead.
       const { data } = await api.get("/api/attendance/all");
       const allRecords = data.data || [];
       const pending = [];
 
-      // Optimized Loop
       for (const empRecord of allRecords) {
         if (empRecord.attendance && Array.isArray(empRecord.attendance)) {
           for (const dayLog of empRecord.attendance) {
@@ -135,7 +170,6 @@ const AdminNotifications = () => {
     fetchLateRequests();
     fetchWorkModeRequests();
     
-    // Poll every 60 seconds (increased from 30s to reduce load for Late Requests)
     const interval = setInterval(() => {
         fetchOvertimeRequests();
         fetchPunchOutRequests();
@@ -156,18 +190,13 @@ const AdminNotifications = () => {
     const hidden = getHiddenIds();
     const updated = [...hidden, _id];
     sessionStorage.setItem(HIDDEN_KEY, JSON.stringify(updated));
-    updateLocalNotifications(); // Trigger re-render
+    updateLocalNotifications();
   };
 
   const clearAllLocal = () => {
     const allIds = localNotifications.map((n) => n._id);
     sessionStorage.setItem(HIDDEN_KEY, JSON.stringify(allIds));
     setLocalNotifications([]);
-  };
-
-  const restoreAll = () => {
-    sessionStorage.removeItem(HIDDEN_KEY);
-    updateLocalNotifications();
   };
 
 
@@ -183,9 +212,9 @@ const AdminNotifications = () => {
         const id = `sys-ot-${item._id}`;
         systemNotifs.push({
             _id: id,
-            message: `⏳ Overtime Request: ${item.employeeName || item.employeeId} requested  on ${item.date || "N/A"}`,
+            message: `⏳ Overtime Request: ${item.employeeName || item.employeeId} requested on ${item.date || "N/A"}`,
             date: item.date || item.createdAt || new Date().toISOString(),
-            isRead: readSystemIds.includes(id), // Check session storage
+            isRead: readSystemIds.includes(id),
             type: "system",
             icon: <FaClock className="text-orange-500" />
         });
@@ -247,7 +276,6 @@ const AdminNotifications = () => {
 
   }, [notifications, overtimeData, punchOutData, lateLoginData, workModeData]);
 
-  // Update logic whenever data dependencies change
   useEffect(() => {
     updateLocalNotifications();
   }, [updateLocalNotifications]);
@@ -278,23 +306,15 @@ const AdminNotifications = () => {
             >
               <FaTrash /> Clear All
             </button>
-
-            <button
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition"
-              onClick={restoreAll}
-            >
-              <FaUndo /> Restore Hidden
-            </button>
           </div>
         </div>
 
         {/* ----------------- MAIN CONTENT ----------------- */}
         <div className="flex-1 bg-white rounded-xl shadow-md p-6 border overflow-y-auto">
           <div className="flex justify-between items-center mb-5">
-            {/* ADDED: Flex container with Back Button */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate("/")}
+                onClick={() => navigate(-1)} // Updates back navigation cleanly
                 className="p-3 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 hover:text-blue-600 transition shadow-sm"
                 title="Go Back"
               >
@@ -328,12 +348,12 @@ const AdminNotifications = () => {
               {localNotifications.map((n) => (
                 <div
                   key={n._id}
-                  className={`flex items-start gap-4 p-4 rounded-xl border shadow-sm transition cursor-pointer ${
+                  className={`flex items-start gap-4 p-4 rounded-xl border shadow-sm transition cursor-pointer hover:shadow-md ${
                     !n.isRead
-                      ? "bg-blue-50 border-blue-300" // Highlighted Style (New)
-                      : "bg-white border-gray-200 opacity-75" // Read Style
+                      ? "bg-blue-50 border-blue-300" 
+                      : "bg-white border-gray-200 opacity-75 hover:opacity-100" 
                   }`}
-                  onClick={() => handleMarkAsReadWrapper(n)}
+                  onClick={() => handleNotificationClick(n)}
                 >
                   <div
                     className={`p-3 rounded-full text-lg ${
@@ -355,8 +375,9 @@ const AdminNotifications = () => {
                     </p>
                   </div>
 
+                  {/* Stop Propagation to prevent redirect when clicking trash button */}
                   <button
-                    className="text-red-500 hover:text-red-700 p-2"
+                    className="text-red-500 hover:text-red-700 p-2 z-10"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeNotification(n._id);
