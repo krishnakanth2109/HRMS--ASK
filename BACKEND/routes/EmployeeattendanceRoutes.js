@@ -185,8 +185,7 @@ const createInsufficientHoursEmail = (employeeData) => {
           <!-- Footer -->
           <tr>
             <td style="background:#f3f4f6; padding:18px; text-align:center; font-size:12px; color:#9ca3af;">
-              © ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric' })}
- Attendance Management System <br/>
+              © ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric' })} Attendance Management System <br/>
               This is an automated notification. Please do not reply to this email.
             </td>
           </tr>
@@ -200,7 +199,7 @@ const createInsufficientHoursEmail = (employeeData) => {
 `;
 };
 
-/* ================= ✅ NEW: LEAVE DEDUCTED FOR MISSING ATTENDANCE (ABSENT) ================= */
+/* ================= LEAVE DEDUCTED FOR MISSING ATTENDANCE (ABSENT) ================= */
 const createMissingAttendanceEmail = (employeeData) => {
   const { employeeName, date } = employeeData;
 
@@ -226,9 +225,7 @@ const createMissingAttendanceEmail = (employeeData) => {
         </p>
         
         <p style="margin:0 0 25px 0; font-size:15px; color:#1f2937; line-height:1.6;">
-         
           There has been a penalization of 1 of leave for Worked Hours Less Than Half Day.
-           
         </p>
 
         <h3 style="margin:0 0 10px 0; font-size:16px; color:#1f2937;">Leave Deduction Details</h3>
@@ -245,7 +242,6 @@ const createMissingAttendanceEmail = (employeeData) => {
           In case you might have any question related to this deduction, please reach out to your Reporting Manager or HR manager for more clarity.
         </p>
 
-     
       </td>
     </tr>
   </table>
@@ -254,7 +250,7 @@ const createMissingAttendanceEmail = (employeeData) => {
 `;
 };
 
-/* ================= ✅ NEW: UNINFORMED ABSENCE TEMPLATE ================= */
+/* ================= UNINFORMED ABSENCE TEMPLATE ================= */
 const createUninformedAbsenceEmail = (employeeName, absentDate) => {
 return `
 <!DOCTYPE html>
@@ -324,7 +320,6 @@ return `
 </body>
 </html>
 `;
-
 };
 
 /* ================= SEND EMAIL FUNCTIONS ================= */
@@ -385,8 +380,6 @@ router.get('/all', onlyAdmin, async (req, res) => {
 });
 
 /* ================= ADMIN DATE RANGE — Flat daily records with ALL fields ================= */
-// Used by AdminviewAttendance for Daily Log and Summary tables
-// Returns each day as a flat object so isOnBreak, isFinalPunchOut, breakSessions etc. are always present
 router.get('/admin/date-range', onlyAdmin, async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -539,13 +532,22 @@ router.post('/punch-in', async (req, res) => {
             isWeekOff = (dayNum === 0);
           }
 
-          // ✅ 2. Check if yesterday was a Holiday
-          const startOfYest = new Date(`${yesterday}T00:00:00.000Z`);
-          const endOfYest = new Date(`${yesterday}T23:59:59.999Z`);
-          
-          const isHoliday = await Holiday.findOne({
-            startDate: { $lte: endOfYest },
-            endDate: { $gte: startOfYest }
+          // ✅ 2. Check if yesterday was a Holiday (FIXED logic to compare YYYY-MM-DD reliably)
+          const yDate = new Date(`${yesterday}T00:00:00.000Z`).getTime();
+          const allHolidays = await Holiday.find({});
+          const isHoliday = allHolidays.some(holiday => {
+            try {
+              // Ensure we only use the date string part for fair comparison
+              const startStr = holiday.startDate.split("T")[0];
+              const endStr = holiday.endDate.split("T")[0];
+              
+              const hStart = new Date(`${startStr}T00:00:00.000Z`).getTime();
+              const hEnd = new Date(`${endStr}T23:59:59.999Z`).getTime();
+              
+              return yDate >= hStart && yDate <= hEnd;
+            } catch (error) {
+              return false;
+            }
           });
 
           // ✅ 3. Check if yesterday had an approved leave
@@ -1078,10 +1080,6 @@ router.post("/approve-correction", async (req, res) => {
 });
 
 /* ================= STATUS CORRECTION ================= */
-// EmployeeattendanceRoutes.js - Update the request-status-correction route
-
-/* ================= STATUS CORRECTION ================= */
-/* ================= STATUS CORRECTION ================= */
 router.post('/request-status-correction', async (req, res) => {
   try {
     const { employeeId, date, requestedPunchOut, reason } = req.body;
@@ -1236,105 +1234,6 @@ router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
   }
 });
 
-// EmployeeattendanceRoutes.js - Update the approve-status-correction route
-
-router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
-  try {
-    const { employeeId, date, adminComment } = req.body;
-
-    const attendance = await Attendance.findOne({ employeeId });
-    if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
-
-    const dayRecord = attendance.attendance.find(a => a.date === date);
-    if (!dayRecord) return res.status(404).json({ message: "No attendance record found for this date" });
-    if (!dayRecord.statusCorrectionRequest?.hasRequest) {
-      return res.status(404).json({ message: "No correction request found for this date" });
-    }
-
-    // The requestedPunchOut is already stored in UTC from the submission
-    const newPunchOut = new Date(dayRecord.statusCorrectionRequest.requestedPunchOut);
-    const punchInTime = new Date(dayRecord.punchIn);
-
-    // ✅ Validate punchOut is strictly after punchIn before saving
-    if (newPunchOut <= punchInTime) {
-      return res.status(400).json({
-        message: "Cannot approve: requested punch-out time is not after the employee's punch-in time. Please reject and ask the employee to resubmit."
-      });
-    }
-
-    // ✅ Update punchOut on the day record
-    dayRecord.punchOut = newPunchOut;
-    dayRecord.isFinalPunchOut = true;
-    dayRecord.status = "COMPLETED";
-
-    // ✅ Update the last session's punchOut and recalculate its durationSeconds
-    if (dayRecord.sessions && dayRecord.sessions.length > 0) {
-      const lastSession = dayRecord.sessions[dayRecord.sessions.length - 1];
-      lastSession.punchOut = newPunchOut;
-      const sessDuration = (newPunchOut - new Date(lastSession.punchIn)) / 1000;
-      lastSession.durationSeconds = sessDuration > 0 ? sessDuration : 0;
-    }
-
-    // ✅ Recalculate total worked seconds from all sessions
-    let totalSeconds = 0;
-    dayRecord.sessions.forEach(sess => {
-      if (sess.punchIn && sess.punchOut) {
-        const dur = (new Date(sess.punchOut) - new Date(sess.punchIn)) / 1000;
-        if (dur > 0) totalSeconds += dur;
-      }
-    });
-
-    // ✅ Fallback: if sessions give 0, calculate from punchIn → newPunchOut minus breaks
-    if (totalSeconds <= 0) {
-      const rawSeconds = (newPunchOut - punchInTime) / 1000;
-      const breakSeconds = dayRecord.totalBreakSeconds || 0;
-      totalSeconds = Math.max(0, rawSeconds - breakSeconds);
-    }
-
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = Math.floor(totalSeconds % 60);
-
-    dayRecord.workedHours = h;
-    dayRecord.workedMinutes = m;
-    dayRecord.workedSeconds = s;
-    dayRecord.displayTime = `${h}h ${m}m ${s}s`;
-
-    // ✅ Get shift thresholds for proper status calculation
-    let shift = await Shift.findOne({ employeeId });
-    if (!shift) shift = { fullDayHours: 8, halfDayHours: 4, quarterDayHours: 2 };
-
-    let workedStatus = "ABSENT";
-    let attendanceCategory = "ABSENT";
-
-    if (h >= shift.fullDayHours) {
-      workedStatus = "FULL_DAY";
-      attendanceCategory = "FULL_DAY";
-    } else if (h >= shift.halfDayHours) {
-      workedStatus = "HALF_DAY";
-      attendanceCategory = "HALF_DAY";
-    } else if (h >= (shift.quarterDayHours || 2)) {
-      workedStatus = "QUARTER_DAY";
-      attendanceCategory = "ABSENT";
-    }
-
-    dayRecord.workedStatus = workedStatus;
-    dayRecord.attendanceCategory = attendanceCategory;
-
-    // ✅ Mark the correction request as approved
-    dayRecord.statusCorrectionRequest.status = "APPROVED";
-    dayRecord.statusCorrectionRequest.adminComment = adminComment || "Approved by Admin";
-
-    await attendance.save();
-    res.json({
-      success: true,
-      message: `Attendance corrected. Worked: ${h}h ${m}m ${s}s → Status: ${workedStatus}`
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 /* ================= GET ALL STATUS CORRECTION REQUESTS (ADMIN) ================= */
 router.get('/admin/status-correction-requests', onlyAdmin, async (req, res) => {
   try {
@@ -1364,7 +1263,6 @@ router.get('/admin/status-correction-requests', onlyAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 /* ================= REJECT STATUS CORRECTION ================= */
 router.post('/reject-status-correction', onlyAdmin, async (req, res) => {

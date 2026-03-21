@@ -1,3 +1,4 @@
+// models/Message.js
 import mongoose from "mongoose";
 
 const MessageSchema = new mongoose.Schema(
@@ -6,28 +7,30 @@ const MessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
       required: true,
-      index: true, // Index for faster lookup
     },
     receiver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
       required: true,
-      index: true, // Index for faster lookup
     },
     message: {
       type: String,
       required: true,
+      trim: true,
     },
     isRead: {
       type: Boolean,
       default: false,
     },
+    // ✅ NEW: needed for edit / delete features
+    isEdited:  { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-// Compound index for fetching chat history between two specific users quickly
+// Fast indexes for history + unread queries
 MessageSchema.index({ sender: 1, receiver: 1, createdAt: 1 });
-MessageSchema.index({ sender: 1, isRead: 1 }); // Optimize unread counts
+MessageSchema.index({ receiver: 1, isRead: 1 });
 
 export default mongoose.model("Message", MessageSchema);

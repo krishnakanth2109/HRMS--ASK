@@ -62,15 +62,21 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
   return (
     <nav className="h-16 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 flex items-center justify-between px-6 shadow-lg relative z-10">
 
-      {/* Logo */}
-      <div
-        className="flex items-center gap-3 cursor-pointer"
-        onClick={() => navigate("/employee/dashboard")}
-      >
-        <h1 className="ps-5 text-2xl font-bold text-white tracking-wide drop-shadow">
-          HRMS
-        </h1>
-      </div>
+{/* Logo + Toggle */}
+<div
+  className="flex items-center gap-3 cursor-pointer"
+  onClick={() => navigate("/employee/dashboard")}
+>
+  {/* Sidebar Toggle Button */}
+ <button className="text-white text-2xl md:hidden">
+    ☰
+  </button>
+
+  {/* HRMS Title */}
+  <h1 className="text-2xl font-bold text-white tracking-wide drop-shadow">
+    HRMS
+  </h1>
+</div>
 
       {/* Right Section */}
       <div className="flex items-center gap-6">
