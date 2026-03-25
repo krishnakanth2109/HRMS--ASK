@@ -332,7 +332,22 @@ const createLeaveStatusEmail = ({
 /* ===============================================================
    INLINE HTML RESPONSE — shown in browser when admin clicks button
 =============================================================== */
-const emailActionResultPage = (success, status, employeeName, message) => `
+// success = true (action worked) | false (error/expired)
+// action = "Approved" | "Rejected" | "Error" | "Expired" | etc.
+const emailActionResultPage = (success, action, employeeName, message) => {
+  // Color is based on the action taken, not just success/failure
+  const isApproved = action === "Approved";
+  const isError    = !success;
+
+  const headerGradient = isError
+    ? "linear-gradient(135deg,#374151,#6b7280)"       // grey for errors
+    : isApproved
+      ? "linear-gradient(135deg,#059669,#10b981)"      // green for approved
+      : "linear-gradient(135deg,#b91c1c,#ef4444)";    // red for rejected
+
+  const icon = isError ? "&#9888;" : isApproved ? "&#10003;" : "&#10007;";
+
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -340,8 +355,7 @@ const emailActionResultPage = (success, status, employeeName, message) => `
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Leave Action — HRMS</title>
 </head>
-<body style="margin:0;padding:0;background:#eef2f7;font-family:'Segoe UI',Tahoma,sans-serif;
-             min-height:100vh;display:flex;align-items:center;justify-content:center;">
+<body style="margin:0;padding:0;background:#eef2f7;font-family:'Segoe UI',Tahoma,sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
          style="padding:60px 15px;">
     <tr><td align="center">
@@ -349,15 +363,12 @@ const emailActionResultPage = (success, status, employeeName, message) => `
              style="background:#ffffff;border-radius:16px;overflow:hidden;
                     box-shadow:0 8px 32px rgba(0,0,0,0.10);">
         <tr>
-          <td style="background:${success
-              ? "linear-gradient(135deg,#059669,#10b981)"
-              : "linear-gradient(135deg,#b91c1c,#ef4444)"};
-                     padding:40px 32px;text-align:center;">
-            <div style="font-size:52px;margin-bottom:12px;">
-              ${success ? "&#10003;" : "&#10007;"}
+          <td style="background:${headerGradient};padding:40px 32px;text-align:center;">
+            <div style="font-size:52px;margin-bottom:12px;color:#ffffff;">
+              ${icon}
             </div>
             <h1 style="margin:0;font-size:24px;color:#ffffff;font-weight:800;">
-              Leave ${status}
+              Leave ${action}
             </h1>
           </td>
         </tr>
@@ -367,9 +378,9 @@ const emailActionResultPage = (success, status, employeeName, message) => `
               ${message}
             </p>
             <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.7;">
-              ${success
+              ${success && employeeName
                 ? `<strong>${employeeName}</strong> will be notified via email about this decision.`
-                : "The action could not be completed. Please use the Admin Portal."}
+                : "Please use the Admin Portal to manage leave requests."}
             </p>
           </td>
         </tr>
@@ -383,7 +394,7 @@ const emailActionResultPage = (success, status, employeeName, message) => `
     </td></tr>
   </table>
 </body>
-</html>`;
+</html>`; };
 
 // ===================================================================================
 // ✅ EMPLOYEE CREATES LEAVE → Email with action buttons sent to scoped Admin
@@ -519,7 +530,7 @@ export const handleEmailAction = async (req, res) => {
       );
     }
 
-    // Find the leave and check it's still Pending
+    // Find the leave BEFORE updating — use this for employeeName
     const leave = await LeaveRequest.findById(leaveId);
 
     if (!leave) {
@@ -533,7 +544,7 @@ export const handleEmailAction = async (req, res) => {
         emailActionResultPage(
           false,
           leave.status,
-          leave.employeeName,
+          leave.employeeName || "Employee",
           `This leave request has already been ${leave.status}. No further action needed.`
         )
       );
@@ -554,33 +565,35 @@ export const handleEmailAction = async (req, res) => {
       { new: true }
     );
 
-    // Notify employee in-app
-    const employee = await Employee.findOne({ employeeId: updated.employeeId });
+    // Use leave.employeeName (pre-update) as primary, fallback to updated fields
+    const employeeName = leave.employeeName || updated?.employeeName || "Employee";
+
+    // Notify employee in-app + send email
+    const employee = await Employee.findOne({ employeeId: leave.employeeId });
 
     if (employee) {
       await Notification.create({
         userId:   employee._id,
         userType: "Employee",
         title:    "Leave Status Update",
-        message:  `Your leave request (${updated.from} → ${updated.to}) has been ${action} by ${approvedBy}.`,
+        message:  `Your leave request (${leave.from} → ${leave.to}) has been ${action} by ${approvedBy}.`,
         type:     "leave-status",
         isRead:   false,
       });
 
-      // Send status email to employee
       if (employee.email) {
         try {
           await transporter.sendMail({
             from:    `"Leave Management" <${process.env.SMTP_USER}>`,
             to:      employee.email,
-            subject: `Leave Request ${action}: ${updated.from} to ${updated.to}`,
+            subject: `Leave Request ${action}: ${leave.from} to ${leave.to}`,
             html:    createLeaveStatusEmail({
-              employeeName: employee.name,
+              employeeName: employee.name || employeeName,
               status:       action,
-              from:         updated.from,
-              to:           updated.to,
-              leaveType:    updated.leaveType,
-              reason:       updated.reason,
+              from:         leave.from,
+              to:           leave.to,
+              leaveType:    leave.leaveType,
+              reason:       leave.reason,
               approvedBy,
             }),
           });
@@ -591,13 +604,13 @@ export const handleEmailAction = async (req, res) => {
       }
     }
 
-    // Return a nice success page in the browser
+    // Return styled confirmation page — color matches action
     return res.status(200).send(
       emailActionResultPage(
         true,
         action,
-        updated.employeeName,
-        `Leave request for ${updated.employeeName} has been ${action} successfully.`
+        employeeName,
+        `Leave request for ${employeeName} has been ${action} successfully.`
       )
     );
   } catch (err) {
