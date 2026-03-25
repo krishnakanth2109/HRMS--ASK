@@ -325,6 +325,194 @@ router.patch("/:id/reactivate", protect, onlyAdmin, async (req, res) => {
 
     if (!emp) return res.status(404).json({ message: "Employee not found" });
 
+    // ── EMAIL: notify employee their account is reactivated ──────────────────
+    if (emp.email) {
+      try {
+        // Use service:"gmail" — same pattern as the working OTP routes in this file
+        const reactivationTransporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        const reactivatedOn = new Date(date || Date.now()).toLocaleDateString("en-IN", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric",
+        });
+
+        const reactivationEmailHtml = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background-color:#eef2f7;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:40px 15px;">
+    <tr><td align="center">
+      <table role="presentation" width="620" cellspacing="0" cellpadding="0"
+             style="background:#ffffff;border-radius:14px;overflow:hidden;
+                    box-shadow:0 8px 24px rgba(0,0,0,0.09);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#065f46,#059669,#10b981);
+                     padding:42px 32px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:12px;color:#a7f3d0;
+                      letter-spacing:3px;text-transform:uppercase;font-weight:700;">
+              HRMS &mdash; Account Status Update
+            </p>
+            <h1 style="margin:0;font-size:28px;color:#ffffff;font-weight:800;line-height:1.3;">
+              Your Account Has Been Reactivated!
+            </h1>
+            <p style="margin:12px 0 0;color:#d1fae5;font-size:15px;line-height:1.6;">
+              Welcome back! You can now log in to your HRMS portal.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Welcome Banner -->
+        <tr>
+          <td style="background:#f0fdf4;border-bottom:3px solid #10b981;
+                     padding:16px 32px;text-align:center;">
+            <p style="margin:0;font-size:14px;color:#065f46;font-weight:600;">
+              Your HRMS account is now active and fully accessible
+            </p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:38px 32px 28px;">
+            <p style="margin:0 0 6px;font-size:17px;color:#1f2937;font-weight:600;">
+              Dear <strong>${emp.name}</strong>,
+            </p>
+            <p style="margin:0 0 26px;font-size:15px;color:#4b5563;line-height:1.8;">
+              We are pleased to inform you that your HRMS employee account has been
+              <strong style="color:#059669;">successfully reactivated</strong> by your
+              administrator. You now have full access to all your HRMS features and services.
+            </p>
+
+            <!-- Account Details Card -->
+            <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#6b7280;
+                      text-transform:uppercase;letter-spacing:1px;">
+              Your Account Details
+            </p>
+            <table width="100%" cellspacing="0" cellpadding="0"
+                   style="background:#f0fdf4;border-radius:10px;padding:20px 22px;
+                          border:1px solid #bbf7d0;margin-bottom:24px;">
+              <tr><td>
+                <table width="100%" style="font-size:14px;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:10px 0;color:#374151;width:40%;">Full Name</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:700;color:#111827;">
+                      ${emp.name}
+                    </td>
+                  </tr>
+                  <tr style="border-top:1px solid #dcfce7;">
+                    <td style="padding:10px 0;color:#374151;">Employee ID</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:600;
+                               color:#111827;font-family:monospace;">
+                      ${emp.employeeId}
+                    </td>
+                  </tr>
+                  <tr style="border-top:1px solid #dcfce7;">
+                    <td style="padding:10px 0;color:#374151;">Email Address</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:600;color:#059669;">
+                      ${emp.email}
+                    </td>
+                  </tr>
+                  <tr style="border-top:1px solid #dcfce7;">
+                    <td style="padding:10px 0;color:#374151;">Account Status</td>
+                    <td style="padding:10px 0;text-align:right;">
+                      <span style="background:#dcfce7;color:#166534;padding:4px 16px;
+                                   border-radius:20px;font-size:13px;font-weight:700;">
+                        &#9679; Active
+                      </span>
+                    </td>
+                  </tr>
+                  <tr style="border-top:1px solid #dcfce7;">
+                    <td style="padding:10px 0;color:#374151;">Reactivated On</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:600;color:#111827;">
+                      ${reactivatedOn}
+                    </td>
+                  </tr>
+                  ${reason
+                    ? `<tr style="border-top:1px solid #dcfce7;">
+                         <td style="padding:10px 0;color:#374151;vertical-align:top;">Reason</td>
+                         <td style="padding:10px 0;text-align:right;color:#4b5563;font-style:italic;">
+                           &ldquo;${reason}&rdquo;
+                         </td>
+                       </tr>`
+                    : ""}
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- What You Can Do Now -->
+            <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#6b7280;
+                      text-transform:uppercase;letter-spacing:1px;">
+              What You Can Do Now
+            </p>
+            <table width="100%" cellspacing="0" cellpadding="0"
+                   style="background:#f8fafc;border-radius:10px;padding:18px 22px;
+                          border:1px solid #e5e7eb;margin-bottom:26px;">
+              <tr><td style="font-size:14px;color:#374151;line-height:2.2;">
+                &#10004;&nbsp; Log in using your registered email and password<br/>
+                &#10004;&nbsp; View and manage your attendance records<br/>
+                &#10004;&nbsp; Apply for leaves and track their status<br/>
+                &#10004;&nbsp; Access your payslips and documents<br/>
+                &#10004;&nbsp; Update your personal profile information
+              </td></tr>
+            </table>
+
+            <!-- CTA Note -->
+            <table width="100%" cellspacing="0" cellpadding="0"
+                   style="background:#ecfdf5;border-radius:10px;padding:20px 22px;
+                          border:1px solid #a7f3d0;margin-bottom:24px;">
+              <tr><td style="text-align:center;">
+                <p style="margin:0 0 6px;font-size:15px;color:#065f46;font-weight:700;">
+                  Ready to get started?
+                </p>
+                <p style="margin:0;font-size:14px;color:#047857;line-height:1.7;">
+                  Visit your HRMS portal and log in with your existing credentials.<br/>
+                  If you have forgotten your password, use the
+                  <strong>&ldquo;Forgot Password&rdquo;</strong> option on the login page.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.7;">
+              If you have any questions or face issues logging in, please contact
+              your HR administrator or our support team.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f3f4f6;padding:20px 32px;text-align:center;
+                     font-size:12px;color:#9ca3af;line-height:1.7;">
+            &copy; ${new Date().getFullYear()} Attendance Management System &nbsp;&bull;&nbsp;
+            This is an automated notification regarding your account status.<br/>
+            Please do not reply directly to this email.
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+        await reactivationTransporter.sendMail({
+          from:    `"HRMS Team" <${process.env.SMTP_USER}>`,
+          to:      emp.email,
+          subject: `Your HRMS Account Has Been Reactivated - Welcome Back, ${emp.name}!`,
+          html:    reactivationEmailHtml,
+        });
+        console.log(`✅ Reactivation email sent to: ${emp.email}`);
+      } catch (emailErr) {
+        console.error("❌ Failed to send reactivation email:", emailErr.message);
+      }
+    }
+
     res.json(emp);
   } catch (err) {
     res.status(500).json({ error: err.message });

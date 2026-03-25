@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
-import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays } from "../api";
+import api, { getAttendanceByDateRange, getAllOvertimeRequests, getEmployees, getAllShifts, getHolidays,getAllProfiles  } from "../api";
 import { FaCalendarAlt, FaUsers, FaFileExcel, FaClock, FaCheckCircle, FaEye, FaTimes, FaMapMarkerAlt, FaUserSlash, FaSignOutAlt, FaShareAlt, FaSearch, FaBriefcase, FaUserTimes, FaFilter, FaCalendarDay, FaExchangeAlt, FaCheck, FaHome, FaList, FaLayerGroup, FaChevronDown, FaChevronUp, FaInfoCircle, FaCoffee } from "react-icons/fa";
 import { toBlob } from 'html-to-image';
 
@@ -907,21 +907,38 @@ const AdminAttendance = () => {
     fetchEmployeeWorkModes(); // Also fetch when summary dates change
   },[summaryStartDate, summaryEndDate, fetchSummaryData, fetchOvertimeData, fetchAllEmployees, fetchEmployeeWorkModes]);
 
-  useEffect(() => {
+useEffect(() => {
     const fetchImages = async () => {
-      const newImages = {};
       if (allEmployees.length === 0) return;
-      for (const emp of allEmployees) {
-        if (!employeeImages[emp.employeeId]) {
-          try {
-            const res = await api.get(`/api/profile/${emp.employeeId}`);
-            if (res.data?.profilePhoto?.url) newImages[emp.employeeId] = getSecureUrl(res.data.profilePhoto.url);
-          } catch (err) { }
-        }
+
+      try {
+        // ✅ 1. Call the backend ONCE for all profiles
+        const response = await getAllProfiles();
+        
+        // Handle different possible backend response structures safely
+        const profilesList = Array.isArray(response) ? response : (response?.data || []);
+        
+        const newImages = {};
+        
+        // ✅ 2. Map existing URLs to Employee IDs
+        profilesList.forEach(profile => {
+          if (profile.employeeId && profile.profilePhoto?.url) {
+            newImages[profile.employeeId] = getSecureUrl(profile.profilePhoto.url);
+          }
+        });
+
+        // ✅ 3. Update the state just once
+        setEmployeeImages(newImages);
+
+      } catch (err) {
+        console.error("Failed to fetch bulk profile images", err);
       }
-      if (Object.keys(newImages).length > 0) setEmployeeImages(prev => ({ ...prev, ...newImages }));
     };
-    if (allEmployees.length > 0) fetchImages();
+
+    // ✅ Only run if employees exist AND we haven't already populated the images
+    if (allEmployees.length > 0 && Object.keys(employeeImages).length === 0) {
+      fetchImages();
+    }
   }, [allEmployees]);
 
   const handleAdminPunchOut = async (employeeId, punchOutTime, location, dateOfRecord) => {

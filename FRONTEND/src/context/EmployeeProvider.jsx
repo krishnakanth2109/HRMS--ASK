@@ -105,83 +105,83 @@ export const EmployeeProvider = ({ children }) => {
   // ---------------------------------------------
   // ⭐ 1. DYNAMIC LOADING UI
   // ---------------------------------------------
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <style>{animations}</style>
-        <div style={styles.spinner}></div>
-        <h3 style={styles.loadingText}>Loading Application Data...</h3>
-        <p style={styles.subText}>Please wait while we connect to the server</p>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div style={styles.container}>
+  //       <style>{animations}</style>
+  //       <div style={styles.spinner}></div>
+  //       <h3 style={styles.loadingText}>Loading Application Data...</h3>
+  //       <p style={styles.subText}>Please wait while we connect to the server</p>
+  //     </div>
+  //   );
+  // }
 
-  // ---------------------------------------------
-  // ⭐ 2. "TIRED WIRES & FIRE" ERROR UI
-  // ---------------------------------------------
-  if (error) {
-    return (
-      <div style={styles.container}>
-        <style>{animations}</style>
+  // // ---------------------------------------------
+  // // ⭐ 2. "TIRED WIRES & FIRE" ERROR UI
+  // // ---------------------------------------------
+  // if (error) {
+  //   return (
+  //     <div style={styles.container}>
+  //       <style>{animations}</style>
         
-        {/* Visual: Broken Wire with Fire */}
-        <div style={styles.illustrationBox}>
-          <svg width="200" height="120" viewBox="0 0 200 120">
-            {/* Left Wire (Drooping) */}
-            <path 
-              d="M 0 60 Q 50 60 80 90" 
-              stroke="#555" 
-              strokeWidth="8" 
-              fill="none" 
-              strokeLinecap="round"
-            />
-            {/* Right Wire (Drooping) */}
-            <path 
-              d="M 200 60 Q 150 60 120 90" 
-              stroke="#555" 
-              strokeWidth="8" 
-              fill="none" 
-              strokeLinecap="round"
-            />
+  //       {/* Visual: Broken Wire with Fire */}
+  //       <div style={styles.illustrationBox}>
+  //         <svg width="200" height="120" viewBox="0 0 200 120">
+  //           {/* Left Wire (Drooping) */}
+  //           <path 
+  //             d="M 0 60 Q 50 60 80 90" 
+  //             stroke="#555" 
+  //             strokeWidth="8" 
+  //             fill="none" 
+  //             strokeLinecap="round"
+  //           />
+  //           {/* Right Wire (Drooping) */}
+  //           <path 
+  //             d="M 200 60 Q 150 60 120 90" 
+  //             stroke="#555" 
+  //             strokeWidth="8" 
+  //             fill="none" 
+  //             strokeLinecap="round"
+  //           />
             
-            {/* Sparks (Animated Circles) */}
-            <circle cx="80" cy="90" r="3" fill="orange">
-              <animate attributeName="opacity" values="1;0" dur="0.5s" repeatCount="indefinite" />
-              <animate attributeName="cy" values="90;110" dur="0.5s" repeatCount="indefinite" />
-              <animate attributeName="cx" values="80;70" dur="0.5s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="120" cy="90" r="2" fill="yellow">
-              <animate attributeName="opacity" values="1;0" dur="0.3s" repeatCount="indefinite" />
-              <animate attributeName="cy" values="90;70" dur="0.3s" repeatCount="indefinite" />
-              <animate attributeName="cx" values="120;130" dur="0.3s" repeatCount="indefinite" />
-            </circle>
-          </svg>
+  //           {/* Sparks (Animated Circles) */}
+  //           <circle cx="80" cy="90" r="3" fill="orange">
+  //             <animate attributeName="opacity" values="1;0" dur="0.5s" repeatCount="indefinite" />
+  //             <animate attributeName="cy" values="90;110" dur="0.5s" repeatCount="indefinite" />
+  //             <animate attributeName="cx" values="80;70" dur="0.5s" repeatCount="indefinite" />
+  //           </circle>
+  //           <circle cx="120" cy="90" r="2" fill="yellow">
+  //             <animate attributeName="opacity" values="1;0" dur="0.3s" repeatCount="indefinite" />
+  //             <animate attributeName="cy" values="90;70" dur="0.3s" repeatCount="indefinite" />
+  //             <animate attributeName="cx" values="120;130" dur="0.3s" repeatCount="indefinite" />
+  //           </circle>
+  //         </svg>
 
-          {/* CSS Fire Effect */}
-          <div style={styles.fireWrapper}>
-            <div style={styles.fireMain}></div>
-            <div style={{...styles.fireMain, ...styles.fireLeft}}></div>
-            <div style={{...styles.fireMain, ...styles.fireRight}}></div>
-          </div>
-        </div>
+  //         {/* CSS Fire Effect */}
+  //         <div style={styles.fireWrapper}>
+  //           <div style={styles.fireMain}></div>
+  //           <div style={{...styles.fireMain, ...styles.fireLeft}}></div>
+  //           <div style={{...styles.fireMain, ...styles.fireRight}}></div>
+  //         </div>
+  //       </div>
 
-        <h2 style={styles.errorTitle}>Something Went Wrong!</h2>
-        <p style={styles.errorText}>
-           We failed to fetch the employee data.
-        </p>
+  //       <h2 style={styles.errorTitle}>Something Went Wrong!</h2>
+  //       <p style={styles.errorText}>
+  //          We failed to fetch the employee data.
+  //       </p>
 
-        {/* Retry Button */}
-        <button 
-          onClick={fetchEmployees}
-          style={styles.retryButton}
-          onMouseOver={(e) => e.target.style.transform = "scale(1.05)"}
-          onMouseOut={(e) => e.target.style.transform = "scale(1)"}
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
+  //       {/* Retry Button */}
+  //       <button 
+  //         onClick={fetchEmployees}
+  //         style={styles.retryButton}
+  //         onMouseOver={(e) => e.target.style.transform = "scale(1.05)"}
+  //         onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+  //       >
+  //         Try Again
+  //       </button>
+  //     </div>
+  //   );
+  // }
 
   return (
     <EmployeeContext.Provider value={contextValue}>

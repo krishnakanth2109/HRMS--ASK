@@ -8,6 +8,7 @@ import {
   getLeaveDetails,
   updateLeaveStatus,
   cancelLeave,
+  handleEmailAction,          // ← NEW
 } from "../controllers/leaveController.js";
 
 import { protect } from "../controllers/authController.js";
@@ -15,12 +16,17 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-// 🔐 All routes require login
+/* ============================================================================
+   📧 PUBLIC — Admin clicks Approve/Reject button in their email
+   NO auth required — secured by the signed JWT inside the token
+============================================================================ */
+router.get("/email-action", handleEmailAction);
+
+// 🔐 All routes below require login
 router.use(protect);
 
 /* ============================================================================
    📌 ADMIN → GET ALL LEAVES
-   (Managers CANNOT access this, only admin)
 ============================================================================ */
 router.get("/", adminListAllLeaves);
 
@@ -40,7 +46,7 @@ router.get("/my-leaves", listLeavesForEmployee);
 router.get("/:id/details", getLeaveDetails);
 
 /* ============================================================================
-   🟩 ADMIN → APPROVE or REJECT LEAVE (Manager cannot)
+   🟩 ADMIN → APPROVE or REJECT LEAVE (from portal UI)
 ============================================================================ */
 router.patch("/:id/approve", onlyAdmin, (req, res) => {
   req.body.status = "Approved";
@@ -58,9 +64,9 @@ router.patch("/:id/reject", onlyAdmin, (req, res) => {
 router.delete("/cancel/:id", cancelLeave);
 
 /* ============================================================================
-   🔁 Legacy Route → Get leaves of specific employee
-   (Admin only)
+   🔁 Legacy Route → Get leaves of specific employee (Admin only)
 ============================================================================ */
 router.get("/:employeeId", listLeavesForEmployee);
 
 export default router;
+// --- END OF FILE routes/leaveRoutes.js ---

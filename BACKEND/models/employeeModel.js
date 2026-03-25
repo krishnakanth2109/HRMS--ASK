@@ -61,8 +61,15 @@ const EmployeeSchema = new mongoose.Schema({
   
   phone: String,
   address: String,
-  emergency: String, 
+  emergency: String,
   emergencyPhone: String,
+
+  // ✅ FIX: Top-level current employment fields saved by EditEmployee.jsx.
+  // Without these, Mongoose strict mode silently drops them on every update.
+  currentRole: { type: String, default: null },
+  currentDepartment: { type: String, default: null },
+  currentSalary: { type: Number, default: null },
+  joiningDate: { type: String, default: null },
   
   // Status and Deactivation Details
   isActive: { type: Boolean, default: true },

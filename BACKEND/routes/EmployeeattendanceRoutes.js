@@ -6,6 +6,7 @@ import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import LeaveRequest from "../models/LeaveRequest.js";
 import Holiday from "../models/Holiday.js";
+import Overtime from "../models/Overtime.js";
 import nodemailer from 'nodemailer';
 
 const router = express.Router();
@@ -586,6 +587,42 @@ router.post('/punch-in', async (req, res) => {
         }
       }
     }
+
+    /* ================= ✅ CHECK WEEK OFF — BLOCK PUNCH-IN UNLESS APPROVED OT EXISTS ================= */
+    const todayDayNum = new Date(today + "T00:00:00").getDay(); // 0=Sunday … 6=Saturday
+    let isTodayWeekOff = false;
+
+    if (shift.weeklyOffDays && Array.isArray(shift.weeklyOffDays)) {
+      isTodayWeekOff = shift.weeklyOffDays.includes(todayDayNum);
+    } else if (shift.weekOffs && Array.isArray(shift.weekOffs)) {
+      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const todayDayName = daysOfWeek[todayDayNum];
+      isTodayWeekOff = shift.weekOffs.some(off =>
+        String(off).toLowerCase() === todayDayName.toLowerCase() || off === todayDayNum
+      );
+    } else {
+      isTodayWeekOff = (todayDayNum === 0); // ultimate fallback — Sunday
+    }
+
+    if (isTodayWeekOff) {
+      // Allow punch-in ONLY if an APPROVED overtime request exists for today
+      const approvedOT = await Overtime.findOne({
+        employeeId: String(employeeId),
+        date: today,
+        status: "APPROVED",
+      });
+
+      if (!approvedOT) {
+        return res.status(403).json({
+          success: false,
+          isWeekOff: true,
+          message:
+            "Today is your Week Off. Punch-in is not allowed. If you want to work, please apply for Overtime and contact your admin to approve it. Once approved, you can punch in.",
+        });
+      }
+      // ✅ Approved OT found — allow punch-in to proceed normally
+    }
+    /* ================= END WEEK OFF CHECK ================= */
 
     let address = "Unknown Location";
     try { address = await reverseGeocode(latitude, longitude); } catch { }

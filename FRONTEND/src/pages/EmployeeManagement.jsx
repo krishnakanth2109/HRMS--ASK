@@ -11,6 +11,7 @@ import api, {
   getAttendanceByDateRange,
   getAllShifts,
   getLeaveRequests,
+  getAllProfiles ,
   getHolidays
 } from "../api";
 
@@ -807,21 +808,39 @@ const EmployeeManagement = () => {
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
-  useEffect(() => {
+useEffect(() => {
     const fetchImages = async () => {
+      // Prevent running if no employees are loaded
       if (employees.length === 0) return;
-      const newImages = {};
-      for (const emp of employees) {
-        if (!employeeImages[emp.employeeId]) {
-          try {
-            const res = await api.get(`/api/profile/${emp.employeeId}`);
-            if (res.data?.profilePhoto?.url) newImages[emp.employeeId] = getSecureUrl(res.data.profilePhoto.url);
-          } catch (err) { }
-        }
+
+      try {
+        // ✅ Call the bulk API ONCE instead of making individual calls for every employee
+        const response = await getAllProfiles();
+        
+        // Handle different possible backend response structures safely
+        const profilesList = Array.isArray(response) ? response : (response?.data || []);
+        
+        const newImages = {};
+        
+        // Loop through the existing profiles and map URLs to Employee IDs
+        profilesList.forEach(profile => {
+          if (profile.employeeId && profile.profilePhoto?.url) {
+            newImages[profile.employeeId] = getSecureUrl(profile.profilePhoto.url);
+          }
+        });
+
+        // Set the state once with all found images
+        setEmployeeImages(newImages);
+
+      } catch (err) {
+        console.error("Failed to fetch bulk profile images", err);
       }
-      if (Object.keys(newImages).length > 0) setEmployeeImages(prev => ({ ...prev, ...newImages }));
     };
-    if (employees.length > 0) fetchImages();
+
+    // ✅ Only run if employees exist AND we haven't fetched images yet
+    if (employees.length > 0 && Object.keys(employeeImages).length === 0) {
+      fetchImages();
+    }
   }, [employees]);
 
   const handleDeactivateSubmit = async ({ endDate, reason }) => {

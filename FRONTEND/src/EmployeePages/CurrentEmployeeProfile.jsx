@@ -36,32 +36,84 @@ const CurrentEmployeeProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState({ pan: false, aadhaar: false, exp: false });
 
-  // Load Employee from sessionStorage
+  // Load Employee — first from sessionStorage for instant display,
+  // then fetch fresh data from API so admin edits are always reflected.
   useEffect(() => {
     const saved = sessionStorage.getItem("hrmsUser");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const empData = parsed.data || parsed; 
-        
-        empData.employeeId = String(empData.employeeId);
-        
-        if (!empData.experienceDetails) empData.experienceDetails = [];
-        if (empData.experienceDetails.length === 0) {
-            empData.experienceDetails.push({
+
+    if (!saved || saved === "undefined") {
+      setLoading(false);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(saved);
+    } catch (e) {
+      console.error("Error parsing hrmsUser:", e);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ ALWAYS normalize user shape (same as before)
+    const empData = {
+      ...parsed,
+      employeeId: String(parsed.employeeId),
+      experienceDetails:
+        parsed.experienceDetails?.length > 0
+          ? parsed.experienceDetails
+          : [
+              {
                 company: "Current Company",
                 role: "",
                 department: "",
                 joiningDate: "",
-                salary: 0
-            });
-        }
-        setEmployee(empData);
-      } catch (e) {
-        console.error("Error parsing user data:", e);
-      }
-    }
-    setLoading(false);
+                salary: 0,
+              },
+            ],
+    };
+
+    // Show stored data immediately so the UI isn't blank
+    setEmployee(empData);
+
+    // ✅ FIX: Fetch fresh data from the API so any edits made by admin
+    // via EditEmployee are reflected here without requiring a re-login.
+    const empId = String(parsed.employeeId);
+    api.get(`/api/employees/${empId}`)
+      .then(({ data }) => {
+        const freshData = {
+          ...data,
+          employeeId: String(data.employeeId),
+          experienceDetails:
+            data.experienceDetails?.length > 0
+              ? data.experienceDetails
+              : [
+                  {
+                    company: "Current Company",
+                    role: "",
+                    department: "",
+                    joiningDate: "",
+                    salary: 0,
+                  },
+                ],
+        };
+
+        // Update state with fresh DB data
+        setEmployee(freshData);
+
+        // Also keep sessionStorage in sync so next load is up-to-date
+        const currentStorage = JSON.parse(sessionStorage.getItem("hrmsUser") || "{}");
+        const merged = { ...currentStorage, ...freshData };
+        if (currentStorage.token && !merged.token) merged.token = currentStorage.token;
+        sessionStorage.setItem("hrmsUser", JSON.stringify(merged));
+      })
+      .catch((err) => {
+        // Non-fatal: keep showing the sessionStorage version
+        console.warn("Could not refresh employee profile from API:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   if (loading) return <div className="p-10 text-center text-blue-600 font-bold"><FaSpinner className="animate-spin inline mr-2"/>Loading profile...</div>;
@@ -309,8 +361,7 @@ const CurrentEmployeeProfile = () => {
           <Section title="Basic Information">
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StaticField label="Employee ID" value={employeeId} />
-                {/* ✅ UPDATED: Email is now editable */}
-                <Input label="Email" value={email} onChange={(v) => handleBasicChange("email", v)} editable={isEditing} icon={<FaEnvelope/>} />
+                <StaticField label="Email" value={email} />
                 <Input label="Full Name" value={name} onChange={(v) => handleBasicChange("name", v)} editable={isEditing} icon={<FaUser/>} />
                 <Input label="Phone (10 Digits)" value={phone} onChange={(v) => handleBasicChange("phone", v)} editable={isEditing} icon={<FaPhone/>} />
                 <div className="md:col-span-2">
@@ -373,11 +424,10 @@ const CurrentEmployeeProfile = () => {
 
           <Section title="Current Job Details">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               <Input label="Department" value={currentJob.department} onChange={(v) => handleCurrentJobChange("department", v)} editable={false}  icon={<FaBuilding/>} />
-               <Input label="Role" value={currentJob.role} editable={false} onChange={(v) => handleCurrentJobChange("role", v)}  />
-               <Input label="Joining Date" type="date" value={currentJob.joiningDate?.split("T")[0]} onChange={(v) => handleCurrentJobChange("joiningDate", v)} editable={false} icon={<FaCalendarAlt/>} />
-               {/* ✅ UPDATED: Salary is now NOT editable from employee side */}
-               <Input label="Salary (CTC)" type="number" value={currentJob.salary} onChange={(v) => handleCurrentJobChange("salary", v)} editable={false} icon={<FaMoneyBill/>} />
+               <Input label="Department" value={currentJob.department} onChange={(v) => handleCurrentJobChange("department", v)} editable={isEditing} icon={<FaBuilding/>} />
+               <Input label="Role" value={currentJob.role} onChange={(v) => handleCurrentJobChange("role", v)} editable={isEditing} />
+               <Input label="Joining Date" type="date" value={currentJob.joiningDate?.split("T")[0]} onChange={(v) => handleCurrentJobChange("joiningDate", v)} editable={isEditing} icon={<FaCalendarAlt/>} />
+               <Input label="Salary (CTC)" type="number" value={currentJob.salary} onChange={(v) => handleCurrentJobChange("salary", v)} editable={isEditing} icon={<FaMoneyBill/>} />
              </div>
           </Section>
 
@@ -422,7 +472,7 @@ const CurrentEmployeeProfile = () => {
                        </div>
                     )}
                     {exp.experienceLetterUrl && (
-                       <a href={getSecureUrl(exp.experienceLetterUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm md:col-span-2 flex items-center gap-1">
+                       <a href={getSecureUrl(exp.experienceLetterUrl)} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm md:col-span-2 flex items-center gap-1">
                           <FaCheck className="text-green-500"/> View Document
                         </a>
                     )}

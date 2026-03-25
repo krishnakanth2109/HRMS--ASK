@@ -130,29 +130,29 @@ const AdminLeavePanel = () => {
     );
   }, [allEmployeesList]);
 
-  // Fetch Images
-  useEffect(() => {
-    const fetchImages = async () => {
-      if (leaveList.length === 0) return;
-      const uniqueEmployeeIds = [...new Set(leaveList.map(l => l.employeeId))];
-      const newImages = {};
+  // // Fetch Images
+  // useEffect(() => {
+  //   const fetchImages = async () => {
+  //     if (leaveList.length === 0) return;
+  //     const uniqueEmployeeIds = [...new Set(leaveList.map(l => l.employeeId))];
+  //     const newImages = {};
 
-      for (const empId of uniqueEmployeeIds) {
-        if (empId && !employeeImages[empId]) {
-          try {
-            const res = await api.get(`/api/profile/${empId}`);
-            if (res.data?.profilePhoto?.url) {
-              newImages[empId] = getSecureUrl(res.data.profilePhoto.url);
-            }
-          } catch (err) { }
-        }
-      }
-      if (Object.keys(newImages).length > 0) {
-        setEmployeeImages(prev => ({ ...prev, ...newImages }));
-      }
-    };
-    fetchImages();
-  }, [leaveList]);
+  //     for (const empId of uniqueEmployeeIds) {
+  //       if (empId && !employeeImages[empId]) {
+  //         try {
+  //           const res = await api.get(`/api/profile/${empId}`);
+  //           if (res.data?.profilePhoto?.url) {
+  //             newImages[empId] = getSecureUrl(res.data.profilePhoto.url);
+  //           }
+  //         } catch (err) { }
+  //       }
+  //     }
+  //     if (Object.keys(newImages).length > 0) {
+  //       setEmployeeImages(prev => ({ ...prev, ...newImages }));
+  //     }
+  //   };
+  //   fetchImages();
+  // }, [leaveList]);
 
   const enrichedLeaveList = useMemo(() => {
     return leaveList.map((leave) => {
@@ -480,9 +480,9 @@ const AdminLeavePanel = () => {
               return (
                 <div key={lv._id} className="py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4 hover:bg-slate-50/50 transition duration-150 px-2 rounded-lg -mx-2">
                   <div className="flex gap-4 items-center w-full">
-                    <div className="w-10 h-10 rounded-full shrink-0 border border-slate-200 overflow-hidden bg-white flex items-center justify-center font-bold text-slate-700">
+                    {/* <div className="w-10 h-10 rounded-full shrink-0 border border-slate-200 overflow-hidden bg-white flex items-center justify-center font-bold text-slate-700">
                       {employeeImages[lv.employeeId] ? <img src={employeeImages[lv.employeeId]} alt="" className="w-full h-full object-cover" /> : getInitials(lv.employeeName)}
-                    </div>
+                    </div> */}
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="font-bold text-slate-800">{lv.employeeName}</span>
