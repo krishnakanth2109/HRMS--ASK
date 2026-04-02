@@ -1275,137 +1275,319 @@ const EmployeeDashboard = () => {
       )}
 
       {/* Profile Section - SaaS Glassmorphism style */}
-      <div className="bg-white/60 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-6 mb-8 flex flex-col md:flex-row items-center gap-6 relative z-10 overflow-visible">
-        <div className="flex flex-col items-center">
-          <img
-            src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`}
-            alt="Profile"
-            className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover relative z-0"
-          />
-
-          <div className="flex justify-center gap-2 -mt-5 relative z-10">
-            <label
-              htmlFor="profile-upload"
-              className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg border-2 border-white ${uploadingImage ? "opacity-50" : ""}`}
+ <div className="bg-white/60 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-6 mb-8 relative z-10">
+  {/* Main Content */}
+  <div className="flex flex-col lg:flex-row gap-6">
+    {/* Profile Image Section */}
+    <div className="flex flex-col items-center lg:items-start">
+      <div className="relative">
+        <img
+          src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128&bold=true`}
+          alt="Profile"
+          className="w-28 h-28 rounded-full border-4 border-white shadow-md object-cover"
+          onError={(e) => {
+            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128&bold=true`;
+          }}
+        />
+        <div className="flex justify-center gap-2 -mt-5 absolute left-1/2 transform -translate-x-1/2">
+          <label
+            htmlFor="profile-upload"
+            className={`bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg border-2 border-white ${uploadingImage ? "opacity-50" : ""}`}
+          >
+            {uploadingImage ? <div className="animate-spin text-sm">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />}
+          </label>
+          {profileImage && (
+            <button
+              onClick={handleDeleteProfilePic}
+              className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg border-2 border-white"
             >
-              {uploadingImage ? <div className="animate-spin text-sm">⏳</div> : profileImage ? <FaEdit size={14} /> : <FaCamera size={14} />}
-            </label>
+              <FaTrash size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
+    </div>
 
-            {profileImage && (
-              <button
-                onClick={handleDeleteProfilePic}
-                className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg border-2 border-white"
-              >
-                <FaTrash size={14} />
-              </button>
-            )}
+    {/* User Info Section */}
+    <div className="flex-1">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+        <div className="flex-1">
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-3">
+            <FaUserCircle className="text-blue-500" /> {name}
+          </h3>
+          
+          {/* Work Mode */}
+          <div className="mb-3">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs uppercase tracking-wider font-bold shadow-sm border ${currentWorkMode === 'WFH' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+              {currentWorkMode === 'WFH' ? <FaLaptopHouse size={14} /> : <FaBuilding size={14} />} 
+              {currentWorkMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
+            </span>
+            <div className="text-[11px] text-gray-500 font-medium italic flex items-center gap-1 mt-1">
+              <FaInfoCircle size={10} />
+              {currentWorkMode === 'WFO' && officeConfig?.requireAccurateLocation !== false
+                ? 'Accurate office location required'
+                : workModeDesc
+              }
+            </div>
           </div>
 
-          <input id="profile-upload" type="file" className="hidden" onChange={handleImageSelect} disabled={uploadingImage} />
+          {/* Employee Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-gray-600 text-sm font-medium">
+            <div><span className="text-gray-800 font-semibold">ID:</span> {employeeId}</div>
+            <div><span className="text-gray-800 font-semibold">Email:</span> {email}</div>
+            <div><span className="text-gray-800 font-semibold">Department:</span> {department}</div>
+            <div><span className="text-gray-800 font-semibold">Role:</span> {role}</div>
+          </div>
         </div>
 
-        <div className="flex-1 w-full">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><FaUserCircle className="text-blue-500" /> {name}</h3>
-              <div className="mt-3 mb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs uppercase tracking-wider font-bold shadow-sm border ${currentWorkMode === 'WFH' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                    {currentWorkMode === 'WFH' ? <FaLaptopHouse size={14} /> : <FaBuilding size={14} />} {currentWorkMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-gray-500 font-medium italic flex items-center gap-1 ml-1 mt-1">
-                  <FaInfoCircle size={10} />
-                  {currentWorkMode === 'WFO' && officeConfig?.requireAccurateLocation !== false
-                    ? 'Accurate office location required'
-                    : workModeDesc
-                  }
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-gray-600 mt-2 text-sm font-medium">
-                <div><b className="text-gray-800">ID:</b> {employeeId}</div> <div><b className="text-gray-800">Email:</b> {email}</div> <div><b className="text-gray-800">Department:</b> {department}</div> <div><b className="text-gray-800">Role:</b> {role}</div>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-3 w-full md:w-auto">
-              <div className="text-right bg-white p-3 rounded-xl border border-gray-100 shadow-sm w-full md:w-auto">
-                <div className="text-2xl font-extrabold text-gray-800 tracking-wider font-mono">
-                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </div>
-                <div className="text-xs font-bold text-blue-600 uppercase mt-0.5">
-                  {currentTime.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
-              </div>
-
-              <div className="flex gap-2 items-start flex-wrap justify-end">
-                {showCorrectionBtn && (
-                  <button
-                    onClick={handleOpenLateRequestModal}
-                    className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-xl shadow-sm hover:bg-red-50 transition-all text-sm font-bold animate-pulse-slow"
-                  >
-                    <div className="flex flex-col items-start leading-tight">
-                      <span className="flex items-center gap-1.5">
-                        <FaPen size={12} /> Request on-time login
-                      </span>
-                      <span className="text-[10px] text-red-400 font-semibold mt-0.5">
-                        {requestLimit.limit - requestLimit.used} requests remaining
-                      </span>
-                    </div>
-                  </button>
-                )}
-
-                {todayLog?.sessions?.length > 0 && (
-                  <div className="relative" ref={breakDropdownRef}>
-                    <button onClick={() => setIsBreakDropdownOpen(!isBreakDropdownOpen)} className="flex items-center gap-2 bg-white text-orange-700 border border-orange-200 px-4 py-2 rounded-xl shadow-sm hover:bg-orange-50 transition-all text-sm font-bold h-[42px]"> <FaHistory /> Breaks & Sessions <FaChevronDown className={`transform transition-transform ${isBreakDropdownOpen ? 'rotate-180' : ''}`} size={12} /> </button>
-                    {isBreakDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 z-50 p-5 animate-fade-in-down"
-                        onClick={(e) => e.stopPropagation()}>
-                        <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 uppercase text-[11px] tracking-wider">Today's Sessions</h4>
-                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                          {todayLog.sessions.map((sess, idx) => (
-                            <div key={idx} className="text-xs bg-gray-50 p-3 rounded-xl border border-gray-100">
-                              <div className="flex justify-between font-bold text-gray-700 mb-1">
-                                <span>Session {idx + 1}</span>
-                                <span className={sess.punchOut ? "text-green-600 bg-green-50 px-2 py-0.5 rounded" : "text-blue-600 bg-blue-50 px-2 py-0.5 rounded animate-pulse"}>{sess.punchOut ? "Completed" : "Active"}</span>
-                              </div>
-                              <div className="flex justify-between text-gray-500 font-medium">
-                                <span>In: {new Date(sess.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                <span>Out: {sess.punchOut ? new Date(sess.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--"}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {shiftTimings && (
-                  <div className="relative" ref={dropdownRef}>
-                    <button onClick={() => setIsShiftDropdownOpen(!isShiftDropdownOpen)} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-4 py-2 rounded-xl shadow-sm hover:bg-blue-50 transition-all text-sm font-bold h-[42px]"> <FaRegClock /> Shift Details <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12} /> </button>
-                    {isShiftDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-200 z-50 p-5 animate-fade-in-down"
-                        onClick={(e) => e.stopPropagation()}>
-                        <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 uppercase text-[11px] tracking-wider">Assigned Shift</h4>
-                        <div className="space-y-3 text-sm text-gray-700 font-medium">
-                          <div className="flex justify-between"><span>Start Time:</span> <span className="font-bold text-gray-900">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
-                          <div className="flex justify-between"><span>End Time:</span> <span className="font-bold text-gray-900">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>
-
-                          <div className="flex justify-between bg-blue-50 p-2 rounded-lg border border-blue-100 mt-2"><span>Required Work:</span> <span className="font-bold text-blue-700">{calculatedTargetHours}</span></div>
-                          <div className="flex justify-between text-[11px] text-gray-500 mt-2"><span>Min Half Day:</span> <span>{getTargetHalfDayHours()}</span></div>
-                          <div className="flex justify-between text-[11px] text-gray-500"><span>Late Grace:</span> <span>{shiftTimings.lateGracePeriod} mins</span></div>
-
-                          <div className="pt-3 border-t border-gray-100 mt-2"> <span className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Weekly Offs:</span> <div className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">{getDayNames(shiftTimings.weeklyOffDays)}</div> </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* Time Display */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 shadow-sm min-w-[200px]">
+          <div className="text-2xl font-extrabold text-gray-800 tracking-wider font-mono text-center">
+            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </div>
+          <div className="text-xs font-bold text-blue-600 uppercase mt-1 text-center">
+            {currentTime.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         </div>
       </div>
+
+      {/* Action Buttons - Desktop View */}
+      <div className="hidden md:flex gap-3 justify-end mt-6 pt-4 border-t border-gray-200 relative">
+        {showCorrectionBtn && (
+          <button
+            onClick={handleOpenLateRequestModal}
+            className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2 rounded-xl shadow-sm hover:bg-red-50 transition-all text-sm font-bold"
+          >
+            <FaPen size={14} />
+            <span>Request on-time login</span>
+          </button>
+        )}
+
+        {todayLog?.sessions?.length > 0 && (
+          <div className="relative" style={{ zIndex: 9999 }}>
+            <button 
+              onClick={() => {
+                setIsBreakDropdownOpen(!isBreakDropdownOpen);
+                setIsShiftDropdownOpen(false);
+              }} 
+              className="flex items-center gap-2 bg-white text-orange-600 border border-orange-200 px-4 py-2 rounded-xl shadow-sm hover:bg-orange-50 transition-all text-sm font-bold"
+            >
+              <FaHistory size={14} />
+              <span>Breaks & Sessions</span>
+              <FaChevronDown className={`transform transition-transform ${isBreakDropdownOpen ? 'rotate-180' : ''}`} size={12} />
+            </button>
+            {isBreakDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 p-5"
+                style={{ zIndex: 10000, position: 'absolute', top: '100%', right: 0 }}
+              >
+                <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">Today's Sessions</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {todayLog.sessions.map((sess, idx) => (
+                    <div key={idx} className="text-xs bg-gray-50 p-3 rounded-xl">
+                      <div className="flex justify-between font-bold mb-1">
+                        <span>Session {idx + 1}</span>
+                        <span className={sess.punchOut ? "text-green-600" : "text-blue-600 animate-pulse"}>{sess.punchOut ? "Completed" : "Active"}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>In: {new Date(sess.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>Out: {sess.punchOut ? new Date(sess.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {shiftTimings && (
+          <div className="relative" style={{ zIndex: 9999 }}>
+            <button 
+              onClick={() => {
+                setIsShiftDropdownOpen(!isShiftDropdownOpen);
+                setIsBreakDropdownOpen(false);
+              }} 
+              className="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-xl shadow-sm hover:bg-blue-50 transition-all text-sm font-bold"
+            >
+              <FaRegClock size={14} />
+              <span>Shift Details</span>
+              <FaChevronDown className={`transform transition-transform ${isShiftDropdownOpen ? 'rotate-180' : ''}`} size={12} />
+            </button>
+            {isShiftDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200 p-5"
+                style={{ zIndex: 10000, position: 'absolute', top: '100%', right: 0 }}
+              >
+                <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">Assigned Shift</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-600">Start Time:</span> <span className="font-bold">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">End Time:</span> <span className="font-bold">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span></div>
+                  <div className="flex justify-between bg-blue-50 p-2 rounded-lg"><span>Required Work:</span> <span className="font-bold text-blue-700">{calculatedTargetHours}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Min Half Day:</span> <span>{getTargetHalfDayHours()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Late Grace:</span> <span>{shiftTimings.lateGracePeriod} mins</span></div>
+                  <div><span className="text-gray-600 text-xs">Weekly Offs:</span> <div className="font-bold text-blue-600 mt-1">{getDayNames(shiftTimings.weeklyOffDays)}</div></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons - Mobile View (Circular) */}
+      <div className="flex md:hidden justify-center gap-6 mt-6 pt-4 border-t border-gray-200">
+        {showCorrectionBtn && (
+          <button
+            onClick={handleOpenLateRequestModal}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center border-2 border-red-200 shadow-md">
+              <FaPen className="text-red-600 text-xl" />
+            </div>
+            <span className="text-[10px] font-semibold text-red-600">Request Login</span>
+            <span className="text-[8px] text-red-400">{requestLimit.limit - requestLimit.used} left</span>
+          </button>
+        )}
+
+        {todayLog?.sessions?.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => {
+                setIsBreakDropdownOpen(!isBreakDropdownOpen);
+                setIsShiftDropdownOpen(false);
+              }}
+              className="flex flex-col items-center gap-1.5"
+            >
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center border-2 border-orange-200 shadow-md">
+                <FaHistory className="text-orange-600 text-xl" />
+              </div>
+              <span className="text-[10px] font-semibold text-orange-600 text-center">Breaks & Sessions</span>
+            </button>
+          </div>
+        )}
+
+        {shiftTimings && (
+          <div className="relative">
+            <button
+              onClick={() => {
+                setIsShiftDropdownOpen(!isShiftDropdownOpen);
+                setIsBreakDropdownOpen(false);
+              }}
+              className="flex flex-col items-center gap-1.5"
+            >
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border-2 border-blue-200 shadow-md">
+                <FaRegClock className="text-blue-600 text-xl" />
+              </div>
+              <span className="text-[10px] font-semibold text-blue-600 text-center">Shift Details</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* Mobile Dropdowns - High z-index to appear above everything */}
+{isBreakDropdownOpen && todayLog?.sessions?.length > 0 && (
+  <>
+    <div 
+      className="fixed inset-0 bg-black/30 z-[9998] md:hidden"
+      onClick={() => setIsBreakDropdownOpen(false)}
+    />
+    <div 
+      className="fixed left-4 right-4 top-1/2 transform -translate-y-1/2 bg-white rounded-2xl shadow-2xl z-[9999] p-5 max-h-[80vh] overflow-y-auto md:hidden"
+      style={{ zIndex: 10000 }}
+    >
+      <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+        <h4 className="font-bold text-gray-800 text-base flex items-center gap-2">
+          <FaHistory className="text-orange-500" size={16} />
+          Today's Sessions
+        </h4>
+        <button 
+          onClick={() => setIsBreakDropdownOpen(false)} 
+          className="text-2xl text-gray-400 hover:text-gray-600"
+        >
+          ×
+        </button>
+      </div>
+      <div className="space-y-3">
+        {todayLog.sessions.map((sess, idx) => (
+          <div key={idx} className="bg-gray-50 p-3 rounded-xl">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-bold text-gray-800">Session {idx + 1}</span>
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${sess.punchOut ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                {sess.punchOut ? "Completed" : "Active"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>In: {new Date(sess.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Out: {sess.punchOut ? new Date(sess.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--"}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </>
+)}
+
+{isShiftDropdownOpen && shiftTimings && (
+  <>
+    <div 
+      className="fixed inset-0 bg-black/30 z-[9998] md:hidden"
+      onClick={() => setIsShiftDropdownOpen(false)}
+    />
+    <div 
+      className="fixed left-4 right-4 top-1/2 transform -translate-y-1/2 bg-white rounded-2xl shadow-2xl z-[9999] p-5 max-h-[80vh] overflow-y-auto md:hidden"
+      style={{ zIndex: 10000 }}
+    >
+      <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+        <h4 className="font-bold text-gray-800 text-base flex items-center gap-2">
+          <FaRegClock className="text-blue-500" size={16} />
+          Shift Details
+        </h4>
+        <button 
+          onClick={() => setIsShiftDropdownOpen(false)} 
+          className="text-2xl text-gray-400 hover:text-gray-600"
+        >
+          ×
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+          <span className="text-gray-600 font-medium">Start Time:</span>
+          <span className="font-bold text-gray-900">{formatTimeDisplay(shiftTimings.shiftStartTime)}</span>
+        </div>
+        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+          <span className="text-gray-600 font-medium">End Time:</span>
+          <span className="font-bold text-gray-900">{formatTimeDisplay(shiftTimings.shiftEndTime)}</span>
+        </div>
+        <div className="flex justify-between items-center py-2 bg-blue-50 p-3 rounded-lg">
+          <span className="text-gray-700 font-medium">Required Work:</span>
+          <span className="font-bold text-blue-700 text-lg">{calculatedTargetHours}</span>
+        </div>
+        <div className="flex justify-between items-center py-2">
+          <span className="text-gray-600 font-medium">Min Half Day:</span>
+          <span className="font-bold text-gray-800">{getTargetHalfDayHours()}</span>
+        </div>
+        <div className="flex justify-between items-center py-2">
+          <span className="text-gray-600 font-medium">Late Grace:</span>
+          <span className="font-bold text-gray-800">{shiftTimings.lateGracePeriod} minutes</span>
+        </div>
+        <div className="pt-2">
+          <span className="text-gray-600 font-medium block mb-2">Weekly Offs:</span>
+          <div className="flex flex-wrap gap-2">
+            {getDayNames(shiftTimings.weeklyOffDays).split(', ').map((day, index) => (
+              <span key={index} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                {day}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </>
+)}
 
       {/* ✨ FIX: Screen Effect applied here for the Attendance Table */}
       <div className="rounded-2xl shadow-lg border border-gray-200 relative bg-white mb-8 animate-fade-in">

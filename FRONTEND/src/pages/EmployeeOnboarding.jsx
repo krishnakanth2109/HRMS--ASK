@@ -215,7 +215,7 @@ const handleVerifyEmail = async () => {
     return null;
   };
 
-  const handleInitialSubmit = async (e) => {
+const handleInitialSubmit = async (e) => {
     e.preventDefault();
     const error = validateForm();
     if (error) return Swal.fire({ icon: "warning", title: "Missing Information", text: error, confirmButtonColor: '#f59e0b' });
@@ -235,11 +235,18 @@ const handleVerifyEmail = async () => {
       }]
     };
 
+    // 1. Append Text Data
     finalData.append("jsonData", JSON.stringify(payload));
 
-    if (docFiles.aadhaar) finalData.append("aadhaarCard", docFiles.aadhaar);
-    if (docFiles.pan) finalData.append("panCard", docFiles.pan);
+    // 2. Append Identity Files (MUST match backend exact names)
+    if (docFiles.aadhaar) {
+      finalData.append("aadhaarCard", docFiles.aadhaar);
+    }
+    if (docFiles.pan) {
+      finalData.append("panCard", docFiles.pan);
+    }
 
+    // 3. Append Company Documents
     if (Object.keys(docFiles.filledDocs).length > 0) {
       Object.keys(docFiles.filledDocs).forEach((id) => {
         finalData.append("companyDocuments", docFiles.filledDocs[id]);
@@ -247,21 +254,29 @@ const handleVerifyEmail = async () => {
     }
 
     try {
-      // Direct submission to DB
+      // 🚨 FIX: Explicitly setting the header here overrides the global JSON header in api.js
+      // This guarantees the files are actually packaged and sent to the backend.
       await api.post('/api/employees/onboard', finalData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data' 
+        }
       });
 
       await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
 
       setLoading(false);
       setStage('compliance'); // Direct transition to Policy Compliance
+      
     } catch (err) {
       setLoading(false);
+      
+      // Better error message extraction
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "An error occurred during onboarding. Please check your details.";
+      
       Swal.fire({
         icon: 'error',
         title: 'Submission Failed',
-        text: err.response?.data?.error || "An error occurred during onboarding. Please check your details.",
+        text: errorMessage,
         confirmButtonColor: '#ef4444'
       });
     }

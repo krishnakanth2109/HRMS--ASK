@@ -17,7 +17,9 @@ import {
   FaChevronRight,
   FaChevronLeft,
   FaSyncAlt,
-  FaChartLine // Added for Leave Summary
+  FaChartLine,
+  FaBirthdayCake,
+  FaAward
 } from "react-icons/fa";
 import {
   BarChart,
@@ -92,6 +94,75 @@ const formatWeekRange = (start, end) => {
   return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
 };
 
+// ─── Helper function to get joining date from employee data ─────────────────
+const getJoiningDate = (employee) => {
+  // Check experienceDetails for current employment
+  if (Array.isArray(employee.experienceDetails) && employee.experienceDetails.length > 0) {
+    const currentExp = employee.experienceDetails.find(
+      exp => exp.lastWorkingDate === "Present" || !exp.lastWorkingDate
+    );
+    if (currentExp && currentExp.joiningDate) {
+      return currentExp.joiningDate;
+    }
+  }
+  // Fallback to createdAt if available
+  if (employee.createdAt) {
+    return employee.createdAt;
+  }
+  return null;
+};
+
+// ─── Helper function to check if today is employee's birthday ─────────────────
+const isTodayBirthday = (employee) => {
+  const dob = employee.personalDetails?.dob;
+  if (!dob) return false;
+  
+  const today = new Date();
+  const birthDate = new Date(dob);
+  
+  // Compare month and day only
+  return today.getMonth() === birthDate.getMonth() && 
+         today.getDate() === birthDate.getDate();
+};
+
+// ─── Helper function to check if today is work anniversary ─────────────────
+const isTodayWorkAnniversary = (employee) => {
+  const joiningDate = getJoiningDate(employee);
+  if (!joiningDate) return null;
+  
+  const today = new Date();
+  const joinDate = new Date(joiningDate);
+  
+  // Check if today matches the month and day of joining
+  const isSameDay = today.getMonth() === joinDate.getMonth() && 
+                    today.getDate() === joinDate.getDate();
+  
+  if (!isSameDay) return null;
+  
+  // Calculate years completed
+  let yearsCompleted = today.getFullYear() - joinDate.getFullYear();
+  
+  // If anniversary hasn't occurred yet this year (for future dates), subtract 1
+  if (today < new Date(today.getFullYear(), joinDate.getMonth(), joinDate.getDate())) {
+    yearsCompleted--;
+  }
+  
+  // Only return if at least 1 year has been completed
+  if (yearsCompleted >= 1) {
+    return yearsCompleted;
+  }
+  
+  return null;
+};
+
+// ─── Helper to format anniversary text ─────────────────────────────────────
+const getAnniversaryText = (years) => {
+  if (years === 1) return "1st Work Anniversary";
+  if (years === 2) return "2nd Work Anniversary";
+  if (years === 3) return "3rd Work Anniversary";
+  return `${years}th Work Anniversary`;
+};
+
 // ─── Pie Active Shape (Updated for Hover Expansion) ───────────────────────────
 
 const renderActiveShape = (props) => {
@@ -101,7 +172,7 @@ const renderActiveShape = (props) => {
       cx={cx}
       cy={cy}
       innerRadius={innerRadius}
-      outerRadius={outerRadius + 3} // Expands hovered slice slightly
+      outerRadius={outerRadius + 3}
       startAngle={startAngle}
       endAngle={endAngle}
       fill={fill}
@@ -126,7 +197,7 @@ const AdminDashboard = () => {
   const [loadingData, setLoadingData] = useState(true);
 
   // --- Graph State ---
-  const [viewMode, setViewMode] = useState("week"); // 'week' or 'month'
+  const [viewMode, setViewMode] = useState("week");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [currentWeek, setCurrentWeek] = useState(0);
   const [chartRawData, setChartRawData] = useState([]);
@@ -140,7 +211,7 @@ const AdminDashboard = () => {
   };
 
   const onPieLeave = () => {
-    setActiveIndex(-1); // Reset back to default (100% total)
+    setActiveIndex(-1);
   };
 
   // Context-based stat cards
@@ -197,6 +268,52 @@ const AdminDashboard = () => {
     return m;
   }, [allEmployees]);
 
+  // ── Birthday and Anniversary Announcements (FIXED) ───────────────────────────
+  const announcements = useMemo(() => {
+    const announcementsList = [];
+    const today = new Date();
+    const todayStr = today.toLocaleDateString();
+    
+    console.log("Checking announcements for date:", todayStr); // Debug log
+
+    activeEmployees.forEach((employee) => {
+      // Check Birthday (FIXED)
+      const hasBirthday = isTodayBirthday(employee);
+      if (hasBirthday) {
+        const { role } = getDeptRole(employee);
+        announcementsList.push({
+          type: "birthday",
+          name: employee.name,
+          role: role,
+          message: `🎉 Happy Birthday to ${employee.name}${role !== "—" ? ` (${role})` : ""}! Wishing you a fantastic day! 🎂🎈`,
+          icon: <FaBirthdayCake className="inline mr-2 text-pink-500" />
+        });
+        console.log("Found birthday for:", employee.name); // Debug log
+      }
+
+      // Check Work Anniversary (FIXED)
+      const anniversaryYears = isTodayWorkAnniversary(employee);
+      if (anniversaryYears) {
+        const { role } = getDeptRole(employee);
+        announcementsList.push({
+          type: "anniversary",
+          name: employee.name,
+          role: role,
+          years: anniversaryYears,
+          message: `🎊 Congratulations to ${employee.name}${role !== "—" ? ` (${role})` : ""} on completing ${getAnniversaryText(anniversaryYears)}! 🎉🏆`,
+          icon: <FaAward className="inline mr-2 text-yellow-500" />
+        });
+        console.log("Found anniversary for:", employee.name, anniversaryYears, "years"); // Debug log
+      }
+    });
+
+    console.log("Total announcements:", announcementsList.length); // Debug log
+    return announcementsList;
+  }, [activeEmployees]);
+
+  // Check if there are any announcements
+  const hasAnnouncements = announcements.length > 0;
+
   // ── Date Range Logic ─────────────────────────────────────────────────────
   const weekDates = useMemo(() => {
     const formatDate = (date) => {
@@ -208,7 +325,7 @@ const AdminDashboard = () => {
     if (viewMode === 'month') {
       const [year, month] = selectedMonth.split('-').map(Number);
       const firstDay = new Date(year, month - 1, 1);
-      const lastDay = new Date(year, month, 0); // Last day of the month
+      const lastDay = new Date(year, month, 0);
       lastDay.setHours(23, 59, 59, 999);
 
       return {
@@ -223,9 +340,8 @@ const AdminDashboard = () => {
     const today = new Date();
     today.setDate(today.getDate() + currentWeek * 7);
 
-    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon
+    const dayOfWeek = today.getDay();
 
-    // Adjust to make Monday the start of the week
     const monday = new Date(today);
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     monday.setHours(0, 0, 0, 0);
@@ -264,11 +380,9 @@ const AdminDashboard = () => {
     const totalActive = activeEmployees.length || 1;
     const data = [];
 
-    // Normalize "Today" to midnight for comparison
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Strictly use 7 days for 'week' mode to avoid 8th day
     const iterations = viewMode === 'week'
       ? 7
       : Math.ceil((weekDates.endDateObj - weekDates.startDateObj) / (1000 * 3600 * 24)) + 1;
@@ -289,7 +403,6 @@ const AdminDashboard = () => {
         ? loopDate.toLocaleDateString('en-US', { weekday: 'short' })
         : loopDate.getDate().toString();
 
-      // Check if date is in future (Don't show bars)
       if (loopDateNormalized > today) {
         data.push({
           name: dayName,
@@ -299,7 +412,6 @@ const AdminDashboard = () => {
         continue;
       }
 
-      // Count Present for this specific date
       let presentCount = 0;
       chartRawData.forEach(att => {
         const attDate = att.date
@@ -307,21 +419,18 @@ const AdminDashboard = () => {
           : (att.punchIn ? new Date(att.punchIn).toISOString().split("T")[0] : null);
 
         if (attDate === dateStr && att.punchIn) {
-          // Ensure employee is active
           if (activeEmployees.some(e => e.employeeId === att.employeeId)) {
             presentCount++;
           }
         }
       });
 
-      // Calculate Leaves for this date
       const onLeaveCount = allLeaves.filter(l =>
         l.status === 'Approved' &&
         dateStr >= l.from &&
         dateStr <= l.to
       ).length;
 
-      // Calculate Absent
       const absentCount = Math.max(0, totalActive - presentCount - onLeaveCount);
 
       data.push({
@@ -338,14 +447,12 @@ const AdminDashboard = () => {
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Today Present
   const todayPresent = useMemo(
     () => todayAttendance.filter((a) => !!a.punchIn),
     [todayAttendance]
   );
   const presentIds = useMemo(() => new Set(todayAttendance.map((a) => a.employeeId)), [todayAttendance]);
 
-  // Today Leaves List
   const onLeaveTodayList = useMemo(() => {
     return allLeaves
       .filter(
@@ -369,19 +476,16 @@ const AdminDashboard = () => {
 
   const onLeaveIds = useMemo(() => new Set(onLeaveTodayList.map((l) => l.employeeId)), [onLeaveTodayList]);
 
-  // Today Absent
   const todayAbsentCount = useMemo(() => {
     return activeEmployees.filter(
       (e) => !presentIds.has(e.employeeId) && !onLeaveIds.has(e.employeeId)
     ).length;
   }, [activeEmployees, presentIds, onLeaveIds]);
 
-  // Total Pending Count
   const totalPendingLeavesCount = useMemo(() => {
     return allLeaves.filter(l => l.status === "Pending").length;
   }, [allLeaves]);
 
-  // Recent Leave Requests
   const recentLeaves = useMemo(
     () =>
       allLeaves
@@ -400,7 +504,6 @@ const AdminDashboard = () => {
         .slice(0, 4), [allLeaves, empMap]
   );
 
-  // Working Remotely
   const remoteWorkers = useMemo(() => {
     return todayPresent
       .filter((a) => (employeeWorkModes[a.employeeId] || "WFO") === "WFH")
@@ -415,7 +518,6 @@ const AdminDashboard = () => {
       });
   }, [todayPresent, employeeWorkModes, empMap]);
 
-  // Birthdays
   const { todayBirthdays, upcomingBirthdays } = useMemo(() => {
     const todayM = new Date().getMonth();
     const todayD = new Date().getDate();
@@ -457,11 +559,9 @@ const AdminDashboard = () => {
     return { todayBirthdays: todayB, upcomingBirthdays: upcoming };
   }, [activeEmployees]);
 
-  // Employee Distribution (Dynamic Departments)
   const departmentData = useMemo(() => {
     const counts = {};
     activeEmployees.forEach((e) => {
-      // Use helper to get Dept safely
       const { department } = getDeptRole(e);
       const deptName = department || "Unassigned";
       counts[deptName] = (counts[deptName] || 0) + 1;
@@ -469,25 +569,23 @@ const AdminDashboard = () => {
 
     return Object.keys(counts).map((dept) => ({
       name: dept,
-      value: counts[dept], // Recharts Pie expects 'value'
+      value: counts[dept],
     }));
   }, [activeEmployees]);
 
-  const totalEmployeesCount = activeEmployees.length || 1; // Safely divide by this
+  const totalEmployeesCount = activeEmployees.length || 1;
 
-  // Extended Color Palette for dynamic departments
   const COLORS = [
-    "#4f46e5", // Indigo
-    "#0ea5e9", // Sky
-    "#10b981", // Emerald
-    "#f59e0b", // Amber
-    "#ef4444", // Red
-    "#8b5cf6", // Violet
-    "#ec4899", // Pink
-    "#14b8a6", // Teal
+    "#4f46e5",
+    "#0ea5e9",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#ec4899",
+    "#14b8a6",
   ];
 
-  // Actions
   const handleApprove = async (leaveId) => {
     try {
       const { approveLeaveRequestById } = await import("../api");
@@ -509,7 +607,7 @@ const AdminDashboard = () => {
 
     <div
       className="relative w-full font-sans text-gray-800 overflow-hidden flex flex-col"
-      style={{ height: "calc(100vh - 70px)" }} // Adjust this 70px offset if your layout header is taller/shorter
+      style={{ height: "calc(100vh - 70px)" }}
     >
 
       {/* ================= INJECT CUSTOM CSS FOR SCROLLBAR ================= */}
@@ -528,10 +626,38 @@ const AdminDashboard = () => {
         .internal-scroll::-webkit-scrollbar-thumb:hover {
           background-color: #94a3b8;
         }
+        
+        /* Marquee Animation */
+        @keyframes marquee {
+          0% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+        
+        .marquee-container {
+          overflow: hidden;
+          white-space: nowrap;
+          position: relative;
+        }
+        
+        .marquee-content {
+          display: inline-block;
+          animation: marquee 30s linear infinite;
+          white-space: nowrap;
+        }
+        
+        .marquee-content:hover {
+          animation-play-state: paused;
+        }
       `}</style>
 
       {/* ================= MAIN CONTENT (Internally Scrollable Area) ================= */}
       <div className="relative z-10 w-full h-full overflow-y-auto p-6 pb-20 internal-scroll">
+
+    
 
         {/* 1. TOP STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -550,7 +676,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Present - Clickable (UPDATED ROUTE) */}
+          {/* Present - Clickable */}
           <Link
             to="/admin/today-overview"
             className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-blue-200 cursor-pointer"
@@ -564,9 +690,9 @@ const AdminDashboard = () => {
             </div>
           </Link>
 
-          {/* Absent - Clickable (UPDATED ROUTE) */}
+          {/* Absent - Clickable */}
           <Link
-              to="/admin/today-overview?type=absent"
+            to="/admin/today-overview?type=absent"
             className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md hover:border-red-100 cursor-pointer"
           >
             <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
@@ -579,24 +705,51 @@ const AdminDashboard = () => {
           </Link>
 
           {/* Leave Requests */}
-     <div
-  onClick={() => navigate("/admin/admin-Leavemanage")}
-  className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md cursor-pointer"
->
-  <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
-    <FaPlane />
-  </div>
-
-  <div>
-    <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
-      Leave Requests
-    </p>
-    <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">
-      {totalPendingLeavesCount}
-    </h3>
-  </div>
-</div>
+          <div
+            onClick={() => navigate("/admin/admin-Leavemanage")}
+            className="bg-white rounded-[20px] p-5 shadow-sm h-[130px] flex flex-col justify-between border border-gray-100 transition-all hover:shadow-md cursor-pointer"
+          >
+            <div className="w-11 h-11 bg-[#F4F7FE] rounded-xl flex items-center justify-center text-[#4318FF] text-lg">
+              <FaPlane />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                Leave Requests
+              </p>
+              <h3 className="text-3xl font-bold text-[#2B3674] tracking-tight">
+                {totalPendingLeavesCount}
+              </h3>
+            </div>
+          </div>
         </div>
+
+            {/* ================= ANNOUNCEMENTS MARQUEE SECTION ================= */}
+        {hasAnnouncements && (
+          <div className="mb-6 bg-gradient-to-r from-purple-50 via-pink-50 to-yellow-50 rounded-xl shadow-sm border border-purple-100 overflow-hidden">
+            <div className="flex items-center bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 border-b border-purple-200">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                </span>
+                <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">🎉 Celebrations Today 🎊</span>
+              </div>
+            </div>
+            <div className="marquee-container py-3 px-4">
+              <div className="marquee-content">
+                {announcements.map((announcement, idx) => (
+                  <span key={idx} className="inline-flex items-center mx-8 text-base font-medium">
+                    {announcement.icon}
+                    <span className="text-gray-700">{announcement.message}</span>
+                    {idx < announcements.length - 1 && (
+                      <span className="mx-4 text-purple-300">✦</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 2. CHARTS SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -610,7 +763,6 @@ const AdminDashboard = () => {
                 <h3 className="text-white font-bold text-lg">
                   {viewMode === 'week' ? "Weekly Attendance" : "Monthly Attendance"}
                 </h3>
-                {/* Updated: Peak Day/Date Logic */}
                 {!loadingGraph && weeklyChartData.length > 0 && (
                   <p className="text-[#39B8FF] text-[10px] font-bold uppercase tracking-wider mt-1">
                     Peak {viewMode === 'week' ? "Day" : "Date"}: {
@@ -621,7 +773,6 @@ const AdminDashboard = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 md:gap-4">
-                {/* View Toggle */}
                 <select
                   value={viewMode}
                   onChange={(e) => setViewMode(e.target.value)}
@@ -631,7 +782,6 @@ const AdminDashboard = () => {
                   <option value="month">Monthly</option>
                 </select>
 
-                {/* Navigation */}
                 {viewMode === 'week' ? (
                   <div className="flex items-center gap-2 bg-[#1B254B] rounded-lg p-1">
                     <button
@@ -666,7 +816,6 @@ const AdminDashboard = () => {
                   />
                 )}
 
-                {/* Legend */}
                 <div className="hidden xl:flex gap-3 ml-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#39B8FF]"></span>
@@ -679,7 +828,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-            x
+            
             {/* Chart Area */}
             <div className="h-[250px] w-full">
               {loadingGraph ? (
@@ -718,7 +867,6 @@ const AdminDashboard = () => {
                       tick={{ fill: "#fff", fontSize: 10 }}
                     />
 
-                    {/* UPDATED: Added itemSorter to show Present first */}
                     <Tooltip
                       cursor={{ fill: "rgba(255,255,255,0.05)" }}
                       itemSorter={(item) => (item.dataKey === 'Present' ? -1 : 1)}
@@ -750,7 +898,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Employee Distribution Card - DYNAMIC HOVER LOGIC ADDED HERE */}
+          {/* Employee Distribution Card */}
           <div className="bg-white/70 backdrop-blur-md rounded-[24px] p-6 shadow-sm border border-white/50">
             <h3 className="text-[#2B3674] font-bold text-lg mb-4">
               Employee Distribution
@@ -777,7 +925,6 @@ const AdminDashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
 
-              {/* Dynamic Center Text Overlay */}
               <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-[#2B3674] font-bold text-xl">
                   {activeIndex === -1 || departmentData.length === 0
@@ -791,7 +938,6 @@ const AdminDashboard = () => {
                 </span>
               </div>
 
-              {/* Dynamic Legend */}
               <div className="absolute top-0 right-0 text-right space-y-1 h-[180px] overflow-y-auto pr-2 custom-scrollbar internal-scroll">
                 <div>
                   <p className="text-xs font-bold text-[#2B3674]">Total</p>
@@ -809,7 +955,6 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* Dynamic Percentage Bar */}
             <div className="mt-4 bg-[#F4F7FE] rounded-full h-4 w-full flex overflow-hidden">
               {departmentData.map((dept, idx) => {
                 const percentage = ((dept.value / totalEmployeesCount) * 100).toFixed(0);
@@ -833,6 +978,8 @@ const AdminDashboard = () => {
 
         </div>
 
+        
+
         {/* 3. MAIN CONTENT GRID */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
@@ -845,7 +992,6 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   Recent Leave Requests ({recentLeaves.length})
                 </h3>
-                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
                   onClick={() => navigate("/admin/admin-Leavemanage")}
@@ -883,7 +1029,6 @@ const AdminDashboard = () => {
                           </p>
                         </div>
                       </div>
-                      {/* Actions or Status Badge */}
                       <div className="flex gap-3">
                         {item.status === "Pending" ? (
                           <>
@@ -925,7 +1070,6 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   On Leave Today ({onLeaveTodayList.length})
                 </h3>
-                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
                   onClick={() => navigate("/admin/admin-Leavemanage")}
@@ -974,7 +1118,6 @@ const AdminDashboard = () => {
                 <h3 className="text-[#2B3674] font-bold text-lg">
                   Working Remotely ({remoteWorkers.length})
                 </h3>
-                {/* UPDATED ROUTE HERE */}
                 <button
                   className="text-xs font-bold text-teal-400 uppercase"
                   onClick={() => navigate("/attendance")}
@@ -1021,7 +1164,7 @@ const AdminDashboard = () => {
           {/* RIGHT COLUMN (Span 1) */}
           <div className="xl:col-span-1 flex flex-col gap-8">
 
-            {/* QUICK ACTIONS - ALL ROUTES UPDATED FROM SIDEBAR MAP */}
+            {/* QUICK ACTIONS */}
             <div className="bg-white/70 backdrop-blur-md rounded-[24px] p-6 shadow-sm border border-white/50">
               <h3 className="text-[#2B3674] font-bold text-lg mb-6">Quick Actions</h3>
               <div className="flex flex-col gap-4">
@@ -1103,7 +1246,6 @@ const AdminDashboard = () => {
                     >
                       {getInitials(b.name)}
 
-                      {/* Hover Name Box */}
                       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 hidden group-hover:block bg-black text-[#ffffff] text-xs px-3 py-1 rounded shadow-lg whitespace-nowrap">
                         {b.name} — {b.role}
                       </div>

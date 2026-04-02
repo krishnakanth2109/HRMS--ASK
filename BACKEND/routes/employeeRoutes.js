@@ -10,8 +10,12 @@ import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import nodemailer from "nodemailer";
 import bcrypt from "bcrypt"; 
+import multer from "multer";
 
 const router = express.Router();
+
+const memoryStorage = multer.memoryStorage();
+const memoryUpload = multer({ storage: memoryStorage });
 
 // FIXED: Nodemailer transporter configuration with better error handling
 const transporter = nodemailer.createTransport({
@@ -563,7 +567,7 @@ router.post("/idle-activity", protect, async (req, res) => {
 
 // FIXED: /onboard route with proper file handling
 // FIXED: /onboard route with proper file handling using memory storage only
-router.post("/onboard", upload.fields([
+router.post("/onboard", memoryUpload.fields([
   { name: 'aadhaarCard', maxCount: 1 },
   { name: 'panCard', maxCount: 1 },
   { name: 'companyDocuments' }
@@ -747,9 +751,19 @@ router.post("/onboard", upload.fields([
       employeeId: result.employeeId 
     });
 
-  } catch (err) {
+} catch (err) {
     console.error("❌ Onboarding error:", err);
     console.error("Error stack:", err.stack);
+    
+    // 🚨 FIX: Handle Mongoose Duplicate Key Errors gracefully instead of crashing
+    if (err.code === 11000) {
+      const duplicateField = Object.keys(err.keyValue || {})[0];
+      return res.status(400).json({ 
+        success: false, 
+        error: `This ${duplicateField} is already registered. If you have already onboarded, please log in.` 
+      });
+    }
+
     res.status(500).json({ 
       success: false,
       error: "Internal Server Error", 
@@ -757,6 +771,7 @@ router.post("/onboard", upload.fields([
     });
   }
 });
+
 
 // FIXED: ROUTE: SEND OTP with better error handling
 router.post("/send-onboarding-otp", async (req, res) => {

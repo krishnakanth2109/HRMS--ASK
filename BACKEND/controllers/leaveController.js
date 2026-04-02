@@ -216,7 +216,7 @@ const createAdminLeaveNotificationEmail = ({
         <tr>
           <td style="background:#f3f4f6;padding:18px 32px;text-align:center;
                      font-size:12px;color:#9ca3af;">
-            &copy; ${new Date().getFullYear()} Attendance Management System &nbsp;&bull;&nbsp;
+            &copy; ${new Date().getFullYear()} Leave Management System &nbsp;&bull;&nbsp;
             This is an automated notification. Please do not reply directly.
           </td>
         </tr>
@@ -379,7 +379,7 @@ const emailActionResultPage = (success, action, employeeName, message) => {
             </p>
             <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.7;">
               ${success && employeeName
-                ? `<strong>${employeeName}</strong> will be notified via email about this decision.`
+                ? `${employeeName} will be notified via email about this decision.`
                 : "Please use the Admin Portal to manage leave requests."}
             </p>
           </td>
@@ -535,7 +535,7 @@ export const handleEmailAction = async (req, res) => {
 
     if (!leave) {
       return res.status(404).send(
-        emailActionResultPage(false, "Not Found", "", "This leave request no longer exists.")
+        emailActionResultPage(false, "Not Found", "", "This leave request no longer exists.Might be Employee Cancelled his Leave")
       );
     }
 
@@ -610,7 +610,7 @@ export const handleEmailAction = async (req, res) => {
         true,
         action,
         employeeName,
-        `Leave request for ${employeeName} has been ${action} successfully.`
+        `Leave request of ${employeeName} has been ${action} successfully.`
       )
     );
   } catch (err) {
