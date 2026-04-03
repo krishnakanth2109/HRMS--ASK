@@ -868,7 +868,7 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const handleLateRequestSubmit = async (e) => {
+const handleLateRequestSubmit = async (e) => {
     e.preventDefault();
 
     if (requestLimit.limit - requestLimit.used <= 0) {
@@ -888,6 +888,7 @@ const EmployeeDashboard = () => {
       const todayDate = new Date().toISOString().split("T")[0];
       const requestedDateTime = new Date(`${todayDate}T${time}:00`);
 
+      // 🔴 Make sure this matches the route we just made!
       await api.post("/api/attendance/submit-late-correction", {
         employeeId: user.employeeId,
         date: todayDate,
@@ -912,17 +913,10 @@ const EmployeeDashboard = () => {
 
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message;
-
       if (err.response?.data?.limitReached) {
         await loadRequestLimit(user.employeeId);
       }
-
-      Swal.fire({
-        title: "Submission Failed",
-        text: errorMsg,
-        icon: "error",
-        confirmButtonColor: "#d33"
-      });
+      Swal.fire({ title: "Submission Failed", text: errorMsg, icon: "error" });
     } finally {
       setLateReqLoading(false);
     }

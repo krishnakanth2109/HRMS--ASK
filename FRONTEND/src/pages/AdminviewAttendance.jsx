@@ -151,7 +151,7 @@ const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, al
                     <th className="px-6 py-4">Role</th>
                     {isOnBreakModal && <th className="px-6 py-4">Break At</th>}
                     {isOnBreakModal && <th className="px-6 py-4">Total Break Time</th>}
-                    {!isLoginRequired && !isOnBreakModal && <th className="px-6 py-4">Login Status</th>}
+                    {/* {!isLoginRequired && !isOnBreakModal && <th className="px-6 py-4">Login Status</th>} */}
                     {!isLoginRequired && !isOnBreakModal && <th className="px-6 py-4">Worked Status</th>}
                   </tr>
                 </thead>
@@ -168,7 +168,7 @@ const StatusListModal = ({ isOpen, onClose, title, employees, employeeImages, al
                         {isOnBreakModal && (<td className="px-6 py-4">{breakStartTime ? (<span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100"><FaCoffee size={10} /> {new Date(breakStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>) : (<span className="text-gray-400 text-xs">--</span>)}</td>)}
                         {isOnBreakModal && (<td className="px-6 py-4"><span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-100 font-mono">{formatBreakDuration(totalBreakSecs)}</span></td>)}
                         {!isLoginRequired && !isOnBreakModal && (<td className="px-6 py-4">{emp.displayLoginStatus && (<span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-md font-bold ${emp.displayLoginStatus === 'LATE' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{emp.displayLoginStatus}</span>)}</td>)}
-                        {!isLoginRequired && !isOnBreakModal && (<td className="px-6 py-4">{emp.workedStatus && (<span className={`text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold ${emp.workedStatus === 'Full Day' ? 'bg-green-50 text-green-700 border border-green-100' : emp.workedStatus === 'Half Day' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : emp.workedStatus.includes('Absent') ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-gray-50 text-gray-700 border border-gray-200'}`}>{emp.workedStatus}</span>)}</td>)}
+                        {/* {!isLoginRequired && !isOnBreakModal && (<td className="px-6 py-4">{emp.workedStatus && (<span className={`text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold ${emp.workedStatus === 'Full Day' ? 'bg-green-50 text-green-700 border border-green-100' : emp.workedStatus === 'Half Day' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : emp.workedStatus.includes('Absent') ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-gray-50 text-gray-700 border border-gray-200'}`}>{emp.workedStatus}</span>)}</td>)} */}
                       </tr>
                     );
                   })}

@@ -722,27 +722,62 @@ router.post('/admin-punch-out', onlyAdmin, async (req, res) => {
 /**
  * Submit Request for Late Login correction
  */
-router.post('/request-correction', async (req, res) => { 
+router.post('/submit-late-correction', async (req, res) => { 
     try {
-        const { employeeId, date, time, reason } = req.body; 
-        let attendance = await Attendance.findOne({ employeeId }); 
-        if (!attendance) return res.status(404).json({ message: "Attendance record not found" });
+        const { employeeId, date, requestedTime, reason } = req.body;
+        
+        if (!employeeId || !date || !requestedTime || !reason) {
+            return res.status(400).json({ message: "Missing required fields." });
+        }
 
-        const now = new Date(); 
-        const currentYearMonth = now.toISOString().slice(0, 7); 
-        const monthlyRequestCount = attendance.attendance.filter(day => day.date.startsWith(currentYearMonth) && day.lateCorrectionRequest?.hasRequest === true ).length;
+        const attendanceRecord = await Attendance.findOne({ employeeId });
+        if (!attendanceRecord) return res.status(404).json({ message: "Employee not found" });
+
+        const dayLog = attendanceRecord.attendance.find(a => a.date === date);
+        if (!dayLog) return res.status(404).json({ message: "Attendance record not found for this date" });
+
+        if (dayLog.lateCorrectionRequest?.hasRequest) {
+            return res.status(400).json({ message: "A request for this date is already submitted." });
+        }
+
+        // Initialize map to prevent 500 Server Crashes!
+        if (!attendanceRecord.monthlyRequestLimits) {
+            attendanceRecord.monthlyRequestLimits = new Map();
+        }
+
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const monthData = attendanceRecord.monthlyRequestLimits.get(currentMonth) || { limit: 5, used: 0 };
+
+        if (monthData.used >= monthData.limit) {
+            return res.status(400).json({ message: "Monthly limit reached", limitReached: true });
+        }
+
+        // Prevent Invalid Date crashes
+        const parsedTime = new Date(requestedTime);
+        if (isNaN(parsedTime.getTime())) {
+            return res.status(400).json({ message: "Invalid time format provided." });
+        }
+
+        dayLog.lateCorrectionRequest = {
+            hasRequest: true,
+            status: "PENDING",
+            requestedTime: parsedTime,
+            reason,
+        };
+
+        // Increment limit usage so the frontend UI updates (e.g., 5 left goes to 4 left)
+        attendanceRecord.monthlyRequestLimits.set(currentMonth, { 
+            limit: monthData.limit, 
+            used: monthData.used + 1 
+        });
         
-        if (monthlyRequestCount >= 3) { return res.status(400).json({ success: false, message: "Monthly limit reached (3)." }); }
+        await attendanceRecord.save();
+        res.json({ success: true, message: "Request submitted successfully" });
         
-        let dayRecord = attendance.attendance.find(a => a.date === date); 
-        if (!dayRecord) return res.status(400).json({ message: "No attendance found for this date." });
-        if (dayRecord.lateCorrectionRequest?.hasRequest) { return res.status(400).json({ message: "A request for this date is already submitted." }); }
-        
-        const requestedDateObj = new Date(`${date}T${time}:00`); 
-        dayRecord.lateCorrectionRequest = { hasRequest: true, status: "PENDING", requestedTime: requestedDateObj, reason: reason };
-        
-        await attendance.save(); res.json({ success: true, message: "Request sent to Admin." });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (error) {
+        console.error("❌ Error in /submit-late-correction:", error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 /**
@@ -786,7 +821,12 @@ router.post("/approve-correction", async (req, res) => {
         const attendanceRecord = await Attendance.findOne({ employeeId }); 
         const dayLog = attendanceRecord?.attendance.find(a => a.date === date); 
         
-        if (!dayLog || !dayLog.lateCorrectionRequest?.hasRequest) return res.status(404).json({ message: "No request found" });
+        if (!dayLog || !dayLog.lateCorrectionRequest?.hasRequest) {
+            return res.status(404).json({ message: "No request found" });
+        }
+
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const monthData = attendanceRecord.monthlyRequestLimits?.get(currentMonth) || { limit: 5, used: 0 };
 
         if (status === "APPROVED") { 
             const newPunchIn = new Date(dayLog.lateCorrectionRequest.requestedTime); 
@@ -798,11 +838,23 @@ router.post("/approve-correction", async (req, res) => {
                 } 
             } 
             dayLog.lateCorrectionRequest.status = "APPROVED"; 
-        } else { dayLog.lateCorrectionRequest.status = "REJECTED"; }
+        } else { 
+            dayLog.lateCorrectionRequest.status = "REJECTED"; 
+            // Refund the limit if rejected so they can try again!
+            if (monthData.used > 0) {
+                attendanceRecord.monthlyRequestLimits.set(currentMonth, { 
+                    limit: monthData.limit, 
+                    used: monthData.used - 1 
+                });
+            }
+        }
         
         dayLog.lateCorrectionRequest.adminComment = adminComment; 
-        await attendanceRecord.save(); res.json({ success: true, message: "Status updated" });
-    } catch (error) { res.status(500).json({ error: error.message }); }
+        await attendanceRecord.save(); 
+        res.json({ success: true, message: `Status updated to ${status}` });
+    } catch (error) { 
+        res.status(500).json({ error: error.message }); 
+    }
 });
 
 /**
