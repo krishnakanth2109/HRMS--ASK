@@ -84,6 +84,16 @@ import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 import OnboardingEmailForm from "./pages/InviteEmployee";
 import PayrollManagement from "./pages/PayrollManagement";
 import AdminLiveTracking from "./pages/AdminLiveTracking";
+// import DocVerifyInvite from "./pages/DocVerifyInvite";
+import DocVerifyInvite from "./pages/DocVerifyInvite";
+import DocVerifyAdmin from "./pages/DocVerifyAdmin";
+import DocumentVerificationForm from "./pages/DocumentVerificationForm";
+import OfferLetterPage from "./pages/OfferLetterPage";
+import HRChecklist from "./pages/HRChecklist";
+import Induction from "./pages/Induction";
+import AdminResignation from "./pages/AdminResignation";
+import EmployeeResignation from "./EmployeePages/EmployeeResignation";
+import AdminWelcomeKits from "./pages/AdminWelcomeKits";
 
 function App() {
   return (
@@ -158,15 +168,24 @@ function App() {
         <Route path="/admin/late-requests" element={<AdminLateRequests />} />
         <Route path="/admin/meeting" element={<MeetingGenerator />} />
         <Route path="/admin/today-overview" element={<TodayOverview />} />
-          <Route path="/admin/rules" element={<AdminRulesPost />} />
-         <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
-         <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
-         <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
-         <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
-         <Route path="/admin/onboarding-email" element={<OnboardingEmailForm />} />
-          <Route path="/admin/payrollcandidates" element={<PayrollManagement />} />
-          <Route path="/admin/idletime-tracking" element={<AdminLiveTracking />} />
-       
+        <Route path="/admin/rules" element={<AdminRulesPost />} />
+        <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
+        <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
+        <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
+        <Route path="/admin/workmode-requests" element={<WorkModeRequests />} />
+        <Route path="/admin/onboarding-email" element={<OnboardingEmailForm />} />
+        <Route path="/admin/payrollcandidates" element={<PayrollManagement />} />
+        <Route path="/admin/idletime-tracking" element={<AdminLiveTracking />} />
+        <Route path="/admin/doc-verify-invite" element={<DocVerifyInvite />} />
+        <Route path="/admin/doc-verify-portal" element={<DocVerifyAdmin />} />
+        <Route path="/document-verification" element={<DocumentVerificationForm />} />
+        <Route path="/admin/hr-checklist" element={<HRChecklist />} />
+        <Route path="/admin/offer-letter" element={<OfferLetterPage />} />
+        <Route path="/admin/induction" element={<Induction />} />
+        <Route path="/admin/resignation" element={<AdminResignation />} />
+        <Route path="/admin/welcome-kits-management" element={<AdminWelcomeKits />} />
+
+
       </Route>
 
       {/* ------------------ EMPLOYEE ROUTES ------------------ */}
@@ -213,6 +232,7 @@ function App() {
         <Route path="/employee/notices" element={<CurrentEmployeeNoticeBoard />} />
         <Route path="/employee/leave-summary" element={<EmployeeLeaveSummary />} />
         <Route path="/employee/change-password" element={<ChangePasswordPage />} />
+        <Route path="/employee/resignation" element={<EmployeeResignation />} />
       </Route>
     </Routes>
   );

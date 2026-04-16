@@ -737,7 +737,7 @@ router.post('/submit-late-correction', async (req, res) => {
         if (!dayLog) return res.status(404).json({ message: "Attendance record not found for this date" });
 
         if (dayLog.lateCorrectionRequest?.hasRequest) {
-            return res.status(400).json({ message: "A request for this date is already submitted." });
+            return res.status(400).json({ message: "A request for this date is already submitted or Request is Rejected on the same date." });
         }
 
         // Initialize map to prevent 500 Server Crashes!

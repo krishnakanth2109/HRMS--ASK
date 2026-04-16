@@ -37,7 +37,11 @@ import mailRoutes from "./routes/mailRoutes.js";
 import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
 import payrollcandidatesRoutes from "./routes/payrollcandidatesRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
-
+import documentVerificationRoutes from "./routes/documentVerificationRoutes.js";
+import offerLetterRoutes from "./routes/offerLetterRoutes.js";
+import offerResponseRoutes from "./routes/offerResponseRoutes.js";
+import resignationRoutes from "./routes/resignationRoutes.js";
+import welcomeKitRoutes from "./routes/welcomeKitRoutes.js";
 
 // -------------------- APP SETUP --------------------
 const app = express();
@@ -302,6 +306,11 @@ app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
 app.use('/api/idletime', idleTimeRoutes);
 app.use("/api/ai", aiRoutes); 
+app.use("/api/doc-verification", documentVerificationRoutes);
+app.use("/api/offer-letters", offerLetterRoutes);
+app.use("/api/offer-letters", offerResponseRoutes);
+app.use("/api/resignations", resignationRoutes);
+app.use("/api/welcome-kit", welcomeKitRoutes);
 
 
 // -------------------- 404 --------------------
