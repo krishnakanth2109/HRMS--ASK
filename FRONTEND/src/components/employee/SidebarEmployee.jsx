@@ -18,6 +18,7 @@ import {
   FaChevronRight,
   FaUserShield,
   FaClipboardCheck
+  FaFileSignature,
 } from "react-icons/fa";
 
 // Import AuthContext to get current user details
@@ -38,6 +39,7 @@ const navLinks = [
   { to: "/employee/expense", label: "Add Expense", icon: <FaReceipt /> },
   { to: "/employee/daily-work-tracker", label: "Daily Work Tracker", icon: <FaClipboardCheck /> },
   { to: "/employee/setup-face", label: "Face & Fingerprint", icon: <FaUserShield /> }
+    { to: "/employee/resignation", label: "Resignation", icon: <FaFileSignature /> },
 ];
 
 const SidebarEmployee = () => {

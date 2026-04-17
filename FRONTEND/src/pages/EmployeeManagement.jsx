@@ -1,8 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { FaUser, FaEdit, FaTrash, FaRedo, FaDownload, FaEye, FaClipboardList, FaCalendarAlt, FaFileExcel, FaTimes } from "react-icons/fa";
+import { FaEdit, FaTrash, FaRedo, FaDownload, FaEye, FaClipboardList, FaCalendarAlt, FaFileExcel, FaTimes, FaSpinner,
+  FaChevronDown,
+  FaShieldAlt,
+  FaFileAlt,
+  FaUser,
+  FaUserPlus,
+  FaConnectdevelop,
+  FaFileSignature,
+  FaEnvelope,
+  FaGift } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import Swal from "sweetalert2";
 // ✅ IMPORT THE CENTRALIZED API FUNCTIONS
 import api, {
   getEmployees,
@@ -11,7 +21,7 @@ import api, {
   getAttendanceByDateRange,
   getAllShifts,
   getLeaveRequests,
-  getAllProfiles ,
+  getAllProfiles,
   getHolidays
 } from "../api";
 
@@ -162,7 +172,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
     <tr className={`border-t transition duration-150 hover:bg-blue-50`}>
       <td className="p-4 align-middle text-left font-mono font-semibold text-blue-700 text-sm pl-6">
         {emp.employeeId}
-      </td>
+       </td>
 
       <td className="p-4 align-middle text-left">
         <div className="flex items-center gap-3">
@@ -329,44 +339,199 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
 // ==========================================
 // MODALS
 // ==========================================
+
+// ✅ UPDATED DeactivateModal with smooth transitions and SweetAlert
 function DeactivateModal({ open, employee, onClose, onSubmit }) {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setEndDate("");
       setReason("");
       setError("");
+      setIsSubmitting(false);
     }
   }, [open]);
 
   if (!open || !employee) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!endDate || !reason.trim()) {
       setError("All fields are required.");
       return;
     }
     setError("");
-    onSubmit({ endDate, reason });
+    setIsSubmitting(true);
+
+    // Show processing SweetAlert
+    Swal.fire({
+      title: 'Processing...',
+      text: `${employee.name} is being deactivated. Please wait...`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      await onSubmit({ endDate, reason });
+      
+      // Close the SweetAlert and show success
+      Swal.close();
+      Swal.fire({
+        title: 'Success!',
+        text: `${employee.name} has been deactivated successfully.`,
+        icon: 'success',
+        confirmButtonColor: '#3085d6',
+        confirmButtonText: 'OK',
+        timer: 3000,
+        timerProgressBar: true
+      });
+      
+      setIsSubmitting(false);
+    } catch (error) {
+      Swal.close();
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to deactivate employee. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'OK'
+      });
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h3 className="text-xl font-bold mb-2">Deactivate Employee</h3>
-        <p className="mb-4 text-gray-600">Deactivating <b>{employee.name}</b>.</p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div><label className="block text-sm font-medium text-gray-700">Date</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1" required /></div>
-          <div><label className="block text-sm font-medium text-gray-700">Reason</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1" rows={3} required /></div>
-          {error && <div className="text-red-600 text-sm">{error}</div>}
-          <div className="flex gap-2 justify-end mt-4"><button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200">Cancel</button><button type="submit" className="px-4 py-2 rounded bg-red-600 text-white">Deactivate</button></div>
-        </form>
+    <>
+      <div 
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
+          open ? 'opacity-100 visible' : 'opacity-0 invisible'
+        }`}
+      >
+        {/* Backdrop with blur effect */}
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
+          onClick={!isSubmitting ? onClose : undefined}
+        />
+        
+        {/* Modal Container with animation */}
+        <div 
+          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${
+            open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
+          }`}
+        >
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-t-2xl px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Deactivate Employee</h3>
+                <p className="text-sm text-red-100 mt-1">This action can be reversed later</p>
+              </div>
+              {!isSubmitting && (
+                <button
+                  onClick={onClose}
+                  className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                >
+                  <FaTimes size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Body */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>Employee:</strong> {employee.name}
+              </p>
+              <p className="text-sm text-amber-800 mt-1">
+                <strong>ID:</strong> {employee.employeeId}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Deactivation Date <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                  required
+                  disabled={isSubmitting}
+                />
+                {/* <FaCalendarAlt className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" /> */}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Reason for Deactivation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none"
+                rows={4}
+                placeholder="Please provide a reason for deactivation..."
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+       <button
+  type="submit"
+  disabled={isSubmitting}
+  className="px-5 py-2.5 rounded-lg 
+  bg-gradient-to-r from-red-600 to-red-500 
+  hover:from-red-700 hover:to-red-800 
+  text-white font-semibold 
+  transition-all duration-300 
+  shadow-md hover:shadow-xl 
+  hover:scale-105
+  disabled:opacity-50 disabled:cursor-not-allowed 
+  flex items-center gap-2"
+>
+  {isSubmitting ? (
+    <>
+      <FaSpinner className="animate-spin" />
+      Processing...
+    </>
+  ) : (
+    "Deactivate"
+  )}
+</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -374,22 +539,190 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  useEffect(() => { if (open) { setDate(new Date().toISOString().split("T")[0]); setReason(""); setError(""); } }, [open]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDate(new Date().toISOString().split("T")[0]);
+      setReason("");
+      setError("");
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
   if (!open || !employee) return null;
-  const handleSubmit = (e) => { e.preventDefault(); if (!date || !reason.trim()) setError("All fields required."); else onSubmit({ date, reason }); };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!date || !reason.trim()) {
+      setError("All fields are required.");
+      return;
+    }
+    setError("");
+    setIsSubmitting(true);
+
+    // Show processing SweetAlert
+    Swal.fire({
+      title: 'Processing...',
+      text: `${employee.name} is being reactivated. Please wait...`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      await onSubmit({ date, reason });
+      
+      // Close the SweetAlert and show success
+      Swal.close();
+      Swal.fire({
+        title: 'Success!',
+        text: `${employee.name} has been reactivated successfully.`,
+        icon: 'success',
+        confirmButtonColor: '#3085d6',
+        confirmButtonText: 'OK',
+        timer: 3000,
+        timerProgressBar: true
+      });
+      
+      setIsSubmitting(false);
+    } catch (error) {
+      Swal.close();
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to reactivate employee. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'OK'
+      });
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h3 className="text-xl font-bold mb-2">Reactivate Employee</h3>
-        <p className="mb-4 text-gray-600">Reactivating <b>{employee.name}</b>.</p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div><label className="block text-sm font-medium text-gray-700">Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1" required /></div>
-          <div><label className="block text-sm font-medium text-gray-700">Reason</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} className="border border-gray-300 px-3 py-2 rounded w-full mt-1" rows={3} required /></div>
-          {error && <div className="text-red-600 text-sm">{error}</div>}
-          <div className="flex gap-2 justify-end mt-4"><button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200">Cancel</button><button type="submit" className="px-4 py-2 rounded bg-green-600 text-white">Reactivate</button></div>
-        </form>
+    <>
+      <div 
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
+          open ? 'opacity-100 visible' : 'opacity-0 invisible'
+        }`}
+      >
+        {/* Backdrop with blur effect */}
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
+          onClick={!isSubmitting ? onClose : undefined}
+        />
+        
+        {/* Modal Container with animation */}
+        <div 
+          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${
+            open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
+          }`}
+        >
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-t-2xl px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Reactivate Employee</h3>
+                <p className="text-sm text-green-100 mt-1">Restore employee access to the system</p>
+              </div>
+              {!isSubmitting && (
+                <button
+                  onClick={onClose}
+                  className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                >
+                  <FaTimes size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Body */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Employee:</strong> {employee.name}
+              </p>
+              <p className="text-sm text-blue-800 mt-1">
+                <strong>ID:</strong> {employee.employeeId}
+              </p>
+              {employee.deactivationDate && (
+                <p className="text-sm text-blue-800 mt-1">
+                  <strong>Previously Deactivated:</strong> {new Date(employee.deactivationDate).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Reactivation Date <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
+                  required
+                  disabled={isSubmitting}
+                />
+                {/* <FaCalendarAlt className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" /> */}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Reason for Reactivation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all resize-none"
+                rows={4}
+                placeholder="Please provide a reason for reactivation..."
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <FaSpinner className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Reactivate'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -778,7 +1111,15 @@ function EmployeeOverviewModal({ open, employee, onClose }) {
 
 const EmployeeManagement = () => {
   const navigate = useNavigate();
+
+
+    const hrDropdownRef = useRef(null);
+  const [hrActivitiesOpen, setHrActivitiesOpen] = useState(false);
+  const [docVerifyOpen, setDocVerifyOpen] = useState(false);
+
+
   const [employees, setEmployees] = useState([]);
+  
   const [loading, setLoading] = useState(true); 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("All");
@@ -844,14 +1185,30 @@ useEffect(() => {
   }, [employees]);
 
   const handleDeactivateSubmit = async ({ endDate, reason }) => {
-    try { await deactivateEmployeeById(selectedEmployee.employeeId, { endDate, reason }); fetchEmployees(); setDeactivateModalOpen(false); setSelectedEmployee(null); }
-    catch (e) { alert("Error deactivating"); }
+    try { 
+      await deactivateEmployeeById(selectedEmployee.employeeId, { endDate, reason }); 
+      await fetchEmployees(); 
+      setDeactivateModalOpen(false); 
+      setSelectedEmployee(null);
+      return true;
+    }
+    catch (e) { 
+      throw e;
+    }
   };
 
-  const handleReactivateSubmit = async ({ date, reason }) => {
-    try { await activateEmployeeById(selectedEmployee.employeeId, { date, reason }); fetchEmployees(); setReactivateModalOpen(false); setSelectedEmployee(null); }
-    catch (e) { alert("Error reactivating"); }
-  };
+const handleReactivateSubmit = async ({ date, reason }) => {
+  try { 
+    await activateEmployeeById(selectedEmployee.employeeId, { date, reason }); 
+    await fetchEmployees(); 
+    setReactivateModalOpen(false); 
+    setSelectedEmployee(null);
+    return true;
+  }
+  catch (e) { 
+    throw e;
+  }
+};
 
   const openDeactivateModal = (emp) => { setSelectedEmployee(emp); setDeactivateModalOpen(true); };
   const openReactivateModal = (emp) => { setSelectedEmployee(emp); setReactivateModalOpen(true); };
@@ -916,10 +1273,40 @@ useEffect(() => {
     };
   }, [employees, searchQuery, selectedDept, selectedRole, selectedEmploymentType]);
 
+
+const SmartSubmenu = ({ onClose, onNavigate }) => {
+  return (
+    <div className="absolute right-full top-0 mr-1 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-[10000]">
+            <button
+        onClick={() => { onNavigate("/admin/doc-verify-invite"); onClose(); }}
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100 rounded-t-xl"
+      >
+        <FaEnvelope className="text-violet-500" /> Send Invitations
+      </button>
+      <button
+        onClick={() => onNavigate("/admin/doc-verify-portal")}
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-t-xl border-b border-slate-100"
+      >
+        <FaShieldAlt className="text-violet-500" />
+        Verify Documents
+      </button>
+      <button
+        onClick={() => onNavigate("/admin/hr-checklist")}
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+      >
+        <FaClipboardList className="text-violet-500" />
+        Verified Documents
+      </button>
+    </div>
+  );
+};
+
   return (
     <div className="min-h-screen w-full  flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-        <div className="flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+<div className="relative z-[20] flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+
+        
 
           <div>
             <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
@@ -939,13 +1326,94 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <button onClick={() => navigate("/admin/onboarding-email")} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105">
-              <FaUser />Onboarding Invitation
-            </button>
-            <button onClick={() => navigate("/employees/add")} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 shadow-md font-bold flex items-center gap-2 transition-transform transform hover:scale-105">
-              <FaUser /> Add Employee
-            </button>
+           <div className="flex gap-3 flex-wrap">
+            {/* HR Activities Dropdown */}
+            <div className="relative z-50" ref={hrDropdownRef}>
+              <button
+                onClick={() => { setHrActivitiesOpen(!hrActivitiesOpen); setDocVerifyOpen(false); }}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-md font-bold flex items-center gap-2 transition-all duration-200 transform hover:scale-105"
+              >
+                <FaClipboardList /> HR Activities
+                <FaChevronDown className={`text-xs transition-transform duration-200 ${hrActivitiesOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {hrActivitiesOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-100 z-[9999]">
+  
+
+
+                  {/* Document Verification with smart positioned nested submenu */}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDocVerifyOpen(!docVerifyOpen); }}
+                      className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center justify-between transition-colors duration-150 border-b border-slate-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FaShieldAlt className="text-violet-500" />
+                        Document Verification
+                      </div>
+                      <FaChevronDown className={`text-xs text-slate-400 transition-transform duration-200 ${docVerifyOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {/* Smart positioned submenu - opens right by default, left if off-screen */}
+                    {docVerifyOpen && (
+                      <SmartSubmenu
+                        onClose={() => setDocVerifyOpen(false)}
+                        onNavigate={(path) => {
+                          navigate(path);
+                          setHrActivitiesOpen(false);
+                          setDocVerifyOpen(false);
+                        }}
+                      />
+                    )}
+                  </div>
+                                  {/* Offer Letter */}
+                  <button
+                    onClick={() => { navigate("/admin/offer-letter"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100 rounded-t-xl"
+                  >
+                    <FaFileAlt className="text-blue-500" /> Offer Letter
+                  </button>
+                  
+                  {/* Onboarding Invitation */}
+                  <button
+                    onClick={() => { navigate("/admin/onboarding-email"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
+                  >
+                    <FaUser className="text-blue-500" /> Onboarding Invitation
+                  </button>
+
+                  {/* Add Employee */}
+                  <button
+                    onClick={() => { navigate("/employees/add"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                  >
+                    <FaUserPlus className="text-blue-500" /> Add Employee
+                  </button>
+                  <button
+                    onClick={() => { navigate("/admin/induction"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                  >
+                    <FaConnectdevelop className="text-blue-500" /> Induction
+                  </button>
+                  <button
+                    onClick={() => { navigate("/admin/resignation"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                  >
+                    <FaFileSignature className="text-blue-500" /> Resignations
+                </button>
+            
+
+                           <button
+                    onClick={() => { navigate("/admin/welcome-kits-management"); setHrActivitiesOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                  >
+                    <FaGift className="text-blue-500" /> Welcome Kit
+                </button>
+
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -965,8 +1433,8 @@ useEffect(() => {
           </select>
         </div>
 
-        <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10 overflow-hidden">
-          <div className="overflow-x-auto min-h-[300px]">
+       <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10">
+  <div className="overflow-x-auto">
             <table className="min-w-full rounded-2xl">
               <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">
                 <tr className="text-white uppercase text-sm font-semibold tracking-wide">

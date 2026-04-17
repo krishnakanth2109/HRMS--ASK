@@ -41,6 +41,11 @@ import webauthnRoutes from "./routes/webauthnRoutes.js";
 import faceAuthRoutes from "./routes/faceAuthRoutes.js";
 import { employeeWorkRoutes, adminWorkRoutes } from "./routes/workRoutes.js";
 
+import documentVerificationRoutes from "./routes/documentVerificationRoutes.js";
+import offerLetterRoutes from "./routes/offerLetterRoutes.js";
+import offerResponseRoutes from "./routes/offerResponseRoutes.js";
+import resignationRoutes from "./routes/resignationRoutes.js";
+import welcomeKitRoutes from "./routes/welcomekitroutes.js";
 
 // -------------------- APP SETUP --------------------
 const app = express();
@@ -305,10 +310,18 @@ app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
 app.use('/api/idletime', idleTimeRoutes);
 app.use("/api/ai", aiRoutes); 
+<<<<<<< HEAD
 app.use("/api/webauthn", webauthnRoutes);
 app.use("/api/face-auth", faceAuthRoutes);
 app.use("/api/work", employeeWorkRoutes);
 app.use("/api/admin", adminWorkRoutes);
+=======
+app.use("/api/doc-verification", documentVerificationRoutes);
+app.use("/api/offer-letters", offerLetterRoutes);
+app.use("/api/offer-letters", offerResponseRoutes);
+app.use("/api/resignations", resignationRoutes);
+app.use("/api/welcome-kit", welcomeKitRoutes);
+>>>>>>> de74e27eb88546a5838fbecd715e7b349963cbcb
 
 
 // -------------------- 404 --------------------

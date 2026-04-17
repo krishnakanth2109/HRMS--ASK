@@ -1182,5 +1182,83 @@ export const deleteWebAuthnCredential = async (credentialId) => {
     throw error;
   }
 };
+export const getAllVerifiedDocCandidates = async () => {
+  const res = await api.get("/api/doc-verification/all");
+  const records = res.data.data || [];
+  return records.filter(r => r.status === 'verified');
+};
+
+
+/* =============================================================================
+   OFFER LETTER MANAGEMENT
+============================================================================= */
+export const getOfferLetterCompanies = async () => {
+  const response = await api.get("/api/companies");
+  return response.data.data || [];
+};
+
+export const getOfferLetterEmployees = async () =>
+  (await api.get("/api/offer-letters/employees")).data;
+
+export const getOfferLetterEmployeeById = async (id) =>
+  (await api.get(`/api/offer-letters/employees/${id}`)).data;
+
+export const createOfferLetterEmployee = async (data) =>
+  (await api.post("/api/offer-letters/employees", data)).data;
+
+export const updateOfferLetterEmployee = async (id, data) =>
+  (await api.put(`/api/offer-letters/employees/${id}`, data)).data;
+
+export const deleteOfferLetterEmployee = async (id) =>
+  (await api.delete(`/api/offer-letters/employees/${id}`)).data;
+
+export const uploadOfferLetterExcel = async (formData) =>
+  (await api.post("/api/offer-letters/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })).data;
+
+export const downloadOfferLetterExcelTemplate = async () => {
+  const response = await api.get("/api/offer-letters/template", { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", "Employees_Bulk_Upload_Template.xlsx");
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+};
+export const generateOfferLetter = async (data) =>
+  (await api.post("/api/offer-letters/generate", data)).data;
+
+export const sendOfferLetterEmail = async (data) => {
+  const response = await api.post("/api/offer-letters/send-email", data);
+  return response.data;
+};
+
+export const downloadOfferLetterDocx = async (data) => {
+  const response = await api.post("/api/offer-letters/download-docx", data, {
+      responseType: "blob"
+  });
+  return response.data;
+};
+export const sendInductionEmail = async (formData) => {
+  const response = await api.post("/api/mail/send", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+export const getOfferLetterTemplates = async () =>
+  (await api.get("/api/offer-letters/templates")).data;
+
+export const getOfferLetterTemplate = async (companyName) =>
+  (await api.get(`/api/offer-letters/templates/${encodeURIComponent(companyName)}`)).data;
+
+export const uploadOfferLetterTemplate = async (formData) =>
+  (await api.post("/api/offer-letters/templates/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })).data;
+
+export const deleteOfferLetterTemplate = async (id) =>
+  (await api.delete(`/api/offer-letters/templates/${id}`)).data;
 
 export default api;// --- START OF FILE: routes/employeeRoutes.js ---
