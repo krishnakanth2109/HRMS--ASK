@@ -6,8 +6,8 @@ import Admin from "../models/adminModel.js";
 import Employee from "../models/employeeModel.js";
 
 // Create JWT
-const signToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+const signToken = (id, role, loginMethod = "password") => {
+  return jwt.sign({ id, role, loginMethod }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 };
@@ -54,15 +54,18 @@ export const login = async (req, res, next) => {
     }
 
     // 5️⃣ CREATE TOKEN WITH ROLE
-    const token = signToken(user._id, role);
+    const loginMethod = "password";
+    const token = signToken(user._id, role, loginMethod);
     user.password = undefined;
 
     return res.status(200).json({
       status: "success",
       token,
+      loginMethod,
       data: {
         ...user.toObject(),
         role: role, // Include user role in response
+        loginMethod,
       },
     });
   } catch (error) {
@@ -122,7 +125,9 @@ export const protect = async (req, res, next) => {
     }
 
     // 6️⃣ Attach user to request
+    currentUser.role = decoded.role || currentUser.role;
     req.user = currentUser; // includes role for admin/manager
+    req.auth = decoded;
 
     next();
   } catch (error) {

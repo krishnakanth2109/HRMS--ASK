@@ -2,11 +2,12 @@
 
 import axios from "axios";
 
-// Automatically determine API base URL depending on environment
+// In development, use the Vite proxy so we always talk to the local HRMS backend
+// instead of whatever else might be listening on a hardcoded port.
 const baseURL =
   import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
-    : import.meta.env.VITE_API_URL_DEVELOPMENT || "http://localhost:5000";
+    : "";
 
 
 // Debug logs
@@ -93,6 +94,46 @@ export const loginUser = async (email, password) => {
     return response; 
   } catch (error) {
     console.error("Login failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const loginWithFaceApi = async (descriptor) => {
+  try {
+    const response = await api.post("/api/face-auth/login", { descriptor });
+    return response.data;
+  } catch (error) {
+    console.error("Face login failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const registerFaceApi = async (descriptors) => {
+  try {
+    const response = await api.post("/api/face-auth/register", { descriptors });
+    return response.data;
+  } catch (error) {
+    console.error("Face register failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const checkFaceStatusApi = async () => {
+  try {
+    const response = await api.get("/api/face-auth/status");
+    return response.data;
+  } catch (error) {
+    console.error("Face status check failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteFaceApi = async () => {
+  try {
+    const response = await api.delete("/api/face-auth/remove");
+    return response.data;
+  } catch (error) {
+    console.error("Face delete failed:", error.response?.data || error.message);
     throw error;
   }
 };
@@ -235,6 +276,9 @@ export const rejectPermissionRequestById = async (id) =>
 ============================================================================= */
 export const getAttendanceForEmployee = async (id) =>
   (await api.get(`/api/attendance/${id}`)).data;
+
+export const getFingerprintAutoAttendanceAction = async () =>
+  (await api.get("/api/attendance/fingerprint-auto-action")).data;
 
 export const getAttendanceByDateRange = async (startDate, endDate) =>
   (
@@ -782,6 +826,117 @@ export const deleteExpense = async (expenseId) => {
   }
 };
 
+/* =============================================================================
+   DAILY WORK TRACKER
+============================================================================= */
+export const submitMorningWork = async (payload) =>
+  (await api.post("/api/work/morning", payload)).data;
+
+export const submitEveningWork = async (
+  description,
+  images = [],
+  employee_submitted_percentage
+) => {
+  const formData = new FormData();
+  formData.append("description", description);
+  formData.append("employee_submitted_percentage", employee_submitted_percentage);
+
+  images.forEach((image) => {
+    formData.append("images", image);
+  });
+
+  return (
+    await api.post("/api/work/evening", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  ).data;
+};
+
+export const getMyDailyWorkRecords = async (month, year) =>
+  (
+    await api.get("/api/work/my-records", {
+      params: { month, year },
+    })
+  ).data;
+
+export const getMyMonthlyPerformance = async (month, year) =>
+  (
+    await api.get("/api/work/performance", {
+      params: { month, year },
+    })
+  ).data;
+
+export const getAdminWorkRecords = async (params = {}) =>
+  (await api.get("/api/admin/work-records", { params })).data;
+
+export const getWorkPercentageSettings = async () =>
+  (await api.get("/api/admin/work-percentage-settings")).data;
+
+export const updateWorkPercentageSettings = async (payload) =>
+  (await api.patch("/api/admin/work-percentage-settings", payload)).data;
+
+export const getAdminWorkPerformance = async (employeeId, month, year) =>
+  (
+    await api.get(`/api/admin/work-performance/${employeeId}`, {
+      params: { month, year },
+    })
+  ).data;
+
+export const approveWorkEntry = async (id, daily_work_percentage) =>
+  (
+    await api.patch(`/api/admin/work/${id}/approve`, {
+      daily_work_percentage,
+    })
+  ).data;
+
+export const rejectWorkEntry = async (id) =>
+  (await api.patch(`/api/admin/work/${id}/reject`)).data;
+
+export const updateWorkEntryStatus = async (
+  id,
+  status,
+  daily_work_percentage
+) =>
+  (
+    await api.patch(`/api/admin/work/${id}/update-status`, {
+      status,
+      daily_work_percentage,
+    })
+  ).data;
+
+export const generateWorkEntryPercentage = async (id, daily_work_percentage) =>
+  (
+    await api.post(`/api/admin/work/${id}/generate-percentage`, {
+      daily_work_percentage,
+    })
+  ).data;
+
+export const bulkGenerateWorkEntryPercentage = async (entryIds, daily_work_percentage) =>
+  (
+    await api.post("/api/admin/work/bulk-generate-percentage", {
+      entryIds,
+      daily_work_percentage,
+    })
+  ).data;
+
+export const deleteWorkEntry = async (id) =>
+  (await api.delete(`/api/admin/work/${id}`)).data;
+
+export const sendEmployeeMonthlyWorkSummary = async (employeeId, month, year) =>
+  (
+    await api.post(`/api/admin/work-performance/${employeeId}/send-summary`, {
+      month,
+      year,
+    })
+  ).data;
+
+export const getEmployeeWorkPerformance = async (employeeId, month, year) =>
+  (
+    await api.get(`/api/admin/work-performance/${employeeId}`, {
+      params: { month, year },
+    })
+  ).data;
+
 // ✅ NEW: Get Request Limit for Employee
 export const getRequestLimit = (employeeId) => {
   return api.get(`/api/attendance/request-limit/${employeeId}`);
@@ -947,6 +1102,83 @@ export const getAllIdleTimeRecords = async () => {
       "Get all idle time error:",
       error.response?.data || error.message
     );
+    throw error;
+  }
+};
+
+/* =============================================================================
+   WEBAUTHN FINGERPRINT AUTHENTICATION
+============================================================================= */
+
+// Get registration options (requires auth)
+export const getWebAuthnRegistrationOptions = async () => {
+  try {
+    const response = await api.post("/api/webauthn/register/options");
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn registration options error:", error);
+    throw error;
+  }
+};
+
+// Verify registration (requires auth)
+export const verifyWebAuthnRegistration = async (credential, challenge, deviceName) => {
+  try {
+    const response = await api.post("/api/webauthn/register/verify", {
+      credential,
+      challenge,
+      deviceName,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn registration verify error:", error);
+    throw error;
+  }
+};
+
+// Get authentication options (public)
+export const getWebAuthnLoginOptions = async () => {
+  try {
+    const response = await api.post("/api/webauthn/login/options");
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn login options error:", error);
+    throw error;
+  }
+};
+
+// Verify authentication (public)
+export const verifyWebAuthnLogin = async (credential, challenge) => {
+  try {
+    const response = await api.post("/api/webauthn/login/verify", {
+      credential,
+      challenge,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn login verify error:", error);
+    throw error;
+  }
+};
+
+// Get user's credentials (requires auth)
+export const getWebAuthnCredentials = async () => {
+  try {
+    const response = await api.get("/api/webauthn/credentials");
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn get credentials error:", error);
+    throw error;
+  }
+};
+
+// Delete a credential (requires auth)
+export const deleteWebAuthnCredential = async (credentialId) => {
+  try {
+    const response = await api.delete(`/api/webauthn/credentials/${credentialId}`);
+    return response.data;
+  } catch (error) {
+    console.error("WebAuthn delete credential error:", error);
     throw error;
   }
 };

@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test utils/*.test.js",
+    "migrate:daily-work": "node scripts/dailyWorkMigration.js"
   },
   "keywords": [],
   "author": "",

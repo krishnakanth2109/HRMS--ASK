@@ -54,6 +54,7 @@ import NewEmployeeAttendance from "./EmployeePages/EmployeeAttendance";
 import EmployeeDailyAttendance from "./EmployeePages/EmployeeDailyAttendance";
 import EmployeeNotifications from "./pages/EmployeeNotifications";
 import EmployeeTeamsPage from "./EmployeePages/EmployeeTeamsPage";
+import CurrentEmployeeFaceSetup from "./EmployeePages/CurrentEmployeeFaceSetup";
 
 
 // Admin pages
@@ -84,6 +85,8 @@ import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 import OnboardingEmailForm from "./pages/InviteEmployee";
 import PayrollManagement from "./pages/PayrollManagement";
 import AdminLiveTracking from "./pages/AdminLiveTracking";
+import EmployeeWorkTracker from "./EmployeePages/EmployeeWorkTracker";
+import AdminWorkReports from "./pages/AdminWorkReports";
 
 function App() {
   return (
@@ -160,6 +163,8 @@ function App() {
         <Route path="/admin/today-overview" element={<TodayOverview />} />
           <Route path="/admin/rules" element={<AdminRulesPost />} />
          <Route path="/admin/expense" element={<AdminExpenseDashboard />} />
+         <Route path="/admin/work-reports" element={<AdminWorkReports />} />
+         <Route path="/admin/setup-face" element={<CurrentEmployeeFaceSetup />} />
          <Route path="/admin/attendance-requests" element={<AdminAttendanceRequests />} />
          <Route path="/admin/punchout-requests" element={<PunchOutRequests />} />
          <Route path="/admin/workmode-requests" element={<WorkModeRequests />}/>
@@ -195,6 +200,8 @@ function App() {
         <Route path="/employee/payslip" element={<EmployeePayslip />} />
         <Route path="/employee/chatting" element={<ConnectWithEmployee />} />
         <Route path="/employee/expense" element={<AddExpense />} />
+        <Route path="/employee/daily-work-tracker" element={<EmployeeWorkTracker />} />
+        <Route path="/employee/setup-face" element={<CurrentEmployeeFaceSetup />} />
         <Route
           path="/employee/teams"
           element={<EmployeeTeamsPage />}

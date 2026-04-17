@@ -15,7 +15,9 @@ import {
   FaUserFriends,
   FaReceipt,
   FaChevronLeft,
-  FaChevronRight
+  FaChevronRight,
+  FaUserShield,
+  FaClipboardCheck
 } from "react-icons/fa";
 
 // Import AuthContext to get current user details
@@ -33,7 +35,9 @@ const navLinks = [
   { to: "/employee/reuestworkmode", label: "WorkMode Request", icon: <FaLaptopHouse /> },
   { to: "/employee/payslip", label: "Pay-Slip", icon: <FaMoneyCheckAlt /> },
   { to: "/employee/chatting", label: "Connect with Employee", icon: <FaUserFriends /> },
-  { to: "/employee/expense", label: "Add Expense", icon: <FaReceipt /> }
+  { to: "/employee/expense", label: "Add Expense", icon: <FaReceipt /> },
+  { to: "/employee/daily-work-tracker", label: "Daily Work Tracker", icon: <FaClipboardCheck /> },
+  { to: "/employee/setup-face", label: "Face & Fingerprint", icon: <FaUserShield /> }
 ];
 
 const SidebarEmployee = () => {

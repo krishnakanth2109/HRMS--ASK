@@ -37,6 +37,9 @@ import mailRoutes from "./routes/mailRoutes.js";
 import invitedEmployeeRoutes from "./routes/invitedEmployeeRoutes.js";
 import payrollcandidatesRoutes from "./routes/payrollcandidatesRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import webauthnRoutes from "./routes/webauthnRoutes.js";
+import faceAuthRoutes from "./routes/faceAuthRoutes.js";
+import { employeeWorkRoutes, adminWorkRoutes } from "./routes/workRoutes.js";
 
 
 // -------------------- APP SETUP --------------------
@@ -302,6 +305,10 @@ app.use("/api/invited-employees", invitedEmployeeRoutes);
 app.use('/api/payroll', payrollcandidatesRoutes);
 app.use('/api/idletime', idleTimeRoutes);
 app.use("/api/ai", aiRoutes); 
+app.use("/api/webauthn", webauthnRoutes);
+app.use("/api/face-auth", faceAuthRoutes);
+app.use("/api/work", employeeWorkRoutes);
+app.use("/api/admin", adminWorkRoutes);
 
 
 // -------------------- 404 --------------------

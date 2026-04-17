@@ -8,10 +8,18 @@ import {
   FaLock,
   FaEye,
   FaEyeSlash,
-    FaChartBar, 
+  FaChartBar, 
   FaUserShield,  
-  FaUsersCog 
+  FaUsersCog,
+  FaFingerprint
 } from "react-icons/fa";
+import { HiOutlineFaceSmile } from "react-icons/hi2";
+import FaceLogin from "../components/FaceLogin";
+import {
+  getWebAuthnLoginOptions,
+  verifyWebAuthnLogin,
+  loginWithFaceApi,
+} from "../api";
 
 const Login = () => {
   const { user, login } = useContext(AuthContext);
@@ -22,6 +30,26 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [showFaceLogin, setShowFaceLogin] = useState(false);
+  const [faceLoading, setFaceLoading] = useState(false);
+
+  // Check if WebAuthn/biometric is available on this device
+  useEffect(() => {
+    const checkBiometric = async () => {
+      try {
+        if (window.PublicKeyCredential &&
+            typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
+          const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          setBiometricSupported(available);
+        }
+      } catch {
+        setBiometricSupported(false);
+      }
+    };
+    checkBiometric();
+  }, []);
 
   /* ---------------------------------------------------------------------------
       PREVENT INFINITE REDIRECT LOOP
@@ -91,6 +119,140 @@ const Login = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  /* ---------------------------------------------------------------------------
+      FINGERPRINT LOGIN HANDLER
+  --------------------------------------------------------------------------- */
+  const handleFingerprintLogin = async () => {
+    if (!biometricSupported) {
+      setError("Fingerprint authentication not supported on this device");
+      return;
+    }
+
+    setError("");
+    setBiometricLoading(true);
+
+    try {
+      // 1. Get challenge from server
+      const { options } = await getWebAuthnLoginOptions();
+
+      // 2. Convert challenge to ArrayBuffer
+      const challengeBuffer = Uint8Array.from(
+        atob(options.challenge.replace(/-/g, "+").replace(/_/g, "/")),
+        (c) => c.charCodeAt(0)
+      );
+
+      // 3. Trigger biometric prompt
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBuffer,
+          rpId: options.rpId,
+          timeout: options.timeout,
+          userVerification: options.userVerification,
+          allowCredentials: options.allowCredentials.map((cred) => ({
+            ...cred,
+            id: Uint8Array.from(
+              atob(cred.id.replace(/-/g, "+").replace(/_/g, "/")),
+              (c) => c.charCodeAt(0)
+            ),
+          })),
+        },
+      });
+
+      // 4. Prepare credential for server
+      const credentialData = {
+        id: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, ""),
+        type: assertion.type,
+        response: {
+          authenticatorData: btoa(
+            String.fromCharCode(
+              ...new Uint8Array(assertion.response.authenticatorData)
+            )
+          ),
+          clientDataJSON: btoa(
+            String.fromCharCode(
+              ...new Uint8Array(assertion.response.clientDataJSON)
+            )
+          ),
+          signature: btoa(
+            String.fromCharCode(
+              ...new Uint8Array(assertion.response.signature)
+            )
+          ),
+        },
+      };
+
+      // 5. Verify with server
+      const result = await verifyWebAuthnLogin(credentialData, options.challenge);
+
+      if (result.status === "success" && result.token) {
+        // Store auth data (same as normal login)
+        sessionStorage.setItem("token", result.token);
+        sessionStorage.setItem("hrms-token", result.token);
+        const userWithToken = { ...result.data, token: result.token };
+        sessionStorage.setItem("hrmsUser", JSON.stringify(userWithToken));
+
+        // Update AuthContext
+        // We need to reload because login() in AuthProvider sets state
+        window.location.href =
+          result.data.role === "admin" || result.data.role === "manager"
+            ? "/admin/dashboard"
+            : "/employee/dashboard";
+      } else {
+        setError("Fingerprint authentication failed");
+      }
+    } catch (err) {
+      console.error("Fingerprint login error:", err);
+      if (err.name === "NotAllowedError") {
+        setError("Fingerprint authentication was cancelled");
+      } else if (err.name === "SecurityError") {
+        setError("Fingerprint authentication requires a secure connection (HTTPS)");
+      } else {
+        setError(
+          err.response?.data?.message || "Fingerprint authentication failed"
+        );
+      }
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
+
+  const handleFaceLogin = async (descriptor) => {
+    setFaceLoading(true);
+    setError("");
+
+    try {
+      const result = await loginWithFaceApi(descriptor);
+
+      if (result.status === "success" && result.token) {
+        sessionStorage.setItem("token", result.token);
+        sessionStorage.setItem("hrms-token", result.token);
+        const userWithToken = { ...result.data, token: result.token };
+        sessionStorage.setItem("hrmsUser", JSON.stringify(userWithToken));
+        setShowFaceLogin(false);
+
+        window.location.href =
+          result.data.role === "admin" || result.data.role === "manager"
+            ? "/admin/dashboard"
+            : "/employee/dashboard";
+      } else {
+        setError("Face authentication failed");
+        setShowFaceLogin(false);
+      }
+    } catch (err) {
+      console.error("Face Login Error:", err.response?.data || err);
+      setError(
+        err.response?.data?.message ||
+          "Face not recognized. Please try again or use email/password."
+      );
+      setShowFaceLogin(false);
+    } finally {
+      setFaceLoading(false);
     }
   };
 
@@ -518,6 +680,88 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
                   )}
                 </span>
               </motion.button>
+
+              {/* Fingerprint Login — WebAuthn */}
+              {biometricSupported && (
+                <>
+                  <div className="flex items-center gap-3 mt-4">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400 font-medium">or</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+
+                  <motion.button
+                    type="button"
+                    disabled={biometricLoading}
+                    onClick={handleFingerprintLogin}
+                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: "0 10px 25px -5px rgba(16, 185, 129, 0.4)"
+                    }}
+                    className="w-full mt-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
+                    id="fingerprint-login-btn"
+                  >
+                    <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                    
+                    <span className="relative flex items-center justify-center gap-2">
+                      {biometricLoading ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="h-4 w-4 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          Scanning Fingerprint...
+                        </>
+                      ) : (
+                        <>
+                          <FaFingerprint className="text-lg" />
+                          Login with Fingerprint
+                        </>
+                      )}
+                    </span>
+                  </motion.button>
+                </>
+              )}
+
+              <div className="flex items-center gap-3 mt-4">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium">or</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+
+              <motion.button
+                type="button"
+                disabled={faceLoading}
+                onClick={() => setShowFaceLogin(true)}
+                whileTap={{ scale: 0.97 }}
+                whileHover={{
+                  scale: 1.02,
+                  boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.35)"
+                }}
+                className="w-full mt-2 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-sky-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
+                id="face-login-btn"
+              >
+                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {faceLoading ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="h-4 w-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Scanning Face...
+                    </>
+                  ) : (
+                    <>
+                      <HiOutlineFaceSmile className="text-lg" />
+                      Login with Face
+                    </>
+                  )}
+                </span>
+              </motion.button>
             </form>
 
             {/* Footer */}
@@ -558,6 +802,15 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
           </motion.div>
         </motion.div>
       </div>
+
+      {showFaceLogin && (
+        <FaceLogin
+          onFaceLogin={handleFaceLogin}
+          onClose={() => {
+            if (!faceLoading) setShowFaceLogin(false);
+          }}
+        />
+      )}
     </div>
   );
 };

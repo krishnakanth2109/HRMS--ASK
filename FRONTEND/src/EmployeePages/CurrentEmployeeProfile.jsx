@@ -5,7 +5,8 @@ import React, { useEffect, useState } from "react";
 import api from "../api"; 
 import { 
   FaUser, FaEnvelope, FaPhone, FaBuilding, FaMoneyBill, FaCalendarAlt, 
-  FaCreditCard, FaAddressCard, FaFileUpload, FaCheck, FaSpinner, FaIdCard, FaEdit, FaSave, FaTrash
+  FaCreditCard, FaAddressCard, FaFileUpload, FaCheck, FaSpinner, FaIdCard, FaEdit, FaSave, FaTrash,
+  FaCheckCircle
 } from "react-icons/fa";
 
 const INDIAN_BANKS = [

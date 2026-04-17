@@ -50,6 +50,7 @@ import Swal from "sweetalert2";
 
 import api, {
   getAttendanceForEmployee,
+  getFingerprintAutoAttendanceAction,
   punchIn,
   punchOut,
   uploadProfilePic,
@@ -168,6 +169,7 @@ const EmployeeDashboard = () => {
   // ✅ NEW: Live break time counter (seconds)
   const [breakTime, setBreakTime] = useState(0);
   const alarmPlayedRef = useRef(false);
+  const fingerprintAutoAttendanceAttemptedRef = useRef(false);
 
   // ✅ FIX: Fresh employee data fetched from API to reflect admin edits instantly
   const [freshEmployee, setFreshEmployee] = useState(null);
@@ -481,6 +483,10 @@ const EmployeeDashboard = () => {
     bootstrap();
   }, [user, loadAttendance, loadShiftTimings, loadHolidaysAndLeaves, loadRequestLimit]);
 
+  useEffect(() => {
+    fingerprintAutoAttendanceAttemptedRef.current = false;
+  }, [user?.employeeId, user?.loginMethod, todayIso]);
+
   const loadProfilePic = async () => {
     try {
       const res = await getProfilePic();
@@ -627,7 +633,100 @@ const EmployeeDashboard = () => {
     return defaults;
   }, [officeConfig, user]);
 
-  const performPunchAction = async (action) => {
+  const canProceedPunchIn = async ({ auto = false } = {}) => {
+    if (!user) return false;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    const unresolvedMissedPunch =
+      missedPunchLog ||
+      attendance.find(
+        (entry) => entry.date === yesterdayStr && entry.punchIn && !entry.punchOut
+      );
+
+    if (!todayLog && unresolvedMissedPunch) {
+      if (!auto) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Punch In Disabled',
+          text: 'You did not punch out yesterday. Please use the "Request Punch Out" button above to resolve this with Admin.'
+        });
+      }
+      return false;
+    }
+
+    const todayDayNum = new Date().getDay();
+    const weeklyOffDays = shiftTimings?.weeklyOffDays ?? [0];
+    const isTodayWeekOff =
+      Array.isArray(weeklyOffDays) && weeklyOffDays.includes(todayDayNum);
+
+    if (!isTodayWeekOff) {
+      return true;
+    }
+
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: otList } = await api.get(`/api/overtime/${user.employeeId}`);
+      const approvedOT = Array.isArray(otList)
+        ? otList.find((ot) => ot.date === todayStr && ot.status === "APPROVED")
+        : null;
+
+      if (approvedOT) {
+        return true;
+      }
+
+      if (!auto) {
+        Swal.fire({
+          icon: "warning",
+          title: "🗓️ Today is Your Week Off!",
+          html: `
+                <p style="font-size:15px; color:#374151; margin-bottom:12px">
+                  Punch-in is <b>not allowed</b> on your assigned week off.
+                </p>
+                <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px; text-align:left; font-size:13px; color:#92400e; line-height:1.8">
+                  <b>Want to work today? Follow these steps:</b><br/>
+                  1️⃣ Apply for <b>Overtime</b> from Quick Actions or the Overtime page<br/>
+                  2️⃣ Contact your <b>Admin</b> to approve the overtime request<br/>
+                  3️⃣ Once <b>Approved</b>, come back here to punch in
+                </div>
+              `,
+          showCancelButton: true,
+          confirmButtonText: "Apply Overtime →",
+          cancelButtonText: "Close",
+          confirmButtonColor: "#4f46e5",
+          cancelButtonColor: "#6b7280",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            navigate("/employee/empovertime");
+          }
+        });
+      }
+
+      return false;
+    } catch (err) {
+      console.error("Week-off OT check failed:", err);
+
+      if (!auto) {
+        Swal.fire({
+          icon: "error",
+          title: "Check Failed",
+          text: "Could not verify your overtime status. Please try again.",
+        });
+      }
+
+      return false;
+    }
+  };
+
+  const performPunchAction = async (action, options = {}) => {
+    const {
+      successTitle,
+      successText,
+      speechText,
+      suppressSyncAlert = false,
+    } = options;
+
     setPunchStatus("FETCHING");
 
     try {
@@ -657,9 +756,19 @@ const EmployeeDashboard = () => {
           }
         }
         alarmPlayedRef.current = false;
-        await punchIn({ employeeId: user.employeeId, employeeName: user.name, latitude: location.latitude, longitude: location.longitude });
-        speak(`${user.name}, punch in successful`);
-        Swal.fire({ icon: 'success', title: 'Welcome!', text: 'Punch in recorded successfully.' });
+        await punchIn({
+          employeeId: user.employeeId,
+          employeeName: user.name,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          loginMethod: user?.loginMethod || "password",
+        });
+        speak(speechText || `${user.name}, punch in successful`);
+        Swal.fire({
+          icon: 'success',
+          title: successTitle || 'Welcome!',
+          text: successText || 'Punch in recorded successfully.'
+        });
 
       } else if (action === "BREAK") {
         await api.post('/api/attendance/punch-break', {
@@ -672,8 +781,12 @@ const EmployeeDashboard = () => {
 
       } else {
         await punchOut({ employeeId: user.employeeId, latitude: location.latitude, longitude: location.longitude });
-        speak(`${user.name}, punch out successful`);
-        Swal.fire({ icon: 'success', title: 'Goodbye!', text: 'Punch out recorded successfully.' });
+        speak(speechText || `${user.name}, punch out successful`);
+        Swal.fire({
+          icon: 'success',
+          title: successTitle || 'Goodbye!',
+          text: successText || 'Punch out recorded successfully.'
+        });
       }
 
       await loadAttendance(user.employeeId);
@@ -689,11 +802,13 @@ const EmployeeDashboard = () => {
           confirmButtonText: "Try Again"
         });
       } else if (msg.toLowerCase().includes("already punched")) {
-        Swal.fire({
-          icon: 'info',
-          title: 'Syncing',
-          text: "System syncing: You are already punched in."
-        });
+        if (!suppressSyncAlert) {
+          Swal.fire({
+            icon: 'info',
+            title: 'Syncing',
+            text: "System syncing: You are already punched in."
+          });
+        }
         await loadAttendance(user.employeeId);
       } else {
         speak("Punch operation failed");
@@ -706,74 +821,72 @@ const EmployeeDashboard = () => {
     } finally { setPunchStatus("IDLE"); }
   };
 
+  useEffect(() => {
+    if (loading || loadingTeamData || !user?.employeeId || user?.role !== "employee") {
+      return;
+    }
+
+    if (fingerprintAutoAttendanceAttemptedRef.current) {
+      return;
+    }
+
+    fingerprintAutoAttendanceAttemptedRef.current = true;
+
+    if (user?.loginMethod !== "fingerprint") {
+      return;
+    }
+
+    const runFingerprintAutoAttendance = async () => {
+      try {
+        const response = await getFingerprintAutoAttendanceAction();
+        const decision = response?.data || response;
+
+        if (decision?.action === "PUNCH_IN") {
+          const canPunchIn = await canProceedPunchIn({ auto: true });
+          if (!canPunchIn) return;
+
+          await performPunchAction("IN", {
+            successTitle: "Attendance Updated",
+            successText: "Punch In recorded automatically via fingerprint login",
+            speechText: `${user.name}, punch in recorded automatically via fingerprint login`,
+            suppressSyncAlert: true,
+          });
+          return;
+        }
+
+        if (decision?.action === "PUNCH_OUT") {
+          await performPunchAction("OUT", {
+            successTitle: "Attendance Updated",
+            successText: "Punch Out recorded automatically via fingerprint login",
+            speechText: `${user.name}, punch out recorded automatically via fingerprint login`,
+            suppressSyncAlert: true,
+          });
+        }
+      } catch (error) {
+        console.error("Fingerprint auto attendance error:", error);
+      }
+    };
+
+    runFingerprintAutoAttendance();
+  }, [
+    loading,
+    loadingTeamData,
+    user?.employeeId,
+    user?.role,
+    user?.loginMethod,
+    shiftTimings,
+    officeConfig,
+    missedPunchLog,
+  ]);
+
   const handlePunch = async (action) => {
     if (!user) return;
     if (action === "IN") {
-      if (!todayLog) {
-        if (missedPunchLog) {
-          Swal.fire({
-            icon: 'error',
-            title: 'Punch In Disabled',
-            text: 'You did not punch out yesterday. Please use the "Request Punch Out" button above to resolve this with Admin.'
-          });
-          return;
-        }
+      const canPunchIn = await canProceedPunchIn();
+      if (!canPunchIn) {
+        return;
       }
 
-      // ✅ WEEK OFF GUARD — check if today is assigned week off
-      const todayDayNum = new Date().getDay(); // 0=Sunday … 6=Saturday
-      const weeklyOffDays = shiftTimings?.weeklyOffDays ?? [0];
-      const isTodayWeekOff = Array.isArray(weeklyOffDays) && weeklyOffDays.includes(todayDayNum);
-
-      if (isTodayWeekOff) {
-        try {
-          const todayStr = new Date().toISOString().split("T")[0];
-          const { data: otList } = await api.get(`/api/overtime/${user.employeeId}`);
-          const approvedOT = Array.isArray(otList)
-            ? otList.find(ot => ot.date === todayStr && ot.status === "APPROVED")
-            : null;
-
-          if (!approvedOT) {
-            // No approved OT — block and show informative alert
-            Swal.fire({
-              icon: "warning",
-              title: "🗓️ Today is Your Week Off!",
-              html: `
-                <p style="font-size:15px; color:#374151; margin-bottom:12px">
-                  Punch-in is <b>not allowed</b> on your assigned week off.
-                </p>
-                <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px; text-align:left; font-size:13px; color:#92400e; line-height:1.8">
-                  <b>Want to work today? Follow these steps:</b><br/>
-                  1️⃣ Apply for <b>Overtime</b> from Quick Actions or the Overtime page<br/>
-                  2️⃣ Contact your <b>Admin</b> to approve the overtime request<br/>
-                  3️⃣ Once <b>Approved</b>, come back here to punch in
-                </div>
-              `,
-              showCancelButton: true,
-              confirmButtonText: "Apply Overtime →",
-              cancelButtonText: "Close",
-              confirmButtonColor: "#4f46e5",
-              cancelButtonColor: "#6b7280",
-            }).then((result) => {
-              if (result.isConfirmed) {
-                navigate("/employee/empovertime");
-              }
-            });
-            return; // ❌ Block punch-in
-          }
-          // ✅ Approved OT found — fall through to performPunchAction below
-        } catch (err) {
-          console.error("Week-off OT check failed:", err);
-          // If check fails, let backend decide — don't silently allow
-          Swal.fire({
-            icon: "error",
-            title: "Check Failed",
-            text: "Could not verify your overtime status. Please try again.",
-          });
-          return;
-        }
-      }
-      // ✅ Either not a week off, or approved OT exists — proceed to punch in
       performPunchAction("IN");
     }
 

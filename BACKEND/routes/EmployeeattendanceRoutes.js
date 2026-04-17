@@ -8,6 +8,7 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import Holiday from "../models/Holiday.js";
 import Overtime from "../models/Overtime.js";
 import nodemailer from 'nodemailer';
+import { getFingerprintAttendanceDecision } from "../utils/fingerprintAttendance.js";
 
 const router = express.Router();
 
@@ -422,9 +423,10 @@ const getTimeDifferenceInMinutes = (punchIn, shiftStart) => {
 
 router.post('/punch-in', async (req, res) => { 
     try {
-        const { employeeId, employeeName, latitude, longitude } = req.body;
+        const { employeeId, employeeName, latitude, longitude, loginMethod } = req.body;
         if (!employeeId || !employeeName) return res.status(400).json({ message: 'Employee ID & Name required' });
         if (!validateCoordinates(latitude, longitude)) return res.status(400).json({ message: "Invalid coordinates" });
+        const normalizedLoginMethod = loginMethod === "fingerprint" ? "fingerprint" : "password";
 
         const today = getToday(); 
         const now = new Date();
@@ -526,7 +528,8 @@ router.post('/punch-in', async (req, res) => {
                 punchInLocation: { latitude, longitude, address, timestamp: now }, 
                 sessions: [{ punchIn: now, punchOut: null, durationSeconds: 0 }], 
                 workedHours: 0, workedMinutes: 0, workedSeconds: 0, totalBreakSeconds: 0, 
-                displayTime: "0h 0m 0s", status: "WORKING", loginStatus: isLate ? "LATE" : "ON_TIME" 
+                displayTime: "0h 0m 0s", status: "WORKING", loginStatus: isLate ? "LATE" : "ON_TIME",
+                loginMethod: normalizedLoginMethod
             }; 
             attendance.attendance.push(todayRecord); 
         } else { 
@@ -553,6 +556,9 @@ router.post('/punch-in', async (req, res) => {
             todayRecord.sessions.push({ punchIn: now, punchOut: null, durationSeconds: 0 }); 
             todayRecord.status = "WORKING"; 
             todayRecord.punchOut = null; 
+            if (!todayRecord.loginMethod || todayRecord.loginMethod === "unknown") {
+                todayRecord.loginMethod = normalizedLoginMethod;
+            }
         }
 
         await attendance.save(); 
@@ -811,6 +817,37 @@ router.post('/request-status-correction', async (req, res) => {
 /* ==========================================================
    12. ADMIN APPROVALS
    ========================================================== */
+
+router.get("/fingerprint-auto-action", async (req, res) => {
+    try {
+        if (req.user?.role !== "employee") {
+            return res.json({
+                success: true,
+                data: { action: "NONE", reason: "non_employee_user" }
+            });
+        }
+
+        const employeeId = req.user?.employeeId;
+        if (!employeeId) {
+            return res.status(400).json({ message: "Employee ID missing for current user" });
+        }
+
+        const attendanceRecord = await Attendance.findOne({ employeeId });
+        const today = getToday();
+        const todayAttendance =
+            attendanceRecord?.attendance?.find((entry) => entry.date === today) || null;
+
+        const decision = getFingerprintAttendanceDecision({
+            loginMethod: req.auth?.loginMethod,
+            now: new Date(),
+            todayAttendance,
+        });
+
+        return res.json({ success: true, data: decision });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 /**
  * Admin: Approve Late Correction

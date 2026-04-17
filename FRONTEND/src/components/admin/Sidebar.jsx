@@ -25,6 +25,8 @@ import {
   FaClipboardList,
 FaSignOutAlt,
 FaUserCheck,
+FaClipboardCheck,
+FaFingerprint,
 } from "react-icons/fa";
 
 import { io } from "socket.io-client";
@@ -82,6 +84,8 @@ const navLinks = [
   { to: "/admin/payroll", label: "Payroll", icon: <FaMoneyBillWave /> },
   { to: "/admin/payrollcandidates", label: "Payroll Candidates", icon: <FaUserCheck /> },
   { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
+  { to: "/admin/work-reports", label: "Employee Work Reports", icon: <FaClipboardCheck /> },
+  { to: "/admin/setup-face", label: "Face & Fingerprint", icon: <FaFingerprint /> },
 
   // 📢 COMMUNICATION
   {

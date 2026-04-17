@@ -24,7 +24,6 @@ const AdminProfile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Basic validation for name and phone
     if (name === "name" && !/^[A-Za-z\s]*$/.test(value)) return;
     if (name === "phone" && !/^\d*$/.test(value)) return;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -103,6 +102,7 @@ const AdminProfile = () => {
             </>
           )}
         </div>
+
       </div>
     </div>
   );

@@ -60,6 +60,12 @@ const DailySchema = new mongoose.Schema({
     default: "NOT_APPLICABLE",
   },
 
+  loginMethod: {
+    type: String,
+    enum: ["password", "fingerprint", "unknown"],
+    default: "unknown",
+  },
+
   workedStatus: {
     type: String,
     enum: ["FULL_DAY", "HALF_DAY", "QUARTER_DAY", "ABSENT", "NOT_APPLICABLE"],
