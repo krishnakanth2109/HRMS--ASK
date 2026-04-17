@@ -41,7 +41,7 @@ import documentVerificationRoutes from "./routes/documentVerificationRoutes.js";
 import offerLetterRoutes from "./routes/offerLetterRoutes.js";
 import offerResponseRoutes from "./routes/offerResponseRoutes.js";
 import resignationRoutes from "./routes/resignationRoutes.js";
-import welcomeKitRoutes from "./routes/welcomeKitRoutes.js";
+import welcomeKitRoutes from "./routes/welcomekitroutes.js";
 
 // -------------------- APP SETUP --------------------
 const app = express();
