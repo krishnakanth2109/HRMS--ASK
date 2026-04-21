@@ -18,6 +18,121 @@ import {
   getTimeKeyInTimeZone,
 } from "../utils/monthlyPerformance.js";
 
+// ─── Correct proportional daily → monthly & weekly percentage calc ────────────
+//
+//  Formula per day:
+//    fixedDailySlot  = 100 / totalWorkingDaysInMonth          (e.g. 3.85%)
+//    dailyContrib    = (adminApprovedPct / 100) * fixedDailySlot
+//                    = (90 / 100) * 3.85  = 3.465%
+//
+//  Monthly Work %  = sum of dailyContrib for all approved days in month
+//  Weekly   %      = same but reset at each Mon–Sun calendar week boundary
+//                    (week starts fresh at 0, accumulates Mon→Sat, resets next Mon)
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sunday = 0 in JS.  We treat Mon as week-start, Sun as week-end.
+ * Returns a string "YYYY-Www" that uniquely identifies the Mon-Sun week
+ * a date belongs to, without shifting the date into a different month.
+ */
+const getCalendarWeekKey = (date) => {
+  const d = new Date(date);
+  // Find the Monday of this week
+  const dayOfWeek = d.getDay(); // 0 Sun … 6 Sat
+  const daysToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + daysToMon);
+  return monday.toISOString().split("T")[0]; // "YYYY-MM-DD" of that Monday
+};
+
+/**
+ * Core calculation.
+ *
+ * @param {Array}  entries          – DailyWorkEntry docs (lean or mongoose) for the month
+ * @param {number} totalWorkingDays – total working days in that month (from performance util)
+ * @returns {{ monthlyWorkPercentage, weeklyPerformance }}
+ */
+const accumulateApprovedPercentages = (entries, totalWorkingDays) => {
+  // Guard: if no working days we can't compute anything meaningful
+  const workingDays = Number(totalWorkingDays) || 0;
+  if (!workingDays) {
+    return { monthlyWorkPercentage: 0, weeklyPerformance: [] };
+  }
+
+  const fixedDailySlot = 100 / workingDays; // e.g. 100/26 = 3.846…
+
+  // weekKey (Monday date string) → { runningTotal, approvedDays, mondayDate, latestDate }
+  const weekMap = new Map();
+
+  // We also need ALL calendar weeks that appear in the month (even with 0 approved days)
+  // so the week labels are consistent. We collect them from ALL entries, not just approved.
+  for (const entry of entries) {
+    const d = new Date(entry.date);
+    const wk = getCalendarWeekKey(d);
+    if (!weekMap.has(wk)) {
+      const monday = new Date(d);
+      const dow = d.getDay();
+      monday.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+      weekMap.set(wk, {
+        runningTotal: 0,
+        approvedDays: 0,
+        mondayDate: monday,
+        latestDate: d,
+      });
+    } else {
+      const wkData = weekMap.get(wk);
+      if (d > wkData.latestDate) wkData.latestDate = d;
+    }
+  }
+
+  let monthlyTotal = 0;
+
+  for (const entry of entries) {
+    if (entry.status !== "approved") continue;
+
+    const adminApprovedPct = Number(entry.daily_work_percentage ?? 0);
+    // dailyContrib = what fraction of 100% this day contributes
+    const dailyContrib = (adminApprovedPct / 100) * fixedDailySlot;
+
+    monthlyTotal += dailyContrib;
+
+    const wk = getCalendarWeekKey(new Date(entry.date));
+    const wkData = weekMap.get(wk);
+    if (wkData) {
+      wkData.runningTotal += dailyContrib;
+      wkData.approvedDays += 1;
+    }
+  }
+
+  // Build sorted weekly array (one entry per calendar week in the month)
+  const weeklyPerformance = Array.from(weekMap.entries())
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([, wkData], index) => {
+      const startLabel = wkData.mondayDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const endLabel = wkData.latestDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      return {
+        weekLabel: `Week ${index + 1} (${startLabel} – ${endLabel})`,
+        weeklyPercentage: Number(wkData.runningTotal.toFixed(2)),
+        workingDays: wkData.approvedDays,
+        fixedDailySlot: Number(fixedDailySlot.toFixed(4)),
+      };
+    });
+
+  return {
+    monthlyWorkPercentage: Number(monthlyTotal.toFixed(2)),
+    weeklyPerformance,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const createWorkImageUploader = () =>
   multer({
     storage: multer.memoryStorage(),
@@ -149,44 +264,64 @@ const attachImagesToEntries = async (entries) => {
 };
 
 const attachMonthlyWorkPercentages = async (records = []) => {
+  // Group records by employeeId + month/year so we can compute accurate sums
+  const groupMap = new Map(); // cacheKey → [entries]
+
+  for (const record of records) {
+    const employeeId =
+      record.employeeId?._id?.toString?.() || record.employeeId?.toString?.();
+    if (!employeeId || !record.date) continue;
+
+    const dateKey = getDateKeyInTimeZone(new Date(record.date));
+    const [year, month] = dateKey.split("-").map(Number);
+    const cacheKey = `${employeeId}-${month}-${year}`;
+
+    if (!groupMap.has(cacheKey)) groupMap.set(cacheKey, []);
+    groupMap.get(cacheKey).push(record);
+  }
+
+  // For each unique employee+month, fetch ALL entries (not just filtered ones)
+  // so the monthly/weekly total is accurate even when admin filters by date
   const performanceCache = new Map();
 
   await Promise.all(
-    records.map(async (record) => {
-      const employeeId = record.employeeId?._id?.toString?.() || record.employeeId?.toString?.();
-      if (!employeeId || !record.date) {
-        return;
-      }
+    Array.from(groupMap.keys()).map(async (cacheKey) => {
+      const [empId, month, year] = cacheKey.split("-");
+      const { startDate, endDate } = getMonthDateRange(Number(month), Number(year));
 
-      const dateKey = getDateKeyInTimeZone(new Date(record.date));
-      const [year, month] = dateKey.split("-").map(Number);
-      const cacheKey = `${employeeId}-${month}-${year}`;
+      const allEntries = await DailyWorkEntry.find({
+        employeeId: empId,
+        date: { $gte: startDate, $lte: endDate },
+      }).lean();
 
-      if (!performanceCache.has(cacheKey)) {
-        const performance = await calculateMonthlyPerformance(employeeId, month, year);
-        performanceCache.set(cacheKey, {
-          monthlyWorkPercentage: Number(performance?.monthlyWorkPercentage || 0),
-          employeePortalDailyPercentage: Number(
-            performance?.employeePortalDailyPercentage || 0
-          ),
-          totalWorkingDays: Number(performance?.totalWorkingDays || 0),
-        });
-      }
+      const basePerf = await calculateMonthlyPerformance(empId, Number(month), Number(year));
+
+      const { monthlyWorkPercentage, weeklyPerformance } =
+        accumulateApprovedPercentages(allEntries, basePerf?.totalWorkingDays);
+
+      performanceCache.set(cacheKey, {
+        monthlyWorkPercentage,
+        weeklyPerformance,
+        employeePortalDailyPercentage: Number(basePerf?.employeePortalDailyPercentage || 0),
+        totalWorkingDays: Number(basePerf?.totalWorkingDays || 0),
+      });
     })
   );
 
   return records.map((record) => {
-      const employeeId = record.employeeId?._id?.toString?.() || record.employeeId?.toString?.();
-      const dateKey = getDateKeyInTimeZone(new Date(record.date));
-      const [year, month] = dateKey.split("-").map(Number);
-      const cacheKey = `${employeeId}-${month}-${year}`;
-      const performance = performanceCache.get(cacheKey);
+    const employeeId =
+      record.employeeId?._id?.toString?.() || record.employeeId?.toString?.();
+    const dateKey = getDateKeyInTimeZone(new Date(record.date));
+    const [year, month] = dateKey.split("-").map(Number);
+    const cacheKey = `${employeeId}-${month}-${year}`;
+    const perf = performanceCache.get(cacheKey);
 
     return {
       ...record,
-      daily_percentage_display: Number(performance?.employeePortalDailyPercentage || 0),
-      monthly_work_percentage: Number(performance?.monthlyWorkPercentage || 0),
-      total_working_days: Number(performance?.totalWorkingDays || 0),
+      daily_percentage_display: Number(perf?.employeePortalDailyPercentage || 0),
+      monthly_work_percentage: Number(perf?.monthlyWorkPercentage || 0),
+      weekly_performance: perf?.weeklyPerformance || [],
+      total_working_days: Number(perf?.totalWorkingDays || 0),
     };
   });
 };
@@ -391,10 +526,20 @@ employeeWorkRoutes.get("/my-records", async (req, res) => {
     const performance = await calculateMonthlyPerformance(req.user, month, year);
     const settings = await getWorkPercentageSettings();
 
+    // ── Override monthly & weekly % using proportional daily slot calc ──────
+    const { monthlyWorkPercentage, weeklyPerformance } =
+      accumulateApprovedPercentages(entries, performance?.totalWorkingDays);
+    const mergedPerformance = {
+      ...performance,
+      monthlyWorkPercentage,
+      weeklyPerformance,
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
     return res.status(200).json({
       success: true,
       data: records,
-      performance,
+      performance: mergedPerformance,
       percentageSettings: settings,
       month,
       year,
@@ -544,10 +689,21 @@ adminWorkRoutes.get("/work-performance/:employeeId", async (req, res) => {
     const { month, year } = getMonthYearFromQuery(req.query);
     const performance = await calculateMonthlyPerformance(employee, month, year);
 
+    // ── Override with sum of approved daily percentages ──
+    const { startDate, endDate } = getMonthDateRange(month, year);
+    const monthEntries = await DailyWorkEntry.find({
+      employeeId: req.params.employeeId,
+      date: { $gte: startDate, $lte: endDate },
+    }).lean();
+    const { monthlyWorkPercentage, weeklyPerformance } =
+      accumulateApprovedPercentages(monthEntries, performance?.totalWorkingDays);
+    const mergedPerformance = { ...performance, monthlyWorkPercentage, weeklyPerformance };
+    // ─────────────────────────────────────────────────────
+
     return res.status(200).json({
       success: true,
       employee,
-      data: performance,
+      data: mergedPerformance,
       month,
       year,
     });
@@ -771,11 +927,22 @@ adminWorkRoutes.post("/work-performance/:employeeId/send-summary", async (req, r
     const { month, year } = getMonthYearFromQuery(req.body);
     const performance = await calculateMonthlyPerformance(employee, month, year);
 
+    // ── Override with sum of approved daily percentages ──
+    const { startDate, endDate } = getMonthDateRange(month, year);
+    const monthEntries = await DailyWorkEntry.find({
+      employeeId: employee._id,
+      date: { $gte: startDate, $lte: endDate },
+    }).lean();
+    const { monthlyWorkPercentage, weeklyPerformance } =
+      accumulateApprovedPercentages(monthEntries, performance?.totalWorkingDays);
+    const mergedPerformance = { ...performance, monthlyWorkPercentage, weeklyPerformance };
+    // ─────────────────────────────────────────────────────
+
     await Notification.create({
       userId: employee._id,
       userType: "Employee",
       title: "Monthly Work Percentage",
-      message: `Your work score for ${String(month).padStart(2, "0")}/${year} is ${performance.monthlyWorkPercentage}%. Approved days: ${performance.approvedDays}, Rejected days: ${performance.rejectedDays}, Missed days: ${performance.missedDays}.`,
+      message: `Your work score for ${String(month).padStart(2, "0")}/${year} is ${mergedPerformance.monthlyWorkPercentage}%. Approved days: ${mergedPerformance.approvedDays}, Rejected days: ${mergedPerformance.rejectedDays}, Missed days: ${mergedPerformance.missedDays}.`,
       type: "system",
       isRead: false,
       date: new Date(),
@@ -784,7 +951,7 @@ adminWorkRoutes.post("/work-performance/:employeeId/send-summary", async (req, r
     return res.status(200).json({
       success: true,
       message: "Monthly work percentage sent to the employee.",
-      data: performance,
+      data: mergedPerformance,
       employee,
     });
   } catch (error) {

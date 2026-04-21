@@ -7,7 +7,7 @@ import axios from "axios";
 const baseURL =
   import.meta.env.MODE === "production"
     ? import.meta.env.VITE_API_URL_PRODUCTION
-    : "";
+    : "http://localhost:5000";
 
 
 // Debug logs
