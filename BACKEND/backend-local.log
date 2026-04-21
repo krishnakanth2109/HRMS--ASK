@@ -1,0 +1,10 @@
+🚀 Server running on port 5000
+🔌 Socket.IO server initialized for real-time chat
+✅ MongoDB Connected
+✅ PunchOut Mail Server is ready
+✅ Mail Server is ready to send messages
+✅ Email Server is ready to take messages
+Please check your SMTP credentials in .env file
+✅ User connected: GTflMsnPqvHV2cucAAAB
+✅ User connected: FZymCxOpGABTPKtbAAAD
+🔐 User admin registered with socket FZymCxOpGABTPKtbAAAD

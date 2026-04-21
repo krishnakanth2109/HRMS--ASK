@@ -284,7 +284,7 @@ const [deleting, setDeleting] = useState(false);
     };
 
     loadSelectedEmployeePerformance();
-  }, [selectedPerformanceMonth, selectedRecord?.employeeId?._id]);
+  }, [selectedPerformanceMonth, selectedRecord?.employeeId?._id, records]);
 
   useEffect(() => {
     if (!selectedRecord?.employeeId?._id || !selectedRecord?.employeeId?.employeeId || !selectedPerformanceMonth) {
@@ -332,6 +332,7 @@ const [deleting, setDeleting] = useState(false);
 
     loadSelectedEmployeeCalendar();
   }, [
+    records,
     selectedPerformanceMonth,
     selectedRecord?.employeeId?._id,
     selectedRecord?.employeeId?.employeeId,
@@ -1050,30 +1051,8 @@ const handleDelete = async (record) => {
                     const isSelectable = Boolean(record.evening_time) && bulkSelectionEnabled;
                     const isChecked = selectedEntryIds.includes(record._id);
                     
-                    // Get the monthly percentage from the record
-                    const monthlyPercentage = record.monthly_work_percentage || 0;
-                    
-                    // Calculate today score based on admin percentage and fixed slot
-                    // For approved records, calculate using daily_work_percentage
-                    // For non-approved, show 0
-                    let todayScoreValue = 0;
-                    if (record.status === "approved") {
-                      // Get working days for this employee's month
-                      const monthValue = getMonthValueFromDate(record.date);
-                      const empId = record.employeeId?.employeeId;
-                      
-                      // Try to get working days from cache or calculate
-                      if (empId && employeeShiftCache[empId]) {
-                        const shift = employeeShiftCache[empId];
-                        const workingDays = computeWorkingDaysForMonth(monthValue, shift.weeklyOffDays || [0]);
-                        const perDaySlot = workingDays > 0 ? (100 / workingDays) : 0;
-                        todayScoreValue = calculateTodayScore(record.daily_work_percentage, perDaySlot);
-                      } else if (record.daily_work_percentage) {
-                        // Fallback: use a default per-day slot if shift not loaded yet
-                        // This will be updated when shift loads
-                        todayScoreValue = parseFloat(record.daily_percentage_display || 0).toFixed(2);
-                      }
-                    }
+                    const monthlyPercentage = Number(record.monthly_work_percentage || 0);
+                    const todayScoreValue = Number(record.daily_percentage_display || 0);
 
                     return (
                       <tr key={record._id} className="hover:bg-slate-50/80">
@@ -1667,7 +1646,7 @@ const handleDelete = async (record) => {
                   </div>
                   {displayedRecord.status === "approved" ? (
                     <div className="rounded-xl bg-emerald-50 p-2 text-center">
-                      <p className="text-[9px] font-semibold uppercase text-emerald-600">Today Score</p>
+                      <p className="text-[9px] font-semibold uppercase text-emerald-600">Selected Day Score</p>
                       <p className="text-base font-bold text-emerald-700">
                         +{displayedRecord.daily_percentage_display || 0}%
                       </p>

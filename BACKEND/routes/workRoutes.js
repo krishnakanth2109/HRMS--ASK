@@ -315,13 +315,20 @@ const attachMonthlyWorkPercentages = async (records = []) => {
     const [year, month] = dateKey.split("-").map(Number);
     const cacheKey = `${employeeId}-${month}-${year}`;
     const perf = performanceCache.get(cacheKey);
+    const totalWorkingDays = Number(perf?.totalWorkingDays || 0);
+    const perRecordDailyScore =
+      record.status === "approved" && totalWorkingDays > 0
+        ? Number(
+            ((Number(record.daily_work_percentage || 0) / 100) * (100 / totalWorkingDays)).toFixed(2)
+          )
+        : 0;
 
     return {
       ...record,
-      daily_percentage_display: Number(perf?.employeePortalDailyPercentage || 0),
+      daily_percentage_display: perRecordDailyScore,
       monthly_work_percentage: Number(perf?.monthlyWorkPercentage || 0),
       weekly_performance: perf?.weeklyPerformance || [],
-      total_working_days: Number(perf?.totalWorkingDays || 0),
+      total_working_days: totalWorkingDays,
     };
   });
 };

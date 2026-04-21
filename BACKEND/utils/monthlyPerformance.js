@@ -1,6 +1,7 @@
 import DailyWorkEntry from "../models/DailyWorkEntry.js";
 import Holiday from "../models/Holiday.js";
 import Shift from "../models/shiftModel.js";
+import Employee from "../models/employeeModel.js";
 
 const HRMS_TIME_ZONE = "Asia/Kolkata";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -99,9 +100,25 @@ export const getCurrentMonthYear = (
   };
 };
 
+const resolveEmployeeCodeForShift = async (employee) => {
+  if (employee?.employeeId) {
+    return employee.employeeId;
+  }
+
+  const employeeLookupId = employee?._id || employee;
+  if (!employeeLookupId) {
+    return null;
+  }
+
+  const employeeDoc = await Employee.findById(employeeLookupId).select("employeeId");
+  return employeeDoc?.employeeId || null;
+};
+
 export const getEmployeeWeeklyOffDays = async (employee) => {
-  const employeeId = employee?.employeeId || String(employee);
-  const shift = await Shift.findOne({ employeeId, isActive: true });
+  const employeeCode = await resolveEmployeeCodeForShift(employee);
+  const shift = employeeCode
+    ? await Shift.findOne({ employeeId: employeeCode, isActive: true })
+    : null;
 
   return Array.isArray(shift?.weeklyOffDays) && shift.weeklyOffDays.length > 0
     ? shift.weeklyOffDays

@@ -1,0 +1,17 @@
+(node:380) [MONGOOSE] Warning: Duplicate schema index on {"email":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:380) [MONGOOSE] Warning: Duplicate schema index on {"token":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+❌ Email server configuration error: Error: Missing credentials for "PLAIN"
+    at SMTPConnection._formatError (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:887:19)
+    at SMTPConnection.login (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:524:38)
+    at C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-transport\index.js:361:32
+    at SMTPConnection.<anonymous> (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:248:17)
+    at Object.onceWrapper (node:events:632:28)
+    at SMTPConnection.emit (node:events:518:28)
+    at SMTPConnection._actionEHLO (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:1479:14)
+    at SMTPConnection._processResponse (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:1072:20)
+    at SMTPConnection._onData (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:847:14)
+    at SMTPConnection._onSocketData (C:\Users\kchan\Downloads\chandu resume\projects\HRMS--ASK\BACKEND\node_modules\nodemailer\lib\smtp-connection\index.js:217:44) {
+  code: 'EAUTH',
+  command: 'API'
+}

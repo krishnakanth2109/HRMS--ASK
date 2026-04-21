@@ -462,27 +462,20 @@ const EmployeeWorkTracker = () => {
     return records;
   }, [isViewingCurrentMonth, records, todayRecord, selectedCalendarDateKey]);
 
-  const latestDailyPercentageRecord = useMemo(
-    () =>
-      records.find(
-        (record) =>
-          record.percentage_generated_at || record.percentage_mode !== "none"
-      ) || null,
-    [records]
+  const latestDailyCalculatedPercentage = useMemo(
+    () => Number(performance?.employeePortalDailyPercentage ?? 0),
+    [performance?.employeePortalDailyPercentage]
   );
 
-  const latestDailyCalculatedPercentage = useMemo(() => {
-    const latestDailyPercentage = Number(
-      latestDailyPercentageRecord?.daily_work_percentage ?? 0
-    );
-    const totalWorkingDays = Number(performance?.totalWorkingDays ?? 0);
-
-    if (!totalWorkingDays || Number.isNaN(latestDailyPercentage)) {
-      return 0;
+  const latestDailyPercentageLabel = useMemo(() => {
+    if (!performance?.latestGeneratedDate) {
+      return "Visible after admin approval";
     }
 
-    return Number((latestDailyPercentage / totalWorkingDays).toFixed(2));
-  }, [latestDailyPercentageRecord, performance?.totalWorkingDays]);
+    return `Calculated share from ${new Date(
+      performance.latestGeneratedDate
+    ).toLocaleDateString()}`;
+  }, [performance?.latestGeneratedDate]);
 
   const selectedCalendarRecord = useMemo(
     () =>
@@ -1176,9 +1169,7 @@ const renderMorningUpdateSection = () => {
       {latestDailyCalculatedPercentage}%
     </p>
     <p className="mt-2 text-[11px] font-medium text-slate-400">
-      {latestDailyPercentageRecord
-        ? `Calculated share from ${new Date(latestDailyPercentageRecord.date).toLocaleDateString()}`
-        : "Visible after admin approval"}
+      {latestDailyPercentageLabel}
     </p>
   </div>
 
