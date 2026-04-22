@@ -14,7 +14,7 @@ import {
   getShiftByEmployeeId // ✅ ADDED: To get week off days
 } from "../api";
 
-const REASON_LIMIT = 100; // Max characters for reason input
+const REASON_LIMIT = 200; // Max characters for reason input (must match LeaveRequest schema maxlength)
 
 // --- LEAVE YEAR CONFIGURATION ---
 const LEAVE_YEAR_START_MONTH = 1; // Jan

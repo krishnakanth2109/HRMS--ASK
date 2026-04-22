@@ -16,7 +16,7 @@ const leaveRequestSchema = new mongoose.Schema(
 
     from: { type: String, required: true },
     to: { type: String, required: true },
-    reason: { type: String, required: true, maxlength: 50 },
+    reason: { type: String, required: true, maxlength: 200 },
 
     leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY"], required: true },
     leaveDayType: { type: String, enum: ["Full Day", "Half Day"], required: true },

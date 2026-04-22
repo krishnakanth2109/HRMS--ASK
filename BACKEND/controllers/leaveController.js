@@ -402,7 +402,10 @@ const emailActionResultPage = (success, action, employeeName, message) => {
 export const createLeave = async (req, res) => {
   try {
     const loggedUser = req.user;
-    const { _id: userMongoId, name } = loggedUser;
+    const { _id: userMongoId } = loggedUser;
+    // Guard: support both 'name' and 'employeeName' depending on how auth middleware attaches user
+    const name = loggedUser.name || loggedUser.employeeName || req.body.employeeName || "Unknown";
+    const employeeId = loggedUser.employeeId || req.body.employeeId || null;
     const { from, to, reason, leaveType, leaveDayType, halfDaySession = "" } = req.body;
 
     if (!from || !to || !reason || !leaveType || !leaveDayType) {
@@ -418,8 +421,8 @@ export const createLeave = async (req, res) => {
     }));
 
     const doc = await LeaveRequest.create({
-      employeeId:   loggedUser.employeeId || null,
-      employeeName: loggedUser.name || "Unknown",
+      employeeId:   employeeId,
+      employeeName: name,
       from,
       to,
       reason,
@@ -457,7 +460,7 @@ export const createLeave = async (req, res) => {
           subject: `New Leave Request from ${name} — Action Required`,
           html:    createAdminLeaveNotificationEmail({
             name,
-            employeeId: loggedUser.employeeId,
+            employeeId: employeeId,
             email:      loggedUser.email,
             leaveType,
             from,
