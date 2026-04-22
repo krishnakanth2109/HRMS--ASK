@@ -684,15 +684,17 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
                 </span>
               </motion.button>
 
-              {/* Fingerprint Login — WebAuthn */}
-              {biometricSupported && (
-                <>
-                  <div className="flex items-center gap-3 mt-4">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-gray-400 font-medium">or</span>
-                    <div className="flex-1 h-px bg-gray-200" />
-                  </div>
+              {/* Divider with "or" */}
+              <div className="flex items-center gap-3 mt-4">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium">or</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
 
+              {/* Side by side buttons container */}
+              <div className="flex gap-3 mt-2">
+                {/* Fingerprint Button */}
+                {biometricSupported && (
                   <motion.button
                     type="button"
                     disabled={biometricLoading}
@@ -702,7 +704,7 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
                       scale: 1.02,
                       boxShadow: "0 10px 25px -5px rgba(16, 185, 129, 0.4)"
                     }}
-                    className="w-full mt-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
+                    className="flex-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white py-2.5 px-3 rounded-xl text-sm font-semibold shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
                     id="fingerprint-login-btn"
                   >
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -713,58 +715,53 @@ Arah Info Tech HRMS is a secure, intelligent platform designed to enhance produc
                           <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="h-4 w-4 border-2 border-white border-t-transparent rounded-full"
+                            className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"
                           />
-                          Scanning Fingerprint...
+                          <span className="text-xs">Scanning...</span>
                         </>
                       ) : (
                         <>
-                          <FaFingerprint className="text-lg" />
-                          Login with Fingerprint
+                          <FaFingerprint className="text-base" />
+                          <span className="text-xs whitespace-nowrap">Fingerprint</span>
                         </>
                       )}
                     </span>
                   </motion.button>
-                </>
-              )}
+                )}
 
-              <div className="flex items-center gap-3 mt-4">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400 font-medium">or</span>
-                <div className="flex-1 h-px bg-gray-200" />
+                {/* Face Login Button */}
+                <motion.button
+                  type="button"
+                  disabled={faceLoading}
+                  onClick={() => setShowFaceLogin(true)}
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{
+                    scale: 1.02,
+                    boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.35)"
+                  }}
+                  className="flex-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white py-2.5 px-3 rounded-xl text-sm font-semibold shadow-lg hover:shadow-sky-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
+                  id="face-login-btn"
+                >
+                  <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {faceLoading ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        <span className="text-xs">Scanning...</span>
+                      </>
+                    ) : (
+                      <>
+                        <HiOutlineFaceSmile className="text-base" />
+                        <span className="text-xs whitespace-nowrap">Face ID</span>
+                      </>
+                    )}
+                  </span>
+                </motion.button>
               </div>
-
-              <motion.button
-                type="button"
-                disabled={faceLoading}
-                onClick={() => setShowFaceLogin(true)}
-                whileTap={{ scale: 0.97 }}
-                whileHover={{
-                  scale: 1.02,
-                  boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.35)"
-                }}
-                className="w-full mt-2 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-sky-500/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden group"
-                id="face-login-btn"
-              >
-                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {faceLoading ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="h-4 w-4 border-2 border-white border-t-transparent rounded-full"
-                      />
-                      Scanning Face...
-                    </>
-                  ) : (
-                    <>
-                      <HiOutlineFaceSmile className="text-lg" />
-                      Login with Face
-                    </>
-                  )}
-                </span>
-              </motion.button>
             </form>
 
             {/* Footer */}
