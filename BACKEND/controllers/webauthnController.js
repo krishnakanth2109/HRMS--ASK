@@ -13,6 +13,25 @@ import Employee from "../models/employeeModel.js";
 const generateChallenge = () =>
   crypto.randomBytes(32).toString("base64url");
 
+/**
+ * Derive the Relying Party ID from environment or request.
+ * Priority: WEBAUTHN_RP_ID env → hostname from FRONTEND_URL env → req.headers.host → localhost
+ */
+const getRpId = (req) => {
+  // 1. Explicit env var (most reliable for production)
+  if (process.env.WEBAUTHN_RP_ID) {
+    return process.env.WEBAUTHN_RP_ID;
+  }
+  // 2. Extract hostname from FRONTEND_URL (e.g. "https://hrms-ask.vercel.app" → "hrms-ask.vercel.app")
+  if (process.env.FRONTEND_URL) {
+    try {
+      return new URL(process.env.FRONTEND_URL).hostname;
+    } catch { /* fall through */ }
+  }
+  // 3. Fallback to request host header (works for localhost dev)
+  return req.headers.host?.split(":")[0] || "localhost";
+};
+
 /** Create a JWT token (same logic as authController) */
 const signToken = (id, role, loginMethod = "fingerprint") =>
   jwt.sign({ id, role, loginMethod }, process.env.JWT_SECRET, {
@@ -71,7 +90,7 @@ export const getRegistrationOptions = async (req, res) => {
     }
 
     // Determine Relying Party from environment or request
-    const rpId = req.headers.host?.split(":")[0] || "localhost";
+    const rpId = getRpId(req);
     const rpName = "HRMS - Arah Info Tech";
 
     const challenge = generateChallenge();
@@ -212,7 +231,7 @@ export const verifyRegistration = async (req, res) => {
  */
 export const getAuthenticationOptions = async (req, res) => {
   try {
-    const rpId = req.headers.host?.split(":")[0] || "localhost";
+    const rpId = getRpId(req);
     const challenge = generateChallenge();
     storeChallenge(challenge, { type: "authentication" });
 
