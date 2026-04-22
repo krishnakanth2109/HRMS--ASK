@@ -19,62 +19,52 @@ const CurrentEmployeeFaceSetup = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-8"
+          className="grid gap-8 lg:grid-cols-2 lg:items-stretch"
         >
-          <div className="relative overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-8 text-center shadow-xl md:p-14">
-            <div className="pointer-events-none absolute top-0 right-0 p-8 pt-12 text-purple-600 opacity-5">
-              <FaCube size={180} />
-            </div>
-
-            <div className="mx-auto mb-6 flex h-24 w-24 rotate-3 items-center justify-center rounded-3xl bg-purple-50 shadow-inner">
-              <FaUserShield className="-rotate-3 text-5xl text-purple-600" />
-            </div>
-
-            <h2 className="mb-4 text-2xl font-extrabold tracking-tight text-slate-800 md:text-4xl">
-              Face and Fingerprint Authentication
-            </h2>
-
-            <p className="mx-auto mb-10 max-w-2xl text-base leading-relaxed text-slate-500 md:text-lg">
-              Manage both passwordless login methods in one place. Register your
-              face for camera login or add your fingerprint for WebAuthn login.
-            </p>
-
-            <div className="mx-auto mb-12 grid max-w-3xl gap-6 text-left md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 shadow-sm transition hover:shadow-md">
-                <FaCheckCircle className="mb-3 text-2xl text-green-500" />
-                <h4 className="font-bold tracking-wide text-slate-800">
-                  Unified Setup
-                </h4>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                  Face and fingerprint controls now live on this single page.
+          <div className="flex h-full flex-col rounded-[2rem] border border-purple-100 bg-white p-6 md:p-10 shadow-lg shadow-purple-100/60">
+            <div className="mb-5 flex items-start gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 shadow-inner">
+                <FaCamera className="text-3xl" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-purple-500">
+                  Face ID
+                </p>
+                <h3 className="mt-1 text-2xl font-extrabold text-slate-800">
+                  Register Face Login
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  Register your face with liveness checks to enable completely passwordless sign in.
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 shadow-sm transition hover:shadow-md">
-                <FaCamera className="mb-3 text-2xl text-purple-500" />
-                <h4 className="font-bold tracking-wide text-slate-800">
-                  Face Recognition
-                </h4>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                  Register your face with liveness checks for passwordless sign in.
+            </div>
+
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="mb-2 flex items-center gap-2 text-slate-700">
+                  <FaUserShield className="text-purple-500" />
+                  <span className="text-sm font-semibold">Liveness Detection</span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Ensures real-time presence to prevent spoofing with photos.
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 shadow-sm transition hover:shadow-md">
-                <FaFingerprint className="mb-3 text-2xl text-emerald-500" />
-                <h4 className="font-bold tracking-wide text-slate-800">
-                  Fingerprint Login
-                </h4>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                  Register your device fingerprint and use it directly on login.
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="mb-2 flex items-center gap-2 text-slate-700">
+                  <FaCheckCircle className="text-blue-500" />
+                  <span className="text-sm font-semibold">Quick Verification</span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Log in to your dashboard instantly using your device's camera.
                 </p>
               </div>
             </div>
 
             <button
               onClick={() => setShowFaceRegister(true)}
-              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-4 text-lg font-bold text-white shadow-[0_8px_30px_rgb(99,102,241,0.3)] transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(99,102,241,0.5)]"
+              className="mt-auto flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-200 transition-all duration-300 hover:from-purple-600 hover:to-indigo-700"
             >
-              <span className="absolute h-0 w-0 rounded-full bg-white opacity-10 transition-all duration-300 ease-out group-hover:h-56 group-hover:w-60"></span>
-              <FaCamera className="text-2xl animate-pulse" />
+              <FaCamera className="text-lg animate-pulse" />
               Launch Face Setup Scanner
             </button>
           </div>

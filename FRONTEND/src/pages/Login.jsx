@@ -138,10 +138,16 @@ const Login = () => {
       // 1. Get challenge from server
       const { options } = await getWebAuthnLoginOptions();
 
+      // Safely pad base64url strings before atob decoding
+      const safeAtob = (str) => {
+        let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+        while (base64.length % 4) base64 += "=";
+        return atob(base64);
+      };
+
       // 2. Convert challenge to ArrayBuffer
-      const challengeBuffer = Uint8Array.from(
-        atob(options.challenge.replace(/-/g, "+").replace(/_/g, "/")),
-        (c) => c.charCodeAt(0)
+      const challengeBuffer = Uint8Array.from(safeAtob(options.challenge), (c) =>
+        c.charCodeAt(0)
       );
 
       // 3. Trigger biometric prompt
@@ -151,12 +157,9 @@ const Login = () => {
           rpId: options.rpId,
           timeout: options.timeout,
           userVerification: options.userVerification,
-          allowCredentials: options.allowCredentials.map((cred) => ({
+          allowCredentials: (options.allowCredentials || []).map((cred) => ({
             ...cred,
-            id: Uint8Array.from(
-              atob(cred.id.replace(/-/g, "+").replace(/_/g, "/")),
-              (c) => c.charCodeAt(0)
-            ),
+            id: Uint8Array.from(safeAtob(cred.id), (c) => c.charCodeAt(0)),
           })),
         },
       });

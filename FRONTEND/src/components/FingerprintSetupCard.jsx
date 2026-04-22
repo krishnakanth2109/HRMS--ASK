@@ -85,23 +85,25 @@ const FingerprintSetupCard = () => {
     try {
       const { options } = await getWebAuthnRegistrationOptions();
 
-      const challengeBuffer = Uint8Array.from(
-        atob(options.challenge.replace(/-/g, "+").replace(/_/g, "/")),
-        (c) => c.charCodeAt(0)
+      // Safely pad base64url strings before atob decoding to prevent invalid length errors
+      const safeAtob = (str) => {
+        let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+        while (base64.length % 4) base64 += "=";
+        return atob(base64);
+      };
+
+      const challengeBuffer = Uint8Array.from(safeAtob(options.challenge), (c) =>
+        c.charCodeAt(0)
       );
 
-      const userIdBuffer = Uint8Array.from(
-        atob(options.user.id.replace(/-/g, "+").replace(/_/g, "/")),
-        (c) => c.charCodeAt(0)
+      const userIdBuffer = Uint8Array.from(safeAtob(options.user.id), (c) =>
+        c.charCodeAt(0)
       );
 
       const excludeCredentials = (options.excludeCredentials || []).map(
         (cred) => ({
           ...cred,
-          id: Uint8Array.from(
-            atob(cred.id.replace(/-/g, "+").replace(/_/g, "/")),
-            (c) => c.charCodeAt(0)
-          ),
+          id: Uint8Array.from(safeAtob(cred.id), (c) => c.charCodeAt(0)),
         })
       );
 
@@ -199,7 +201,7 @@ const FingerprintSetupCard = () => {
   };
 
   return (
-    <div className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-lg shadow-emerald-100/60">
+    <div className="flex h-full flex-col rounded-[2rem] border border-emerald-100 bg-white p-6 md:p-10 shadow-lg shadow-emerald-100/60">
       <div className="mb-5 flex items-start gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-inner">
           <FaFingerprint className="text-3xl" />
@@ -299,7 +301,7 @@ const FingerprintSetupCard = () => {
             onClick={handleRegisterFingerprint}
             disabled={fpLoading}
             id="register-fingerprint-btn"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition-all duration-300 hover:from-emerald-600 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-auto flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition-all duration-300 hover:from-emerald-600 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {fpLoading ? (
               <>

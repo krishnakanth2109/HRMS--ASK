@@ -76,18 +76,11 @@ export const getRegistrationOptions = async (req, res) => {
     const userId = user._id.toString();
     const userRole = user.role || "employee";
 
-    // Enforce ONE credential per user — block if already registered
+    // Retrieve existing credentials to prevent registering the EXACT same device twice
     const existingCreds = await WebAuthnCredential.find({
       userId: user._id,
       userRole,
     });
-
-    if (existingCreds.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: "Fingerprint already registered. Delete the existing one first to register a new one.",
-      });
-    }
 
     // Determine Relying Party from environment or request
     const rpId = getRpId(req);
@@ -96,7 +89,12 @@ export const getRegistrationOptions = async (req, res) => {
     const challenge = generateChallenge();
     storeChallenge(challenge, { userId, userRole, type: "registration" });
 
-    const excludeCredentials = [];
+    // Exclude already registered authenticators
+    const excludeCredentials = existingCreds.map((cred) => ({
+      id: cred.credentialId,
+      type: "public-key",
+      transports: cred.transports || [],
+    }));
 
     const options = {
       challenge,
@@ -180,9 +178,8 @@ export const verifyRegistration = async (req, res) => {
       });
     }
 
-    // Enforce ONE credential per user — delete old before creating new
-    await WebAuthnCredential.deleteMany({ userId: user._id, userRole });
-
+    // Allow multiple credentials per user - DO NOT delete old credentials
+    
     // Store the credential (public key only — never raw biometric data)
     const newCredential = await WebAuthnCredential.create({
       userId: user._id,
