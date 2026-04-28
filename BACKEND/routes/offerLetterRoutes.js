@@ -18,6 +18,31 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import { upload, cloudinary } from "../config/cloudinary.js";
 
 const router = express.Router();
+const DEFAULT_OFFER_DOCX_TEMPLATE_URL = 'https://res.cloudinary.com/dm0qq5no9/raw/upload/v1775132006/Vagerious_new.docx';
+
+async function fetchDocxTemplateBuffer(templateUrl) {
+  const response = await fetch(templateUrl, { headers: { 'Cache-Control': 'no-cache' } });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch DOCX template (${response.status} ${response.statusText})`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.slice(0, 4).toString('hex') !== '504b0304') {
+    throw new Error('Downloaded template is not a valid DOCX file.');
+  }
+
+  return buffer;
+}
+
+function getPublicBackendUrl(req) {
+  const configuredUrl = process.env.BACKEND_URL || process.env.API_URL || process.env.SERVER_URL;
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "http";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  return `${protocol}://${host}`;
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -447,7 +472,10 @@ router.post("/generate", protect, onlyAdmin, async (req, res) => {
 // ============================================================
 router.post('/download-docx', protect, onlyAdmin, async (req, res) => {
   try {
-    const { htmlContent } = req.body;
+    const { htmlContent, templateUrl: requestedTemplateUrl } = req.body;
+    if (!htmlContent) {
+      return res.status(400).json({ error: 'Offer letter content is required.' });
+    }
 
     const AdmZip = (await import('adm-zip')).default;
 
@@ -643,9 +671,11 @@ router.post('/download-docx', protect, onlyAdmin, async (req, res) => {
     // ══════════════════════════════════════════════════
     // STEP 4: Open the template
     // ══════════════════════════════════════════════════
-    const templateUrl = 'https://res.cloudinary.com/dm0qq5no9/raw/upload/v1775132006/Vagerious_new.docx';
-    const response = await axios.get(templateUrl, { responseType: 'arraybuffer' });
-    const templateZip = new AdmZip(Buffer.from(response.data));
+    const docxTemplateUrl = requestedTemplateUrl && /\.docx(?:\?|$)/i.test(requestedTemplateUrl)
+      ? requestedTemplateUrl
+      : DEFAULT_OFFER_DOCX_TEMPLATE_URL;
+    const templateBuffer = await fetchDocxTemplateBuffer(docxTemplateUrl);
+    const templateZip = new AdmZip(templateBuffer);
     let templateDocXml = templateZip.readAsText('word/document.xml');
 
     // Disable Word image compression
@@ -807,10 +837,10 @@ router.post("/send-email", protect, onlyAdmin, async (req, res) => {
     }
     await emp.save();
 
-    // Build response URLs (using your frontend URL)
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const acceptUrl = `${frontendUrl}/offer-response?token=${token}&action=accept`;
-    const rejectUrl = `${frontendUrl}/offer-response?token=${token}&action=reject`;
+    // Candidate responses are handled by the public backend route.
+    const backendUrl = getPublicBackendUrl(req);
+    const acceptUrl = `${backendUrl}/api/offer-letters/respond?token=${token}&action=accept`;
+    const rejectUrl = `${backendUrl}/api/offer-letters/respond?token=${token}&action=reject`;
 
     const company = companyName || "Your Company";
     const customBody = emailBody || `Dear ${emp.name},\n\nWe are pleased to offer you the position at ${company}.\n\nPlease find the detailed offer letter attached.\n\nBest Regards,\nHR Team`;
@@ -1064,8 +1094,25 @@ router.get("/respond", async (req, res) => {
         </html>
       `);
     }
+
+    if (employee.status === "Accepted" || employee.status === "Rejected") {
+      return res.send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #0f172a;">Already Responded</h1>
+            <p>This offer has already been ${employee.status.toLowerCase()}.</p>
+            <p>No further action is required.</p>
+          </body>
+        </html>
+      `);
+    }
     
     if (employee.expires_at < new Date()) {
+      employee.status = "Rejected";
+      employee.offer_token = null;
+      employee.rejection_reason = "Offer Expired";
+      await employee.save();
+
       return res.status(400).send(`
         <html>
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
@@ -1080,6 +1127,8 @@ router.get("/respond", async (req, res) => {
     if (action === "accept") {
       employee.status = "Accepted";
       employee.responded_at = new Date();
+      employee.accepted_at = new Date();
+      employee.offer_token = null;
       await employee.save();
       
       return res.send(`
@@ -1107,6 +1156,9 @@ router.get("/respond", async (req, res) => {
     } else if (action === "reject") {
       employee.status = "Rejected";
       employee.responded_at = new Date();
+      employee.rejected_at = new Date();
+      employee.rejection_reason = "Declined by candidate";
+      employee.offer_token = null;
       await employee.save();
       
       return res.send(`
