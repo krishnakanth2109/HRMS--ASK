@@ -269,14 +269,32 @@ const handleInitialSubmit = async (e) => {
       
     } catch (err) {
       setLoading(false);
-      
-      // Better error message extraction
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "An error occurred during onboarding. Please check your details.";
+
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "";
+      const isAlreadyRegistered =
+        err.response?.status === 400 &&
+        (errorMessage.toLowerCase().includes("already registered") ||
+          errorMessage.toLowerCase().includes("already exists") ||
+          errorMessage.toLowerCase().includes("employeeid"));
+
+      // ✅ RECOVERY: If the employee record already exists in DB, it means a previous
+      // submission succeeded but the mark-onboarded call failed (network glitch, timeout, etc.).
+      // The profile is saved — just mark them onboarded and move to compliance.
+      if (isAlreadyRegistered) {
+        try {
+          await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+        } catch (_markErr) {
+          // Ignore — the invite may already be marked onboarded on a previous attempt.
+          // Either way the employee profile exists, so we proceed to compliance.
+        }
+        setStage('compliance');
+        return;
+      }
       
       Swal.fire({
         icon: 'error',
         title: 'Submission Failed',
-        text: errorMessage,
+        text: errorMessage || "An error occurred during onboarding. Please check your details.",
         confirmButtonColor: '#ef4444'
       });
     }

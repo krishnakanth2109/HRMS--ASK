@@ -416,13 +416,16 @@ router.post('/mark-onboarded', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
+    // ✅ FIX: Remove the status:'pending' restriction so this is idempotent.
+    // If a previous onboard submission succeeded but this call failed (network timeout etc.),
+    // the employee can re-trigger it safely without hitting a 404.
     const invite = await InvitedEmployee.findOneAndUpdate(
-      { email: email.toLowerCase(), status: 'pending' },
+      { email: email.toLowerCase(), status: { $in: ['pending', 'onboarded'] } },
       { status: 'onboarded', onboardedAt: new Date() },
       { new: true }
     );
 
-    if (!invite) return res.status(404).json({ success: false, error: 'Invitation not found' });
+    if (!invite) return res.status(404).json({ success: false, error: 'Invitation not found or already revoked' });
 
     res.status(200).json({ success: true, message: 'Email marked as onboarded', data: invite });
   } catch (error) {

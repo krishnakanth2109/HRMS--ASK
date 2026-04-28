@@ -62,7 +62,7 @@ const DailySchema = new mongoose.Schema({
 
   loginMethod: {
     type: String,
-    enum: ["password", "fingerprint", "unknown"],
+    enum: ["password", "fingerprint", "face", "unknown"],
     default: "unknown",
   },
 
