@@ -592,10 +592,30 @@ router.post("/onboard", memoryUpload.fields([
     const company = await Company.findById(data.company);
     if (!company) return res.status(404).json({ error: "Company not found" });
 
-    // 2. ID Generation Logic
+    // ✅ FIX: Check if this email already has a full employee profile.
+    // This covers the case where a previous onboard succeeded but mark-onboarded failed,
+    // and the frontend recovery path re-submits. Return success so the user can proceed.
+    const existingByEmail = await Employee.findOne({ email: data.email?.toLowerCase() });
+    if (existingByEmail) {
+      console.log(`ℹ️ Employee with email ${data.email} already exists. Returning existing profile.`);
+      return res.status(200).json({
+        success: true,
+        message: "Onboarding already completed",
+        employeeId: existingByEmail.employeeId,
+        alreadyExists: true
+      });
+    }
+
+    // 2. ✅ FIX: Collision-safe ID Generation.
+    // countDocuments can be stale if employees were deleted/re-indexed.
+    // We loop until we find an ID not yet taken in the DB.
     const currentCount = await Employee.countDocuments({ company: data.company });
-    const paddedCount = String(currentCount + 1).padStart(2, "0");
-    const employeeId = `${company.prefix}${paddedCount}`;
+    let counter = currentCount + 1;
+    let employeeId = `${company.prefix}${String(counter).padStart(2, "0")}`;
+    while (await Employee.findOne({ employeeId })) {
+      counter++;
+      employeeId = `${company.prefix}${String(counter).padStart(2, "0")}`;
+    }
     console.log("Generated Employee ID:", employeeId);
 
     // 3. Construct the Employee Object
@@ -755,9 +775,27 @@ router.post("/onboard", memoryUpload.fields([
     console.error("❌ Onboarding error:", err);
     console.error("Error stack:", err.stack);
     
-    // 🚨 FIX: Handle Mongoose Duplicate Key Errors gracefully instead of crashing
+    // 🚨 FIX: Handle Mongoose Duplicate Key Errors gracefully.
+    // Even with collision-safe ID generation, a race condition (two simultaneous submits)
+    // could still hit this. In that case the employee WAS created — return success.
     if (err.code === 11000) {
       const duplicateField = Object.keys(err.keyValue || {})[0];
+      const duplicateValue = err.keyValue?.[duplicateField];
+
+      // If it's a duplicate email, the profile exists — return it so frontend can proceed
+      if (duplicateField === 'email' && duplicateValue) {
+        const existing = await Employee.findOne({ email: duplicateValue });
+        if (existing) {
+          return res.status(200).json({
+            success: true,
+            message: "Onboarding already completed",
+            employeeId: existing.employeeId,
+            alreadyExists: true
+          });
+        }
+      }
+
+      // For other duplicate fields (shouldn't happen with collision-safe ID gen)
       return res.status(400).json({ 
         success: false, 
         error: `This ${duplicateField} is already registered. If you have already onboarded, please log in.` 

@@ -256,13 +256,20 @@ const handleInitialSubmit = async (e) => {
     try {
       // 🚨 FIX: Explicitly setting the header here overrides the global JSON header in api.js
       // This guarantees the files are actually packaged and sent to the backend.
-      await api.post('/api/employees/onboard', finalData, {
+      const onboardResponse = await api.post('/api/employees/onboard', finalData, {
         headers: { 
           'Content-Type': 'multipart/form-data' 
         }
       });
 
-      await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+      // ✅ FIX: If backend says profile already exists (alreadyExists:true),
+      // it means a previous attempt succeeded. Still mark onboarded and proceed.
+      // For fresh creation OR existing-profile recovery, always call mark-onboarded.
+      try {
+        await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+      } catch (_markErr) {
+        // Ignore — invite may already be marked onboarded from a previous attempt
+      }
 
       setLoading(false);
       setStage('compliance'); // Direct transition to Policy Compliance
@@ -285,7 +292,6 @@ const handleInitialSubmit = async (e) => {
           await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
         } catch (_markErr) {
           // Ignore — the invite may already be marked onboarded on a previous attempt.
-          // Either way the employee profile exists, so we proceed to compliance.
         }
         setStage('compliance');
         return;

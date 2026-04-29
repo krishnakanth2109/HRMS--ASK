@@ -4,6 +4,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import InvitedEmployee from '../models/Invitedemployee.js'; // Adjust path as needed
 import Company from '../models/CompanyModel.js'; // Adjust path as needed
 import CompanyDocument from '../models/Companydocument.js'; // Added for document management
+import Employee from '../models/employeeModel.js'; // ✅ FIX: needed to check if profile exists
 
 const router = express.Router();
 
@@ -361,6 +362,38 @@ router.post('/verify-email', async (req, res) => {
     // --- NEW LOGIC START ---
     // If status is onboarded, check if they finished the compliance/policy step
     if (invite.status === 'onboarded') {
+      // ✅ FIX: First check if the actual employee profile was created in the employees collection.
+      // It's possible the invite got marked 'onboarded' but the employee save failed,
+      // leaving the person with no login account. In that case, let them re-fill the form.
+      const employeeProfile = await Employee.findOne({ email: invite.email });
+
+      if (!employeeProfile) {
+        // Invite says onboarded but no employee profile exists — let them redo the form
+        console.warn(`⚠️ Invite onboarded but no employee profile for ${invite.email}. Allowing re-onboarding.`);
+        
+        // Reset invite status back to pending so the normal flow works
+        invite.status = 'pending';
+        invite.onboardedAt = null;
+        invite.policyStatus = 'not accepted';
+        invite.policyAcceptedAt = null;
+        invite.signatureUrl = null;
+        await invite.save();
+
+        return res.status(200).json({ 
+          success: true, 
+          data: {
+            email: invite.email,
+            company: invite.company,
+            name: invite.name,
+            role: invite.role,
+            department: invite.department,
+            employmentType: invite.employmentType,
+            salary: invite.salary,
+            requiredDocuments: invite.requiredDocuments
+          }
+        });
+      }
+
       if (invite.policyStatus === 'accepted') {
         // Truly finished everything
         return res.status(200).json({ 
@@ -416,16 +449,13 @@ router.post('/mark-onboarded', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
-    // ✅ FIX: Remove the status:'pending' restriction so this is idempotent.
-    // If a previous onboard submission succeeded but this call failed (network timeout etc.),
-    // the employee can re-trigger it safely without hitting a 404.
     const invite = await InvitedEmployee.findOneAndUpdate(
-      { email: email.toLowerCase(), status: { $in: ['pending', 'onboarded'] } },
+      { email: email.toLowerCase(), status: 'pending' },
       { status: 'onboarded', onboardedAt: new Date() },
       { new: true }
     );
 
-    if (!invite) return res.status(404).json({ success: false, error: 'Invitation not found or already revoked' });
+    if (!invite) return res.status(404).json({ success: false, error: 'Invitation not found' });
 
     res.status(200).json({ success: true, message: 'Email marked as onboarded', data: invite });
   } catch (error) {
