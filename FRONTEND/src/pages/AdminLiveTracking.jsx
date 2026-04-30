@@ -400,7 +400,13 @@ const AdminLiveTracking = () => {
         try {
             const targetDate = dateStr || selectedDate || new Date().toISOString().split('T')[0];
             const res = await api.get(`/api/idletime/screenshots/${empId}?date=${targetDate}`);
-            let data = res.data || [];
+            console.log("Screenshot API response:", res.data);
+            let data = res.data;
+            if (!Array.isArray(data)) {
+                if (data && Array.isArray(data.screenshots)) data = data.screenshots;
+                else if (data && Array.isArray(data.data)) data = data.data;
+                else data = [];
+            }
             setScreenshots(data);
         } catch (err) {
             console.error("Error fetching screenshots:", err);
@@ -742,7 +748,7 @@ const AdminLiveTracking = () => {
                                     <span className="text-slate-800">{selectedEmployee.name}</span>
                                     <span className="text-xs px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-slate-600">{selectedEmployee.employeeId}</span>
                                     <span className={`text-xs ml-1 flex items-center gap-1 font-semibold ${selectedEmployee.statusInfo.color}`}>
-                                        <FaCircle className="text-[8px]"/> {selectedEmployee.statusInfo.text}
+                                        <FaCircle className="text-[8px]" /> {selectedEmployee.statusInfo.text}
                                     </span>
                                 </p>
                                 {/* Tab Switcher */}
@@ -750,8 +756,8 @@ const AdminLiveTracking = () => {
                                     <button
                                         onClick={() => setActiveTab('report')}
                                         className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'report'
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
                                             }`}
                                     >
                                         <FaChartPie className="inline mr-1.5" /> Activity Report
@@ -759,8 +765,8 @@ const AdminLiveTracking = () => {
                                     <button
                                         onClick={() => setActiveTab('screenshots')}
                                         className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'screenshots'
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
                                             }`}
                                     >
                                         <FaCamera />
@@ -775,8 +781,8 @@ const AdminLiveTracking = () => {
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center bg-white border border-slate-300 shadow-sm rounded-lg px-3 py-2 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
                                     <FaCalendarAlt className="text-indigo-400 mr-2 text-sm" />
-                                    <input 
-                                        type="date" 
+                                    <input
+                                        type="date"
                                         value={selectedDate}
                                         onChange={(e) => handleDateChange(e.target.value)}
                                         className="bg-transparent text-slate-700 outline-none text-sm font-semibold cursor-pointer"
