@@ -7,7 +7,18 @@ const idleSegmentSchema = new mongoose.Schema(
     {
         startTime: { type: Date, required: true },
         endTime: { type: Date, required: true },
-        idleDurationSeconds: { type: Number, required: false }
+        idleDurationSeconds: { type: Number, required: false },
+    },
+    { _id: false }
+);
+
+// ---------------------------------------------------
+// Schema for an individual WORKING screenshot
+// ---------------------------------------------------
+const workingScreenshotSchema = new mongoose.Schema(
+    {
+        screenshotUrl: { type: String, required: true },
+        capturedAt: { type: Date, required: true }
     },
     { _id: false }
 );
@@ -22,7 +33,10 @@ const dailyLiveSchema = new mongoose.Schema(
         idleSince: { type: Date, default: null },
         idleTimeline: { type: [idleSegmentSchema], default: [] },
         trackedWorkSeconds: { type: Number, default: 0 },
-        trackedIdleSeconds: { type: Number, default: 0 }
+        trackedIdleSeconds: { type: Number, default: 0 },
+        currentIdleScreenshot: { type: String, default: null },
+        screenshotCapturedAt: { type: Date, default: null },
+        workingScreenshots: { type: [workingScreenshotSchema], default: [] }
     },
     { _id: false, timestamps: true }
 );
