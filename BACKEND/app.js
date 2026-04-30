@@ -229,12 +229,6 @@ io.on("connection", (socket) => {
 });
 
 // -------------------- MIDDLEWARE --------------------
-<<<<<<< HEAD
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-=======
->>>>>>> d48028812868219934fbe7d890da165e80899743
 app.use(
   cors({
     origin: (origin, callback) => {
