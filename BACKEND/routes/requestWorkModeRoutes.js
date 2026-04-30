@@ -190,7 +190,78 @@ router.put("/action", async (req, res) => {
 
     res.status(400).json({ message: "Invalid action" });
   } catch (error) {
-    console.error(error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+});
+
+// 5. Withdraw a Request (Employee)
+router.delete("/withdraw/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = await WorkModeRequest.findById(id);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+
+    if (request.status !== "Pending") {
+      return res.status(400).json({ message: "Only pending requests can be withdrawn" });
+    }
+
+    request.status = "Withdrawn";
+    await request.save();
+    res.status(200).json({ message: "Request withdrawn successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+});
+
+// 6. Update a Request (Employee)
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { requestType, fromDate, toDate, recurringDays, requestedMode, reason } = req.body;
+
+    const request = await WorkModeRequest.findById(id);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+
+    // Ensure only pending requests can be updated
+    if (request.status !== "Pending") {
+      return res.status(400).json({ message: "Only pending requests can be updated" });
+    }
+
+    // Update fields
+    request.requestType = requestType || request.requestType;
+    request.fromDate = fromDate || request.fromDate;
+    request.toDate = toDate || request.toDate;
+    request.recurringDays = recurringDays || request.recurringDays;
+    request.requestedMode = requestedMode || request.requestedMode;
+    request.reason = reason || request.reason;
+    request.isEdited = true;
+
+    await request.save();
+
+    res.status(200).json({ message: "Request updated successfully", request });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+});
+
+// 7. Clear All History (For Employee)
+router.delete("/my/clear/:employeeId", async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    await WorkModeRequest.deleteMany({ employeeId });
+    res.status(200).json({ message: "History cleared successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+});
+
+// 8. Delete Individual Request (For Employee History)
+router.delete("/my/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await WorkModeRequest.findByIdAndDelete(id);
+    res.status(200).json({ message: "Request deleted successfully" });
+  } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 });

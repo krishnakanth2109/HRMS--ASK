@@ -15,7 +15,10 @@ import {
   FaInfinity,
   FaSyncAlt,
   FaCalendarDay,
-  FaInfoCircle
+  FaInfoCircle,
+  FaEdit,
+  FaTrash,
+  FaUndo
 } from "react-icons/fa";
 
 const EmployeeWorkModeRequest = () => {
@@ -34,6 +37,17 @@ const EmployeeWorkModeRequest = () => {
   const [toDate, setToDate] = useState("");
   const [selectedDays, setSelectedDays] = useState([]);
   const [reason, setReason] = useState("");
+  
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [editRequestType, setEditRequestType] = useState("");
+  const [editRequestedMode, setEditRequestedMode] = useState("");
+  const [editFromDate, setEditFromDate] = useState("");
+  const [editToDate, setEditToDate] = useState("");
+  const [editSelectedDays, setEditSelectedDays] = useState([]);
+  const [editReason, setEditReason] = useState("");
+  const [updateLoading, setUpdateLoading] = useState(false);
 
   const daysOfWeek = [
     { id: 1, label: "Mon" }, { id: 2, label: "Tue" }, { id: 3, label: "Wed" },
@@ -189,6 +203,122 @@ const EmployeeWorkModeRequest = () => {
     }
   };
 
+  const handleEditClick = (req) => {
+    setEditingRequest(req);
+    setEditRequestType(req.requestType);
+    setEditRequestedMode(req.requestedMode);
+    setEditFromDate(req.fromDate ? req.fromDate.split('T')[0] : "");
+    setEditToDate(req.toDate ? req.toDate.split('T')[0] : "");
+    setEditSelectedDays(req.recurringDays || []);
+    setEditReason(req.reason || "");
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (editRequestType === "Temporary" && (!editFromDate || !editToDate)) return Swal.fire("Missing Dates", "Please select a start and end date.", "warning");
+    if (editRequestType === "Recurring" && editSelectedDays.length === 0) return Swal.fire("Missing Days", "Please select at least one day for the recurring schedule.", "warning");
+    if (!editReason.trim()) return Swal.fire("Missing Reason", "Please provide a reason for this request.", "warning");
+
+    const payload = {
+      requestType: editRequestType,
+      requestedMode: editRequestedMode,
+      fromDate: editRequestType === "Temporary" ? editFromDate : null,
+      toDate: editRequestType === "Temporary" ? editToDate : null,
+      recurringDays: editRequestType === "Recurring" ? editSelectedDays : [],
+      reason: editReason
+    };
+
+    try {
+      setUpdateLoading(true);
+      await api.put(`/api/admin/requests/update/${editingRequest._id}`, payload);
+      Swal.fire({
+        title: "Updated!",
+        text: "Your request has been successfully updated.",
+        icon: "success",
+        confirmButtonColor: "#3b82f6"
+      });
+      setIsEditModalOpen(false);
+      fetchRequests();
+    } catch (err) {
+      Swal.fire("Error", err.response?.data?.message || "Update failed", "error");
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const toggleEditDay = (id) => {
+    setEditSelectedDays(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  };
+
+  const handleWithdraw = async (id) => {
+    const result = await Swal.fire({
+      title: "Withdraw Request?",
+      text: "Are you sure you want to withdraw this pending request?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, withdraw it!"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/api/admin/requests/withdraw/${id}`);
+        Swal.fire("Withdrawn!", "Your request has been withdrawn.", "success");
+        fetchRequests();
+      } catch (err) {
+        Swal.fire("Error", err.response?.data?.message || "Withdrawal failed", "error");
+      }
+    }
+  };
+
+  const handleDeleteIndividual = async (id) => {
+    const result = await Swal.fire({
+      title: "Delete from History?",
+      text: "This will remove the request record from your history.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/api/admin/requests/my/${id}`);
+        Swal.fire("Deleted!", "Record removed from history.", "success");
+        fetchRequests();
+      } catch (err) {
+        Swal.fire("Error", err.response?.data?.message || "Delete failed", "error");
+      }
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (requests.length === 0) return;
+
+    const result = await Swal.fire({
+      title: "Clear All History?",
+      text: "This will permanently remove ALL your work mode request records.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, clear all!"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/api/admin/requests/my/clear/${user.employeeId}`);
+        Swal.fire("Cleared!", "Your entire history has been wiped.", "success");
+        fetchRequests();
+      } catch (err) {
+        Swal.fire("Error", err.response?.data?.message || "Clear failed", "error");
+      }
+    }
+  };
+
   // --- UI HELPER COMPONENTS ---
 
   const RequestTypeCard = ({ type, icon, title, desc }) => (
@@ -254,6 +384,7 @@ const EmployeeWorkModeRequest = () => {
     switch(status) {
       case "Approved": return <span className="flex items-center gap-1.5 text-green-700 bg-green-100 border border-green-200 px-2.5 py-1 rounded-full text-xs font-bold"><FaCheckCircle/> Approved</span>;
       case "Rejected": return <span className="flex items-center gap-1.5 text-red-700 bg-red-100 border border-red-200 px-2.5 py-1 rounded-full text-xs font-bold"><FaTimesCircle/> Rejected</span>;
+      case "Withdrawn": return <span className="flex items-center gap-1.5 text-gray-700 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full text-xs font-bold"><FaUndo/> Withdrawn</span>;
       default: return <span className="flex items-center gap-1.5 text-yellow-700 bg-yellow-100 border border-yellow-200 px-2.5 py-1 rounded-full text-xs font-bold"><FaHourglassHalf/> Pending</span>;
     }
   };
@@ -361,10 +492,18 @@ const EmployeeWorkModeRequest = () => {
           {/* 3. REQUEST HISTORY (Right Column) */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full max-h-[800px]">
-              <div className="p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
+              <div className="p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
                   <FaHistory className="text-blue-500" /> Request History
                 </h3>
+                {requests.length > 0 && (
+                  <button 
+                    onClick={handleClearHistory}
+                    className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors uppercase tracking-wider"
+                  >
+                    Clear All
+                  </button>
+                )}
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
@@ -408,6 +547,34 @@ const EmployeeWorkModeRequest = () => {
 
                       <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                         {getStatusBadge(req.status)}
+                        <div className="flex gap-2 items-center">
+                          {req.status === "Pending" ? (
+                            <>
+                              <button 
+                                onClick={() => handleEditClick(req)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
+                                title="Edit Request"
+                              >
+                                <FaEdit size={12}/> EDIT
+                              </button>
+                              <button 
+                                onClick={() => handleWithdraw(req._id)}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
+                                title="Withdraw Request"
+                              >
+                                <FaTrash size={11}/> WITHDRAW
+                              </button>
+                            </>
+                          ) : (
+                            <button 
+                              onClick={() => handleDeleteIndividual(req._id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Record"
+                            >
+                              <FaTrash size={11}/>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -418,6 +585,128 @@ const EmployeeWorkModeRequest = () => {
 
         </div>
       </div>
+
+      {/* EDIT MODAL */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FaEdit className="text-blue-600" /> Edit Work Mode Request
+              </h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <FaTimesCircle size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Read-Only Info */}
+              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase">Employee ID</label>
+                  <p className="text-sm font-semibold text-gray-800">{editingRequest?.employeeId}</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase">Employee Name</label>
+                  <p className="text-sm font-semibold text-gray-800">{editingRequest?.employeeName}</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase">Current Status</label>
+                  <div className="mt-1">{getStatusBadge(editingRequest?.status)}</div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase">Department</label>
+                  <p className="text-sm font-semibold text-gray-800">{editingRequest?.department || "N/A"}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdate} className="space-y-6">
+                {/* Request Type Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Select Request Type</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div onClick={() => setEditRequestType("Temporary")} className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${editRequestType === "Temporary" ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <div className={`p-2 rounded-full ${editRequestType === "Temporary" ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}><FaCalendarAlt size={14}/></div>
+                      <span className={`font-bold text-xs ${editRequestType === "Temporary" ? 'text-blue-900' : 'text-gray-700'}`}>Temporary</span>
+                    </div>
+                    <div onClick={() => setEditRequestType("Recurring")} className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${editRequestType === "Recurring" ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <div className={`p-2 rounded-full ${editRequestType === "Recurring" ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}><FaSyncAlt size={14}/></div>
+                      <span className={`font-bold text-xs ${editRequestType === "Recurring" ? 'text-blue-900' : 'text-gray-700'}`}>Recurring</span>
+                    </div>
+                    <div onClick={() => setEditRequestType("Permanent")} className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${editRequestType === "Permanent" ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <div className={`p-2 rounded-full ${editRequestType === "Permanent" ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}><FaInfinity size={14}/></div>
+                      <span className={`font-bold text-xs ${editRequestType === "Permanent" ? 'text-blue-900' : 'text-gray-700'}`}>Permanent</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Desired Work Mode</label>
+                  <div className="flex gap-4">
+                    <label className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${editRequestedMode === "WFO" ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+                      <input type="radio" name="editReqMode" className="hidden" checked={editRequestedMode === "WFO"} onChange={() => setEditRequestedMode("WFO")} />
+                      <FaBuilding size={20}/>
+                      <span className="font-bold text-xs">Work From Office</span>
+                    </label>
+                    <label className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${editRequestedMode === "WFH" ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'}`}>
+                      <input type="radio" name="editReqMode" className="hidden" checked={editRequestedMode === "WFH"} onChange={() => setEditRequestedMode("WFH")} />
+                      <FaLaptopHouse size={20}/>
+                      <span className="font-bold text-xs">Work From Home</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Conditional Fields */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  {editRequestType === "Temporary" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">From Date</label>
+                        <input type="date" value={editFromDate} onChange={(e) => setEditFromDate(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">To Date</label>
+                        <input type="date" value={editToDate} onChange={(e) => setEditToDate(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none" />
+                      </div>
+                    </div>
+                  )}
+
+                  {editRequestType === "Recurring" && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-2">Select Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {daysOfWeek.map(day => (
+                          <button type="button" key={day.id} onClick={() => toggleEditDay(day.id)} className={`w-8 h-8 rounded-full text-[10px] font-bold transition-all ${editSelectedDays.includes(day.id) ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {editRequestType === "Permanent" && (
+                    <p className="text-xs text-gray-600 italic flex items-center gap-2"><FaInfinity className="text-orange-500"/> Indefinite override change.</p>
+                  )}
+                </div>
+
+                {/* Reason */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Reason for Request</label>
+                  <textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl h-24 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
+                  <button type="submit" disabled={updateLoading} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex justify-center items-center gap-2">
+                    {updateLoading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"/> : "Update Request"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
