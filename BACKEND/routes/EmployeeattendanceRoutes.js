@@ -592,7 +592,7 @@ router.post('/punch-out', async (req, res) => {
         currentSession.durationSeconds = (new Date(now) - new Date(currentSession.punchIn)) / 1000;
 
         todayRecord.punchOut = now; 
-        todayRecord.punchOutLocation = { latitude, longitude, timestamp: now }; 
+        if (latitude && longitude) { todayRecord.punchOutLocation = { latitude, longitude, timestamp: now }; }
         todayRecord.status = "COMPLETED"; 
         todayRecord.isFinalPunchOut = true; 
         todayRecord.isOnBreak = false;

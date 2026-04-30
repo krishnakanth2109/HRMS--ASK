@@ -3,7 +3,6 @@ import { getHolidays, getEmployees } from "../api";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { 
-  FaCalendarCheck, 
   FaUmbrellaBeach, 
   FaBirthdayCake, 
   FaChevronLeft, 
@@ -43,6 +42,14 @@ const EmployeeHolidays = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
   };
 
+  const formatHolidayDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   // --- LOGIC: FETCH DATA ---
   useEffect(() => {
     const fetchHolidays = async () => {
@@ -67,11 +74,14 @@ const EmployeeHolidays = () => {
     const fetchBirthdays = async () => {
       try {
         const employees = await getEmployees();
-        const list = employees
+        // Filter out inactive employees
+        const activeEmployees = employees.filter((emp) => emp.isActive !== false);
+        
+        const list = activeEmployees
           .filter((emp) => emp.personalDetails?.dob)
           .map((emp) => ({
             name: emp.name,
-            role: emp.designation || "Employee",
+            role: emp.designation || getCurrentRole(emp) || "Employee",
             dob: new Date(emp.personalDetails.dob),
           }));
         setBirthdays(list);
@@ -81,6 +91,16 @@ const EmployeeHolidays = () => {
     };
     fetchBirthdays();
   }, []);
+
+  // Helper: Get Role (Prioritize root, then experience)
+  const getCurrentRole = (employee) => {
+    if (employee.currentRole) return employee.currentRole;
+    if (employee && Array.isArray(employee.experienceDetails)) {
+      const currentExp = employee.experienceDetails.find(exp => exp.lastWorkingDate === "Present");
+      return currentExp?.role || "N/A";
+    }
+    return "N/A";
+  };
 
   // --- LOGIC: CALCULATIONS ---
 
@@ -108,23 +128,8 @@ const EmployeeHolidays = () => {
     : currentMonthBirthdays.slice(0, 3);
 
   // 3. Stats Counts
-  const getWeekendsInMonth = (year, month) => {
-    let count = 0;
-    const date = new Date(year, month, 1);
-    while (date.getMonth() === month) {
-      const day = date.getDay();
-      if (day === 0 || day === 6) count++;
-      date.setDate(date.getDate() + 1);
-    }
-    return count;
-  };
-
-  const currentYear = activeDate.getFullYear();
-  const currentMonth = activeDate.getMonth();
-  
   const stats = {
     holidays: selectedMonthHolidays.length,
-    weekends: getWeekendsInMonth(currentYear, currentMonth),
     birthdays: currentMonthBirthdays.length,
   };
 
@@ -162,6 +167,7 @@ const EmployeeHolidays = () => {
           name: h.name,
           description: h.description || "National holiday",
           daysUntil: getDaysDiff(h.start),
+          date: h.start,
           icon: <FaUmbrellaBeach className="text-blue-500" />
         });
       }
@@ -235,8 +241,8 @@ const EmployeeHolidays = () => {
           </div>
         </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* STATS CARDS - 3 columns */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -246,19 +252,6 @@ const EmployeeHolidays = () => {
               </div>
               <div className="p-3 rounded-full bg-blue-50">
                 <FaUmbrellaBeach className="text-blue-500 text-xl" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Weekends</p>
-                <h3 className="text-2xl font-bold text-gray-800 mt-1">{stats.weekends}</h3>
-                <span className="text-xs text-gray-400">Selected month</span>
-              </div>
-              <div className="p-3 rounded-full bg-indigo-50">
-                <FaCalendarCheck className="text-indigo-500 text-xl" />
               </div>
             </div>
           </div>
@@ -276,7 +269,7 @@ const EmployeeHolidays = () => {
             </div>
           </div>
 
-          {/* Next Holiday Card (Globally from today) */}
+          {/* Next Holiday Card with Date */}
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-sm text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -285,9 +278,14 @@ const EmployeeHolidays = () => {
                   {upcomingHoliday ? upcomingHoliday.name : "None"}
                 </h3>
                 {upcomingHoliday && (
-                  <p className="text-sm opacity-90 mt-1">
-                    {getDaysDiff(upcomingHoliday.start)} days to go
-                  </p>
+                  <>
+                    <p className="text-sm opacity-90 mt-1">
+                      {formatHolidayDate(upcomingHoliday.start)}
+                    </p>
+                    <p className="text-xs opacity-75 mt-1">
+                      {getDaysDiff(upcomingHoliday.start)} days to go
+                    </p>
+                  </>
                 )}
               </div>
               <div className="p-3 rounded-full bg-white/20">
@@ -320,7 +318,7 @@ const EmployeeHolidays = () => {
                     value={activeDate.getMonth()}
                     onChange={(e) => {
                       const newDate = new Date(activeDate);
-                      newDate.setDate(1); // prevent month overflow
+                      newDate.setDate(1);
                       newDate.setMonth(parseInt(e.target.value));
                       setActiveDate(newDate);
                     }}
@@ -337,14 +335,14 @@ const EmployeeHolidays = () => {
                     value={activeDate.getFullYear()}
                     onChange={(e) => {
                       const newDate = new Date(activeDate);
-                      newDate.setDate(1); // prevent month overflow
+                      newDate.setDate(1);
                       newDate.setFullYear(parseInt(e.target.value));
                       setActiveDate(newDate);
                     }}
                     className="bg-transparent outline-none cursor-pointer text-gray-700 hover:text-blue-600 px-1"
                   >
                     {Array.from({ length: 21 }).map((_, i) => {
-                      const year = new Date().getFullYear() - 10 + i; // 10 years past and future options
+                      const year = new Date().getFullYear() - 10 + i;
                       return <option key={year} value={year}>{year}</option>
                     })}
                   </select>
@@ -423,6 +421,11 @@ const EmployeeHolidays = () => {
                             <p className="text-sm text-gray-600 mt-1">
                               {event.type === 'holiday' ? event.description : event.role}
                             </p>
+                            {event.type === 'holiday' && event.date && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                {formatHolidayDate(event.date)}
+                              </p>
+                            )}
                             {event.type === 'birthday' && (
                               <div className="flex items-center gap-2 mt-2">
                                 <span className="text-xs font-medium text-purple-600">
