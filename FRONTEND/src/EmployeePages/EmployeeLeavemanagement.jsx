@@ -1510,25 +1510,25 @@ const EmployeeLeavemanagement = () => {
             </p>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">From-To</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">HalfDay</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Applied</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Approved By</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">From-To</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Reason</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Sessions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Action Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Applied</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Approved By</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-8 text-center">
+                    <td colSpan={9} className="px-6 py-8 text-center align-middle">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         <span className="ml-3 text-gray-600">Loading leave requests...</span>
@@ -1538,39 +1538,41 @@ const EmployeeLeavemanagement = () => {
                 ) : filteredLeaveList.length > 0 ? (
                   filteredLeaveList.map((lv) => (
                     <tr key={lv._id} className="hover:bg-blue-50 transition duration-150">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {formatDisplayDate(lv.from)} 
                           <span className="mx-2 text-gray-400">→</span>
                           {formatDisplayDate(lv.to)}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs">{lv.reason || "-"}</div>
+                      <td className="px-6 py-4 align-middle max-w-[220px] whitespace-nowrap overflow-hidden text-ellipsis group">
+                        <div className="text-sm text-gray-900 truncate" title={lv.reason || "-"}>
+                          {lv.reason || "-"}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {lv.halfDaySession || "Full Day"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           {lv.leaveType || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatDisplayDate(lv.actionDate)}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatDisplayDate(lv.requestDate)}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         {renderStatusBadge(lv.status)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{lv.approvedBy || "-"}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           {lv.status === "Pending" && (
                             <button
@@ -1586,7 +1588,7 @@ const EmployeeLeavemanagement = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center align-middle">
                       <div className="text-gray-500">
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                           <span className="text-2xl">📝</span>
@@ -1889,7 +1891,7 @@ const EmployeeLeavemanagement = () => {
 
                 {form.from && form.to && form.from === form.to && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
                     <select 
                       name="halfDaySession" 
                       value={form.halfDaySession} 
