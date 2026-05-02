@@ -227,7 +227,7 @@ const DocVerifyAdmin = () => {
   (selectedRecord?.documents || []).forEach(d => { docMap[d.fieldKey] = d; });
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-transparent font-sans">
       {/* Preview Modal */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" onClick={() => setPreviewUrl(null)}>

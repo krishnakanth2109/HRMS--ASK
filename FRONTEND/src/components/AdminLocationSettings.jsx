@@ -764,7 +764,7 @@ const AdminLocationSettings = () => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-4">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600 border border-gray-300 font-bold text-sm shadow-sm">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 text-gray-600 border border-gray-300 font-bold text-sm shadow-sm">
                                   {employee.name.charAt(0)}
                                 </div>
                                 <div>

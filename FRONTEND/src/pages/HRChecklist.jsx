@@ -134,7 +134,7 @@ const HRChecklist = () => {
   const stats = getRecordStats(selectedRecord);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans print:bg-white print:min-h-0">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-transparent font-sans print:bg-white print:min-h-0">
       
       {/* ─── Top Navbar (Hidden on Print) ─── */}
       <div className="p-6 max-w-[1400px] mx-auto print:hidden">

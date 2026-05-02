@@ -624,6 +624,7 @@ const EmployeeHolidays = () => {
             color: #6b7280;
             margin-bottom: 0.5rem;
         }
+        .dark .react-calendar__month-view__weekdays { color: #94a3b8; }
         .react-calendar__month-view__weekdays__weekday abbr {
             text-decoration: none;
         }
@@ -643,6 +644,11 @@ const EmployeeHolidays = () => {
             background-color: #f3f4f6 !important;
             border-radius: 8px;
         }
+        .dark .react-calendar__tile:enabled:hover,
+        .dark .react-calendar__tile:enabled:focus {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+        }
         
         .react-calendar__tile--now {
             background: #eff6ff !important;
@@ -651,10 +657,19 @@ const EmployeeHolidays = () => {
             color: #3b82f6 !important;
             font-weight: bold;
         }
+        .dark .react-calendar__tile--now {
+            background: rgba(59, 130, 246, 0.2) !important;
+            border-color: #3b82f6 !important;
+            color: #60a5fa !important;
+        }
         
         .react-calendar__tile--active {
             background: #eff6ff !important; 
             color: #3b82f6 !important;
+        }
+        .dark .react-calendar__tile--active {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: #60a5fa !important;
         }
 
         .today-tile {
@@ -662,6 +677,11 @@ const EmployeeHolidays = () => {
             border: 2px solid #3b82f6 !important;
             border-radius: 8px;
             color: #3b82f6 !important;
+        }
+        .dark .today-tile {
+            background: rgba(59, 130, 246, 0.2) !important;
+            border-color: #3b82f6 !important;
+            color: #60a5fa !important;
         }
 
         /* Remove all borders from calendar */
@@ -675,6 +695,8 @@ const EmployeeHolidays = () => {
         .react-calendar__month-view__days__day {
             border: none !important;
         }
+
+        .dark .react-calendar__tile { color: #cbd5e1; }
 
         @keyframes fadeIn {
           from {
@@ -696,6 +718,16 @@ const EmployeeHolidays = () => {
           display: -webkit-box;
           -webkit-box-orient: vertical;
           -webkit-line-clamp: 2;
+        }
+        
+        /* Dropdown/Select overrides */
+        .dark select {
+            background-color: transparent !important;
+            color: #cbd5e1 !important;
+        }
+        .dark select option {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
         }
       `}</style>
     </div>

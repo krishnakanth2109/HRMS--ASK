@@ -1276,23 +1276,23 @@ const handleReactivateSubmit = async ({ date, reason }) => {
 
 const SmartSubmenu = ({ onClose, onNavigate }) => {
   return (
-    <div className="absolute right-full top-0 mr-1 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-[10000]">
+    <div className="absolute right-full top-0 mr-1 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-[10000] overflow-hidden">
             <button
         onClick={() => { onNavigate("/admin/doc-verify-invite"); onClose(); }}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100 rounded-t-xl"
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
       >
         <FaEnvelope className="text-violet-500" /> Send Invitations
       </button>
       <button
         onClick={() => onNavigate("/admin/doc-verify-portal")}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-t-xl border-b border-slate-100"
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
       >
         <FaShieldAlt className="text-violet-500" />
         Verify Documents
       </button>
       <button
         onClick={() => onNavigate("/admin/hr-checklist")}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150"
       >
         <FaClipboardList className="text-violet-500" />
         Verified Documents
@@ -1304,7 +1304,7 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
   return (
     <div className="min-h-screen w-full  flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-<div className="relative z-[20] flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+<div className="relative z-[15] flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
 
         
 
@@ -1339,14 +1339,11 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
 
               {hrActivitiesOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-100 z-[9999]">
-  
-
-
                   {/* Document Verification with smart positioned nested submenu */}
                   <div className="relative">
                     <button
                       onClick={(e) => { e.stopPropagation(); setDocVerifyOpen(!docVerifyOpen); }}
-                      className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center justify-between transition-colors duration-150 border-b border-slate-100"
+                      className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center justify-between transition-colors duration-150 border-b border-slate-100 rounded-t-xl"
                     >
                       <div className="flex items-center gap-3">
                         <FaShieldAlt className="text-violet-500" />
@@ -1370,7 +1367,7 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
                                   {/* Offer Letter */}
                   <button
                     onClick={() => { navigate("/admin/offer-letter"); setHrActivitiesOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100 rounded-t-xl"
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaFileAlt className="text-blue-500" /> Offer Letter
                   </button>
@@ -1386,19 +1383,19 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
                   {/* Add Employee */}
                   <button
                     onClick={() => { navigate("/employees/add"); setHrActivitiesOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaUserPlus className="text-blue-500" /> Add Employee
                   </button>
                   <button
                     onClick={() => { navigate("/admin/induction"); setHrActivitiesOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaConnectdevelop className="text-blue-500" /> Induction
                   </button>
                   <button
                     onClick={() => { navigate("/admin/resignation"); setHrActivitiesOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaFileSignature className="text-blue-500" /> Resignations
                 </button>
