@@ -47,6 +47,42 @@ const AdminLiveTracking = () => {
     const [screenshotsLoading, setScreenshotsLoading] = useState(false);
     const [lightboxUrl, setLightboxUrl] = useState(null);
 
+    // Tracker Settings
+    const [screenshotInterval, setScreenshotInterval] = useState(5);
+    const [savingSettings, setSavingSettings] = useState(false);
+
+    useEffect(() => {
+        // Fetch tracker settings
+        const fetchSettings = async () => {
+            try {
+                const res = await api.get('/api/idletime/settings/tracker');
+                if (res.data && res.data.screenshotIntervalMinutes) {
+                    setScreenshotInterval(res.data.screenshotIntervalMinutes);
+                }
+            } catch (err) {
+                console.error("Error fetching tracker settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const handleSaveSettings = async (newInterval) => {
+        try {
+            setSavingSettings(true);
+            const val = parseInt(newInterval, 10);
+            if (val > 0) {
+                await api.put('/api/idletime/settings/tracker', { screenshotIntervalMinutes: val });
+                setScreenshotInterval(val);
+                alert(`Tracker screenshot interval updated to ${val} minutes. It will take effect the next time employees' trackers sync.`);
+            }
+        } catch (err) {
+            console.error("Error saving settings", err);
+            alert("Failed to save tracker settings.");
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
     useEffect(() => {
         // Fetch all employees to map IDs to Names once when component loads
         const loadEmployees = async () => {
@@ -541,16 +577,35 @@ const AdminLiveTracking = () => {
                     </p>
                 </div>
 
-                <button
-                    onClick={() => {
-                        setLoading(true);
-                        fetchLiveData(false);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
-                >
-                    <FaSyncAlt className={loading ? "animate-spin text-indigo-400" : "text-indigo-400"} />
-                    Auto-Refresh in {refreshCountdown}s
-                </button>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-white px-3 py-2 border border-slate-200 rounded-lg shadow-sm">
+                        <FaCamera className="text-slate-400" />
+                        <span className="text-sm font-medium text-slate-600">Screenshot Interval:</span>
+                        <select
+                            value={screenshotInterval}
+                            onChange={(e) => handleSaveSettings(e.target.value)}
+                            disabled={savingSettings}
+                            className="text-sm bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none text-indigo-700 font-medium"
+                        >
+                            <option value={1}>1 Minute</option>
+                            <option value={5}>5 Minutes</option>
+                            <option value={10}>10 Minutes</option>
+                            <option value={15}>15 Minutes</option>
+                            <option value={30}>30 Minutes</option>
+                            <option value={60}>1 Hour</option>
+                        </select>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setLoading(true);
+                            fetchLiveData(false);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin text-indigo-400" : "text-indigo-400"} />
+                        Auto-Refresh in {refreshCountdown}s
+                    </button>
+                </div>
             </div>
 
             {/* Summary Cards */}
@@ -670,6 +725,12 @@ const AdminLiveTracking = () => {
                                                 <div className="flex items-center gap-2 text-sm text-gray-500">
                                                     <FaClock className="text-gray-400 text-xs" />
                                                     {formatTime(record.lastPing)}
+                                                    {/* Active Window Badge */}
+                                                    {record.activeWindow && (
+                                                        <span className="ml-2 flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 max-w-[200px] truncate" title={record.activeWindow}>
+                                                            <FaDesktop className="text-[9px]" /> {record.activeWindow}
+                                                        </span>
+                                                    )}
                                                     {/* Live screenshot indicator for IDLE employees */}
                                                     {record.currentIdleScreenshot && statusInfo.text === 'Idle' && (
                                                         <a
@@ -750,6 +811,11 @@ const AdminLiveTracking = () => {
                                     <span className={`text-xs ml-1 flex items-center gap-1 font-semibold ${selectedEmployee.statusInfo.color}`}>
                                         <FaCircle className="text-[8px]" /> {selectedEmployee.statusInfo.text}
                                     </span>
+                                    {selectedEmployee.activeWindow && (
+                                        <span className="text-xs ml-2 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-full text-blue-600 font-medium flex items-center gap-1">
+                                            <FaDesktop className="text-[10px]" /> {selectedEmployee.activeWindow}
+                                        </span>
+                                    )}
                                 </p>
                                 {/* Tab Switcher */}
                                 <div className="flex gap-2 mt-3">
@@ -955,7 +1021,7 @@ const AdminLiveTracking = () => {
                                     <div className="flex items-center gap-3 mb-6">
                                         <FaCamera className="text-indigo-500 text-xl" />
                                         <h3 className="text-xl font-bold text-slate-800">Screenshots Log</h3>
-                                        <span className="text-xs text-slate-500">(working screenshots every 5 minutes)</span>
+                                        <span className="text-xs text-slate-500">(interval dynamically set by admin)</span>
                                     </div>
 
                                     {screenshotsLoading ? (

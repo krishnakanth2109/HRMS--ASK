@@ -4,6 +4,45 @@ import { cloudinary } from "../config/cloudinary.js";
 import Employee from "../models/employeeModel.js";
 
 const router = express.Router();
+import OfficeSettings from "../models/OfficeSettings.js";
+
+// ------------------------------------------
+// GET /settings/tracker
+// (Fetch tracker settings like screenshot interval)
+// ------------------------------------------
+router.get("/settings/tracker", async (req, res) => {
+  try {
+    let settings = await OfficeSettings.findOne({ type: "Global" });
+    if (!settings) {
+      // Return default if not initialized
+      return res.json({ screenshotIntervalMinutes: 5 });
+    }
+    return res.json({ screenshotIntervalMinutes: settings.screenshotIntervalMinutes || 5 });
+  } catch (err) {
+    console.error("Fetch tracker settings error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ------------------------------------------
+// PUT /settings/tracker
+// (Update tracker settings)
+// ------------------------------------------
+router.put("/settings/tracker", async (req, res) => {
+  try {
+    const { screenshotIntervalMinutes } = req.body;
+    let settings = await OfficeSettings.findOne({ type: "Global" });
+    if (!settings) {
+      settings = new OfficeSettings({ type: "Global", officeLocation: { latitude: 0, longitude: 0 } });
+    }
+    settings.screenshotIntervalMinutes = Number(screenshotIntervalMinutes) || 5;
+    await settings.save();
+    return res.json({ message: "Settings updated successfully", screenshotIntervalMinutes: settings.screenshotIntervalMinutes });
+  } catch (err) {
+    console.error("Update tracker settings error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
 
 // Helper to upload base64 to Cloudinary
 const uploadBase64ToCloudinary = async (base64Data, folder = "idle_screenshots") => {
@@ -46,6 +85,7 @@ router.post('/live-status', async (req, res) => {
         currentStatus: status,
         lastPing: pingTime,
         idleSince: idleSinceTime,
+        activeWindow: req.body.activeWindow || null,
         idleTimeline: [],
         trackedWorkSeconds: total_work_seconds || 0,
         trackedIdleSeconds: total_idle_seconds || 0,
@@ -58,6 +98,7 @@ router.post('/live-status', async (req, res) => {
       todayData.currentStatus = status;
       todayData.lastPing = pingTime;
       todayData.idleSince = idleSinceTime;
+      todayData.activeWindow = req.body.activeWindow || null;
       
       if (total_work_seconds !== undefined) todayData.trackedWorkSeconds = total_work_seconds;
       if (total_idle_seconds !== undefined) todayData.trackedIdleSeconds = total_idle_seconds;
@@ -94,6 +135,7 @@ router.get('/live-status', async (req, res) => {
           currentStatus: todayData.currentStatus,
           lastPing: todayData.lastPing,
           idleSince: todayData.idleSince,
+          activeWindow: todayData.activeWindow || null,
           idleTimeline: todayData.idleTimeline || [],
           trackedWorkSeconds: todayData.trackedWorkSeconds || 0,
           trackedIdleSeconds: todayData.trackedIdleSeconds || 0,
