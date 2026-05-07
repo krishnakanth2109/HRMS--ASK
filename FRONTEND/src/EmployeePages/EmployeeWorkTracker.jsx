@@ -19,6 +19,7 @@ import {
   FaCalendarWeek,
   FaBriefcase,
   FaCalculator,
+  FaDownload,
 } from "react-icons/fa";
 
 import {
@@ -932,6 +933,16 @@ const renderMorningUpdateSection = () => {
                 Submit your morning plan, close the day with real outcomes, add your
                 own work score, and watch your monthly progress build up.
               </p>
+              <div className="pt-2">
+                <a
+                  href="/tracker/HRMS_Activity_Tracker_Setup.exe"
+                  download="HRMS_Activity_Tracker_Setup.exe"
+                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5"
+                >
+                  <FaDownload />
+                  Download Activity Tracker App
+                </a>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 min-w-[320px]">
