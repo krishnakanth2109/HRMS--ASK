@@ -496,7 +496,7 @@ router.post('/punch-in', async (req, res) => {
             if (approvedLeaveToday.leaveDayType === "Full Day") { return res.status(403).json({ success: false, message: "Punch-in not allowed. You are on approved leave today." }); } 
             if (approvedLeaveToday.leaveDayType === "Half Day") { 
                 const hour = now.getHours(); 
-                if (approvedLeaveToday.halfDaySession === "Morning" && hour < 13) { return res.status(403).json({ success: false, message: "Morning half-day leave. Punch-in allowed after 1 PM." }); } 
+                if (approvedLeaveToday.halfDaySession === "Morning" && hour < 13) { return res.status(403).json({ success: false, message:"Morning half-day leave. Punch-in allowed after 1 PM." }); } 
                 if (approvedLeaveToday.halfDaySession === "Afternoon" && hour >= 13) { return res.status(403).json({ success: false, message: "Afternoon half-day leave. Punch-in not allowed after 1 PM." }); } 
             } 
         }
@@ -506,7 +506,7 @@ router.post('/punch-in', async (req, res) => {
         if (shift.weeklyOffDays && Array.isArray(shift.weeklyOffDays)) { isTodayWeekOff = shift.weeklyOffDays.includes(todayDayNum); } 
         else if (shift.weekOffs && Array.isArray(shift.weekOffs)) { 
             const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]; 
-            const todayDayName = daysOfWeek[todayDayNum]; 
+            const todayDayName = daysOfWeek[todayDayNum];
             isTodayWeekOff = shift.weekOffs.some(off => String(off).toLowerCase() === todayDayName.toLowerCase() || off === todayDayNum); 
         } else { isTodayWeekOff = (todayDayNum === 0); }
 
