@@ -15,6 +15,13 @@ const LayoutAdmin = () => {
   };
 
   useEffect(() => {
+    // Handle Dark Mode Class
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
     if (theme === "bubbles") {
       const newBubbles = Array.from({ length: 8 }).map((_, i) => ({
         id: i,
@@ -33,19 +40,17 @@ const LayoutAdmin = () => {
   }, [theme]);
 
   return (
-    <div className={`flex h-screen w-full overflow-hidden transition-colors duration-500 ${theme === 'white' ? 'bg-white' : 'bg-[#F8FAFF]'}`}>
+    <div className={`flex h-screen w-full overflow-hidden transition-colors duration-500 ${theme === 'dark' ? 'bg-slate-950 text-slate-200' : theme === 'white' ? 'bg-white' : 'bg-[#F8FAFF]'}`}>
       
       {/* SIDEBAR */}
-      {/* Given z-30 so it sits above the background, but below popups (z-50) */}
-      <div className="z-30 bg-white/70 backdrop-blur-sm shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+      <div className={`z-30 transition-all duration-500 flex-shrink-0 ${theme === 'dark' ? 'bg-slate-900/50 backdrop-blur-xl border-r border-white/5' : 'bg-white/70 backdrop-blur-sm shadow-[4px_0_24px_rgba(0,0,0,0.02)]'}`}>
         <Sidebar />
       </div>
 
       <div className="flex flex-col flex-1 min-w-0">
         
         {/* NAVBAR */}
-        {/* Given z-20 so it sits above the background, but below popups (z-50) */}
-        <div className="z-20 bg-white/70 backdrop-blur-sm shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className={`z-20 transition-all duration-500 flex-shrink-0 ${theme === 'dark' ? 'bg-slate-900/50 backdrop-blur-xl border-b border-white/5' : 'bg-white/70 backdrop-blur-sm shadow-[0_4px_24px_rgba(0,0,0,0.02)]'}`}>
           <Navbar currentTheme={theme} onThemeChange={toggleTheme} />
         </div>
 
@@ -61,6 +66,14 @@ const LayoutAdmin = () => {
 
           {/* BACKGROUND LAYERS */}
           <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+            {theme === "dark" && (
+              <div className="absolute inset-0 bg-slate-950 transition-colors duration-700">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-slate-950 to-purple-900/20" />
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[120px] animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+              </div>
+            )}
+
             {theme === "bubbles" && bubbles.map((bubble) => (
               <div key={bubble.id} className="absolute rounded-full"
                 style={{

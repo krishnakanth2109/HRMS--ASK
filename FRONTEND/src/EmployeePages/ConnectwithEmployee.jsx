@@ -586,7 +586,7 @@ const ConnectWithEmployee = () => {
         {selectedChatUser ? (
           <>
             {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-40 flex-shrink-0">
+            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-15 flex-shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-center rounded-full font-bold text-lg shadow-md">
                   {selectedChatUser.name?.charAt(0)?.toUpperCase()}

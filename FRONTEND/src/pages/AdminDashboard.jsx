@@ -285,7 +285,7 @@ const AdminDashboard = () => {
           type: "birthday",
           name: employee.name,
           role: role,
-          message: `🎉 Happy Birthday to ${employee.name}${role !== "—" ? ` (${role})` : ""}! Wishing you a fantastic day! 🎂🎈`,
+message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s Birthday! Wish them a wonderful day! 🎂🎈`,
           icon: <FaBirthdayCake className="inline mr-2 text-pink-500" />
         });
         console.log("Found birthday for:", employee.name); // Debug log

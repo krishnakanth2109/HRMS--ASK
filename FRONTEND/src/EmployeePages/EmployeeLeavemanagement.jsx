@@ -73,8 +73,8 @@ const formatMonth = (monthStr) => {
 const playRequestSound = () => {
   try {
     const audio = new Audio("/sounds/request-button.mp3");
-    audio.play().catch(() => {});
-  } catch {}
+    audio.play().catch(() => { });
+  } catch { }
 };
 
 const addDays = (date, days) => {
@@ -102,8 +102,8 @@ const isDateInMonth = (dateStr, monthFilter) => {
   if (!dateStr || !monthFilter) return false;
   const date = new Date(dateStr);
   const [year, month] = monthFilter.split('-');
-  return date.getFullYear() === parseInt(year) && 
-         (date.getMonth() + 1) === parseInt(month);
+  return date.getFullYear() === parseInt(year) &&
+    (date.getMonth() + 1) === parseInt(month);
 };
 
 const getMonthFromString = (monthStr) => {
@@ -124,14 +124,14 @@ const toISODateString = (date) => {
 
 const EmployeeLeavemanagement = () => {
   const [user, setUser] = useState(null);
-  
+
   // ✅ ADDED: State for attendance data and unplanned absences
   const [attendanceData, setAttendanceData] = useState([]);
   const [unplannedAbsences, setUnplannedAbsences] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [shiftDetails, setShiftDetails] = useState(null); // ✅ ADDED: For week off days
   const [loadingShift, setLoadingShift] = useState(false);
-  
+
   // ✅ ADDED: State for LOP warning
   const [showLOPWarning, setShowLOPWarning] = useState(false);
   const [LOPWarningDetails, setLOPWarningDetails] = useState({
@@ -139,7 +139,7 @@ const EmployeeLeavemanagement = () => {
     requestedDays: 0,
     willBeLOP: 0
   });
-  
+
   // Use ref to track if data has been loaded
   const dataLoadedRef = useRef({
     leaves: false,
@@ -152,23 +152,23 @@ const EmployeeLeavemanagement = () => {
   // --- UPDATED DATE LOGIC: Allow past dates (Present Month or 7 days ago) ---
   const minSelectionDate = useMemo(() => {
     const now = new Date();
-    
+
     // 1. Calculate 7 days ago
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(now.getDate() - 7);
-    
+
     // 2. Calculate Start of Current Month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     // 3. Take the earlier of the two to be permissible
     const earliestAllowed = sevenDaysAgo < startOfMonth ? sevenDaysAgo : startOfMonth;
-    
+
     // Format to YYYY-MM-DD
     return formatDate(earliestAllowed);
   }, []);
 
   const todayStr = new Date().toISOString().split("T")[0];
-  
+
   // Holiday state
   const [holidays, setHolidays] = useState([]);
   const [sandwichLeaves, setSandwichLeaves] = useState([]);
@@ -176,7 +176,7 @@ const EmployeeLeavemanagement = () => {
   // All Employees Approved Leaves (For View & Overlap Check)
   const [allApprovedLeaves, setAllApprovedLeaves] = useState([]);
   const [upcomingModalOpen, setUpcomingModalOpen] = useState(false);
-  
+
   // Overlap States
   const [overlappingColleagues, setOverlappingColleagues] = useState([]);
   const [expandOverlaps, setExpandOverlaps] = useState(false);
@@ -215,7 +215,7 @@ const EmployeeLeavemanagement = () => {
   // ✅ ADDED: AI Optimize specific states
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isOptimized, setIsOptimized] = useState(false);
-  
+
   // Sandwich leave warning state
   const [sandwichWarning, setSandwichWarning] = useState(null);
   const [showSandwichAlert, setShowSandwichAlert] = useState(false);
@@ -238,36 +238,36 @@ const EmployeeLeavemanagement = () => {
       setUnplannedAbsences([]);
       return [];
     }
-    
+
     const { year, month } = getMonthFromString(monthStr);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Get all dates in selected month up to today
     const datesInMonth = [];
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
-    
+
     let currentDate = new Date(startDate);
     while (currentDate <= endDate && currentDate <= today) {
       datesInMonth.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     // ✅ GET WEEK OFF DAYS FROM SHIFT DATA (0 = Sunday, 1 = Monday, etc.)
     const weekOffDays = shiftData?.weeklyOffDays || [0]; // Default to Sunday if no shift data
-    
+
     const absences = [];
-    
+
     datesInMonth.forEach(date => {
       const dateStr = toISODateString(date);
       const dayOfWeek = date.getDay();
-      
+
       // ✅ SKIP if it's a week off (from shift data)
       if (weekOffDays.includes(dayOfWeek)) {
         return; // Don't count week offs as absences
       }
-      
+
       // ✅ SKIP if it's a holiday
       const isHoliday = holidaysList.some(h => {
         const hStart = new Date(h.startDate);
@@ -276,9 +276,9 @@ const EmployeeLeavemanagement = () => {
         hEnd.setHours(23, 59, 59, 999);
         return date >= hStart && date <= hEnd;
       });
-      
+
       if (isHoliday) return;
-      
+
       // Check if there's an approved leave for this date
       const hasApprovedLeave = leavesList.some(leave => {
         if (leave.status !== 'Approved') return false;
@@ -288,15 +288,15 @@ const EmployeeLeavemanagement = () => {
         leaveEnd.setHours(23, 59, 59, 999);
         return date >= leaveStart && date <= leaveEnd;
       });
-      
+
       if (hasApprovedLeave) return;
-      
+
       // Check attendance record
       const attendanceRecord = attendanceData.find(a => {
         const recordDate = a.date ? new Date(a.date) : null;
         return recordDate && toISODateString(recordDate) === dateStr;
       });
-      
+
       // If no attendance record or status indicates absence
       if (!attendanceRecord) {
         absences.push({
@@ -305,9 +305,9 @@ const EmployeeLeavemanagement = () => {
           reason: "No attendance record found",
           type: "UNPLANNED"
         });
-      } else if (attendanceRecord.status === "Absent" || 
-                 attendanceRecord.status === "ABSENT" ||
-                 attendanceRecord.workedStatus === "Absent") {
+      } else if (attendanceRecord.status === "Absent" ||
+        attendanceRecord.status === "ABSENT" ||
+        attendanceRecord.workedStatus === "Absent") {
         absences.push({
           date: dateStr,
           dateObj: new Date(date),
@@ -316,7 +316,7 @@ const EmployeeLeavemanagement = () => {
         });
       }
     });
-    
+
     setUnplannedAbsences(absences);
     return absences;
   }, []);
@@ -324,12 +324,12 @@ const EmployeeLeavemanagement = () => {
   // Filtered leave list
   const filteredLeaveList = useMemo(() => {
     return leaveList.filter(leave => {
-      const matchesMonth = selectedMonth === "all" || 
-        isDateInMonth(leave.from, selectedMonth) || 
+      const matchesMonth = selectedMonth === "all" ||
+        isDateInMonth(leave.from, selectedMonth) ||
         isDateInMonth(leave.to, selectedMonth);
-      
+
       const matchesStatus = selectedStatus === "All" || leave.status === selectedStatus;
-      
+
       return matchesMonth && matchesStatus;
     });
   }, [leaveList, selectedMonth, selectedStatus]);
@@ -337,7 +337,7 @@ const EmployeeLeavemanagement = () => {
   // ✅ UPDATED STATS CALCULATION: Include unplanned absences
   useEffect(() => {
     if (!leaveList.length || !selectedMonth) return;
-    
+
     // 1. Calculate Approved Days (only from leaves)
     const approvedLeavesInMonth = filteredLeaveList.filter(leave => leave.status === 'Approved');
     const approvedDaysCount = approvedLeavesInMonth.reduce((total, leave) => {
@@ -366,7 +366,7 @@ const EmployeeLeavemanagement = () => {
     setStats({
       monthlyAvailable: monthlyCredit,
       pendingLeaves: pending,
-      totalLeaveDays: totalConsumed, 
+      totalLeaveDays: totalConsumed,
       normalLeaveDays: approvedDaysCount,
       extraLeaves: extra,
       sandwichLeavesCount: sandwichLeaves.length,
@@ -374,14 +374,14 @@ const EmployeeLeavemanagement = () => {
       unplannedAbsenceDays: unplannedAbsenceDays,
     });
   }, [filteredLeaveList, sandwichLeaves, unplannedAbsences, selectedMonth]);
-  
+
   const fetchHolidays = useCallback(async () => {
     try {
       const data = await getHolidays();
       const formatted = data.map((h) => ({
         ...h,
         start: normalize(h.startDate),
-        end: normalize(h.endDate || h.startDate), 
+        end: normalize(h.endDate || h.startDate),
       }));
       setHolidays(formatted);
       dataLoadedRef.current.holidays = true;
@@ -394,7 +394,7 @@ const EmployeeLeavemanagement = () => {
   // ✅ ADDED: Fetch shift details for week off days
   const fetchShiftDetails = useCallback(async (empId) => {
     if (!empId || dataLoadedRef.current.shift) return;
-    
+
     setLoadingShift(true);
     try {
       const shiftRes = await getShiftByEmployeeId(empId);
@@ -445,7 +445,7 @@ const EmployeeLeavemanagement = () => {
   // ✅ OPTIMIZED: Fetch attendance data
   const fetchAttendance = useCallback(async (empId) => {
     if (!empId || dataLoadedRef.current.attendance) return;
-    
+
     setLoadingAttendance(true);
     try {
       const attendanceRes = await getAttendanceForEmployee(empId);
@@ -468,12 +468,12 @@ const EmployeeLeavemanagement = () => {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     setError("");
     try {
       let leavesData = [];
-      
+
       if (typeof getLeaveRequestsForEmployee === "function") {
         try {
           const maybeResult = await getLeaveRequestsForEmployee(empId);
@@ -493,7 +493,7 @@ const EmployeeLeavemanagement = () => {
 
         const res = await fetch(url.toString());
         if (!res.ok) throw new Error("Failed to fetch leave list");
-        
+
         const data = await res.json();
         leavesData = data || [];
       }
@@ -510,7 +510,7 @@ const EmployeeLeavemanagement = () => {
         approvedBy: d.approvedBy || d.approved_by || "-",
         status: d.status || "Pending",
       }));
-      
+
       setLeaveList(normalized);
       dataLoadedRef.current.leaves = true;
     } catch (err) {
@@ -526,7 +526,7 @@ const EmployeeLeavemanagement = () => {
   // ✅ UPDATED: Fetch all data including shift details
   const fetchAllData = useCallback(async () => {
     if (!user?.employeeId) return;
-    
+
     // Reset loading flags
     dataLoadedRef.current = {
       leaves: false,
@@ -535,7 +535,7 @@ const EmployeeLeavemanagement = () => {
       allLeaves: false,
       shift: false
     };
-    
+
     try {
       // Fetch in parallel where possible
       await Promise.all([
@@ -559,11 +559,11 @@ const EmployeeLeavemanagement = () => {
 
   // ✅ UPDATED: Calculate absences when all data is loaded (including shift)
   useEffect(() => {
-    if (dataLoadedRef.current.leaves && 
-        dataLoadedRef.current.holidays && 
-        dataLoadedRef.current.attendance &&
-        dataLoadedRef.current.shift &&
-        attendanceData.length > 0) {
+    if (dataLoadedRef.current.leaves &&
+      dataLoadedRef.current.holidays &&
+      dataLoadedRef.current.attendance &&
+      dataLoadedRef.current.shift &&
+      attendanceData.length > 0) {
       calculateUnplannedAbsences(attendanceData, holidays, leaveList, selectedMonth, shiftDetails);
     }
   }, [attendanceData, holidays, leaveList, selectedMonth, shiftDetails, calculateUnplannedAbsences]);
@@ -588,7 +588,7 @@ const EmployeeLeavemanagement = () => {
 
     approvedLeaves.forEach(leave => {
       // Determine if this leave is "Full Day"
-      const isFullDay = !leave.halfDaySession; 
+      const isFullDay = !leave.halfDaySession;
       let currentDate = new Date(leave.from);
       const endDate = new Date(leave.to);
       while (currentDate <= endDate) {
@@ -598,12 +598,12 @@ const EmployeeLeavemanagement = () => {
     });
 
     const newSandwichLeaves = [];
-    
+
     // 1. Holiday Sandwiches
     holidays.forEach(holiday => {
       const holidayStart = new Date(holiday.start);
       const holidayEnd = new Date(holiday.end);
-      
+
       const dayBefore = addDays(holidayStart, -1);
       const dayAfter = addDays(holidayEnd, 1);
       const dayBeforeStr = formatDate(dayBefore);
@@ -616,14 +616,14 @@ const EmployeeLeavemanagement = () => {
       if (isBeforeFullDay && isAfterFullDay) {
         const isBeforeInMonth = isDateInMonth(dayBeforeStr, selectedMonth);
         const isAfterInMonth = isDateInMonth(dayAfterStr, selectedMonth);
-        
+
         if (isBeforeInMonth || isAfterInMonth) {
           const patternKey = `${dayBeforeStr}|${dayAfterStr}`;
           const existingPattern = newSandwichLeaves.find(p => p.key === patternKey);
-          
+
           if (!existingPattern) {
-             const duration = calculateLeaveDays(holidayStart, holidayEnd);
-             newSandwichLeaves.push({
+            const duration = calculateLeaveDays(holidayStart, holidayEnd);
+            newSandwichLeaves.push({
               key: patternKey,
               dates: `${dayBeforeStr} & ${dayAfterStr}`,
               reason: `Sandwich around holiday: ${holiday.name}. Holiday period counted as leave.`,
@@ -638,18 +638,18 @@ const EmployeeLeavemanagement = () => {
 
     // 2. Weekend Sandwiches (Sat/Mon) - BUT CONSIDER WEEK OFF DAYS
     for (const [dateStr, isFullDay] of approvedLeaveMap.entries()) {
-      if (!isFullDay) continue; 
+      if (!isFullDay) continue;
 
       const date = new Date(dateStr);
       const dayOfWeek = date.getDay();
-      
+
       // Get week off days from shift
       const weekOffDays = shiftDetails?.weeklyOffDays || [0];
-      
+
       // Check if next consecutive days are week offs
       let consecutiveWeekOffCount = 0;
       let checkDate = new Date(date);
-      
+
       // Count consecutive week off days after this date
       for (let i = 1; i <= 7; i++) {
         checkDate.setDate(date.getDate() + i);
@@ -660,12 +660,12 @@ const EmployeeLeavemanagement = () => {
           break;
         }
       }
-      
+
       // If we have consecutive week offs and the day after them is also a leave
       if (consecutiveWeekOffCount > 0) {
         const dayAfterWeekOffs = addDays(date, consecutiveWeekOffCount + 1);
         const dayAfterWeekOffsStr = formatDate(dayAfterWeekOffs);
-        
+
         if (approvedLeaveMap.get(dayAfterWeekOffsStr) === true) {
           const patternKey = `${dateStr}|${dayAfterWeekOffsStr}`;
           const existingPattern = newSandwichLeaves.find(p => p.key === patternKey);
@@ -693,7 +693,7 @@ const EmployeeLeavemanagement = () => {
 
   // Check Overlaps with Colleagues
   const checkColleagueOverlaps = useCallback((fromDate, toDate) => {
-    if(!fromDate || !toDate) {
+    if (!fromDate || !toDate) {
       setOverlappingColleagues([]);
       setExpandOverlaps(false);
       return;
@@ -701,18 +701,18 @@ const EmployeeLeavemanagement = () => {
 
     const start = new Date(fromDate);
     const end = new Date(toDate);
-    
-    start.setHours(0,0,0,0);
-    end.setHours(0,0,0,0);
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
 
     const overlaps = allApprovedLeaves.filter(leave => {
       // Skip own leaves
-      if(leave.employeeId === user?.employeeId) return false;
+      if (leave.employeeId === user?.employeeId) return false;
 
       const lStart = new Date(leave.from);
       const lEnd = new Date(leave.to);
-      lStart.setHours(0,0,0,0);
-      lEnd.setHours(0,0,0,0);
+      lStart.setHours(0, 0, 0, 0);
+      lEnd.setHours(0, 0, 0, 0);
 
       // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
       return (start <= lEnd && end >= lStart);
@@ -727,28 +727,28 @@ const EmployeeLeavemanagement = () => {
       setShowLOPWarning(false);
       return false;
     }
-    
+
     const start = new Date(fromDate);
     const end = new Date(toDate);
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
-    
+
     // Calculate requested days (excluding week offs and holidays)
     let requestedDays = 0;
     let currentDate = new Date(start);
-    
+
     // Get week off days
     const weekOffDays = shiftDetails?.weeklyOffDays || [0];
-    
+
     while (currentDate <= end) {
       const dayOfWeek = currentDate.getDay();
-      
+
       // Skip week offs
       if (weekOffDays.includes(dayOfWeek)) {
         currentDate.setDate(currentDate.getDate() + 1);
         continue;
       }
-      
+
       // Skip holidays
       const isHoliday = holidays.some(h => {
         const hStart = new Date(h.startDate);
@@ -757,18 +757,18 @@ const EmployeeLeavemanagement = () => {
         hEnd.setHours(23, 59, 59, 999);
         return currentDate >= hStart && currentDate <= hEnd;
       });
-      
+
       if (!isHoliday) {
         requestedDays++;
       }
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     // Check if requested days exceed pending leaves
     const pendingLeaves = stats.pendingLeaves;
     const willBeLOP = Math.max(0, requestedDays - pendingLeaves);
-    
+
     if (willBeLOP > 0) {
       setLOPWarningDetails({
         pendingLeaves,
@@ -777,7 +777,7 @@ const EmployeeLeavemanagement = () => {
       });
       return true;
     }
-    
+
     return false;
   }, [stats.pendingLeaves, shiftDetails, holidays]);
 
@@ -819,7 +819,7 @@ const EmployeeLeavemanagement = () => {
 
       // Reset halfDaySession if date range is > 1 day
       if (updated.from && updated.to && updated.from !== updated.to) {
-        updated.halfDaySession = ""; 
+        updated.halfDaySession = "";
       }
 
       const fromDate = updated.from;
@@ -870,7 +870,7 @@ const EmployeeLeavemanagement = () => {
     while (selStart <= selEnd) {
       const fDate = formatDate(selStart);
       currentSelectedDates.add(fDate);
-      bookedMap.set(fDate, isCurrentSelectionFullDay); 
+      bookedMap.set(fDate, isCurrentSelectionFullDay);
       selStart = addDays(selStart, 1);
     }
 
@@ -888,27 +888,27 @@ const EmployeeLeavemanagement = () => {
 
       if (beforeIsFull && afterIsFull) {
         if (currentSelectedDates.has(dayBefore) || currentSelectedDates.has(dayAfter)) {
-           const msg = `Sandwich Detected: Full Day leaves surround '${holiday.name}'. The holiday period will be counted as leave(s).`;
-           if (!warnings.some(w => w.message === msg)) {
-             warnings.push({ type: 'holiday', message: msg });
-           }
+          const msg = `Sandwich Detected: Full Day leaves surround '${holiday.name}'. The holiday period will be counted as leave(s).`;
+          if (!warnings.some(w => w.message === msg)) {
+            warnings.push({ type: 'holiday', message: msg });
+          }
         }
       }
     });
 
     // Check Weekend Sandwiches - CONSIDER WEEK OFF DAYS
     for (const [dateStr, isFullDay] of bookedMap.entries()) {
-      if (!isFullDay) continue; 
+      if (!isFullDay) continue;
       const d = new Date(dateStr);
       const dayOfWeek = d.getDay();
-      
+
       // Get week off days
       const weekOffDays = shiftDetails?.weeklyOffDays || [0];
-      
+
       // Check consecutive week offs after this date
       let consecutiveWeekOffCount = 0;
       let checkDate = new Date(d);
-      
+
       for (let i = 1; i <= 7; i++) {
         checkDate.setDate(d.getDate() + i);
         const checkDayOfWeek = checkDate.getDay();
@@ -918,18 +918,18 @@ const EmployeeLeavemanagement = () => {
           break;
         }
       }
-      
+
       // If we have consecutive week offs
       if (consecutiveWeekOffCount > 0) {
         const dayAfterWeekOffs = addDays(d, consecutiveWeekOffCount + 1);
         const dayAfterWeekOffsStr = formatDate(dayAfterWeekOffs);
-        
+
         if (bookedMap.get(dayAfterWeekOffsStr) === true) {
           if (currentSelectedDates.has(dateStr) || currentSelectedDates.has(dayAfterWeekOffsStr)) {
             const msg = `Sandwich Detected: Full Day leaves sandwiching ${consecutiveWeekOffCount} week off day(s). Week off(s) will be counted as leave.`;
-             if (!warnings.some(w => w.message === msg)) {
-               warnings.push({ type: 'weekend', message: msg });
-             }
+            if (!warnings.some(w => w.message === msg)) {
+              warnings.push({ type: 'weekend', message: msg });
+            }
           }
         }
       }
@@ -945,18 +945,18 @@ const EmployeeLeavemanagement = () => {
   // ✅ ADDED: AI Optimize Reason Handler (Using Gemini API with Robust Fallback & Load Balancing)
   const handleOptimizeReason = async () => {
     if (!form.reason.trim() || isOptimizing) return;
-    
+
     setIsOptimizing(true);
     try {
       const key1 = import.meta.env.VITE_AI_API_KEY_1;
       const key2 = import.meta.env.VITE_AI_API_KEY_2;
       const fallbackKey = import.meta.env.VITE_AI_API_KEY;
-      
+
       // Collect valid keys
-      let availableKeys = [key1, key2, fallbackKey].filter(k => 
-        Boolean(k) && 
-        k !== "your_api_key_here" && 
-        k !== "your_first_gemini_api_key_here" && 
+      let availableKeys = [key1, key2, fallbackKey].filter(k =>
+        Boolean(k) &&
+        k !== "your_api_key_here" &&
+        k !== "your_first_gemini_api_key_here" &&
         k !== "your_second_gemini_api_key_here"
       );
 
@@ -976,17 +976,17 @@ const EmployeeLeavemanagement = () => {
       // Try each key and each model until one succeeds
       for (const apiKey of availableKeys) {
         if (optimizedText) break;
-        
+
         for (const modelName of modelsToTry) {
           try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                system_instruction: { 
-                  parts: { 
-                    text: "You are an HR assistant. Convert the user's short input into a formal, complete sentence explaining why they need leave. Keep it under 90 characters so it fits perfectly. Examples: 'Requesting leave because my friend was in an accident.' or 'I need time off due to family matters.' Return ONLY the finished sentence, no quotes, no extra words." 
-                  } 
+                system_instruction: {
+                  parts: {
+                    text: "You are an HR assistant. Convert the user's short input into a formal, complete sentence explaining why they need leave. Keep it under 90 characters so it fits perfectly. Examples: 'Requesting leave because my friend was in an accident.' or 'I need time off due to family matters.' Return ONLY the finished sentence, no quotes, no extra words."
+                  }
                 },
                 contents: [{ parts: [{ text: form.reason }] }]
               })
@@ -997,7 +997,7 @@ const EmployeeLeavemanagement = () => {
             if (!response.ok) {
               throw new Error(data.error?.message || "Failed to optimize reason via AI.");
             }
-            
+
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (text) {
               optimizedText = text;
@@ -1049,20 +1049,20 @@ const EmployeeLeavemanagement = () => {
       setSubmitError("All fields are required.");
       return;
     }
-    
+
     // First check for sandwich warning
     if (sandwichWarning && sandwichWarning.length > 0) {
       setShowSandwichAlert(true);
       return;
     }
-    
+
     // Then check for LOP warning
     const hasLOPWarning = checkLOPWarning(from, to);
     if (hasLOPWarning) {
       setShowLOPWarning(true);
       return;
     }
-    
+
     // If no warnings, proceed with submission
     await submitLeaveRequest();
   };
@@ -1118,7 +1118,7 @@ const EmployeeLeavemanagement = () => {
       }
 
       playRequestSound();
-      
+
       // Show SweetAlert Success
       Swal.fire({
         icon: 'success',
@@ -1137,14 +1137,14 @@ const EmployeeLeavemanagement = () => {
         leaveType: "",
       });
       setSandwichWarning(null);
-      setOverlappingColleagues([]); 
+      setOverlappingColleagues([]);
       setShowSandwichAlert(false);
       setShowLOPWarning(false);
       setModalOpen(false);
-      
+
       // Refresh data
       await fetchAllData();
-      
+
       setTimeout(() => {
         setSubmitSuccess("");
       }, 3000);
@@ -1205,7 +1205,7 @@ const EmployeeLeavemanagement = () => {
         }
       }
       await fetchAllData();
-      
+
       // Show cancel success alert
       Swal.fire({
         icon: 'success',
@@ -1248,12 +1248,12 @@ const EmployeeLeavemanagement = () => {
   // Filter Upcoming Leaves for Modal
   const upcomingTeamLeaves = useMemo(() => {
     const todayDate = new Date();
-    todayDate.setHours(0,0,0,0);
-    
+    todayDate.setHours(0, 0, 0, 0);
+
     return allApprovedLeaves
       .filter(l => {
         const endDate = new Date(l.to);
-        endDate.setHours(0,0,0,0);
+        endDate.setHours(0, 0, 0, 0);
         return endDate >= todayDate && l.employeeId !== user?.employeeId;
       })
       .sort((a, b) => new Date(a.from) - new Date(b.from));
@@ -1279,7 +1279,7 @@ const EmployeeLeavemanagement = () => {
       </div>
     </div>
   );
-  
+
   if (!user) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
@@ -1288,7 +1288,7 @@ const EmployeeLeavemanagement = () => {
         </div>
         <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
         <p className="text-gray-600 mb-6">Employee data not found. Please log in again.</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition duration-200"
         >
@@ -1302,7 +1302,7 @@ const EmployeeLeavemanagement = () => {
     <div className="min-h-screen p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col lg:flex-row items-start lg:items-center border border-gray-200 shadow-sm bg-white rounded-2xl p-4 justify-between mb-8"
@@ -1311,7 +1311,7 @@ const EmployeeLeavemanagement = () => {
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Leave Management</h1>
             <p className="text-gray-600">Welcome back, <span className="font-semibold text-blue-600">{user.name || user.employeeId}</span></p>
           </div>
-          
+
           <div className="flex gap-3 mt-4 lg:mt-0">
             {/* Team Leaves Button */}
             <motion.button
@@ -1335,7 +1335,7 @@ const EmployeeLeavemanagement = () => {
         </motion.div>
 
         {/* ✅ UPDATED Stats Cards - Added Unplanned Absences Card */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -1367,7 +1367,7 @@ const EmployeeLeavemanagement = () => {
                 </p>
               </div>
               <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center">
-                 <span className="text-3xl">📅</span>
+                <span className="text-3xl">📅</span>
               </div>
             </div>
           </div>
@@ -1417,7 +1417,7 @@ const EmployeeLeavemanagement = () => {
 
         {/* ✅ ADDED: Week Off Info Card */}
         {shiftDetails && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -1447,7 +1447,7 @@ const EmployeeLeavemanagement = () => {
         )}
 
         {/* Filters */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -1497,7 +1497,7 @@ const EmployeeLeavemanagement = () => {
         </motion.div>
 
         {/* Leave Requests Table */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -1509,26 +1509,29 @@ const EmployeeLeavemanagement = () => {
               Showing leaves for {formatMonth(selectedMonth)} • {selectedStatus === "All" ? "All Statuses" : selectedStatus}
             </p>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
+          
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">From-To</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">HalfDay</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Applied</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Approved By</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">From-To</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Reason</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Sessions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Action Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Applied</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Approved By</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-8 text-center">
+                    <td colSpan={9} className="px-6 py-8 text-center align-middle">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         <span className="ml-3 text-gray-600">Loading leave requests...</span>
@@ -1538,39 +1541,41 @@ const EmployeeLeavemanagement = () => {
                 ) : filteredLeaveList.length > 0 ? (
                   filteredLeaveList.map((lv) => (
                     <tr key={lv._id} className="hover:bg-blue-50 transition duration-150">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {formatDisplayDate(lv.from)} 
+                          {formatDisplayDate(lv.from)}
                           <span className="mx-2 text-gray-400">→</span>
                           {formatDisplayDate(lv.to)}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs">{lv.reason || "-"}</div>
+                      <td className="px-6 py-4 align-middle max-w-[220px] whitespace-nowrap overflow-hidden text-ellipsis group">
+                        <div className="text-sm text-gray-900 truncate" title={lv.reason || "-"}>
+                          {lv.reason || "-"}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {lv.halfDaySession || "Full Day"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           {lv.leaveType || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatDisplayDate(lv.actionDate)}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatDisplayDate(lv.requestDate)}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         {renderStatusBadge(lv.status)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="text-sm text-gray-900">{lv.approvedBy || "-"}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-middle whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           {lv.status === "Pending" && (
                             <button
@@ -1586,7 +1591,7 @@ const EmployeeLeavemanagement = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center align-middle">
                       <div className="text-gray-500">
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                           <span className="text-2xl">📝</span>
@@ -1604,7 +1609,7 @@ const EmployeeLeavemanagement = () => {
 
         {/* ✅ UPDATED: Unplanned Absences Section with Week Off info */}
         {unplannedAbsences.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
@@ -1623,13 +1628,13 @@ const EmployeeLeavemanagement = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6">
               <div className="mb-4">
                 <p className="text-gray-700 text-sm mb-3">
                   The following working days (excluding week offs and holidays) were marked as "Absent" in your attendance record but you did not apply for leave:
                 </p>
-                
+
                 {/* Week Off Info */}
                 {shiftDetails && (
                   <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1642,7 +1647,7 @@ const EmployeeLeavemanagement = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {unplannedAbsences.map((absence, index) => (
                   <div key={index} className="bg-red-50 border border-red-200 rounded-xl p-4 hover:shadow-md transition duration-200">
@@ -1663,7 +1668,7 @@ const EmployeeLeavemanagement = () => {
                   </div>
                 ))}
               </div>
-              
+
               <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-yellow-800 text-sm flex items-center">
                   <span className="mr-2">💡</span>
@@ -1676,7 +1681,7 @@ const EmployeeLeavemanagement = () => {
 
         {/* Sandwich Leaves Section */}
         {sandwichLeaves.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
@@ -1695,7 +1700,7 @@ const EmployeeLeavemanagement = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 {sandwichLeaves.map((leave, index) => (
@@ -1712,7 +1717,7 @@ const EmployeeLeavemanagement = () => {
                   </div>
                 ))}
               </div>
-              
+
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-yellow-800 text-sm flex items-center">
                   <span className="mr-2">💡</span>
@@ -1734,7 +1739,7 @@ const EmployeeLeavemanagement = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
             onClick={() => setUpcomingModalOpen(false)}
           >
-             <motion.div
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -1746,7 +1751,7 @@ const EmployeeLeavemanagement = () => {
                   <h3 className="text-xl font-bold text-indigo-900">Upcoming Team Leaves</h3>
                   <p className="text-sm text-indigo-600">Approved leaves of your colleagues from today onwards.</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setUpcomingModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
                 >
@@ -1759,20 +1764,20 @@ const EmployeeLeavemanagement = () => {
                   <div className="space-y-4">
                     {upcomingTeamLeaves.map((leave) => (
                       <div key={leave._id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition">
-                         <div className="flex items-center gap-4">
-                           <div className="flex-1">
-                             <p className="font-bold text-gray-800 text-lg">{leave.employeeName}</p>
-                             <p className="text-xs text-gray-500 uppercase font-semibold">ID: {leave.employeeId}</p>
-                           </div>
-                         </div>
-                         <div className="mt-2 sm:mt-0 text-right">
-                           <div className="bg-indigo-50 px-3 py-1 rounded-lg inline-block">
-                             <p className="text-sm font-semibold text-indigo-800">
-                               {formatDisplayDate(leave.from)} <span className="text-gray-400">→</span> {formatDisplayDate(leave.to)}
-                             </p>
-                           </div>
-                           <p className="text-xs text-gray-500 mt-1">{calculateLeaveDays(leave.from, leave.to)} Day(s) • {leave.leaveType}</p>
-                         </div>
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <p className="font-bold text-gray-800 text-lg">{leave.employeeName}</p>
+                            <p className="text-xs text-gray-500 uppercase font-semibold">ID: {leave.employeeId}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 sm:mt-0 text-right">
+                          <div className="bg-indigo-50 px-3 py-1 rounded-lg inline-block">
+                            <p className="text-sm font-semibold text-indigo-800">
+                              {formatDisplayDate(leave.from)} <span className="text-gray-400">→</span> {formatDisplayDate(leave.to)}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{calculateLeaveDays(leave.from, leave.to)} Day(s) • {leave.leaveType}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1821,10 +1826,10 @@ const EmployeeLeavemanagement = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">From Date</label>
-                    <input 
-                      type="date" 
-                      name="from" 
-                      value={form.from} 
+                    <input
+                      type="date"
+                      name="from"
+                      value={form.from}
                       onChange={handleChange}
                       min={minSelectionDate}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
@@ -1832,10 +1837,10 @@ const EmployeeLeavemanagement = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">To Date</label>
-                    <input 
-                      type="date" 
-                      name="to" 
-                      value={form.to} 
+                    <input
+                      type="date"
+                      name="to"
+                      value={form.to}
                       onChange={handleChange}
                       min={form.from || minSelectionDate}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
@@ -1864,35 +1869,42 @@ const EmployeeLeavemanagement = () => {
                     </ul>
 
                     {overlappingColleagues.length > 3 && (
-                       <div className="mt-2 text-right">
-                         {!expandOverlaps ? (
-                           <button 
-                              type="button" 
-                              onClick={() => setExpandOverlaps(true)}
-                              className="text-xs text-blue-600 font-bold hover:text-blue-800 hover:underline"
-                           >
-                             and {overlappingColleagues.length - 3} others...
-                           </button>
-                         ) : (
-                            <button 
-                              type="button" 
-                              onClick={() => setExpandOverlaps(false)}
-                              className="text-xs text-blue-600 font-bold hover:text-blue-800 hover:underline"
-                            >
-                              Show less
-                            </button>
-                         )}
-                       </div>
+                      <div className="mt-2 text-right">
+                        {!expandOverlaps ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpandOverlaps(true)}
+                            className="text-xs text-blue-600 font-bold hover:text-blue-800 hover:underline"
+                          >
+                            and {overlappingColleagues.length - 3} others...
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setExpandOverlaps(false)}
+                            className="text-xs text-blue-600 font-bold hover:text-blue-800 hover:underline"
+                          >
+                            Show less
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
 
                 {form.from && form.to && form.from === form.to && (
                   <div>
+<<<<<<< HEAD
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
+                    <select
+                      name="halfDaySession"
+                      value={form.halfDaySession}
+=======
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
                     <select 
                       name="halfDaySession" 
                       value={form.halfDaySession} 
+>>>>>>> 7b11b865092e5f608b95a421967663c5d48d7a2f
                       onChange={handleChange}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     >
@@ -1920,9 +1932,9 @@ const EmployeeLeavemanagement = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Leave Type</label>
-                  <select 
-                    name="leaveType" 
-                    value={form.leaveType} 
+                  <select
+                    name="leaveType"
+                    value={form.leaveType}
                     onChange={handleChange}
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                   >
@@ -1952,11 +1964,10 @@ const EmployeeLeavemanagement = () => {
                     onChange={handleChange}
                     maxLength={REASON_LIMIT}
                     rows="3"
-                    className={`w-full border-2 rounded-xl px-4 py-3 transition duration-200 resize-none ${
-                        isOptimized 
-                          ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200" 
-                          : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    }`}
+                    className={`w-full border-2 rounded-xl px-4 py-3 transition duration-200 resize-none ${isOptimized
+                        ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
+                        : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      }`}
                     placeholder="Brief reason for your leave"
                   ></textarea>
 
@@ -1965,11 +1976,10 @@ const EmployeeLeavemanagement = () => {
                       type="button"
                       onClick={handleOptimizeReason}
                       disabled={!form.reason.trim() || isOptimizing}
-                      className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 ${
-                        !form.reason.trim()
+                      className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 ${!form.reason.trim()
                           ? "bg-gray-300 cursor-not-allowed text-gray-500"
                           : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
-                      }`}
+                        }`}
                       style={{ fontFamily: 'Segoe UI, system-ui, sans-serif' }}
                     >
                       {isOptimizing ? (
@@ -2042,7 +2052,7 @@ const EmployeeLeavemanagement = () => {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900">Sandwich Leave Detected</h3>
               </div>
-              
+
               <div className="mb-6 space-y-3">
                 {sandwichWarning.map((warning, index) => (
                   <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
@@ -2106,14 +2116,14 @@ const EmployeeLeavemanagement = () => {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
               </div>
-              
+
               <div className="mb-6 space-y-3">
                 <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
                   <p className="text-sm text-red-700">
                     <strong>Warning:</strong> Your pending leave balance is completed for this month!
                   </p>
                 </div>
-                
+
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -2130,7 +2140,7 @@ const EmployeeLeavemanagement = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                   <p className="text-sm text-blue-700">
                     <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?

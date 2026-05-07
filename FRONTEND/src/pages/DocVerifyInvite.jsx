@@ -224,7 +224,7 @@ const DocVerifyInvite = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans antialiased text-slate-800">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-transparent p-4 md:p-8 font-sans antialiased text-slate-800">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* ── LEFT COLUMN ── */}

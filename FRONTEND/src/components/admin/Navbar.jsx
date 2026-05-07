@@ -11,7 +11,8 @@ import {
   FaKey,
   FaCog,
   FaPalette,
-  FaCheck, // Added for active state
+  FaCheck,
+  FaMoon,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import { io } from "socket.io-client";
@@ -93,7 +94,7 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
         </div>
       )}
 
-      <nav className="h-16 flex items-center justify-between px-6 shadow-lg relative" style={{ backgroundColor: themeColor }}>
+      <nav className={`h-16 flex items-center justify-between px-6 shadow-lg relative transition-all duration-500 ${currentTheme === 'dark' ? 'bg-slate-900/80 backdrop-blur-xl border-b border-white/10' : ''}`} style={currentTheme !== 'dark' ? { backgroundColor: themeColor } : {}}>
         <h1 className="text-2xl font-bold text-white tracking-wide drop-shadow"></h1>
 
         <div className="flex items-center gap-6">
@@ -108,11 +109,12 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
             </div>
 
             {showThemeDropdown && (
-              <div className="absolute top-10 right-0 bg-white border rounded-lg shadow-xl w-48 z-[100] animate-fade-in py-2">
-                <div className="px-4 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b mb-1">
+              <div className={`absolute top-10 right-0 border rounded-lg shadow-xl w-48 z-[100] animate-fade-in py-2 ${currentTheme === 'dark' ? 'bg-slate-900 border-white/10' : 'bg-white border-gray-100 shadow-blue-900/5'}`}>
+                <div className={`px-4 py-1 text-[10px] font-bold uppercase tracking-widest border-b mb-1 ${currentTheme === 'dark' ? 'text-slate-500 border-white/5' : 'text-gray-400 border-gray-100'}`}>
                   Background
                 </div>
                 {[
+                  { id: 'dark', label: 'Dark Theme' },
                   { id: 'bubbles', label: 'Bubbles Theme' },
                   { id: 'image', label: 'Green Theme' },
                   { id: 'white', label: 'Default White' }
@@ -123,9 +125,14 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
                       onThemeChange(t.id);
                       setShowThemeDropdown(false);
                     }}
-                    className="flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 cursor-pointer transition text-sm text-gray-700 font-medium"
+                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition text-sm font-medium ${currentTheme === 'dark' 
+                      ? 'text-slate-300 hover:bg-white/5' 
+                      : 'text-gray-700 hover:bg-blue-50'}`}
                   >
-                    {t.label}
+                    <div className="flex items-center gap-2">
+                      <span>{t.label}</span>
+                      {t.id === 'dark' && <FaMoon className={currentTheme === 'dark' ? "text-slate-500 text-xs" : "text-gray-400 text-xs"} />}
+                    </div>
                     {currentTheme === t.id && <FaCheck className="text-blue-500 text-xs" />}
                   </div>
                 ))}

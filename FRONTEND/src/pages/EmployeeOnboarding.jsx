@@ -256,27 +256,51 @@ const handleInitialSubmit = async (e) => {
     try {
       // 🚨 FIX: Explicitly setting the header here overrides the global JSON header in api.js
       // This guarantees the files are actually packaged and sent to the backend.
-      await api.post('/api/employees/onboard', finalData, {
+      const onboardResponse = await api.post('/api/employees/onboard', finalData, {
         headers: { 
           'Content-Type': 'multipart/form-data' 
         }
       });
 
-      await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+      // ✅ FIX: If backend says profile already exists (alreadyExists:true),
+      // it means a previous attempt succeeded. Still mark onboarded and proceed.
+      // For fresh creation OR existing-profile recovery, always call mark-onboarded.
+      try {
+        await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+      } catch (_markErr) {
+        // Ignore — invite may already be marked onboarded from a previous attempt
+      }
 
       setLoading(false);
       setStage('compliance'); // Direct transition to Policy Compliance
       
     } catch (err) {
       setLoading(false);
-      
-      // Better error message extraction
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "An error occurred during onboarding. Please check your details.";
+
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "";
+      const isAlreadyRegistered =
+        err.response?.status === 400 &&
+        (errorMessage.toLowerCase().includes("already registered") ||
+          errorMessage.toLowerCase().includes("already exists") ||
+          errorMessage.toLowerCase().includes("employeeid"));
+
+      // ✅ RECOVERY: If the employee record already exists in DB, it means a previous
+      // submission succeeded but the mark-onboarded call failed (network glitch, timeout, etc.).
+      // The profile is saved — just mark them onboarded and move to compliance.
+      if (isAlreadyRegistered) {
+        try {
+          await api.post('/api/invited-employees/mark-onboarded', { email: formData.email });
+        } catch (_markErr) {
+          // Ignore — the invite may already be marked onboarded on a previous attempt.
+        }
+        setStage('compliance');
+        return;
+      }
       
       Swal.fire({
         icon: 'error',
         title: 'Submission Failed',
-        text: errorMessage,
+        text: errorMessage || "An error occurred during onboarding. Please check your details.",
         confirmButtonColor: '#ef4444'
       });
     }

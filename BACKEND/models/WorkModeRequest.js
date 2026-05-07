@@ -23,10 +23,11 @@ const workModeRequestSchema = new mongoose.Schema({
   reason: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ["Pending", "Approved", "Rejected"], 
+    enum: ["Pending", "Approved", "Rejected", "Withdrawn"], 
     default: "Pending" 
   },
-  adminComment: { type: String } // Optional reason for rejection
+  adminComment: { type: String }, // Optional reason for rejection
+  isEdited: { type: Boolean, default: false }
 }, { timestamps: true });
 
 export default mongoose.model("WorkModeRequest", workModeRequestSchema);

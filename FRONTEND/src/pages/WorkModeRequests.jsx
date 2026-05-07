@@ -181,6 +181,16 @@ const WorkModeRequests = () => {
                           Pending
                         </span>
                       )}
+                      {req.status === 'Withdrawn' && (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] font-bold rounded flex items-center gap-1">
+                          Withdrawn
+                        </span>
+                      )}
+                      {req.isEdited && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded flex items-center gap-1 border border-blue-100 mt-1">
+                          <FaSyncAlt size={8} /> Edited
+                        </span>
+                      )}
                     </div>
                   </div>
 

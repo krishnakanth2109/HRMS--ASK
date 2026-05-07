@@ -13,6 +13,7 @@ import {
   FaCog,
   FaPalette,
   FaCheck,
+  FaMoon,
 } from "react-icons/fa";
 import { CurrentEmployeeNotificationContext } from "../../EmployeeContext/CurrentEmployeeNotificationContext";
 
@@ -24,8 +25,8 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
-  const[employeeName, setEmployeeName] = useState("Employee");
-  
+  const [employeeName, setEmployeeName] = useState("Employee");
+
   const menuRef = useRef(null);
   const themeRef = useRef(null);
 
@@ -36,7 +37,7 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
       const user = JSON.parse(savedUser);
       setEmployeeName(user.name || "Employee");
     }
-  },[]);
+  }, []);
 
   const user = {
     name: employeeName,
@@ -57,45 +58,46 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  },[]);
+  }, []);
 
   return (
-    <nav className="h-16 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 flex items-center justify-between px-6 shadow-lg relative z-10">
+    <nav className={`h-16 flex items-center justify-between px-6 shadow-lg relative z-10 transition-all duration-500 ${currentTheme === 'dark' ? 'bg-slate-900/80 backdrop-blur-xl border-b border-white/10' : 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700'}`}>
 
-{/* Logo + Toggle */}
-<div
-  className="flex items-center gap-3 cursor-pointer"
-  onClick={() => navigate("/employee/dashboard")}
->
-  {/* Sidebar Toggle Button */}
- <button className="text-white text-2xl md:hidden">
-    ☰
-  </button>
+      {/* Logo + Toggle */}
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={() => navigate("/employee/dashboard")}
+      >
+        {/* Sidebar Toggle Button */}
+        <button className="text-white text-2xl md:hidden">
+          ☰
+        </button>
 
-  {/* HRMS Title */}
-  <h1 className="text-2xl font-bold text-white tracking-wide drop-shadow">
-    HRMS
-  </h1>
-</div>
+        {/* HRMS Title */}
+        <h1 className="text-2xl font-bold text-white tracking-wide drop-shadow">
+          HRMS
+        </h1>
+      </div>
 
       {/* Right Section */}
       <div className="flex items-center gap-6">
 
         {/* 🔥 THEME SELECTION OPTION */}
         <div className="relative" ref={themeRef}>
-          <div 
-            className="cursor-pointer group p-1" 
+          <div
+            className="cursor-pointer group p-1"
             onClick={() => setShowThemeDropdown(!showThemeDropdown)}
           >
             <FaPalette className="text-xl text-white group-hover:text-yellow-300 transition" />
           </div>
 
           {showThemeDropdown && (
-            <div className="absolute top-10 right-0 bg-white border rounded-lg shadow-xl w-48 z-[100] animate-fade-in py-2">
-              <div className="px-4 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b mb-1">
+            <div className={`absolute top-10 right-0 border rounded-lg shadow-xl w-48 z-[100] animate-fade-in py-2 ${currentTheme === 'dark' ? 'bg-slate-900 border-white/10' : 'bg-white border-gray-100 shadow-blue-900/5'}`}>
+              <div className={`px-4 py-1 text-[10px] font-bold uppercase tracking-widest border-b mb-1 ${currentTheme === 'dark' ? 'text-slate-500 border-white/5' : 'text-gray-400 border-gray-100'}`}>
                 Background
               </div>
               {[
+                { id: 'dark', label: 'Dark Theme' },
                 { id: 'bubbles', label: 'Bubbles Theme' },
                 { id: 'image', label: 'Green Theme' },
                 { id: 'white', label: 'Default White' }
@@ -106,9 +108,14 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
                     onThemeChange(t.id);
                     setShowThemeDropdown(false);
                   }}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 cursor-pointer transition text-sm text-gray-700 font-medium"
+                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition text-sm font-medium ${currentTheme === 'dark' 
+                    ? 'text-slate-300 hover:bg-white/5' 
+                    : 'text-gray-700 hover:bg-blue-50'}`}
                 >
-                  {t.label}
+                  <div className="flex items-center gap-2">
+                    <span>{t.label}</span>
+                    {t.id === 'dark' && <FaMoon className={currentTheme === 'dark' ? "text-slate-500 text-xs" : "text-gray-400 text-xs"} />}
+                  </div>
                   {currentTheme === t.id && <FaCheck className="text-blue-500 text-xs" />}
                 </div>
               ))}
@@ -138,9 +145,8 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
             {user.name}
           </span>
           <FaChevronDown
-            className={`text-white ml-1 transition-transform duration-200 ${
-              showMenu ? "rotate-180" : ""
-            }`}
+            className={`text-white ml-1 transition-transform duration-200 ${showMenu ? "rotate-180" : ""
+              }`}
           />
 
           {showMenu && (
