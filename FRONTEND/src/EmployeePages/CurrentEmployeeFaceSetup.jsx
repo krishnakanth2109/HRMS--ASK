@@ -13,6 +13,9 @@ import {
   FaSearchPlus,
   FaTimes,
   FaBook,
+  FaDownload,
+  FaFileAlt,
+  FaWindows,
 } from "react-icons/fa";
 import FaceRegister from "../components/FaceRegister";
 import FingerprintSetupCard from "../components/FingerprintSetupCard";
@@ -33,8 +36,6 @@ const OrangeArrow = ({ top, left, width = "12%" }) => (
     </svg>
   </div>
 );
-
-
 
 const CurrentEmployeeFaceSetup = () => {
   const [showFaceRegister, setShowFaceRegister] = useState(false);
@@ -161,7 +162,7 @@ const CurrentEmployeeFaceSetup = () => {
             <FingerprintSetupCard />
           </motion.div>
 
-          {/* Vertical Setup Guide Section */}
+          {/* Vertical Setup Guide Section - Enhanced UI */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -172,30 +173,82 @@ const CurrentEmployeeFaceSetup = () => {
             <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple-200/30 blur-[80px]" />
             <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-200/30 blur-[80px]" />
 
-            <div className="relative z-10 mb-12 text-center md:text-left">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-purple-500 mb-2">
-                Step-by-Step
-              </p>
-              <h2 className="text-3xl font-black tracking-tight text-slate-800 md:text-4xl">
-                System Configuration Guide
-              </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-500 md:mx-0">
-                Follow these detailed steps to set up Tampermonkey for your HRMS environment. This ensures all automated features work seamlessly.
-              </p>
-              <div className="mt-6 flex justify-center md:justify-start">
+            <div className="relative z-10">
+              <div className="mb-10 text-center md:text-left">
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-purple-500 mb-2">
+                  Step-by-Step
+                </p>
+                <h2 className="text-3xl font-black tracking-tight text-slate-800 md:text-4xl">
+                  System Moniter Configuration Guide
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-base text-slate-500 md:mx-0">
+                  Follow these detailed steps to set up Tampermonkey for your HRMS environment. This ensures all automated features work seamlessly.
+                </p>
+              </div>
+
+              {/* Enhanced Two-Button Area */}
+              <div className="flex flex-col items-center justify-center gap-8 md:flex-row md:items-stretch">
+                {/* Documentation Button - Glassmorphism Style */}
                 <a
                   href="https://docs.google.com/document/d/111UdyP2es0g0n11HGpvwTF7_4TPvAsGQ/edit?usp=sharing&ouid=100321873313062611617&rtpof=true&sd=true"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-purple-100 px-5 py-3 text-sm font-bold text-purple-700 transition-all duration-300 hover:bg-purple-200 hover:-translate-y-1 hover:shadow-md"
+                  className="group relative flex w-full max-w-md items-center justify-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 to-white p-1 shadow-lg transition-all duration-500 hover:shadow-xl hover:-translate-y-1 md:w-auto"
                 >
-                  <FaBook className="text-lg" />
-                  Click here to open clear documentation over the process
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/5 to-purple-600/0 opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
+                  <div className="relative flex w-full items-center justify-center gap-4 rounded-xl bg-white/80 px-8 py-5 backdrop-blur-sm transition-all duration-300 group-hover:bg-white/95">
+                    <div className="rounded-full bg-purple-100 p-3 text-purple-600 shadow-md transition-all duration-300 group-hover:bg-purple-600 group-hover:text-white group-hover:shadow-purple-300">
+                      <FaFileAlt className="text-2xl" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold uppercase tracking-wider text-purple-500">
+                        Clear Documentation
+                      </p>
+                      <p className="text-lg font-bold text-slate-700 group-hover:text-purple-700">
+                        Click here to open guide
+                      </p>
+                    </div>
+                    <FaBook className="ml-2 text-xl text-purple-400 transition-all duration-300 group-hover:translate-x-1 group-hover:text-purple-600" />
+                  </div>
                 </a>
+
+                {/* Download Button Area with Description Above - Enhanced */}
+                <div className="flex w-full max-w-md flex-col items-center gap-3 md:w-auto">
+                  {/* Description above download button */}
+                  <div className="rounded-xl bg-blue-50/80 px-5 py-2.5 text-center shadow-sm backdrop-blur-sm">
+                    <p className="flex items-center justify-center gap-2 text-sm font-semibold text-blue-700">
+                      <FaWindows className="text-base" />
+                      <span>Download this software extension on your PC and complete the above Tampermonkey setup process step by step</span>
+                    </p>
+                  </div>
+                  
+                  {/* Download Button - Premium Style */}
+                  <a
+                    href="/tracker/HRMS_Activity_Tracker_Setup.exe"
+                    download="HRMS_Activity_Tracker_Setup.exe"
+                    className="group relative flex w-full items-center justify-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-[2px] shadow-lg transition-all duration-500 hover:shadow-xl hover:-translate-y-1"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-indigo-400/20 to-blue-400/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                    <div className="relative flex w-full items-center justify-center gap-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 transition-all duration-300 group-hover:from-blue-100 group-hover:to-indigo-100">
+                      <div className="rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 text-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg">
+                        <FaDownload className="text-xl" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-bold uppercase tracking-wider text-blue-500">
+                          Direct Installer
+                        </p>
+                        <p className="text-lg font-bold text-slate-700 group-hover:text-indigo-700">
+                          Download Activity Tracker App
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Version 2.0.1 • 24.5 MB
+                        </p>
+                      </div>
+                    </div>
+                  </a>
+                </div>
               </div>
             </div>
-
-      
           </motion.div>
         </div>
       ) : (

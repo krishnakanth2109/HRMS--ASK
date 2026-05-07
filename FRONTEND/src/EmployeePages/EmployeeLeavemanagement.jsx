@@ -1892,17 +1892,10 @@ const EmployeeLeavemanagement = () => {
 
                 {form.from && form.to && form.from === form.to && (
                   <div>
-<<<<<<< HEAD
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
-                    <select 
-                      name="halfDaySession" 
-                      value={form.halfDaySession} 
-=======
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
                     <select
                       name="halfDaySession"
                       value={form.halfDaySession}
->>>>>>> 74ac98d94182c5bfee89cf81267ed6b591229320
                       onChange={handleChange}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     >
