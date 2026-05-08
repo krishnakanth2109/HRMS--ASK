@@ -475,27 +475,12 @@ const EmployeeLeavemanagement = () => {
       let leavesData = [];
 
       if (typeof getLeaveRequestsForEmployee === "function") {
-        try {
-          const maybeResult = await getLeaveRequestsForEmployee(empId);
-          if (Array.isArray(maybeResult)) {
-            leavesData = maybeResult;
-          }
-        } catch (err) {
-          console.warn("Failed to fetch leaves via function, trying API directly", err);
+        const maybeResult = await getLeaveRequestsForEmployee(empId);
+        if (Array.isArray(maybeResult)) {
+          leavesData = maybeResult;
         }
-      }
-
-      // Fallback to API if function fails
-      if (!leavesData.length) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        const url = new URL(API_BASE, window.location.origin);
-        url.searchParams.set("employeeId", empId);
-
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error("Failed to fetch leave list");
-
-        const data = await res.json();
-        leavesData = data || [];
+      } else {
+        throw new Error("Fetch leaves function is not available.");
       }
 
       const normalized = leavesData.map((d) => ({
@@ -1094,27 +1079,10 @@ const EmployeeLeavemanagement = () => {
         halfDaySession: from === to ? halfDaySession || "" : "",
       };
 
-      let applied = false;
       if (typeof applyForLeave === "function") {
-        try {
-          await applyForLeave(payload);
-          applied = true;
-        } catch (err) {
-          console.error("Error applying leave via function:", err);
-        }
-      }
-
-      if (!applied) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        const res = await fetch(API_BASE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          throw new Error(txt || "Submit failed");
-        }
+        await applyForLeave(payload);
+      } else {
+        throw new Error("Leave application function is not available.");
       }
 
       playRequestSound();
@@ -1187,22 +1155,10 @@ const EmployeeLeavemanagement = () => {
     });
 
     try {
-      let canceled = false;
       if (typeof cancelLeaveRequestById === "function") {
-        try {
-          await cancelLeaveRequestById(leaveId);
-          canceled = true;
-        } catch (err) {
-          console.error("Error cancelling leave via function:", err);
-        }
-      }
-      if (!canceled) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        let res = await fetch(`${API_BASE}/${leaveId}`, { method: "DELETE" });
-        if (!res.ok) {
-          res = await fetch(`${API_BASE}/${leaveId}/cancel`, { method: "POST" });
-          if (!res.ok) throw new Error("Cancel failed");
-        }
+        await cancelLeaveRequestById(leaveId);
+      } else {
+        throw new Error("Cancel leave function is not available.");
       }
       await fetchAllData();
 
