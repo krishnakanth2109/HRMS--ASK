@@ -215,13 +215,13 @@ const CurrentEmployeeFaceSetup = () => {
                 {/* Download Button Area with Description Above - Enhanced */}
                 <div className="flex w-full max-w-md flex-col items-center gap-3 md:w-auto">
                   {/* Description above download button */}
-                  <div className="rounded-xl bg-blue-50/80 px-5 py-2.5 text-center shadow-sm backdrop-blur-sm">
+                  <div className="rounded-xl  px-5 py-2.5 text-center shadow-sm backdrop-blur-sm">
                     <p className="flex items-center justify-center gap-2 text-sm font-semibold text-blue-700">
                       <FaWindows className="text-base" />
                       <span>Download this software extension on your PC and complete the above Tampermonkey setup process step by step</span>
                     </p>
                   </div>
-                  
+
                   {/* Download Button - Premium Style */}
                   <a
                     href="/tracker/HRMS_Activity_Tracker_Setup.exe"

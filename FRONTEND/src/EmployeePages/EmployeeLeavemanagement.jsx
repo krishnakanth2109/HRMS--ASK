@@ -1453,44 +1453,55 @@ const EmployeeLeavemanagement = () => {
           transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl shadow-lg p-6 mb-8"
         >
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Month</label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full lg:w-64 border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
-              >
-                {monthOptions.map((m) => (
-                  <option key={m} value={m}>
-                    {formatMonth(m)}
-                  </option>
-                ))}
-              </select>
+          <div className="flex flex-col lg:flex-row gap-5 items-start lg:items-center">
+            <div className="w-full lg:flex-1">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Filter by Month</label>
+              <div className="relative group">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full border-2 border-gray-100 bg-gray-50/30 rounded-2xl px-5 py-4 text-sm font-black text-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
+                >
+                  {monthOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {formatMonth(m)}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-blue-500 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
             </div>
 
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Status</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full lg:w-64 border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
-              >
-                {statusOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+            <div className="w-full lg:flex-1">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Filter by Status</label>
+              <div className="relative group">
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full border-2 border-gray-100 bg-gray-50/30 rounded-2xl px-5 py-4 text-sm font-black text-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
+                >
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-blue-500 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
             </div>
 
-            <div className="flex-1 text-right">
+            <div className="w-full lg:w-auto lg:self-end">
               <button
                 onClick={handleRefresh}
                 disabled={loadingAttendance || loadingShift}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full lg:w-auto group flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white font-black uppercase tracking-widest text-[11px] px-8 py-4 rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(loadingAttendance || loadingShift) ? "🔄 Loading..." : "🔄 Refresh"}
+                <span className={`transition-transform duration-500 ${(loadingAttendance || loadingShift) ? "animate-spin" : "group-hover:rotate-180"}`}>🔄</span>
+                {(loadingAttendance || loadingShift) ? "Loading..." : "Refresh Data"}
               </button>
             </div>
           </div>
@@ -1512,7 +1523,8 @@ const EmployeeLeavemanagement = () => {
 
 
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full min-w-[900px]">
+            {/* Desktop Table View */}
+            <table className="w-full min-w-[900px] hidden md:table">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">From-To</th>
@@ -1602,6 +1614,78 @@ const EmployeeLeavemanagement = () => {
                 )}
               </tbody>
             </table>
+
+            {/* Mobile Card List View */}
+            <div className="md:hidden flex flex-col divide-y divide-gray-100">
+              {loading ? (
+                <div className="p-12 text-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-4 text-gray-500 font-medium">Fetching requests...</p>
+                </div>
+              ) : filteredLeaveList.length > 0 ? (
+                filteredLeaveList.map((lv) => (
+                  <div key={lv._id} className="p-5 flex flex-col gap-4 active:bg-blue-50/30 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Duration</span>
+                        <div className="text-sm font-black text-gray-900 flex items-center gap-2">
+                          {formatDisplayDate(lv.from)}
+                          <span className="text-blue-200">→</span>
+                          {formatDisplayDate(lv.to)}
+                        </div>
+                      </div>
+                      {renderStatusBadge(lv.status)}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-purple-50/50 p-3 rounded-2xl border border-purple-100/50">
+                        <span className="text-[9px] font-black text-purple-400 uppercase tracking-wider block mb-1">Leave Type</span>
+                        <span className="text-xs font-black text-purple-700">{lv.leaveType || "-"}</span>
+                      </div>
+                      <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50">
+                        <span className="text-[9px] font-black text-blue-400 uppercase tracking-wider block mb-1">Session</span>
+                        <span className="text-xs font-black text-blue-700">{lv.halfDaySession || "Full Day"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Reason</span>
+                      <p className="text-xs text-gray-600 leading-relaxed italic bg-gray-50/50 p-3 rounded-2xl border border-gray-100/50 whitespace-pre-wrap">"{lv.reason || "-"}"</p>
+                    </div>
+
+                    <div className="flex justify-between items-end mt-1 pt-4 border-t border-gray-100">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <span className="text-gray-400 font-bold uppercase tracking-tighter">Applied:</span>
+                          <span className="text-gray-900 font-black">{formatDisplayDate(lv.requestDate)}</span>
+                        </div>
+                        {lv.approvedBy && (
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="text-gray-400 font-bold uppercase tracking-tighter">Approved By:</span>
+                            <span className="text-blue-600 font-black">{lv.approvedBy}</span>
+                          </div>
+                        )}
+                      </div>
+                      {lv.status === "Pending" && (
+                        <button
+                          onClick={() => handleCancelLeave(lv._id)}
+                          className="px-5 py-2.5 bg-red-50 text-red-600 text-[11px] font-black uppercase tracking-wider rounded-xl border border-red-100 shadow-sm active:scale-90 transition-transform"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-16 text-center">
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-gray-200">
+                    <span className="text-2xl opacity-40">📅</span>
+                  </div>
+                  <p className="text-gray-400 font-black uppercase tracking-widest text-xs">No Records Found</p>
+                </div>
+              )}
+            </div>
           </div>
         </motion.div>
 
@@ -1891,62 +1975,63 @@ const EmployeeLeavemanagement = () => {
                 )}
 
                 {form.from && form.to && form.from === form.to && (
-                  <div>
-<<<<<<< HEAD
-
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
-                    <select
-                      name="halfDaySession"
-                      value={form.halfDaySession}
-
-=======
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
-                    <select
-                      name="halfDaySession"
-                      value={form.halfDaySession}
->>>>>>> 043fa46c63bc89cdee4401e47ea38c30e4dcb27d
-                      onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
-                    >
-                      <option value="">Full Day</option>
-                      <option value="Morning Half">Morning Half</option>
-                      <option value="Afternoon Half">Afternoon Half</option>
-                    </select>
+                  <div className="w-full">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Half Day Session</label>
+                    <div className="relative group">
+                      <select
+                        name="halfDaySession"
+                        value={form.halfDaySession}
+                        onChange={handleChange}
+                        className="w-full border-2 border-gray-100 bg-gray-50/30 rounded-2xl px-5 py-4 text-sm font-black text-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Full Day</option>
+                        <option value="Morning Half">Morning Half</option>
+                        <option value="Afternoon Half">Afternoon Half</option>
+                      </select>
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-blue-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </div>
                   </div >
                 )}
 
-{/* Sandwich Warning */ }
-{
-  sandwichWarning && sandwichWarning.length > 0 && (
-    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
-      <div className="flex items-start">
-        <span className="text-yellow-600 text-xl mr-2">⚠️</span>
-        <div>
-          <p className="font-semibold text-yellow-800 mb-2">Sandwich Leave Warning</p>
-          {sandwichWarning.map((warning, index) => (
-            <p key={index} className="text-sm text-yellow-700 mb-1">{warning.message}</p>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+                {/* Sandwich Warning */}
+                {
+                  sandwichWarning && sandwichWarning.length > 0 && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                      <div className="flex items-start">
+                        <span className="text-yellow-600 text-xl mr-2">⚠️</span>
+                        <div>
+                          <p className="font-semibold text-yellow-800 mb-2">Sandwich Leave Warning</p>
+                          {sandwichWarning.map((warning, index) => (
+                            <p key={index} className="text-sm text-yellow-700 mb-1">{warning.message}</p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Leave Type</label>
-                  <select
-                    name="leaveType"
-                    value={form.leaveType}
-                    onChange={handleChange}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
-                  >
-                    <option value="">Select Leave Type</option>
-                    <option value="CASUAL">Casual Leave</option>
-                    <option value="SICK">Sick Leave</option>
-                    <option value="EMERGENCY">Emergency Leave</option>
-                    <option value="PAID">Paid Leave</option>
-                    <option value="LOP">Loss of Pay (LOP)</option>
-                  </select>
+                <div className="w-full">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Leave Type</label>
+                  <div className="relative group">
+                    <select
+                      name="leaveType"
+                      value={form.leaveType}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-100 bg-gray-50/30 rounded-2xl px-5 py-4 text-sm font-black text-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Leave Type</option>
+                      <option value="CASUAL">Casual Leave</option>
+                      <option value="SICK">Sick Leave</option>
+                      <option value="EMERGENCY">Emergency Leave</option>
+                      <option value="PAID">Paid Leave</option>
+                      <option value="LOP">Loss of Pay (LOP)</option>
+                    </select>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-blue-500 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -2000,186 +2085,186 @@ const EmployeeLeavemanagement = () => {
                   </div>
                 </div>
 
-{
-  submitError && (
-    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
-      <p className="text-red-700 font-semibold">{submitError}</p>
-    </div>
-  )
-}
+                {
+                  submitError && (
+                    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+                      <p className="text-red-700 font-semibold">{submitError}</p>
+                    </div>
+                  )
+                }
 
-{
-  submitSuccess && (
-    <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
-      <p className="text-green-700 font-semibold">{submitSuccess}</p>
-    </div>
-  )
-}
+                {
+                  submitSuccess && (
+                    <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
+                      <p className="text-green-700 font-semibold">{submitSuccess}</p>
+                    </div>
+                  )
+                }
 
-<div className="flex gap-3 pt-4">
-  <button
-    type="submit"
-    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
-  >
-    Submit Leave Request
-  </button>
-  <button
-    type="button"
-    onClick={() => setModalOpen(false)}
-    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
-  >
-    Cancel
-  </button>
-</div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
+                  >
+                    Submit Leave Request
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </form >
             </motion.div >
           </motion.div >
         )}
       </AnimatePresence >
 
-  {/* Sandwich Alert Modal */ }
-  < AnimatePresence >
-  { showSandwichAlert && sandwichWarning && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-      >
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h3 className="text-xl font-bold text-gray-900">Sandwich Leave Detected</h3>
-        </div>
-
-        <div className="mb-6 space-y-3">
-          {sandwichWarning.map((warning, index) => (
-            <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-              <p className="text-sm text-gray-700">{warning.message}</p>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-gray-600 mb-6">
-          Do you want to proceed with this leave request?
-        </p>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              setShowSandwichAlert(false);
-              // Check for LOP warning before submitting
-              const hasLOPWarning = checkLOPWarning(form.from, form.to);
-              if (hasLOPWarning) {
-                setShowLOPWarning(true);
-              } else {
-                submitLeaveRequest();
-              }
-            }}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+      {/* Sandwich Alert Modal */}
+      < AnimatePresence >
+        {showSandwichAlert && sandwichWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
-            Yes, Proceed
-          </button>
-          <button
-            onClick={() => {
-              setShowSandwichAlert(false);
-            }}
-            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
-          >
-            Cancel
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Sandwich Leave Detected</h3>
+              </div>
+
+              <div className="mb-6 space-y-3">
+                {sandwichWarning.map((warning, index) => (
+                  <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                    <p className="text-sm text-gray-700">{warning.message}</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Do you want to proceed with this leave request?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowSandwichAlert(false);
+                    // Check for LOP warning before submitting
+                    const hasLOPWarning = checkLOPWarning(form.from, form.to);
+                    if (hasLOPWarning) {
+                      setShowLOPWarning(true);
+                    } else {
+                      submitLeaveRequest();
+                    }
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Yes, Proceed
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSandwichAlert(false);
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence >
 
-  {/* ✅ NEW: LOP Warning Modal */ }
-  < AnimatePresence >
-  { showLOPWarning && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-      >
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
-            <span className="text-2xl text-red-600">💰</span>
-          </div>
-          <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
-        </div>
-
-        <div className="mb-6 space-y-3">
-          <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
-            <p className="text-sm text-red-700">
-              <strong>Warning:</strong> Your pending leave balance is completed for this month!
-            </p>
-          </div>
-
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-700">Available Pending Leaves:</span>
-                <span className="text-sm font-semibold">{LOPWarningDetails.pendingLeaves} day(s)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-700">Requested Leave Days:</span>
-                <span className="text-sm font-semibold">{LOPWarningDetails.requestedDays} day(s)</span>
-              </div>
-              <div className="flex justify-between border-t border-yellow-200 pt-2">
-                <span className="text-sm font-semibold text-red-600">Will be marked as LOP:</span>
-                <span className="text-sm font-bold text-red-600">{LOPWarningDetails.willBeLOP} day(s)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-700">
-              <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?
-            </p>
-          </div>
-        </div>
-
-        <p className="text-gray-600 mb-6">
-          Do you want to continue with this leave request as LOP?
-        </p>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              setShowLOPWarning(false);
-              submitLeaveRequest();
-            }}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+      {/* ✅ NEW: LOP Warning Modal */}
+      < AnimatePresence >
+        {showLOPWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
-            Yes, Proceed as LOP
-          </button>
-          <button
-            onClick={() => {
-              setShowLOPWarning(false);
-            }}
-            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
-          >
-            Cancel Request
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-2xl text-red-600">💰</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
+              </div>
+
+              <div className="mb-6 space-y-3">
+                <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
+                  <p className="text-sm text-red-700">
+                    <strong>Warning:</strong> Your pending leave balance is completed for this month!
+                  </p>
+                </div>
+
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-700">Available Pending Leaves:</span>
+                      <span className="text-sm font-semibold">{LOPWarningDetails.pendingLeaves} day(s)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-700">Requested Leave Days:</span>
+                      <span className="text-sm font-semibold">{LOPWarningDetails.requestedDays} day(s)</span>
+                    </div>
+                    <div className="flex justify-between border-t border-yellow-200 pt-2">
+                      <span className="text-sm font-semibold text-red-600">Will be marked as LOP:</span>
+                      <span className="text-sm font-bold text-red-600">{LOPWarningDetails.willBeLOP} day(s)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-700">
+                    <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Do you want to continue with this leave request as LOP?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowLOPWarning(false);
+                    submitLeaveRequest();
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Yes, Proceed as LOP
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLOPWarning(false);
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
+                >
+                  Cancel Request
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence >
     </div >
   );

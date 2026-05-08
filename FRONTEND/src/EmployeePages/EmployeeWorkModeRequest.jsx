@@ -273,51 +273,7 @@ const EmployeeWorkModeRequest = () => {
     }
   };
 
-  const handleDeleteIndividual = async (id) => {
-    const result = await Swal.fire({
-      title: "Delete from History?",
-      text: "This will remove the request record from your history.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, delete it!"
-    });
 
-    if (result.isConfirmed) {
-      try {
-        await api.delete(`/api/admin/requests/my/${id}`);
-        Swal.fire("Deleted!", "Record removed from history.", "success");
-        fetchRequests();
-      } catch (err) {
-        Swal.fire("Error", err.response?.data?.message || "Delete failed", "error");
-      }
-    }
-  };
-
-  const handleClearHistory = async () => {
-    if (requests.length === 0) return;
-
-    const result = await Swal.fire({
-      title: "Clear All History?",
-      text: "This will permanently remove ALL your work mode request records.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, clear all!"
-    });
-
-    if (result.isConfirmed) {
-      try {
-        await api.delete(`/api/admin/requests/my/clear/${user.employeeId}`);
-        Swal.fire("Cleared!", "Your entire history has been wiped.", "success");
-        fetchRequests();
-      } catch (err) {
-        Swal.fire("Error", err.response?.data?.message || "Clear failed", "error");
-      }
-    }
-  };
 
   // --- UI HELPER COMPONENTS ---
 
@@ -354,27 +310,29 @@ const EmployeeWorkModeRequest = () => {
     const statusColor = isWFO ? "bg-gradient-to-r from-blue-600 to-indigo-700" : "bg-gradient-to-r from-green-500 to-emerald-600";
     
     return (
-      <div className={`${statusColor} rounded-xl p-6 text-white shadow-lg mb-8 relative overflow-hidden`}>
+      <div className={`${statusColor} rounded-2xl md:rounded-3xl p-6 md:p-8 text-white shadow-xl mb-10 relative overflow-hidden`}>
         {/* Background Icon */}
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          {isWFO ? <FaBuilding size={100} /> : <FaLaptopHouse size={100} />}
+        <div className="absolute top-0 right-0 p-4 opacity-10 translate-x-1/4 -translate-y-1/4">
+          {isWFO ? <FaBuilding size={150} /> : <FaLaptopHouse size={150} />}
         </div>
         
-        <div className="relative z-10">
-          <h2 className="text-sm uppercase tracking-wide font-medium opacity-90 mb-1">Current Active Mode</h2>
-          
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-3xl font-bold">{isWFO ? "Work From Office" : "Work From Home"}</span>
-            <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm">
-                {isWFO ? <FaBuilding size={20}/> : <FaLaptopHouse size={20}/>}
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-[10px] md:text-xs uppercase tracking-[0.2em] font-black opacity-70 mb-2">Current Active Mode</h2>
+            <div className="flex items-center gap-4">
+              <span className="text-2xl md:text-4xl font-black tracking-tight">{isWFO ? "Work From Office" : "Work From Home"}</span>
+              <div className="bg-white/20 p-2 md:p-3 rounded-2xl backdrop-blur-sm border border-white/20 shadow-lg">
+                  {isWFO ? <FaBuilding size={24}/> : <FaLaptopHouse size={24}/>}
+              </div>
             </div>
           </div>
-          
-          {/* Detailed Description like Dashboard */}
-          {/* <div className="flex items-start gap-2 bg-black/20 backdrop-blur-md p-3 rounded-lg text-sm font-medium border border-white/10"> */}
-            {/* <FaInfoCircle className="mt-0.5 flex-shrink-0" size={14} /> */}
-            <span className="leading-tight">{description}</span>
-          {/* </div> */}
+
+          <div className="bg-black/20 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/10 max-w-sm">
+            <div className="flex items-start gap-3">
+              <FaInfoCircle className="mt-1 flex-shrink-0 opacity-50" size={14} />
+              <p className="text-xs md:text-sm font-medium leading-relaxed opacity-90">{description}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -424,7 +382,7 @@ const EmployeeWorkModeRequest = () => {
                 {/* Mode Selection */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Desired Work Mode</label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <ModeRadio mode="WFO" icon={<FaBuilding />} label="Work From Office" />
                     <ModeRadio mode="WFH" icon={<FaLaptopHouse />} label="Work From Home" />
                   </div>
@@ -493,55 +451,57 @@ const EmployeeWorkModeRequest = () => {
             </div>
           </div>
 
-          {/* 3. REQUEST HISTORY (Right Column) */}
+          {/* 3. PENDING REQUESTS (Right Column) */}
           <div className="col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full max-h-[800px]">
               <div className="p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                  <FaHistory className="text-blue-500" /> Request History
+                  <FaHourglassHalf className="text-yellow-500" /> Pending Requests
                 </h3>
+                {pendingRequests.length > 0 && <span className="bg-yellow-100 text-yellow-700 text-[10px] font-black px-2 py-0.5 rounded-full">{pendingRequests.length}</span>}
               </div>
               
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                {historyRequests.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400 flex flex-col items-center">
-                    <FaHistory size={30} className="mb-2 opacity-20"/>
-                    <p className="text-sm">No history found.</p>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                {pendingRequests.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center">
+                    <FaHourglassHalf size={30} className="mb-3 opacity-10"/>
+                    <p className="text-sm font-bold">No Pending Requests</p>
                   </div>
                 ) : (
-                  historyRequests.map(req => (
-                    <div key={req._id} className="group bg-white p-4 rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${req.requestType === 'Permanent' ? 'bg-orange-100 text-orange-700' : 'bg-blue-50 text-blue-700'}`}>
+                  pendingRequests.map(req => (
+                    <div key={req._id} className="bg-white p-4 rounded-2xl border border-yellow-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
+                      
+                      <div className="flex justify-between items-start mb-3 pl-1">
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${req.requestType === 'Permanent' ? 'bg-orange-100 text-orange-700' : 'bg-blue-50 text-blue-700'}`}>
                           {req.requestType}
                         </span>
                         <span className="text-[10px] text-gray-400">{new Date(req.createdAt).toLocaleDateString()}</span>
                       </div>
-                      
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className={`font-bold text-sm ${req.requestedMode === 'WFH' ? 'text-green-600' : 'text-blue-600'}`}>
-                          {req.requestedMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
-                        </span>
-                      </div>
 
-                      <div className="text-xs text-gray-500 mb-3 flex items-start gap-1.5">
-                        <FaCalendarDay className="mt-0.5 opacity-50"/>
-                        <span>
-                          {req.requestType === "Temporary" && `${new Date(req.fromDate).toLocaleDateString()} ➝ ${new Date(req.toDate).toLocaleDateString()}`}
-                          {req.requestType === "Recurring" && `Repeats: ${req.recurringDays.length} days/week`}
-                          {req.requestType === "Permanent" && "Permanent Change"}
-                        </span>
-                      </div>
-
-                      {req.reason && (
-                        <div className="text-xs text-gray-600 bg-gray-50/80 p-2.5 rounded-lg mb-3 italic border border-gray-100">
-                          <span className="font-semibold not-italic text-gray-700 block mb-0.5">Reason:</span>
-                          {req.reason}
+                      <div className="flex items-center gap-2 mb-3 pl-1">
+                        <div className={`p-1.5 rounded-lg ${req.requestedMode === 'WFH' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                          {req.requestedMode === 'WFH' ? <FaLaptopHouse size={16}/> : <FaBuilding size={16}/>}
                         </div>
-                      )}
+                        <span className={`font-black text-sm tracking-tight ${req.requestedMode === 'WFH' ? 'text-green-700' : 'text-blue-700'}`}>
+                          {req.requestedMode === 'WFH' ? 'Remote' : 'Office'}
+                        </span>
+                      </div>
 
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-                        {getStatusBadge(req.status)}
+                      <div className="space-y-2 mb-4">
+                        <div className="text-[11px] text-gray-600 flex items-start gap-2 bg-gray-50/80 p-2 rounded-xl border border-gray-100">
+                          <FaCalendarDay className="mt-0.5 text-gray-400" size={10}/>
+                          <span>
+                            {req.requestType === "Temporary" && `${new Date(req.fromDate).toLocaleDateString()} ➝ ${new Date(req.toDate).toLocaleDateString()}`}
+                            {req.requestType === "Recurring" && `Repeats: ${req.recurringDays.length} days/week`}
+                            {req.requestType === "Permanent" && "Permanent Change"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEditClick(req)} className="flex-1 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors">Modify</button>
+                        <button onClick={() => handleWithdraw(req._id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-red-100 transition-colors">Withdraw</button>
                       </div>
                     </div>
                   ))
@@ -551,87 +511,78 @@ const EmployeeWorkModeRequest = () => {
           </div>
         </div>
 
-        {/* 4. PENDING REQUESTS SECTION (Full Width Bottom) */}
-        <div className="mt-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <FaHourglassHalf className="text-yellow-500" /> Pending Requests
-            </h3>
+        {/* 4. REQUEST HISTORY SECTION (Full Width Bottom) */}
+        <div className="mt-12">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                  <FaHistory className="text-indigo-600" /> Request History
+                </h3>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">Summary of all your past work mode applications</p>
+              </div>
+            </div>
             
-            {pendingRequests.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
-                <FaHourglassHalf size={40} className="mb-3 mx-auto opacity-10"/>
-                <p>No pending requests at the moment.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pendingRequests.map(req => (
-                  <div key={req._id} className="bg-white p-5 rounded-2xl border-2 border-yellow-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                    {/* Status accent bar */}
-                    <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400"></div>
-                    
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`text-[10px] w-fit font-bold uppercase tracking-wider px-2 py-0.5 rounded ${req.requestType === 'Permanent' ? 'bg-orange-100 text-orange-700' : 'bg-blue-50 text-blue-700'}`}>
-                          {req.requestType}
-                        </span>
-                        <span className="text-[10px] text-gray-400">Submitted {new Date(req.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {getStatusBadge(req.status)}
-                    </div>
-
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className={`p-2 rounded-lg ${req.requestedMode === 'WFH' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                          {req.requestedMode === 'WFH' ? <FaLaptopHouse size={20}/> : <FaBuilding size={20}/>}
+            <div className="p-0">
+              {historyRequests.length === 0 ? (
+                <div className="text-center py-16 text-gray-400 flex flex-col items-center p-6">
+                  <FaHistory size={40} className="mb-3 opacity-10"/>
+                  <p className="font-bold">Your history is currently empty.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-gray-100">
+                  {historyRequests.map(req => (
+                    <div key={req._id} className="flex flex-col md:flex-row md:items-center justify-between p-5 md:p-6 hover:bg-indigo-50/20 transition-all gap-5 group">
+                        {/* Entry Main Info */}
+                        <div className="flex items-center gap-4 flex-1">
+                            <div className={`p-4 rounded-[1.25rem] shadow-sm flex-shrink-0 ${req.requestedMode === 'WFH' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                                {req.requestedMode === 'WFH' ? <FaLaptopHouse size={24}/> : <FaBuilding size={24}/>}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className={`font-black text-base md:text-sm tracking-tight ${req.requestedMode === 'WFH' ? 'text-green-800' : 'text-blue-800'}`}>
+                                    {req.requestedMode === 'WFH' ? 'Work From Home' : 'Work From Office'}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{req.requestType}</span>
+                                  <span className="hidden md:block w-1 h-1 bg-gray-300 rounded-full"></span>
+                                  <span className="text-[10px] font-bold text-gray-400">Created: {new Date(req.createdAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>
                         </div>
-                        <span className={`font-bold text-lg ${req.requestedMode === 'WFH' ? 'text-green-700' : 'text-blue-700'}`}>
-                          {req.requestedMode === 'WFH' ? 'Remote Work' : 'In-Office'}
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-600 flex items-start gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                        <FaCalendarDay className="mt-1 text-gray-400"/>
-                        <div>
-                          <p className="font-bold text-gray-700 text-xs uppercase mb-1">Timeline</p>
-                          <p className="text-sm">
-                            {req.requestType === "Temporary" && `${new Date(req.fromDate).toLocaleDateString()} ➝ ${new Date(req.toDate).toLocaleDateString()}`}
-                            {req.requestType === "Recurring" && `Repeats: ${req.recurringDays.length} days/week`}
-                            {req.requestType === "Permanent" && "Permanent Change"}
-                          </p>
+                        {/* Timeline */}
+                        <div className="flex-1 md:px-4">
+                            <div className="text-[11px] md:text-xs text-gray-600 font-bold flex items-center gap-2.5 bg-gray-50/80 px-4 py-2 rounded-xl w-fit border border-gray-100/50">
+                                <FaCalendarDay className="text-indigo-400" size={14}/>
+                                <span>
+                                    {req.requestType === "Temporary" && `${new Date(req.fromDate).toLocaleDateString()} ➝ ${new Date(req.toDate).toLocaleDateString()}`}
+                                    {req.requestType === "Recurring" && `Repeats: ${req.recurringDays.length} days/week`}
+                                    {req.requestType === "Permanent" && "Indefinite Change"}
+                                </span>
+                            </div>
                         </div>
-                      </div>
 
-                      {req.reason && (
-                        <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                          <p className="font-bold text-gray-700 text-xs uppercase mb-1">Reason</p>
-                          <p className="italic text-gray-600">"{req.reason}"</p>
+                        {/* Reason - Hidden on mobile, visible as a block or in row on desktop */}
+                        <div className="flex-1 max-w-sm hidden xl:block">
+                             {req.reason && (
+                                <p className="text-xs text-gray-400 italic truncate border-l-2 border-gray-100 pl-4 py-1" title={req.reason}>
+                                  "{req.reason}"
+                                </p>
+                             )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Actions */}
-                    <div className="mt-5 flex gap-3">
-                      <button 
-                        onClick={() => handleEditClick(req)}
-                        className="flex-1 py-2.5 rounded-xl border-2 border-blue-100 text-blue-600 font-bold text-xs hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <FaEdit /> MODIFY
-                      </button>
-                      <button 
-                        onClick={() => handleWithdraw(req._id)}
-                        className="flex-1 py-2.5 rounded-xl border-2 border-red-100 text-red-600 font-bold text-xs hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <FaUndo /> WITHDRAW
-                      </button>
+                        {/* Status */}
+                        <div className="flex items-center md:min-w-[140px] justify-between md:justify-end border-t md:border-t-0 pt-4 md:pt-0">
+                            <div className="transform scale-90 md:scale-100 origin-left md:origin-right">
+                              {getStatusBadge(req.status)}
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-        </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
       </div>
     </div>
   </div>

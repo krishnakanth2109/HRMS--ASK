@@ -644,11 +644,12 @@ const EmployeeDailyAttendance = () => {
             <p className="text-gray-500 text-sm mt-1">Here's Your attendance overview for {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
           </div>
 
-          <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
-            <select value={selectedDate.getMonth()} onChange={handleMonthChange} className="bg-transparent text-sm font-semibold outline-none cursor-pointer hover:text-blue-600">
+          <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50 md:bg-white p-1.5 md:p-2 rounded-xl shadow-sm border border-gray-100">
+            <select value={selectedDate.getMonth()} onChange={handleMonthChange} className="flex-1 md:flex-none bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none cursor-pointer hover:text-blue-600 px-2 py-1">
               {barGraphData.labels.map((m, i) => <option key={i} value={i}>{m}</option>)}
             </select>
-            <select value={selectedDate.getFullYear()} onChange={handleYearChange} className="bg-transparent text-sm font-semibold outline-none cursor-pointer hover:text-blue-600 border-l pl-3">
+            <div className="w-px h-4 bg-gray-300"></div>
+            <select value={selectedDate.getFullYear()} onChange={handleYearChange} className="flex-1 md:flex-none bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none cursor-pointer hover:text-blue-600 px-2 py-1">
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -967,13 +968,13 @@ const EmployeeDailyAttendance = () => {
               </table>
             </div>
 
-            {/* --- MOBILE CARD LIST --- */}
-            <div className="md:hidden flex flex-col gap-4 max-h-[600px] overflow-y-auto p-1 py-2">
+            {/* --- MOBILE LIST VIEW --- */}
+            <div className="md:hidden flex flex-col gap-4">
                 {loading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
+                    Array.from({ length: 5 }).map((_, i) => (
                         <div key={i} className="animate-pulse bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-                            <div className="h-10 bg-gray-200 rounded mb-4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                            <div className="h-3 bg-gray-200 rounded w-1/4"></div>
                         </div>
                     ))
                 ) : filteredData.length > 0 ? (
@@ -983,87 +984,69 @@ const EmployeeDailyAttendance = () => {
                       const isPending = row.statusCorrectionRequest?.hasRequest && row.statusCorrectionRequest?.status === 'PENDING';
 
                       return (
-                          <div key={row.date} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
-                              <div className="flex justify-between items-start">
-                                  <div className="flex flex-col">
-                                      <span className="font-bold text-gray-800 text-base">{new Date(row.date).getDate()} {new Date(row.date).toLocaleString('default', { month: 'short', year: 'numeric' })}</span>
-                                      <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mt-0.5">
-                                          {new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                                      </span>
-                                  </div>
-                                  <div className="flex flex-col items-end gap-1">
-                                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase ${isWeekend ? "bg-gray-100 text-gray-500 border border-gray-200" :
-                                          isAbsent ? "bg-red-50 text-red-500 border border-red-200" :
-                                          row.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-600 border border-yellow-200" :
-                                          "bg-blue-50 text-blue-600 border border-blue-200"
+                          <div key={row.date} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col gap-3 hover:shadow-md transition-shadow">
+                                  <div className="flex justify-between items-center">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                              isWeekend ? "bg-gray-100 text-gray-400" :
+                                              isAbsent ? "bg-red-100 text-red-600" :
+                                              row.workedStatus === "Half Day" ? "bg-yellow-100 text-yellow-600" :
+                                              "bg-green-100 text-green-600"
+                                          }`}>
+                                              {new Date(row.date).getDate()}
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-gray-900 text-sm">{new Date(row.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</h4>
+                                              <p className="text-[10px] text-gray-500 font-mono mt-0.5 uppercase tracking-tighter">{new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}</p>
+                                          </div>
+                                      </div>
+                                      <span className={`px-2 py-1 inline-flex text-[9px] font-bold rounded-md tracking-wider uppercase ${
+                                          isWeekend ? "bg-gray-50 text-gray-500 border border-gray-200" :
+                                          isAbsent ? "bg-red-50 text-red-700 border border-red-200" :
+                                          row.workedStatus === "Half Day" ? "bg-yellow-50 text-yellow-700 border border-yellow-200" :
+                                          "bg-green-50 text-green-700 border border-green-200"
                                       }`}>
                                           {isWeekend ? "Weekend" : row.workedStatus === "Full Day" ? "Full Day" : row.workedStatus}
                                       </span>
                                   </div>
-                              </div>
 
-                              <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-                                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Check In</span>
-                                      <span className="font-semibold text-gray-700">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</span>
-                                  </div>
-                                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Check Out</span>
-                                      <span className="font-semibold text-gray-700">{row.punchOut ? new Date(row.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</span>
-                                  </div>
-                              </div>
+                                  <div className="flex flex-row items-center justify-between text-xs mt-1">
+                                      <div className="flex flex-col gap-1.5">
+                                          <div className="flex items-center gap-2 text-gray-600">
+                                              <FaSignInAlt className="text-gray-400 text-[10px]" />
+                                              <span className="font-medium">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</span>
+                                              <span className="text-gray-300">|</span>
+                                              <FaSignOutAlt className="text-gray-400 text-[10px]" />
+                                              <span className="font-medium">{row.punchOut ? new Date(row.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <span className="text-blue-600 font-bold px-1.5 py-0.5 bg-blue-50 rounded border border-blue-100">{row.displayTime}</span>
+                                              <span className="text-gray-300">•</span>
+                                              {row.loginStatus === 'LATE' ? (
+                                                  <span className="text-red-500 font-bold text-[10px] uppercase">Late</span>
+                                              ) : row.punchIn ? (
+                                                  <span className="text-green-500 font-bold text-[10px] uppercase">On-Time</span>
+                                              ) : <span className="text-gray-300">--</span>}
+                                          </div>
+                                      </div>
 
-                              <div className="flex justify-between items-center bg-blue-50/30 p-3 rounded-lg border border-blue-100/50">
-                                  <div className="flex flex-col">
-                                      <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mb-0.5">Hours Worked</span>
-                                      <span className="font-bold text-blue-700 text-sm">{row.displayTime}</span>
-                                  </div>
-                                  <div className="flex flex-col items-end">
-                                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Login</span>
-                                      {row.loginStatus === 'LATE' ? (
-                                        <span className="text-red-500 font-bold text-xs uppercase tracking-wider">Late</span>
-                                      ) : row.punchIn ? (
-                                        <span className="text-green-500 font-bold text-xs uppercase tracking-wider">On-Time</span>
-                                      ) : <span className="text-gray-300 font-bold text-xs">--</span>}
-                                  </div>
-                              </div>
-
-                              <div className="flex justify-between items-center mt-2 border-t border-gray-100 pt-3">
-                                  <div>
-                                    {row.workedStatus === "Working" ? (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                                        <FaRegClock className="animate-spin-slow" /> Working
-                                      </span>
-                                    ) : row.workedStatus === "Full Day" ? (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-600 border border-green-100">
-                                        <FaCheckCircle /> Completed
-                                      </span>
-                                    ) : isAbsent ? (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 border border-red-100">
-                                        <FaTimesCircle /> Absent
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-500 font-bold text-xs uppercase tracking-wider">{row.workedStatus}</span>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center">
-                                      {(row.punchIn && (isAbsent || row.workedStatus === 'Half Day') && !isPending) && (
-                                        <button onClick={() => openCorrectionModal(row)} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-xs font-bold hover:bg-orange-100 transition-colors border border-orange-100 shadow-sm">
-                                          <FaEdit /> Correct
-                                        </button>
-                                      )}
-                                      {isPending && <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider px-2 py-1 bg-orange-50 rounded border border-orange-100">Pending</span>}
+                                      <div className="flex items-center gap-2">
+                                          {(row.punchIn && (isAbsent || row.workedStatus === 'Half Day') && !isPending) && (
+                                              <button onClick={() => openCorrectionModal(row)} className="p-2.5 text-orange-600 bg-orange-50 rounded-xl border border-orange-100 shadow-sm transition-transform active:scale-95" title="Request Correction">
+                                                  <FaEdit />
+                                              </button>
+                                          )}
+                                          {isPending && <span className="text-[9px] text-orange-500 font-bold uppercase tracking-wider px-2 py-0.5 bg-orange-50 rounded border border-orange-100">Pending</span>}
+                                      </div>
                                   </div>
                               </div>
-                          </div>
-                      );
-                    })
-                ) : (
-                    <div className="text-center py-10 bg-white rounded-2xl shadow-sm border border-gray-100">
-                        <p className="font-semibold text-gray-400">No records found.</p>
-                    </div>
-                )}
+                          );
+                        })
+                    ) : (
+                        <div className="text-center py-12">
+                            <p className="font-semibold text-gray-500">No Records Found</p>
+                        </div>
+                    )}
             </div>
 
             {/* Scroll Indicator */}
@@ -1088,44 +1071,85 @@ const EmployeeDailyAttendance = () => {
 
               {/* Modal Content - Scrollable */}
               <div className="overflow-auto p-0 flex-1 bg-gray-50">
-                <table className="w-full text-sm text-left min-w-[700px]">
-                  <thead className="bg-white text-gray-500 text-xs uppercase sticky top-0 shadow-sm z-10">
-                    <tr>
-                      <th className="px-6 py-4">Date</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Punch In</th>
-                      <th className="px-6 py-4">Reason</th>
-                      <th className="px-6 py-4">Admin Note</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <table className="w-full text-sm text-left min-w-[700px]">
+                    <thead className="bg-white text-gray-500 text-xs uppercase sticky top-0 shadow-sm z-10">
+                      <tr>
+                        <th className="px-6 py-4">Date</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Punch In</th>
+                        <th className="px-6 py-4">Reason</th>
+                        <th className="px-6 py-4">Admin Note</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {lateRequestsHistory.length > 0 ? (
+                        lateRequestsHistory.map((row, i) => (
+                          <tr key={i} className="hover:bg-gray-50 group">
+                            <td className="px-6 py-4 font-bold text-gray-700">
+                              <div className="flex flex-col">
+                                <p>{new Date(row.date).toLocaleDateString()}</p>
+                                <span className="text-[10px] font-bold text-blue-500/70 uppercase tracking-tight mt-0.5">
+                                  {new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.lateCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
+                                row.lateCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
+                                  'bg-yellow-50 text-yellow-600 border-yellow-200'
+                                }`}>{row.lateCorrectionRequest.status}</span>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString() : '--'}</td>
+                            <td className="px-6 py-4 max-w-xs truncate text-gray-500" title={row.lateCorrectionRequest.reason}>{row.lateCorrectionRequest.reason}</td>
+                            <td className="px-6 py-4 italic text-gray-400">{row.lateCorrectionRequest.adminComment || "--"}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr><td colSpan="5" className="text-center py-12 text-gray-400">No late requests found in history.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View */}
+                <div className="md:hidden flex flex-col divide-y divide-gray-100 bg-white">
                     {lateRequestsHistory.length > 0 ? (
                       lateRequestsHistory.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50 group">
-                          <td className="px-6 py-4 font-bold text-gray-700">
-                            <div className="flex flex-col">
-                              <p>{new Date(row.date).toLocaleDateString()}</p>
-                              <span className="text-[10px] font-bold text-blue-500/70 uppercase tracking-tight mt-0.5">
-                                {new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                              </span>
+                        <div key={i} className="p-4 flex flex-col gap-3">
+                            <div className="flex justify-between items-center">
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-gray-800 text-sm">{new Date(row.date).toLocaleDateString()}</span>
+                                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tighter">{new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                                </div>
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.lateCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
+                                    row.lateCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
+                                    'bg-yellow-50 text-yellow-600 border-yellow-200'
+                                }`}>{row.lateCorrectionRequest.status}</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.lateCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
-                              row.lateCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
-                                'bg-yellow-50 text-yellow-600 border-yellow-200'
-                              }`}>{row.lateCorrectionRequest.status}</span>
-                          </td>
-                          <td className="px-6 py-4 font-mono text-xs">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString() : '--'}</td>
-                          <td className="px-6 py-4 max-w-xs truncate text-gray-500" title={row.lateCorrectionRequest.reason}>{row.lateCorrectionRequest.reason}</td>
-                          <td className="px-6 py-4 italic text-gray-400">{row.lateCorrectionRequest.adminComment || "--"}</td>
-                        </tr>
+                            <div className="flex flex-col gap-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 font-bold uppercase text-[9px]">Punch In:</span>
+                                    <span className="font-mono text-gray-700 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">{row.punchIn ? new Date(row.punchIn).toLocaleTimeString() : '--'}</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-gray-400 font-bold uppercase text-[9px]">Reason:</span>
+                                    <p className="text-gray-600 leading-relaxed bg-gray-50/50 p-2 rounded border border-gray-100/50">{row.lateCorrectionRequest.reason}</p>
+                                </div>
+                                {row.lateCorrectionRequest.adminComment && (
+                                    <div className="flex flex-col gap-1 mt-1 bg-blue-50/30 p-2 rounded border border-blue-100/30">
+                                        <span className="text-blue-400 font-bold uppercase text-[9px]">Admin Note:</span>
+                                        <p className="text-blue-700 italic">{row.lateCorrectionRequest.adminComment}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                       ))
                     ) : (
-                      <tr><td colSpan="5" className="text-center py-12 text-gray-400">No late requests found in history.</td></tr>
+                      <div className="text-center py-12 text-gray-400">No late requests found.</div>
                     )}
-                  </tbody>
-                </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1141,52 +1165,99 @@ const EmployeeDailyAttendance = () => {
               </div>
 
               <div className="overflow-auto p-0 flex-1 bg-gray-50">
-                <table className="w-full text-sm text-left min-w-[700px]">
-                  <thead className="bg-white text-gray-500 text-xs uppercase sticky top-0 shadow-sm z-10">
-                    <tr>
-                      <th className="px-6 py-4">Date</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Correction Time</th>
-                      <th className="px-6 py-4">Reason</th>
-                      <th className="px-6 py-4">Admin Note</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <table className="w-full text-sm text-left min-w-[700px]">
+                    <thead className="bg-white text-gray-500 text-xs uppercase sticky top-0 shadow-sm z-10">
+                      <tr>
+                        <th className="px-6 py-4">Date</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Correction Time</th>
+                        <th className="px-6 py-4">Reason</th>
+                        <th className="px-6 py-4">Admin Note</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {statusCorrectionHistory.length > 0 ? (
+                        statusCorrectionHistory.map((row, i) => (
+                          <tr key={i} className="hover:bg-gray-50 group">
+                            <td className="px-6 py-4 font-bold text-gray-700">
+                              <div className="flex flex-col">
+                                <p>{new Date(row.date).toLocaleDateString()}</p>
+                                <span className="text-[10px] font-bold text-blue-500/70 uppercase tracking-tight mt-0.5">
+                                  {new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.statusCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
+                                row.statusCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
+                                  'bg-yellow-50 text-yellow-600 border-yellow-200'
+                                }`}>{row.statusCorrectionRequest.status}</span>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">
+                              {(() => {
+                                // Convert UTC to IST for display
+                                const utcDate = new Date(row.statusCorrectionRequest.requestedPunchOut);
+                                // Add 5.5 hours (IST offset) to convert UTC to IST
+                                const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+                                return istDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              })()}
+                            </td>
+                            <td className="px-6 py-4 max-w-xs truncate text-gray-500" title={row.statusCorrectionRequest.reason}>{row.statusCorrectionRequest.reason}</td>
+                            <td className="px-6 py-4 italic text-gray-400">{row.statusCorrectionRequest.adminComment || "--"}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr><td colSpan="5" className="text-center py-12 text-gray-400">No correction history found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View */}
+                <div className="md:hidden flex flex-col divide-y divide-gray-100 bg-white">
                     {statusCorrectionHistory.length > 0 ? (
                       statusCorrectionHistory.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50 group">
-                          <td className="px-6 py-4 font-bold text-gray-700">
-                            <div className="flex flex-col">
-                              <p>{new Date(row.date).toLocaleDateString()}</p>
-                              <span className="text-[10px] font-bold text-blue-500/70 uppercase tracking-tight mt-0.5">
-                                {new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                              </span>
+                        <div key={i} className="p-4 flex flex-col gap-3">
+                            <div className="flex justify-between items-center">
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-gray-800 text-sm">{new Date(row.date).toLocaleDateString()}</span>
+                                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tighter">{new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                                </div>
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.statusCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
+                                    row.statusCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' :
+                                    'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                }`}>{row.statusCorrectionRequest.status}</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded text-[10px] font-bold border ${row.statusCorrectionRequest.status === 'APPROVED' ? 'bg-green-50 text-green-600 border-green-200' :
-                              row.statusCorrectionRequest.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
-                                'bg-yellow-50 text-yellow-600 border-yellow-200'
-                              }`}>{row.statusCorrectionRequest.status}</span>
-                          </td>
-                          <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">
-                            {(() => {
-                              // Convert UTC to IST for display
-                              const utcDate = new Date(row.statusCorrectionRequest.requestedPunchOut);
-                              // Add 5.5 hours (IST offset) to convert UTC to IST
-                              const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-                              return istDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            })()}
-                          </td>
-                          <td className="px-6 py-4 max-w-xs truncate text-gray-500" title={row.statusCorrectionRequest.reason}>{row.statusCorrectionRequest.reason}</td>
-                          <td className="px-6 py-4 italic text-gray-400">{row.statusCorrectionRequest.adminComment || "--"}</td>
-                        </tr>
+                            <div className="flex flex-col gap-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 font-bold uppercase text-[9px]">Correction Time:</span>
+                                    <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                      {(() => {
+                                        const utcDate = new Date(row.statusCorrectionRequest.requestedPunchOut);
+                                        const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+                                        return istDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                      })()}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-gray-400 font-bold uppercase text-[9px]">Reason:</span>
+                                    <p className="text-gray-600 leading-relaxed bg-gray-50/50 p-2 rounded border border-gray-100/50">{row.statusCorrectionRequest.reason}</p>
+                                </div>
+                                {row.statusCorrectionRequest.adminComment && (
+                                    <div className="flex flex-col gap-1 mt-1 bg-purple-50/30 p-2 rounded border border-purple-100/30">
+                                        <span className="text-purple-400 font-bold uppercase text-[9px]">Admin Note:</span>
+                                        <p className="text-purple-700 italic">{row.statusCorrectionRequest.adminComment}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                       ))
                     ) : (
-                      <tr><td colSpan="5" className="text-center py-12 text-gray-400">No correction history found.</td></tr>
+                      <div className="text-center py-12 text-gray-400">No correction history found.</div>
                     )}
-                  </tbody>
-                </table>
+                </div>
               </div>
             </div>
           </div>

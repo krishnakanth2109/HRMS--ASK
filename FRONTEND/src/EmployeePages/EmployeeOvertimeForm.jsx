@@ -110,77 +110,92 @@ const OvertimeWithModal = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between border border-gray-200 shadow-sm p-4 bg-white rounded-2xl items-start md:items-center gap-4 mb-8">
-        <h2 className="text-2xl md:text-4xl font-extrabold text-indigo-900 tracking-wide">
-          My Overtime Requests
-        </h2>
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black text-indigo-950 tracking-tight">
+            Overtime Requests
+          </h2>
+          <p className="text-indigo-500/70 text-sm font-medium mt-0.5">Manage and track extra hours</p>
+        </div>
 
         <button
           onClick={() => setApplyModalOpen(true)}
-          className="bg-gradient-to-r from-indigo-600 to-indigo-800 hover:opacity-90 text-white px-6 py-2.5 rounded-lg shadow-lg transition-all font-semibold w-full md:w-auto"
+          className="group relative flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg shadow-indigo-100 transition-all font-bold overflow-hidden"
         >
-          + Apply Overtime
+          <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+          <span className="relative text-lg">+</span>
+          <span className="relative text-sm">New Request</span>
         </button>
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white shadow-xl rounded-xl overflow-hidden border">
+      {/* Desktop Table View */}
+      <div className="hidden md:block bg-white shadow-xl shadow-indigo-100/50 rounded-2xl overflow-hidden border border-indigo-50">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[500px]">
-            <thead className="bg-indigo-600 text-white">
+          <table className="w-full text-sm">
+            <thead className="bg-indigo-50/50 text-indigo-900 border-b border-indigo-100">
               <tr>
-                <th className="px-6 py-3 border-r whitespace-nowrap">Date</th>
-                <th className="px-6 py-3 border-r whitespace-nowrap">Type</th>
-                <th className="px-6 py-3 whitespace-nowrap">Status / Action</th>
+                <th className="px-6 py-4 text-left font-black uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-left font-black uppercase tracking-wider">Request Type</th>
+                <th className="px-6 py-4 text-center font-black uppercase tracking-wider">Status & Action</th>
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="divide-y divide-indigo-50/50">
               {overtimeList.length > 0 ? (
                 overtimeList.map((ot) => (
                   <tr
                     key={ot._id}
-                    className="hover:bg-indigo-50 transition border-b"
+                    className="hover:bg-indigo-50/30 transition-colors"
                   >
-                    <td className="px-6 py-3 border-r text-center whitespace-nowrap">{ot.date}</td>
-                    <td className="px-6 py-3 border-r text-center whitespace-nowrap">
-                      {ot.type.replace("_", " ")}
+                    <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                            <span className="font-bold text-gray-900">{new Date(ot.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">{new Date(ot.date).toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                        </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-100">
+                        {ot.type.replace("_", " ")}
+                      </span>
                     </td>
 
-                    <td className="px-6 py-3 text-center whitespace-nowrap">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          ot.status === "APPROVED"
-                            ? "bg-green-100 text-green-700"
-                            : ot.status === "REJECTED"
-                            ? "bg-red-100 text-red-700"
-                            : ot.status === "CANCELLED"
-                            ? "bg-gray-200 text-gray-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {ot.status}
-                      </span>
-
-                      {ot.status === "PENDING" && (
-                        <button
-                          onClick={() => {
-                            setSelectedOT(ot._id);
-                            setConfirmCancelModal(true);
-                          }}
-                          className="ml-3 text-xs bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded-md shadow transition"
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                            ot.status === "APPROVED"
+                              ? "bg-green-50 text-green-600 border-green-200"
+                              : ot.status === "REJECTED"
+                              ? "bg-red-50 text-red-600 border-red-200"
+                              : ot.status === "CANCELLED"
+                              ? "bg-gray-100 text-gray-500 border-gray-200"
+                              : "bg-yellow-50 text-yellow-600 border-yellow-200"
+                          }`}
                         >
-                          Cancel
-                        </button>
-                      )}
+                          {ot.status}
+                        </span>
+
+                        {ot.status === "PENDING" && (
+                          <button
+                            onClick={() => {
+                              setSelectedOT(ot._id);
+                              setConfirmCancelModal(true);
+                            }}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all hover:scale-110"
+                            title="Cancel Request"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    className="p-6 text-center text-gray-600"
+                    className="p-10 text-center text-indigo-300 font-bold"
                     colSpan="3"
                   >
                     No overtime requests found.
@@ -190,6 +205,58 @@ const OvertimeWithModal = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="md:hidden flex flex-col gap-3">
+        {overtimeList.length > 0 ? (
+          overtimeList.map((ot) => (
+            <div key={ot._id} className="bg-white p-4 rounded-2xl shadow-lg shadow-indigo-100/30 border border-indigo-50 flex flex-col gap-3 relative overflow-hidden active:scale-[0.98] transition-transform">
+                <div className="flex justify-between items-start relative z-10">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest mb-0.5">Request Date</span>
+                        <span className="font-bold text-indigo-950 text-base">{new Date(ot.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-tighter">{new Date(ot.date).toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                    </div>
+                    <span
+                        className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider border ${
+                          ot.status === "APPROVED"
+                            ? "bg-green-50 text-green-600 border-green-200"
+                            : ot.status === "REJECTED"
+                            ? "bg-red-50 text-red-600 border-red-200"
+                            : ot.status === "CANCELLED"
+                            ? "bg-gray-100 text-gray-500 border-gray-200"
+                            : "bg-yellow-50 text-yellow-600 border-yellow-200"
+                        }`}
+                    >
+                        {ot.status}
+                    </span>
+                </div>
+
+                <div className="flex justify-between items-center bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50 relative z-10">
+                    <div className="flex flex-col">
+                        <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">OT Type</span>
+                        <span className="font-semibold text-indigo-900 text-xs">{ot.type.replace("_", " ")}</span>
+                    </div>
+                    {ot.status === "PENDING" && (
+                        <button
+                          onClick={() => {
+                            setSelectedOT(ot._id);
+                            setConfirmCancelModal(true);
+                          }}
+                          className="px-3 py-1.5 bg-white text-red-500 rounded-lg text-[10px] font-bold border border-red-100 shadow-sm active:scale-90"
+                        >
+                          Cancel
+                        </button>
+                    )}
+                </div>
+            </div>
+          ))
+        ) : (
+          <div className="bg-white p-10 rounded-2xl border-2 border-dashed border-indigo-50 text-center">
+              <p className="font-bold text-indigo-200">No OT Records</p>
+          </div>
+        )}
       </div>
 
       {/* ----------------------- APPLY OT MODAL ----------------------- */}
