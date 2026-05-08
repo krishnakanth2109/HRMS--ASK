@@ -150,7 +150,7 @@ const NavbarEmployee = ({ currentTheme, onThemeChange }) => {
           />
 
           {showMenu && (
-            <div className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-44 z-50 text-base animate-fade-in">
+            <div className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-44 z-50 text-base animate-fade-in overflow-hidden">
               <div
                 onClick={() => { navigate("/employee/profile"); setShowMenu(false); }}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 text-gray-700 cursor-pointer transition-all"

@@ -9,7 +9,7 @@ import {
   FaSearch, FaUsers, FaPaperPlane, FaSmile, FaSpinner,
   FaEllipsisV, FaRegEdit, FaRegTrashAlt, FaTimes, FaComments,
   FaEllipsisH, FaCheckDouble, FaCheck,
-  FaUserFriends, FaCommentDots, FaTrash, FaPen,
+  FaUserFriends, FaCommentDots, FaTrash, FaPen, FaChevronLeft,
 } from "react-icons/fa";
 
 // ✅ Use VITE_SOCKET_URL for production (set in Netlify env vars)
@@ -44,6 +44,7 @@ const ConnectWithEmployee = () => {
   const [isSwitchingUser, setIsSwitchingUser] = useState(false);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const directChatEndRef = useRef(null);
@@ -269,6 +270,7 @@ const ConnectWithEmployee = () => {
 
   // ── User switch ──────────────────────────────────────────────────────────
   const handleUserSwitch = useCallback(async (emp) => {
+    setIsSidebarVisible(false);
     if (sameId(selectedChatUserRef.current?._id, emp._id) || isSwitchingUser) return;
     setIsSwitchingUser(true);
     setSelectedChatUser(emp);
@@ -376,6 +378,10 @@ const ConnectWithEmployee = () => {
   }, []);
 
   useEffect(() => {
+    if (!selectedChatUser) setIsSidebarVisible(true);
+  }, [selectedChatUser]);
+
+  useEffect(() => {
     fetchEmployees();
     fetchChatList();
   }, [fetchEmployees, fetchChatList]);
@@ -460,7 +466,7 @@ const ConnectWithEmployee = () => {
   // RENDER — original UI structure preserved
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex w-full h-[calc(100vh-4rem)] bg-white font-sans mt-0">
+    <div className="flex w-full h-[calc(100vh-4rem)] bg-white font-sans mt-0 overflow-hidden">
       <Toaster
         position="top-right"
         toastOptions={{
@@ -469,7 +475,7 @@ const ConnectWithEmployee = () => {
       />
 
       {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
-      <div className="w-80 flex flex-col border-r border-gray-200 bg-white h-full">
+      <div className={`w-full md:w-80 flex flex-col border-r border-gray-200 bg-white h-full transition-all duration-300 ${isSidebarVisible ? "flex" : "hidden md:flex"}`}>
         <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -582,13 +588,19 @@ const ConnectWithEmployee = () => {
       </div>
 
       {/* ── CHAT AREA ───────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col h-full bg-gray-50 relative">
+      <div className={`flex-1 flex flex-col h-full bg-gray-50 relative transition-all duration-300 ${!isSidebarVisible ? "flex" : "hidden md:flex"}`}>
         {selectedChatUser ? (
           <>
             {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200 bg-white shadow-sm z-15 flex-shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-center rounded-full font-bold text-lg shadow-md">
+            <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-gray-200 bg-white shadow-sm z-15 flex-shrink-0">
+              <div className="flex items-center gap-3 md:gap-4">
+                <button
+                  onClick={() => setIsSidebarVisible(true)}
+                  className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <FaChevronLeft size={18} />
+                </button>
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-center rounded-full font-bold text-base md:text-lg shadow-md">
                   {selectedChatUser.name?.charAt(0)?.toUpperCase()}
                 </div>
                 <div>
@@ -627,7 +639,7 @@ const ConnectWithEmployee = () => {
                   <p className="text-sm text-gray-500 mt-1">Send a message to {selectedChatUser.name}</p>
                 </div>
               ) : (
-                <div className="p-6">
+                <div className="p-4 md:p-6">
                   {Object.entries(groupedMessages).map(([date, msgs]) => (
                     <div key={date}>
                       <div className="flex justify-center my-6">
@@ -715,7 +727,7 @@ const ConnectWithEmployee = () => {
             </div>
 
             {/* Input */}
-            <footer className="p-4 bg-white border-t border-gray-200 shadow-lg flex-shrink-0">
+            <footer className="p-2 md:p-4 bg-white border-t border-gray-200 shadow-lg flex-shrink-0">
               {editingMessageId && (
                 <div className="max-w-4xl mx-auto mb-3 flex items-center justify-between bg-blue-50 px-4 py-2.5 rounded-xl border border-blue-100 animate-in slide-in-from-top duration-300">
                   <div className="flex items-center gap-3">
@@ -733,7 +745,7 @@ const ConnectWithEmployee = () => {
                 </div>
               )}
 
-              <div className="max-w-4xl mx-auto flex items-end gap-3 bg-gray-100 border border-transparent rounded-2xl p-3 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all duration-300">
+              <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3 bg-gray-100 border border-transparent rounded-2xl p-2 md:p-3 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all duration-300">
                 <div className="relative">
                   {showEmojiPicker && (
                     <div className="absolute bottom-16 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-200 animate-in fade-in zoom-in duration-200">

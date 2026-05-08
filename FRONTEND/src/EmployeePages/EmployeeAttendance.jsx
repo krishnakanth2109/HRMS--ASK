@@ -59,11 +59,10 @@ const NewEmployeeAttendance = ({ employeeId, employeeName, department, role }) =
 
         <button
           onClick={handlePunch}
-          className={`mt-3 px-4 py-2 text-white rounded ${
-            todayLog?.punchIn && !todayLog?.punchOut
+          className={`mt-3 px-4 py-2 text-white rounded ${todayLog?.punchIn && !todayLog?.punchOut
               ? "bg-red-600"
               : "bg-green-600"
-          }`}
+            }`}
         >
           {todayLog?.punchIn && !todayLog?.punchOut ? "Punch Out" : "Punch In"}
         </button>

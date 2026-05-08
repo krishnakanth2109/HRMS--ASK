@@ -598,9 +598,10 @@ const AdminLeaveSummary = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-white"
+          className="rounded-2xl shadow-lg border border-gray-200 relative z-10 overflow-hidden bg-gray-50 md:bg-white"
         >
-          <div className="overflow-x-auto custom-scrollbar">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar">
             <table className="min-w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-[11px] font-bold tracking-wider sticky top-0 z-20 shadow-sm">
                 <tr>
@@ -685,6 +686,77 @@ const AdminLeaveSummary = () => {
             </table>
           </div>
 
+          {/* Mobile List View */}
+          <div className="md:hidden flex flex-col gap-3 p-3 bg-gray-50">
+            <AnimatePresence>
+              {filteredEmployeeStats.length > 0 ? (
+                filteredEmployeeStats.map((emp, index) => (
+                  <motion.div
+                    key={`mobile-${emp.employeeId}`}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ delay: index * 0.01 }}
+                    className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-sm hover:border-blue-200 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 font-bold text-[13px] border border-blue-100 shrink-0">
+                          {emp.employeeName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-800 text-sm">{emp.employeeName}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">{emp.employeeId}</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleViewDetails(emp.employeeId)}
+                        className="bg-gray-50 border border-gray-200 text-gray-500 hover:text-blue-600 hover:bg-blue-50 font-bold px-2.5 py-1.5 rounded-lg transition duration-200 text-[10px] flex items-center gap-1.5 shadow-sm"
+                      >
+                        <FaEye size={12} /> Details
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-gray-50/80 rounded-xl border border-gray-100 p-2">
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Pend</span>
+                        <span className={`text-xs font-black ${emp.pendingLeaves === 0 ? "text-red-500" : "text-blue-600"}`}>
+                          {emp.pendingLeaves}
+                        </span>
+                      </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total</span>
+                        <span className="text-xs font-black text-green-600">
+                          {emp.totalLeaveDays}
+                        </span>
+                      </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">LOP</span>
+                        <span className={`text-xs font-black ${emp.extraLeaves > 0 ? "text-orange-500" : "text-gray-600"}`}>
+                          {emp.extraLeaves}
+                        </span>
+                      </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center flex-1">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Sandw</span>
+                        <span className={`text-xs font-black ${emp.sandwichLeavesDays > 0 ? "text-purple-600" : "text-gray-600"}`}>
+                          {emp.sandwichLeavesDays}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="py-10 text-center bg-gray-50">
+                   <FaUserTie size={32} className="mx-auto mb-3 text-gray-300" />
+                   <p className="text-sm font-semibold text-gray-500">No employee records found matching your criteria.</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               📋 Statistical Legend:
@@ -724,50 +796,50 @@ const AdminLeaveSummary = () => {
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Modal Header */}
-                <div className="px-6 py-5 border-b border-gray-200 bg-white flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xl border border-blue-100">
+                <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200 bg-white flex items-start md:items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg md:text-xl border border-blue-100 shrink-0">
                        {selectedEmployee.employeeName.charAt(0)}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-800">{selectedEmployee.employeeName}</h3>
-                      <p className="text-xs font-mono text-gray-500 mt-0.5">ID: {selectedEmployee.employeeId}</p>
+                      <h3 className="text-lg md:text-xl font-bold text-gray-800 leading-tight">{selectedEmployee.employeeName}</h3>
+                      <p className="text-[10px] md:text-xs font-mono text-gray-500 mt-0.5">ID: {selectedEmployee.employeeId}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowDetailsModal(false)}
-                    className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-full transition-colors"
+                    className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-full transition-colors shrink-0"
                   >
                     <FaTimes size={20} />
                   </button>
                 </div>
 
                 {/* Modal Stats Row */}
-                <div className="bg-gray-50/80 px-6 py-5 border-b border-gray-200 grid grid-cols-5 gap-3 shrink-0">
-                  <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Pending</p>
-                    <p className="text-xl font-black text-blue-600">{selectedEmployee.pendingLeaves}</p>
+                <div className="bg-gray-50/80 px-3 md:px-6 py-2.5 md:py-3 border-b border-gray-200 grid grid-cols-5 gap-1.5 md:gap-3 shrink-0">
+                  <div className="bg-white py-1.5 px-1 md:px-3 rounded-lg border border-gray-200 flex flex-col items-center justify-center shadow-sm text-center">
+                    <p className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate w-full">Pend</p>
+                    <p className="text-sm md:text-lg font-black text-blue-600 leading-none">{selectedEmployee.pendingLeaves}</p>
                   </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Consumed</p>
-                    <p className="text-xl font-black text-green-600">{selectedEmployee.totalLeaveDays}</p>
+                  <div className="bg-white py-1.5 px-1 md:px-3 rounded-lg border border-gray-200 flex flex-col items-center justify-center shadow-sm text-center">
+                    <p className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate w-full">Used</p>
+                    <p className="text-sm md:text-lg font-black text-green-600 leading-none">{selectedEmployee.totalLeaveDays}</p>
                   </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Extra (LOP)</p>
-                    <p className="text-xl font-black text-orange-600">{selectedEmployee.extraLeaves}</p>
+                  <div className="bg-white py-1.5 px-1 md:px-3 rounded-lg border border-gray-200 flex flex-col items-center justify-center shadow-sm text-center">
+                    <p className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate w-full">Extra</p>
+                    <p className="text-sm md:text-lg font-black text-orange-600 leading-none">{selectedEmployee.extraLeaves}</p>
                   </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Absents</p>
-                    <p className="text-xl font-black text-red-600">{selectedEmployee.absentDays}</p>
+                  <div className="bg-white py-1.5 px-1 md:px-3 rounded-lg border border-gray-200 flex flex-col items-center justify-center shadow-sm text-center">
+                    <p className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate w-full">Absent</p>
+                    <p className="text-sm md:text-lg font-black text-red-600 leading-none">{selectedEmployee.absentDays}</p>
                   </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Sandwich</p>
-                    <p className="text-xl font-black text-purple-600">{selectedEmployee.sandwichLeavesDays}</p>
+                  <div className="bg-white py-1.5 px-1 md:px-3 rounded-lg border border-gray-200 flex flex-col items-center justify-center shadow-sm text-center">
+                    <p className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate w-full">Sandw</p>
+                    <p className="text-sm md:text-lg font-black text-purple-600 leading-none">{selectedEmployee.sandwichLeavesDays}</p>
                   </div>
                 </div>
 
                 {/* Modal Content Scrollable Area */}
-                <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white custom-scrollbar">
                    {selectedEmployee.sandwichDetails && selectedEmployee.sandwichDetails.length > 0 && (
                       <div className="mb-6 bg-orange-50 border border-orange-200 p-4 rounded-xl shadow-sm">
                         <div className="flex items-start gap-3">
@@ -864,7 +936,7 @@ const AdminLeaveSummary = () => {
                 </div>
                 
                 {/* Modal Footer */}
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end shrink-0">
+                <div className="bg-gray-50 px-4 md:px-6 py-4 border-t border-gray-200 flex justify-end shrink-0">
                   <button
                     onClick={() => setShowDetailsModal(false)}
                     className="bg-gray-800 hover:bg-gray-900 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition duration-200 shadow-sm"

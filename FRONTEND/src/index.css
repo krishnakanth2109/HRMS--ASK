@@ -191,15 +191,19 @@ body,
 .dark .shadow-sm {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5) !important;
 }
+
 .dark .shadow-md {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
 }
+
 .dark .shadow-lg {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4) !important;
 }
+
 .dark .shadow-xl {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5) !important;
 }
+
 .dark .shadow-2xl {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
 }
@@ -362,7 +366,7 @@ body,
 .dark .bg-\[linear-gradient\(180deg\)\],
 .dark .bg-gradient-to-b {
   background-image: none !important;
-  background-color: rgba(15, 23, 42, 0.8) !important;
+  background-color: rgba(15, 23, 42, 1) !important;
 }
 
 /* Custom Scrollbar for Dashboard */

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { FaEdit, FaTrash, FaRedo, FaDownload, FaEye, FaClipboardList, FaCalendarAlt, FaFileExcel, FaTimes, FaSpinner,
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import {
+  FaEdit, FaTrash, FaRedo, FaDownload, FaEye, FaClipboardList, FaCalendarAlt, FaFileExcel, FaTimes, FaSpinner,
   FaChevronDown,
   FaShieldAlt,
   FaFileAlt,
@@ -9,7 +10,17 @@ import { FaEdit, FaTrash, FaRedo, FaDownload, FaEye, FaClipboardList, FaCalendar
   FaConnectdevelop,
   FaFileSignature,
   FaEnvelope,
-  FaGift } from "react-icons/fa";
+  FaGift,
+  FaFilter,
+  FaSearch,
+  FaCheck,
+  FaBriefcase,
+  FaBuilding,
+  FaUserTag,
+  FaInfoCircle
+} from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Filter, ChevronDown, Check, Briefcase, Building2, UserCircle2, Info } from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import Swal from "sweetalert2";
@@ -142,6 +153,93 @@ const downloadExcelReport = (data, filename) => {
 
 
 // ==========================================
+// CUSTOM PREMIUM COMPONENTS
+// ==========================================
+
+const ModernSelect = ({ value, onChange, options, placeholder, icon: Icon, color = "blue" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const colors = {
+    blue: "text-blue-600 bg-blue-50 border-blue-100 focus:ring-blue-200",
+    indigo: "text-indigo-600 bg-indigo-50 border-indigo-100 focus:ring-indigo-200",
+    teal: "text-teal-600 bg-teal-50 border-teal-100 focus:ring-teal-200",
+    amber: "text-amber-600 bg-amber-50 border-amber-100 focus:ring-amber-200",
+    slate: "text-slate-600 bg-slate-50 border-slate-100 focus:ring-slate-200",
+  };
+
+  const ringColors = {
+    blue: "focus:ring-blue-200 hover:border-blue-400",
+    indigo: "focus:ring-indigo-200 hover:border-indigo-400",
+    teal: "focus:ring-teal-200 hover:border-teal-400",
+    amber: "focus:ring-amber-200 hover:border-amber-400",
+    slate: "focus:ring-slate-200 hover:border-slate-400",
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md focus:ring-4 ${ringColors[color]} transition-all duration-300 text-sm font-bold text-slate-700 active:scale-[0.98]`}
+      >
+        <div className="flex items-center gap-2.5 truncate">
+          {Icon && (
+            <div className={`p-1.5 rounded-lg ${colors[color]} shrink-0 shadow-sm`}>
+              <Icon size={16} />
+            </div>
+          )}
+          <span className="truncate">{value === "All" ? placeholder : value}</span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute z-[100] left-0 right-0 mt-3 bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden ring-1 ring-black/5"
+          >
+            <div className="max-h-[320px] overflow-y-auto py-3 px-2 custom-scrollbar">
+              <button
+                onClick={() => { onChange("All"); setIsOpen(false); }}
+                className={`w-full text-left px-4 py-3 text-sm transition-all rounded-xl mb-1 flex items-center justify-between ${value === "All" ? "bg-slate-100 text-slate-900 font-extrabold" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
+              >
+                <span>{placeholder}</span>
+                {value === "All" && <Check size={14} strokeWidth={3} className="text-slate-900" />}
+              </button>
+              <div className="h-px bg-slate-50 my-2 mx-2" />
+              {options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => { onChange(opt); setIsOpen(false); }}
+                  className={`w-full text-left px-4 py-3 text-sm transition-all rounded-xl mb-1 flex items-center justify-between ${value === opt ? `bg-${color}-50 text-${color}-700 font-extrabold` : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
+                >
+                  <span className="truncate">{opt}</span>
+                  {value === opt && <Check size={14} strokeWidth={3} className={`text-${color}-600`} />}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ==========================================
 // SUB-COMPONENTS (ROWS)
 // ==========================================
 
@@ -172,7 +270,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
     <tr className={`border-t transition duration-150 hover:bg-blue-50`}>
       <td className="p-4 align-middle text-left font-mono font-semibold text-blue-700 text-sm pl-6">
         {emp.employeeId}
-       </td>
+      </td>
 
       <td className="p-4 align-middle text-left">
         <div className="flex items-center gap-3">
@@ -207,12 +305,12 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
         </span>
       </td>
 
-   <td className="p-4 align-middle text-left text-gray-900 text-sm font-semibold">
+      <td className="p-4 align-middle text-left text-gray-900 text-sm font-semibold">
         {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
-        <a 
-          href={gmailComposeUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={gmailComposeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="hover:text-blue-700 hover:underline"
         >
           {emp.email}
@@ -292,22 +390,22 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
       </td>
 
       <td className="p-4 align-middle text-left">
-      <span className="text-sm font-semibold text-gray-700">
+        <span className="text-sm font-semibold text-gray-700">
           {currentRole}
         </span>
       </td>
 
       <td className="p-4 align-middle text-left">
-      <span className="text-sm font-semibold text-gray-700">
+        <span className="text-sm font-semibold text-gray-700">
           {currentDepartment}
         </span>
       </td>
-<td className="p-4 align-middle text-left text-gray-700 text-sm font-semibold line-through decoration-red-800">
+      <td className="p-4 align-middle text-left text-gray-700 text-sm font-semibold line-through decoration-red-800">
         {/* ✅ DIRECT URL TO GMAIL IN NEW TAB */}
-        <a 
-          href={gmailComposeUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={gmailComposeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="hover:text-blue-700 hover:underline"
         >
           {emp.email}
@@ -333,6 +431,172 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
         </div>
       </td>
     </tr>
+  );
+};
+
+const EmployeeCard = ({ emp, navigate, onDeactivateClick, onOverviewClick, profilePic, onImageClick }) => {
+  const currentDepartment = getCurrentDepartment(emp);
+  const currentRole = getCurrentRole(emp);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => { document.removeEventListener("mousedown", handleClickOutside); };
+  }, []);
+
+  const mailSubject = encodeURIComponent("Notice From HRMS");
+  const mailBody = encodeURIComponent(`Hi ${emp.name},\n\n`);
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emp.email}&su=${mailSubject}&body=${mailBody}`;
+
+  return (
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-3 mb-2 relative flex items-center gap-4 hover:bg-blue-50/30 transition-all  ${isMenuOpen ? 'z-50 ring-1 ring-blue-100' : 'z-10'}`}>
+      {/* Avatar Section */}
+      <div
+        className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-700 font-bold border border-blue-100 overflow-hidden cursor-pointer shrink-0 shadow-inner"
+        onClick={() => profilePic && onImageClick(profilePic)}
+      >
+        {profilePic ? (
+          <img src={profilePic} alt={emp.name} className="w-full h-full object-cover" />
+        ) : (
+          emp.name?.split(" ").map((n) => n[0]).join("")
+        )}
+      </div>
+
+      {/* Details Section */}
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div className="flex items-center justify-between">
+          <h3
+            onClick={() => navigate(`/employee/${emp.employeeId}/profile`)}
+            className="text-sm font-bold text-slate-800 truncate cursor-pointer hover:text-blue-600 transition-colors"
+          >
+            {emp.name}
+          </h3>
+        </div>
+
+        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+          <span className="font-mono text-blue-600 font-bold">{emp.employeeId}</span>
+          <span className="text-slate-300">|</span>
+          <span className="truncate">{currentRole}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded uppercase tracking-wider">
+            {currentDepartment}
+          </span>
+          <a href={gmailComposeUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline truncate">
+            {emp.email}
+          </a>
+        </div>
+      </div>
+
+      {/* Action Trigger */}
+      <div className="relative shrink-0" ref={menuRef}>
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isMenuOpen ? 'bg-indigo-600 text-white shadow-lg rotate-180' : 'text-slate-400 hover:bg-slate-100'
+            }`}
+        >
+          <FaChevronDown className="text-[10px]" />
+        </button>
+
+        {isMenuOpen && (
+          <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-2xl z-[100] border border-slate-100 py-1.5 overflow-hidden animate-in fade-in duration-75">
+            <button onClick={() => { navigate(`/employee/${emp.employeeId}/profile`); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-3 font-semibold transition-colors"><FaUser className="text-indigo-500" /> View Profile</button>
+            <button onClick={() => { onOverviewClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-teal-600 flex items-center gap-3 font-semibold transition-colors"><FaClipboardList className="text-teal-500" /> Activity Overview</button>
+            <button onClick={() => { navigate(`/employees/edit/${emp.employeeId}`); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 hover:text-amber-600 flex items-center gap-3 font-semibold transition-colors"><FaEdit className="text-amber-500" /> Edit Details</button>
+            <div className="h-px bg-slate-100 my-1 mx-2"></div>
+            <button onClick={() => { onDeactivateClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-3 font-bold transition-colors"><FaTrash className="text-red-500" /> Deactivate Account</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const InactiveEmployeeCard = ({ emp, navigate, onReactivateClick, onViewDetailsClick, onOverviewClick, profilePic, onImageClick }) => {
+  const currentDepartment = getCurrentDepartment(emp);
+  const currentRole = getCurrentRole(emp);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => { document.removeEventListener("mousedown", handleClickOutside); };
+  }, []);
+
+  const mailSubject = encodeURIComponent("Notice From HRMS");
+  const mailBody = encodeURIComponent(`Hi ${emp.name},\n\n`);
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emp.email}&su=${mailSubject}&body=${mailBody}`;
+
+  return (
+    <div className={`bg-slate-50 rounded-xl shadow-sm border border-slate-200 p-3 mb-2 relative flex items-center gap-4 opacity-75 grayscale-[0.5] hover:grayscale-0 transition-all ${isMenuOpen ? 'z-50 ring-1 ring-slate-300 opacity-100 grayscale-0' : 'z-10'}`}>
+      {/* Avatar Section */}
+      <div
+        className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold border border-slate-300 overflow-hidden shrink-0 grayscale shadow-inner"
+        onClick={() => profilePic && onImageClick(profilePic)}
+      >
+        {profilePic ? (
+          <img src={profilePic} alt={emp.name} className="w-full h-full object-cover" />
+        ) : (
+          emp.name?.split(" ").map((n) => n[0]).join("")
+        )}
+      </div>
+
+      {/* Details Section */}
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-600 truncate">{emp.name}</h3>
+          <span className="text-[8px] px-1 py-0.5 bg-red-100 text-red-600 font-extrabold uppercase rounded border border-red-200 tracking-tighter">Inactive</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+          <span className="font-mono font-bold">{emp.employeeId}</span>
+          <span className="text-slate-300">|</span>
+          <span className="truncate">{currentRole}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="px-1.5 py-0.5 bg-slate-200 text-slate-500 text-[9px] font-bold rounded uppercase tracking-wider">
+            {currentDepartment}
+          </span>
+          <span className="text-[10px] text-slate-400 truncate italic">
+            {emp.email}
+          </span>
+        </div>
+      </div>
+
+      {/* Action Trigger */}
+      <div className="relative shrink-0" ref={menuRef}>
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isMenuOpen ? 'bg-slate-700 text-white shadow-lg rotate-180' : 'text-slate-400 hover:bg-slate-200'
+            }`}
+        >
+          <FaChevronDown className="text-[10px]" />
+        </button>
+
+        {isMenuOpen && (
+          <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-2xl z-[100] border border-slate-100 py-1.5 overflow-hidden animate-in fade-in duration-75 opacity-100">
+            <button onClick={() => { navigate(`/employee/${emp.employeeId}/profile`); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-semibold transition-colors"><FaUser className="text-slate-500" /> View Profile</button>
+            <button onClick={() => { onOverviewClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-semibold transition-colors"><FaClipboardList className="text-slate-500" /> Activity Overview</button>
+            <button onClick={() => { onViewDetailsClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-semibold transition-colors"><FaEye className="text-indigo-500" /> Deactivation Info</button>
+            <div className="h-px bg-slate-100 my-1 mx-2"></div>
+            <button onClick={() => { onReactivateClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-xs text-green-700 hover:bg-green-50 flex items-center gap-3 font-bold transition-colors"><FaRedo className="text-green-600" /> Reactivate Account</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -382,7 +646,7 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
 
     try {
       await onSubmit({ endDate, reason });
-      
+
       // Close the SweetAlert and show success
       Swal.close();
       Swal.fire({
@@ -394,7 +658,7 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
         timer: 3000,
         timerProgressBar: true
       });
-      
+
       setIsSubmitting(false);
     } catch (error) {
       Swal.close();
@@ -411,22 +675,20 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
 
   return (
     <>
-      <div 
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
-          open ? 'opacity-100 visible' : 'opacity-0 invisible'
-        }`}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${open ? 'opacity-100 visible' : 'opacity-0 invisible'
+          }`}
       >
         {/* Backdrop with blur effect */}
-        <div 
+        <div
           className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
           onClick={!isSubmitting ? onClose : undefined}
         />
-        
+
         {/* Modal Container with animation */}
-        <div 
-          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${
-            open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
-          }`}
+        <div
+          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
+            }`}
         >
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-t-2xl px-6 py-4">
@@ -505,10 +767,10 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
               >
                 Cancel
               </button>
-       <button
-  type="submit"
-  disabled={isSubmitting}
-  className="px-5 py-2.5 rounded-lg 
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg 
   bg-gradient-to-r from-red-600 to-red-500 
   hover:from-red-700 hover:to-red-800 
   text-white font-semibold 
@@ -517,16 +779,16 @@ function DeactivateModal({ open, employee, onClose, onSubmit }) {
   hover:scale-105
   disabled:opacity-50 disabled:cursor-not-allowed 
   flex items-center gap-2"
->
-  {isSubmitting ? (
-    <>
-      <FaSpinner className="animate-spin" />
-      Processing...
-    </>
-  ) : (
-    "Deactivate"
-  )}
-</button>
+              >
+                {isSubmitting ? (
+                  <>
+                    <FaSpinner className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Deactivate"
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -576,7 +838,7 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
 
     try {
       await onSubmit({ date, reason });
-      
+
       // Close the SweetAlert and show success
       Swal.close();
       Swal.fire({
@@ -588,7 +850,7 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
         timer: 3000,
         timerProgressBar: true
       });
-      
+
       setIsSubmitting(false);
     } catch (error) {
       Swal.close();
@@ -605,22 +867,20 @@ function ReactivateModal({ open, employee, onClose, onSubmit }) {
 
   return (
     <>
-      <div 
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
-          open ? 'opacity-100 visible' : 'opacity-0 invisible'
-        }`}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${open ? 'opacity-100 visible' : 'opacity-0 invisible'
+          }`}
       >
         {/* Backdrop with blur effect */}
-        <div 
+        <div
           className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
           onClick={!isSubmitting ? onClose : undefined}
         />
-        
+
         {/* Modal Container with animation */}
-        <div 
-          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${
-            open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
-          }`}
+        <div
+          className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ${open ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'
+            }`}
         >
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-t-2xl px-6 py-4">
@@ -1113,18 +1373,21 @@ const EmployeeManagement = () => {
   const navigate = useNavigate();
 
 
-    const hrDropdownRef = useRef(null);
+  const hrDropdownRef = useRef(null);
   const [hrActivitiesOpen, setHrActivitiesOpen] = useState(false);
   const [docVerifyOpen, setDocVerifyOpen] = useState(false);
 
 
   const [employees, setEmployees] = useState([]);
-  
-  const [loading, setLoading] = useState(true); 
+
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmploymentType, setSelectedEmploymentType] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 10;
 
   const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
   const [reactivateModalOpen, setReactivateModalOpen] = useState(false);
@@ -1136,20 +1399,25 @@ const EmployeeManagement = () => {
   const [previewImage, setPreviewImage] = useState(null);
 
   const fetchEmployees = useCallback(async () => {
-    setLoading(true); 
+    setLoading(true);
     try {
       const data = await getEmployees();
       setEmployees(data);
     } catch (err) {
       console.error("Failed to fetch employees:", err);
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
-useEffect(() => {
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedDept, selectedRole, selectedEmploymentType, selectedStatus]);
+
+  useEffect(() => {
     const fetchImages = async () => {
       // Prevent running if no employees are loaded
       if (employees.length === 0) return;
@@ -1157,12 +1425,12 @@ useEffect(() => {
       try {
         // ✅ Call the bulk API ONCE instead of making individual calls for every employee
         const response = await getAllProfiles();
-        
+
         // Handle different possible backend response structures safely
         const profilesList = Array.isArray(response) ? response : (response?.data || []);
-        
+
         const newImages = {};
-        
+
         // Loop through the existing profiles and map URLs to Employee IDs
         profilesList.forEach(profile => {
           if (profile.employeeId && profile.profilePhoto?.url) {
@@ -1185,30 +1453,30 @@ useEffect(() => {
   }, [employees]);
 
   const handleDeactivateSubmit = async ({ endDate, reason }) => {
-    try { 
-      await deactivateEmployeeById(selectedEmployee.employeeId, { endDate, reason }); 
-      await fetchEmployees(); 
-      setDeactivateModalOpen(false); 
+    try {
+      await deactivateEmployeeById(selectedEmployee.employeeId, { endDate, reason });
+      await fetchEmployees();
+      setDeactivateModalOpen(false);
       setSelectedEmployee(null);
       return true;
     }
-    catch (e) { 
+    catch (e) {
       throw e;
     }
   };
 
-const handleReactivateSubmit = async ({ date, reason }) => {
-  try { 
-    await activateEmployeeById(selectedEmployee.employeeId, { date, reason }); 
-    await fetchEmployees(); 
-    setReactivateModalOpen(false); 
-    setSelectedEmployee(null);
-    return true;
-  }
-  catch (e) { 
-    throw e;
-  }
-};
+  const handleReactivateSubmit = async ({ date, reason }) => {
+    try {
+      await activateEmployeeById(selectedEmployee.employeeId, { date, reason });
+      await fetchEmployees();
+      setReactivateModalOpen(false);
+      setSelectedEmployee(null);
+      return true;
+    }
+    catch (e) {
+      throw e;
+    }
+  };
 
   const openDeactivateModal = (emp) => { setSelectedEmployee(emp); setDeactivateModalOpen(true); };
   const openReactivateModal = (emp) => { setSelectedEmployee(emp); setReactivateModalOpen(true); };
@@ -1256,7 +1524,7 @@ const handleReactivateSubmit = async ({ date, reason }) => {
     return types.sort();
   }, [employees]);
 
-  const { activeEmployees, inactiveEmployees } = useMemo(() => {
+  const { activeEmployees, inactiveEmployees, allVisibleEmployees, totalPages } = useMemo(() => {
     const filtered = employees.filter((emp) => {
       const currentDepartment = getCurrentDepartment(emp);
       const currentRole = getCurrentRole(emp);
@@ -1265,80 +1533,96 @@ const handleReactivateSubmit = async ({ date, reason }) => {
       const matchesDept = selectedDept === "All" || currentDepartment === selectedDept;
       const matchesRole = selectedRole === "All" || currentRole === selectedRole;
       const matchesType = selectedEmploymentType === "All" || currentEmploymentType === selectedEmploymentType;
-      return matchesSearch && matchesDept && matchesRole && matchesType;
+
+      const isEmpActive = emp.isActive !== false;
+      const matchesStatus = selectedStatus === "All" ||
+        (selectedStatus === "Active" && isEmpActive) ||
+        (selectedStatus === "Inactive" && !isEmpActive);
+
+      return matchesSearch && matchesDept && matchesRole && matchesType && matchesStatus;
     });
+
+    const active = filtered.filter((emp) => emp.isActive !== false);
+    const inactive = filtered.filter((emp) => emp.isActive === false);
+    const combined = [...active, ...inactive];
+
     return {
-      activeEmployees: filtered.filter((emp) => emp.isActive !== false),
-      inactiveEmployees: filtered.filter((emp) => emp.isActive === false),
+      activeEmployees: active,
+      inactiveEmployees: inactive,
+      allVisibleEmployees: combined,
+      totalPages: Math.ceil(combined.length / recordsPerPage),
     };
-  }, [employees, searchQuery, selectedDept, selectedRole, selectedEmploymentType]);
+  }, [employees, searchQuery, selectedDept, selectedRole, selectedEmploymentType, selectedStatus]);
+
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * recordsPerPage;
+    return allVisibleEmployees.slice(startIndex, startIndex + recordsPerPage);
+  }, [allVisibleEmployees, currentPage]);
 
 
-const SmartSubmenu = ({ onClose, onNavigate }) => {
-  return (
-    <div className="absolute right-full top-0 mr-1 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-[10000] overflow-hidden">
-            <button
-        onClick={() => { onNavigate("/admin/doc-verify-invite"); onClose(); }}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
-      >
-        <FaEnvelope className="text-violet-500" /> Send Invitations
-      </button>
-      <button
-        onClick={() => onNavigate("/admin/doc-verify-portal")}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
-      >
-        <FaShieldAlt className="text-violet-500" />
-        Verify Documents
-      </button>
-      <button
-        onClick={() => onNavigate("/admin/hr-checklist")}
-        className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150"
-      >
-        <FaClipboardList className="text-violet-500" />
-        Verified Documents
-      </button>
-    </div>
-  );
-};
+  const SmartSubmenu = ({ onClose, onNavigate }) => {
+    return (
+      <div className="absolute right-0 sm:right-full top-full sm:top-0 sm:mr-1 mt-1 sm:mt-0 w-full sm:w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-[10000] overflow-hidden">
+        <button
+          onClick={() => { onNavigate("/admin/doc-verify-invite"); onClose(); }}
+          className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
+        >
+          <FaEnvelope className="text-violet-500" /> Send Invitations
+        </button>
+        <button
+          onClick={() => onNavigate("/admin/doc-verify-portal")}
+          className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
+        >
+          <FaShieldAlt className="text-violet-500" />
+          Verify Documents
+        </button>
+        <button
+          onClick={() => onNavigate("/admin/hr-checklist")}
+          className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 font-semibold flex items-center gap-3 transition-colors duration-150"
+        >
+          <FaClipboardList className="text-violet-500" />
+          Verified Documents
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen w-full  flex flex-col items-center py-12">
       <div className="w-full max-w-[95%] xl:max-w-7xl mx-auto">
-<div className="relative z-[15] flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-center mb-8 gap-4 px-8 py-6">
+        <div className="relative z-[15] flex flex-col bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 md:flex-row justify-between items-start md:items-center mb-8 gap-6 px-4 sm:px-8 py-6">
 
-        
-
-          <div>
-            <h2 className="text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
-            <div className="flex gap-3 mt-3">
+          <div className="w-full md:w-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Employee Management</h2>
+            <div className="flex flex-wrap gap-3 mt-3">
               <button
                 onClick={handleDownloadActive}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm text-sm font-semibold flex items-center gap-2"
+                className="bg-green-600 flex-1 sm:flex-none justify-center text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm text-sm font-semibold flex items-center gap-2"
               >
                 <FaDownload /> Active List
               </button>
               <button
                 onClick={handleDownloadInactive}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm text-sm font-semibold flex items-center gap-2"
+                className="bg-red-600 flex-1 sm:flex-none justify-center text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm text-sm font-semibold flex items-center gap-2"
               >
                 <FaDownload /> Inactive List
               </button>
             </div>
           </div>
 
-           <div className="flex gap-3 flex-wrap">
+          <div className="flex w-full md:w-auto justify-start md:justify-end gap-3 flex-wrap">
             {/* HR Activities Dropdown */}
-            <div className="relative z-50" ref={hrDropdownRef}>
+            <div className="relative z-50 w-full sm:w-auto" ref={hrDropdownRef}>
               <button
                 onClick={() => { setHrActivitiesOpen(!hrActivitiesOpen); setDocVerifyOpen(false); }}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-md font-bold flex items-center gap-2 transition-all duration-200 transform hover:scale-105"
+                className="w-full sm:w-auto justify-between sm:justify-start bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-md font-bold flex items-center gap-2 transition-all duration-200 transform hover:scale-[1.02] sm:hover:scale-105"
               >
-                <FaClipboardList /> HR Activities
+                <span className="flex items-center gap-2"><FaClipboardList /> HR Activities</span>
                 <FaChevronDown className={`text-xs transition-transform duration-200 ${hrActivitiesOpen ? "rotate-180" : ""}`} />
               </button>
 
               {hrActivitiesOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-100 z-[9999]">
+                <div className="absolute left-0 right-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-72 bg-white rounded-xl shadow-2xl border border-slate-100 z-[9999]">
                   {/* Document Verification with smart positioned nested submenu */}
                   <div className="relative">
                     <button
@@ -1364,14 +1648,14 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
                       />
                     )}
                   </div>
-                                  {/* Offer Letter */}
+                  {/* Offer Letter */}
                   <button
                     onClick={() => { navigate("/admin/offer-letter"); setHrActivitiesOpen(false); }}
                     className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaFileAlt className="text-blue-500" /> Offer Letter
                   </button>
-                  
+
                   {/* Onboarding Invitation */}
                   <button
                     onClick={() => { navigate("/admin/onboarding-email"); setHrActivitiesOpen(false); }}
@@ -1398,15 +1682,15 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
                     className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 border-b border-slate-100"
                   >
                     <FaFileSignature className="text-blue-500" /> Resignations
-                </button>
-            
+                  </button>
 
-                           <button
+
+                  <button
                     onClick={() => { navigate("/admin/welcome-kits-management"); setHrActivitiesOpen(false); }}
                     className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-semibold flex items-center gap-3 transition-colors duration-150 rounded-b-xl"
                   >
                     <FaGift className="text-blue-500" /> Welcome Kit
-                </button>
+                  </button>
 
                 </div>
               )}
@@ -1414,26 +1698,60 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
           </div>
         </div>
 
-        <div className="flex flex-col  md:flex-row gap-4 mb-10 px-8">
-          <input type="text" placeholder="Search employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-1/4 border bg-white border-gray-200 px-4 py-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full bg-white md:w-1/4 border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
-            <option value="All">All Departments</option>
-            {departmentSet.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
-          </select>
-          <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full md:w-1/4 bg-white border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
-            <option value="All">All Roles</option>
-            {roleSet.map((role) => (<option key={role} value={role}>{role}</option>))}
-          </select>
-          <select value={selectedEmploymentType} onChange={(e) => setSelectedEmploymentType(e.target.value)} className="w-full bg-white md:w-1/4 border border-gray-200 px-3 py-1.0 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700">
-            <option value="All">All Employment Types</option>
-            {employmentTypeSet.map((type) => (<option key={type} value={type}>{type}</option>))}
-          </select>
+        {/* Filter Section */}
+        <div className="mb-10 px-4 sm:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            {/* Search Bar */}
+            <div className="md:col-span-4 relative group">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <input
+                type="text"
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-blue-50 focus:border-blue-400 outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-400 placeholder:font-medium"
+              />
+            </div>
+
+            {/* Dropdowns Grid */}
+            <div className="md:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <ModernSelect
+                value={selectedDept}
+                onChange={setSelectedDept}
+                options={departmentSet}
+                placeholder="All Departments"
+                color="blue"
+              />
+              <ModernSelect
+                value={selectedRole}
+                onChange={setSelectedRole}
+                options={roleSet}
+                placeholder="All Roles"
+                color="indigo"
+              />
+              <ModernSelect
+                value={selectedEmploymentType}
+                onChange={setSelectedEmploymentType}
+                options={employmentTypeSet}
+                placeholder="All Types"
+                color="amber"
+              />
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={["Active", "Inactive"]}
+                placeholder="All Status"
+                color="teal"
+              />
+            </div>
+          </div>
         </div>
 
-       <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10">
-  <div className="overflow-x-auto">
-            <table className="min-w-full rounded-2xl">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">
+        <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10 overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-600">
                 <tr className="text-white uppercase text-sm font-semibold tracking-wide">
                   <th className="p-4 text-left pl-6">ID</th>
                   <th className="p-4 text-left">Name</th>
@@ -1444,28 +1762,37 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
                 </tr>
               </thead>
 
-              <tbody className="divide-y bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 divide-gray-100">
+              <tbody className="divide-y bg-white/20 backdrop-blur-md divide-gray-100">
                 {loading ? (
                   <tr>
                     <td colSpan="6" className="p-8 text-center text-gray-500 font-medium text-lg">
                       Loading employees data...
                     </td>
                   </tr>
-                ) : activeEmployees.length > 0 || inactiveEmployees.length > 0 ? (
+                ) : paginatedEmployees.length > 0 ? (
                   <>
-                    {activeEmployees.map((emp, idx) => (
-                      <EmployeeRow key={emp.employeeId} emp={emp} idx={idx} navigate={navigate} onDeactivateClick={openDeactivateModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
-                    ))}
-                    {activeEmployees.length > 0 && inactiveEmployees.length > 0 && (
-                      <tr><td colSpan="6" className=" p-2 text-center font-bold text-white text-lg tracking-widest uppercase bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">Inactive Employees</td></tr>
-                    )}
-                    {inactiveEmployees.map((emp) => (
-                      <InactiveEmployeeRow key={emp.employeeId} emp={emp} navigate={navigate} onReactivateClick={openReactivateModal} onViewDetailsClick={openViewDetailsModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
-                    ))}
+                    {paginatedEmployees.map((emp, idx) => {
+                      const isInactive = emp.isActive === false;
+                      const actualIdx = (currentPage - 1) * recordsPerPage + idx;
+                      const isFirstInactiveGlobal = isInactive && (actualIdx === activeEmployees.length);
+
+                      return (
+                        <React.Fragment key={emp.employeeId}>
+                          {isFirstInactiveGlobal && activeEmployees.length > 0 && (
+                            <tr><td colSpan="6" className=" p-2 text-center font-bold text-white text-lg tracking-widest uppercase bg-gradient-to-r from-slate-800 to-slate-700 border-b rounded-lg border-slate-600">Inactive Employees</td></tr>
+                          )}
+                          {isInactive ? (
+                            <InactiveEmployeeRow emp={emp} navigate={navigate} onReactivateClick={openReactivateModal} onViewDetailsClick={openViewDetailsModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
+                          ) : (
+                            <EmployeeRow emp={emp} idx={idx} navigate={navigate} onDeactivateClick={openDeactivateModal} onOverviewClick={openOverviewModal} profilePic={employeeImages[emp.employeeId]} onImageClick={setPreviewImage} />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </>
                 ) : (
                   <tr>
-                    <td colSpan="6" className="p-8 text-center bg-white/20 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 text-gray-400 font-medium">
+                    <td colSpan="6" className="p-8 text-center bg-white/20 backdrop-blur-md text-gray-400 font-medium">
                       No employees found matching criteria.
                     </td>
                   </tr>
@@ -1473,6 +1800,106 @@ const SmartSubmenu = ({ onClose, onNavigate }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden p-2 space-y-1 bg-slate-50/50">
+            {loading ? (
+              <div className="p-8 text-center text-gray-500 font-medium">
+                Loading employees data...
+              </div>
+            ) : paginatedEmployees.length > 0 ? (
+              paginatedEmployees.map((emp, idx) => {
+                const isInactive = emp.isActive === false;
+                const actualIdx = (currentPage - 1) * recordsPerPage + idx;
+                const isFirstInactiveGlobal = isInactive && (actualIdx === activeEmployees.length);
+
+                return (
+                  <React.Fragment key={emp.employeeId}>
+                    {isFirstInactiveGlobal && activeEmployees.length > 0 && (
+                      <div className="py-4 text-center">
+                        <span className="px-3 py-1 bg-slate-800 text-white rounded-full text-[9px] font-bold tracking-[0.2em] uppercase shadow-sm">
+                          Inactive Employees
+                        </span>
+                      </div>
+                    )}
+                    {isInactive ? (
+                      <InactiveEmployeeCard
+                        emp={emp}
+                        navigate={navigate}
+                        onReactivateClick={openReactivateModal}
+                        onViewDetailsClick={openViewDetailsModal}
+                        onOverviewClick={openOverviewModal}
+                        profilePic={employeeImages[emp.employeeId]}
+                        onImageClick={setPreviewImage}
+                      />
+                    ) : (
+                      <EmployeeCard
+                        emp={emp}
+                        navigate={navigate}
+                        onDeactivateClick={openDeactivateModal}
+                        onOverviewClick={openOverviewModal}
+                        profilePic={employeeImages[emp.employeeId]}
+                        onImageClick={setPreviewImage}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-gray-400 font-medium">
+                No employees found matching criteria.
+              </div>
+            )}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-4 md:px-6 py-4 bg-white/10 backdrop-blur-md border-t border-gray-100 flex flex-col md:flex-row gap-4 items-center justify-between rounded-b-2xl">
+              <div className="text-xs md:text-sm text-gray-600 text-center md:text-left">
+                Showing <span className="font-semibold">{(currentPage - 1) * recordsPerPage + 1}</span> to <span className="font-semibold">{Math.min(currentPage * recordsPerPage, allVisibleEmployees.length)}</span> of <span className="font-semibold">{allVisibleEmployees.length}</span> entries
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 md:px-3 py-1.5 rounded-lg border border-gray-300 text-xs md:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Only show a limited number of page buttons
+                    if (totalPages > 5) {
+                      if (pageNum !== 1 && pageNum !== totalPages && Math.abs(pageNum - currentPage) > 1) {
+                        if (pageNum === 2 || pageNum === totalPages - 1) return <span key={pageNum} className="px-0.5 text-gray-400 text-xs">..</span>;
+                        return null;
+                      }
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-7 h-7 md:w-9 md:h-9 rounded-lg flex items-center justify-center text-xs md:text-sm font-medium transition-all ${currentPage === pageNum
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                          : "text-gray-700 hover:bg-gray-100 border border-transparent"
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 md:px-3 py-1.5 rounded-lg border border-gray-300 text-xs md:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <DeactivateModal open={deactivateModalOpen} employee={selectedEmployee} onClose={() => setDeactivateModalOpen(false)} onSubmit={handleDeactivateSubmit} />

@@ -24,11 +24,10 @@ const SettingsPage = () => {
   const TabButton = ({ name, icon }) => (
     <button
       onClick={() => setActiveTab(name)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${
-        activeTab === name
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${activeTab === name
           ? 'bg-blue-600 text-white shadow-md'
           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-      }`}
+        }`}
     >
       {icon}
       {name}
@@ -41,7 +40,7 @@ const SettingsPage = () => {
         <TabButton name={TABS.DEPARTMENT} icon={<FaBuilding />} />
       </div>
 
-      <div className="bg-white border-gray-200 p-6 rounded-xl shadow-lg animate-fade-in">
+      <div className="bg-white border-gray-200 p-2 md:p-6 rounded-xl shadow-lg animate-fade-in">
         {renderContent()}
       </div>
     </div>

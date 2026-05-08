@@ -88,7 +88,7 @@ const DepartmentSettings = () => {
 
       const empList = Array.isArray(employeesData) ? employeesData : (employeesData?.data || []);
       const shiftList = Array.isArray(shiftsData) ? shiftsData : (shiftsData?.data || []);
-      
+
       // ✅ FILTER ONLY ACTIVE EMPLOYEES (isActive === true)
       const activeEmployees = empList.filter(emp => emp.isActive === true);
 
@@ -128,7 +128,7 @@ const DepartmentSettings = () => {
       } else {
         const res = await addNotice(payload);
         // If created new, update config ID if response returns it, or re-fetch
-        if(res && res._id) setGroupConfigId(res._id); 
+        if (res && res._id) setGroupConfigId(res._id);
       }
       setGroups(updatedGroups);
     } catch (error) {
@@ -392,15 +392,15 @@ const DepartmentSettings = () => {
       {/* HEADER */}
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 flex items-center gap-3">
             <span className="p-2 bg-blue-100 rounded-lg text-blue-600"><FaClock /></span>
             Shift Management
           </h1>
           <div className="flex items-center gap-2 mt-1">
-             <p className="text-gray-600 text-sm">Configure timings in Indian Standard Time (IST)</p>
-             <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-orange-200">
-               🇮🇳 IST Active
-             </span>
+            <p className="text-gray-600 text-sm">Configure timings in Indian Standard Time (IST)</p>
+            <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-orange-200">
+              🇮🇳 IST Active
+            </span>
           </div>
         </div>
 
@@ -421,15 +421,15 @@ const DepartmentSettings = () => {
       {/* ✅ GROUP FILTER (Replaces Category Filter) */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800 text-sm flex gap-2 items-center"><FaLayerGroup className="text-blue-500"/> Filter by Group</h3>
+          <h3 className="font-semibold text-gray-800 text-sm flex gap-2 items-center"><FaLayerGroup className="text-blue-500" /> Filter by Group</h3>
           <button onClick={() => setIsGroupModalOpen(true)} className="flex items-center gap-2 text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"><FaUsersCog /> Manage Groups</button>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setSelectedGroupId("all")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>All</button>
           <button onClick={() => setSelectedGroupId("unassigned")} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === "unassigned" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}>Unassigned</button>
           {groups.map((group) => (
-            <button 
-              key={group.id} 
+            <button
+              key={group.id}
               onClick={() => setSelectedGroupId(group.id)}
               className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedGroupId === group.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600"}`}
             >
@@ -448,25 +448,24 @@ const DepartmentSettings = () => {
               <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="flex justify-between items-center mt-2">
-               <p className="text-xs text-gray-500">Showing {filteredEmployees.length} employees</p>
-               {viewMode === "bulk" && (
-                 <button onClick={handleSelectAllEmployees} className="text-xs text-blue-600 font-bold hover:underline">
-                   {selectedEmployeeIds.length === filteredEmployees.length && filteredEmployees.length > 0 ? "Deselect All" : "Select All"}
-                 </button>
-               )}
+              <p className="text-xs text-gray-500">Showing {filteredEmployees.length} employees</p>
+              {viewMode === "bulk" && (
+                <button onClick={handleSelectAllEmployees} className="text-xs text-blue-600 font-bold hover:underline">
+                  {selectedEmployeeIds.length === filteredEmployees.length && filteredEmployees.length > 0 ? "Deselect All" : "Select All"}
+                </button>
+              )}
             </div>
           </div>
 
           <div className="overflow-y-auto flex-1 p-2 space-y-2">
             {filteredEmployees.map((emp) => (
-              <div 
-                key={emp.employeeId} 
+              <div
+                key={emp.employeeId}
                 onClick={() => viewMode === "bulk" ? handleBulkEmployeeToggle(emp.employeeId) : handleEmployeeSelect(emp)}
-                className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                  (viewMode === "individual" && selectedEmployee?.employeeId === emp.employeeId) || (viewMode === "bulk" && selectedEmployeeIds.includes(emp.employeeId))
-                    ? "bg-blue-50 border-blue-500" 
-                    : "bg-white border-gray-100 hover:bg-gray-50"
-                }`}
+                className={`p-3 rounded-lg border cursor-pointer transition-colors ${(viewMode === "individual" && selectedEmployee?.employeeId === emp.employeeId) || (viewMode === "bulk" && selectedEmployeeIds.includes(emp.employeeId))
+                  ? "bg-blue-50 border-blue-500"
+                  : "bg-white border-gray-100 hover:bg-gray-50"
+                  }`}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
@@ -502,7 +501,7 @@ const DepartmentSettings = () => {
                     <label className="text-xs font-bold text-gray-700 uppercase">End Time (IST)</label>
                     <input type="time" name="shiftEndTime" value={shiftForm.shiftEndTime} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
-                  
+
                   <div>
                     <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
                     <input type="number" step="0.5" name="fullDayHours" value={shiftForm.fullDayHours} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
@@ -517,16 +516,16 @@ const DepartmentSettings = () => {
                     <input type="number" name="lateGracePeriod" value={shiftForm.lateGracePeriod} onChange={handleFormChange} className="w-full mt-1 p-2 border rounded-md" required />
                   </div>
                   <div>
-                     <label className="flex items-center gap-2 text-sm mt-6 cursor-pointer">
-                        <input type="checkbox" name="autoExtendShift" checked={shiftForm.autoExtendShift} onChange={handleFormChange} className="w-4 h-4 text-blue-600"/>
-                        Auto-extend shift if late
-                     </label>
+                    <label className="flex items-center gap-2 text-sm mt-6 cursor-pointer">
+                      <input type="checkbox" name="autoExtendShift" checked={shiftForm.autoExtendShift} onChange={handleFormChange} className="w-4 h-4 text-blue-600" />
+                      Auto-extend shift if late
+                    </label>
                   </div>
                 </div>
-                
+
                 <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded flex items-center gap-2">
-                   <FaInfoCircle className="text-blue-500" />
-                   Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
+                  <FaInfoCircle className="text-blue-500" />
+                  Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
                 </div>
 
                 <div className="mt-4">
@@ -561,47 +560,47 @@ const DepartmentSettings = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 uppercase">Start Time (IST)</label>
-                    <input type="time" name="shiftStartTime" value={bulkShiftForm.shiftStartTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 uppercase">End Time (IST)</label>
-                    <input type="time" name="shiftEndTime" value={bulkShiftForm.shiftEndTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
-                  </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase">Start Time (IST)</label>
+                  <input type="time" name="shiftStartTime" value={bulkShiftForm.shiftStartTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase">End Time (IST)</label>
+                  <input type="time" name="shiftEndTime" value={bulkShiftForm.shiftEndTime} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
-                    <input type="number" step="0.5" name="fullDayHours" value={bulkShiftForm.fullDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
-                    <input type="number" step="0.5" name="halfDayHours" value={bulkShiftForm.halfDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
-                  </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase">Full Day Work Hours</label>
+                  <input type="number" step="0.5" name="fullDayHours" value={bulkShiftForm.fullDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase">Half Day Work Hours</label>
+                  <input type="number" step="0.5" name="halfDayHours" value={bulkShiftForm.halfDayHours} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
-                    <input type="number" name="lateGracePeriod" value={bulkShiftForm.lateGracePeriod} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
-                  </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase">Grace (Mins)</label>
+                  <input type="number" name="lateGracePeriod" value={bulkShiftForm.lateGracePeriod} onChange={handleBulkFormChange} className="w-full mt-1 p-2 border rounded-md" required />
+                </div>
               </div>
-              
+
               <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded flex items-center gap-2">
-                   <FaInfoCircle className="text-blue-500" />
-                   Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
+                <FaInfoCircle className="text-blue-500" />
+                Timings entered here are treated as Indian Standard Time by the server. Work hours are manual.
               </div>
 
               <div className="mt-4">
-                  <label className="text-xs font-bold text-gray-700 uppercase block mb-2">Weekly Offs</label>
-                  <div className="flex flex-wrap gap-2">
-                    {weekDays.map((d) => (
-                      <button key={d.value} type="button" onClick={() => handleWeeklyOffToggle(d.value, true)} className={`px-3 py-1 rounded text-xs font-bold ${bulkShiftForm.weeklyOffDays.includes(d.value) ? "bg-red-500 text-white" : "bg-gray-200 text-gray-600"}`}>{d.label}</button>
-                    ))}
-                  </div>
+                <label className="text-xs font-bold text-gray-700 uppercase block mb-2">Weekly Offs</label>
+                <div className="flex flex-wrap gap-2">
+                  {weekDays.map((d) => (
+                    <button key={d.value} type="button" onClick={() => handleWeeklyOffToggle(d.value, true)} className={`px-3 py-1 rounded text-xs font-bold ${bulkShiftForm.weeklyOffDays.includes(d.value) ? "bg-red-500 text-white" : "bg-gray-200 text-gray-600"}`}>{d.label}</button>
+                  ))}
+                </div>
               </div>
-              
+
               <div className="mt-auto pt-6">
                 <button type="submit" disabled={saving || selectedEmployeeIds.length === 0} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50">
-                   {saving ? "Processing..." : `Apply to ${selectedEmployeeIds.length} Employees`}
+                  {saving ? "Processing..." : `Apply to ${selectedEmployeeIds.length} Employees`}
                 </button>
               </div>
             </form>
@@ -631,36 +630,36 @@ const DepartmentSettings = () => {
               </div>
               <div className="p-4 bg-slate-100 border-t border-slate-200"><div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System</div><div onClick={() => { setViewUnassigned(true); resetGroupForm(); }} className={`bg-white p-3 rounded-lg border shadow-sm cursor-pointer transition-all ${viewUnassigned ? 'border-orange-400 ring-1 ring-orange-400' : 'border-slate-200 hover:border-orange-300'}`}><div className="flex justify-between items-center"><h4 className={`font-bold text-sm ${viewUnassigned ? 'text-orange-700' : 'text-slate-600'}`}>Unassigned Employees</h4><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${viewUnassigned ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-600'}`}>{getUnassignedEmployees().length}</span></div></div></div>
             </div>
-            
+
             {/* Right Panel: Form */}
             <div className="w-full md:w-2/3 h-[65%] md:h-full flex flex-col bg-white">
               {viewUnassigned ? (
                 <><div className="p-5 border-b border-slate-100 flex justify-between items-center bg-orange-50/50"><div><h3 className="font-bold text-xl text-orange-800 flex items-center gap-2"><FaExclamationCircle /> Unassigned Employees</h3></div><button onClick={() => setIsGroupModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"><FaTimes size={20} /></button></div><div className="p-6 flex-1 overflow-y-auto"><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{getUnassignedEmployees().length === 0 ? (<div className="col-span-2 text-center py-12 text-slate-400"><FaCheck className="mx-auto mb-2 text-green-400" size={24} /><p>All employees assigned!</p></div>) : (getUnassignedEmployees().map(emp => (<div key={emp._id} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-slate-50"><div className="w-8 h-8 rounded bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">{emp.name.charAt(0)}</div><div className="min-w-0"><p className="text-sm font-bold text-slate-700 truncate">{emp.name}</p><p className="text-xs text-slate-500">{emp.employeeId}</p></div></div>)))}</div></div></>
               ) : (
                 <><div className="p-5 border-b border-slate-100 flex justify-between items-center"><div><h3 className="font-bold text-xl text-slate-800">{editingGroupId ? 'Edit Group' : 'Create New Group'}</h3></div><button onClick={() => setIsGroupModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"><FaTimes size={20} /></button></div><div className="p-6 flex-1 overflow-y-auto"><div className="mb-6"><label className="block text-sm font-bold text-slate-700 mb-2">Group Name</label><input type="text" placeholder="e.g. Marketing Team" value={groupForm.name} onChange={e => setGroupForm({ ...groupForm, name: e.target.value })} className="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div><div className="mb-3 flex justify-between items-end"><label className="block text-sm font-bold text-slate-700">Select Members ({groupForm.members.length})</label><input type="text" placeholder="Search..." value={groupSearchTerm} onChange={e => setGroupSearchTerm(e.target.value)} className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:border-blue-500 outline-none" /></div><div className="border border-slate-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto bg-slate-50/50">
-                {employees
-                  .filter(e => e.name.toLowerCase().includes(groupSearchTerm.toLowerCase()))
-                  .sort((a, b) => {
-                    const aSelected = groupForm.members.includes(a._id);
-                    const bSelected = groupForm.members.includes(b._id);
-                    if (aSelected && !bSelected) return -1;
-                    if (!aSelected && bSelected) return 1;
-                    return 0;
-                  })
-                  .map(emp => { 
-                    const isSelected = groupForm.members.includes(emp._id); 
-                    return (
-                      <div key={emp._id} onClick={() => toggleGroupMemberSelection(emp._id)} className={`flex items-center gap-3 p-3 border-b border-slate-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-white'}`}>
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
-                          {isSelected && <FaCheck className="text-white text-xs" />}
+                  {employees
+                    .filter(e => e.name.toLowerCase().includes(groupSearchTerm.toLowerCase()))
+                    .sort((a, b) => {
+                      const aSelected = groupForm.members.includes(a._id);
+                      const bSelected = groupForm.members.includes(b._id);
+                      if (aSelected && !bSelected) return -1;
+                      if (!aSelected && bSelected) return 1;
+                      return 0;
+                    })
+                    .map(emp => {
+                      const isSelected = groupForm.members.includes(emp._id);
+                      return (
+                        <div key={emp._id} onClick={() => toggleGroupMemberSelection(emp._id)} className={`flex items-center gap-3 p-3 border-b border-slate-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-white'}`}>
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
+                            {isSelected && <FaCheck className="text-white text-xs" />}
+                          </div>
+                          <div>
+                            <p className={`text-sm font-semibold ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>{emp.name}</p>
+                            <p className="text-xs text-slate-500">{emp.employeeId}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className={`text-sm font-semibold ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>{emp.name}</p>
-                          <p className="text-xs text-slate-500">{emp.employeeId}</p>
-                        </div>
-                      </div>
-                    ) 
-                  })}
+                      )
+                    })}
                 </div></div><div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">{editingGroupId && (<button onClick={resetGroupForm} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg">Cancel Edit</button>)}<button onClick={handleSaveGroup} className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md flex items-center gap-2">{editingGroupId ? <FaSave /> : <FaPlus size={12} />} {editingGroupId ? 'Update' : 'Create'}</button></div></>
               )}
             </div>

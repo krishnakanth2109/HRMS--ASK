@@ -148,67 +148,73 @@ const WorkModeRequests = () => {
             </div>
           ) : (
             sortedRequests.map(req => (
-              <div key={req._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-5 items-start">
+              <div key={req._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4 md:gap-5 items-start">
 
                 {/* Left: Employee & Request Details */}
                 <div className="flex-1 w-full">
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${req.requestedMode === 'WFH' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full shrink-0 flex items-center justify-center text-lg md:text-xl font-bold ${req.requestedMode === 'WFH' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
                         {req.requestedMode === 'WFH' ? <FaLaptopHouse /> : <FaBuilding />}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-lg">{req.employeeName}</h4>
-                        <p className="text-xs text-slate-500 font-mono">{req.employeeId} • {req.department}</p>
+                      <div className="flex flex-col">
+                        <h4 className="font-bold text-slate-800 text-base md:text-lg">{req.employeeName}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-[10px] md:text-xs text-slate-500 font-mono">{req.employeeId}</p>
+                            <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-300"></span>
+                            <p className="text-[10px] md:text-xs text-slate-500">{req.department}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase border border-slate-200">
-                        {req.requestType}
-                      </span>
-                      {req.status === 'Approved' && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded flex items-center gap-1">
-                          <FaCheckCircle /> Approved
-                        </span>
-                      )}
-                      {req.status === 'Rejected' && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded flex items-center gap-1">
-                          <FaTimesCircle /> Rejected
-                        </span>
-                      )}
-                      {req.status === 'Pending' && (
-                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded flex items-center gap-1">
-                          Pending
-                        </span>
-                      )}
-                      {req.status === 'Withdrawn' && (
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] font-bold rounded flex items-center gap-1">
-                          Withdrawn
-                        </span>
-                      )}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
+                      <div className="flex flex-col md:flex-row items-end gap-1.5">
+                          <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[9px] md:text-[10px] font-bold rounded uppercase border border-slate-200 tracking-wider">
+                            {req.requestType}
+                          </span>
+                          {req.status === 'Approved' && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-[9px] md:text-[10px] font-bold rounded flex items-center gap-1 uppercase tracking-wider">
+                              <FaCheckCircle /> Approved
+                            </span>
+                          )}
+                          {req.status === 'Rejected' && (
+                            <span className="px-2 py-1 bg-red-100 text-red-700 text-[9px] md:text-[10px] font-bold rounded flex items-center gap-1 uppercase tracking-wider">
+                              <FaTimesCircle /> Rejected
+                            </span>
+                          )}
+                          {req.status === 'Pending' && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-[9px] md:text-[10px] font-bold rounded flex items-center gap-1 uppercase tracking-wider">
+                              Pending
+                            </span>
+                          )}
+                          {req.status === 'Withdrawn' && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-[9px] md:text-[10px] font-bold rounded flex items-center gap-1 uppercase tracking-wider">
+                              Withdrawn
+                            </span>
+                          )}
+                      </div>
                       {req.isEdited && (
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded flex items-center gap-1 border border-blue-100 mt-1">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] md:text-[10px] font-bold rounded flex items-center gap-1 border border-blue-100 uppercase tracking-wider">
                           <FaSyncAlt size={8} /> Edited
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="ml-13 pl-13 md:pl-0 mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <div>
-                      <span className="pl-4 text-slate-400 text-[10px] font-bold uppercase tracking-wider block">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div className="flex flex-col">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">
                         Requested Mode
                       </span>
                       <span
-                        className={`pl-4 font-bold ${req.requestedMode === "WFH" ? "text-green-600" : "text-blue-600"
+                        className={`font-bold text-xs md:text-sm ${req.requestedMode === "WFH" ? "text-green-600" : "text-blue-600"
                           }`}
                       >
                         {req.requestedMode === "WFH" ? "Work From Home" : "Work From Office"}
                       </span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Duration / Days</span>
-                      <span className="text-slate-700 font-medium">
+                    <div className="flex flex-col">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Duration / Days</span>
+                      <span className="text-slate-700 font-medium text-xs md:text-sm">
                         {req.requestType === "Temporary" && req.fromDate && req.toDate &&
                           `${new Date(req.fromDate).toLocaleDateString()} ➔ ${new Date(req.toDate).toLocaleDateString()}`
                         }
@@ -219,26 +225,26 @@ const WorkModeRequests = () => {
                   </div>
 
                   {req.reason && (
-                    <div className="mt-3 text-sm text-slate-600 italic">
-                      <span className="font-semibold text-slate-400 text-xs not-italic mr-1">Reason:</span>
+                    <div className="mt-3 text-xs md:text-sm text-slate-600 italic bg-slate-50/50 p-2 md:p-0 md:bg-transparent rounded border border-slate-100 md:border-0">
+                      <span className="font-semibold text-slate-400 text-[10px] md:text-xs not-italic mr-1.5 uppercase tracking-wider">Reason:</span>
                       "{req.reason}"
                     </div>
                   )}
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto min-w-[120px] justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5">
+                <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto min-w-[120px] justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 mt-2 md:mt-0">
                   {req.status === 'Pending' && (
                     <>
                       <button
                         onClick={() => handleAction(req._id, "Approved")}
-                        className="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                        className="flex-1 md:flex-none bg-[#10B981] hover:bg-[#059669] text-white px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95"
                       >
                         <FaCheck /> Approve
                       </button>
                       <button
                         onClick={() => handleAction(req._id, "Rejected")}
-                        className="flex-1 md:flex-none bg-white hover:bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-bold shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                        className="flex-1 md:flex-none bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95"
                       >
                         <FaTimes /> Reject
                       </button>
@@ -246,9 +252,9 @@ const WorkModeRequests = () => {
                   )}
                   <button
                     onClick={() => handleDelete(req._id)}
-                    className="flex-1 md:flex-none text-slate-400 hover:text-red-500 text-xs flex items-center justify-center md:justify-end gap-1 px-3 py-2 hover:bg-slate-50 rounded transition mt-auto"
+                    className={`${req.status !== 'Pending' ? 'flex-1' : 'w-auto'} md:w-full md:flex-none text-slate-400 hover:text-red-500 text-xs flex items-center justify-center md:justify-end gap-1 px-3 py-2 hover:bg-slate-50 border border-slate-200 md:border-0 rounded-lg md:rounded transition mt-0 md:mt-auto bg-white md:bg-transparent`}
                   >
-                    <FaTrash size={12} /> Delete
+                    <FaTrash size={12} /> <span className="md:inline">Delete</span>
                   </button>
                 </div>
               </div>

@@ -213,10 +213,10 @@ const PayrollPage = () => {
 
     return (
         <div className="">
-            <div className="p-6 bg-gray-50 rounded-xl flex justify-between items-center mb-8">
+            <div className="p-4 md:p-6 bg-gray-50 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Payroll Candidates Management</h1>
-                    <p className="text-gray-600 mt-1">Manage Payroll Candidates information and documents</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-gray-800 leading-tight">Payroll Candidates Management</h1>
+                    <p className="text-sm md:text-base text-gray-600 mt-1">Manage Payroll Candidates information and documents</p>
                 </div>
                 <button
                     onClick={() => {
@@ -232,7 +232,7 @@ const PayrollPage = () => {
                         setFiles({ profilePic: null, panDoc: null, aadhaarDoc: null });
                         setPreviewImage(null);
                     }}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 font-semibold"
+                    className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-semibold"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -269,115 +269,169 @@ const PayrollPage = () => {
                         </button>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto w-full">
-                        <div className="min-w-[1300px]">
-                            <table className="w-full text-left table-fixed">
-                                <thead className="bg-gray-50 text-gray-700 uppercase text-xs font-semibold">
-                                    <tr>
-                                        <th className="p-4 pl-6 w-20 whitespace-nowrap">Profile</th>
-                                        <th className="p-4 w-40 whitespace-nowrap">Full Name</th>
-                                        <th className="p-4 w-64 whitespace-nowrap">Email</th>
-                                        <th className="p-4 w-30 whitespace-nowrap">Phone</th>
-                                        <th className="p-4 w-35 whitespace-nowrap">Company</th>
-                                        <th className="p-4 w-40 whitespace-nowrap">Designation</th>
-                                        <th className="p-4 w-30 whitespace-nowrap">Net Salary</th>
-                                        <th className="p-4 w-80 whitespace-nowrap text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm divide-y divide-gray-200">
-                                    {candidates.map(user => (
-                                        <tr key={user._id} className="hover:bg-blue-50 transition-colors duration-200">
-                                            <td className="p-4 pl-6 whitespace-nowrap">
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                                                        onClick={() => {
-                                                            setSelectedUser(user);
-                                                            setIsProfilePicOpen(true);
-                                                        }}
-                                                        title="Click to view full size"
-                                                    >
-                                                        {user.profilePic ? (
-                                                            <img
-                                                                src={user.profilePic}
-                                                                alt={user.fullName}
-                                                                className="w-full h-full rounded-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            user.fullName.charAt(0)
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 font-medium text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" title={user.fullName}>
-                                                {user.fullName}
-                                            </td>
-                                            <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.email}>
-                                                {user.email}
-                                            </td>
-                                            <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.phone}>
-                                                {user.phone}
-                                            </td>
-                                            <td className="p-4 whitespace-nowrap overflow-hidden text-ellipsis" title={user.companyName}>
-                                                <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded truncate inline-block max-w-full">
-                                                    {user.companyName}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.designation}>
-                                                {user.designation}
-                                            </td>
-                                            <td className="p-4 whitespace-nowrap">
-                                                <span className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 text-sm font-bold px-3 py-1 rounded-lg">
-                                                    {formatCurrency(user.netSalary)}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 whitespace-nowrap">
-                                                <div className="flex justify-center gap-2">
-                                                    <button
-                                                        onClick={() => { setSelectedUser(user); setIsViewOpen(true); }}
-                                                        className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                                                    >
-                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                        </svg>
-                                                        View
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditId(user._id);
-                                                            setFormData({
-                                                                ...user,
-                                                                dob: user.dob?.split('T')[0],
-                                                                joiningDate: user.joiningDate?.split('T')[0]
-                                                            });
-                                                            setIsFormOpen(true);
-                                                            setPreviewImage(user.profilePic || null);
-                                                        }}
-                                                        className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                                                    >
-                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                        </svg>
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteUser(user._id, user.fullName)}
-                                                        className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                                                    >
-                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                        </svg>
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </td>
+                    <>
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto w-full">
+                            <div className="min-w-[1300px]">
+                                <table className="w-full text-left table-fixed">
+                                    <thead className="bg-gray-50 text-gray-700 uppercase text-xs font-semibold">
+                                        <tr>
+                                            <th className="p-4 pl-6 w-20 whitespace-nowrap">Profile</th>
+                                            <th className="p-4 w-40 whitespace-nowrap">Full Name</th>
+                                            <th className="p-4 w-64 whitespace-nowrap">Email</th>
+                                            <th className="p-4 w-30 whitespace-nowrap">Phone</th>
+                                            <th className="p-4 w-35 whitespace-nowrap">Company</th>
+                                            <th className="p-4 w-40 whitespace-nowrap">Designation</th>
+                                            <th className="p-4 w-30 whitespace-nowrap">Net Salary</th>
+                                            <th className="p-4 w-80 whitespace-nowrap text-center">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-gray-200">
+                                        {candidates.map(user => (
+                                            <tr key={user._id} className="hover:bg-blue-50 transition-colors duration-200">
+                                                <td className="p-4 pl-6 whitespace-nowrap">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                                                            onClick={() => {
+                                                                setSelectedUser(user);
+                                                                setIsProfilePicOpen(true);
+                                                            }}
+                                                            title="Click to view full size"
+                                                        >
+                                                            {user.profilePic ? (
+                                                                <img
+                                                                    src={user.profilePic}
+                                                                    alt={user.fullName}
+                                                                    className="w-full h-full rounded-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                user.fullName.charAt(0)
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 font-medium text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" title={user.fullName}>
+                                                    {user.fullName}
+                                                </td>
+                                                <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.email}>
+                                                    {user.email}
+                                                </td>
+                                                <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.phone}>
+                                                    {user.phone}
+                                                </td>
+                                                <td className="p-4 whitespace-nowrap overflow-hidden text-ellipsis" title={user.companyName}>
+                                                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded truncate inline-block max-w-full">
+                                                        {user.companyName}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" title={user.designation}>
+                                                    {user.designation}
+                                                </td>
+                                                <td className="p-4 whitespace-nowrap">
+                                                    <span className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 text-sm font-bold px-3 py-1 rounded-lg">
+                                                        {formatCurrency(user.netSalary)}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 whitespace-nowrap">
+                                                    <div className="flex justify-center gap-2">
+                                                        <button
+                                                            onClick={() => { setSelectedUser(user); setIsViewOpen(true); }}
+                                                            className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                                                        >
+                                                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                            </svg>
+                                                            View
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditId(user._id);
+                                                                setFormData({
+                                                                    ...user,
+                                                                    dob: user.dob?.split('T')[0],
+                                                                    joiningDate: user.joiningDate?.split('T')[0]
+                                                                });
+                                                                setIsFormOpen(true);
+                                                                setPreviewImage(user.profilePic || null);
+                                                            }}
+                                                            className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                                                        >
+                                                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                            </svg>
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteUser(user._id, user.fullName)}
+                                                            className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                                                        >
+                                                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+
+                        {/* Mobile Card List View */}
+                        <div className="md:hidden flex flex-col gap-4 p-4">
+                            {candidates.map(user => (
+                                <div key={`mobile-${user._id}`} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:border-blue-200 transition-colors relative">
+                                    <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                        <div
+                                            className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0 cursor-pointer hover:opacity-90 shadow-sm"
+                                            onClick={() => {
+                                                setSelectedUser(user);
+                                                setIsProfilePicOpen(true);
+                                            }}
+                                        >
+                                            {user.profilePic ? (
+                                                <img src={user.profilePic} alt={user.fullName} className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                user.fullName.charAt(0)
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-gray-800 text-sm truncate">{user.fullName}</div>
+                                            <div className="text-[11px] font-semibold text-blue-600 truncate">{user.designation}</div>
+                                            <div className="text-[10px] text-gray-500 mt-0.5 truncate">{user.email}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex flex-col">
+                                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Company</span>
+                                            <span className="font-bold text-gray-700 text-xs truncate">{user.companyName}</span>
+                                        </div>
+                                        <div className="bg-green-50 p-2.5 rounded-lg border border-green-100 flex flex-col items-end">
+                                            <span className="text-[9px] font-bold text-green-600 uppercase tracking-wider mb-0.5">Net Salary</span>
+                                            <span className="font-black text-green-700 text-sm">{formatCurrency(user.netSalary)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between gap-2 mt-1">
+                                        <button onClick={() => { setSelectedUser(user); setIsViewOpen(true); }} className="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 py-2 rounded-lg text-xs font-bold transition-colors flex justify-center items-center gap-1 shadow-sm">
+                                            👁️ View
+                                        </button>
+                                        <button onClick={() => { setEditId(user._id); setFormData({...user, dob: user.dob?.split('T')[0], joiningDate: user.joiningDate?.split('T')[0]}); setIsFormOpen(true); setPreviewImage(user.profilePic || null); }} className="flex-1 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 py-2 rounded-lg text-xs font-bold transition-colors flex justify-center items-center gap-1 shadow-sm">
+                                            ✏️ Edit
+                                        </button>
+                                        <button onClick={() => deleteUser(user._id, user.fullName)} className="flex-1 bg-red-50 text-red-700 hover:bg-red-100 py-2 rounded-lg text-xs font-bold transition-colors flex justify-center items-center gap-1 shadow-sm">
+                                            🗑️ Del
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
 

@@ -143,11 +143,11 @@ const OvertimeAdmin = () => {
         {/* --- END OF NEW COUNT CONTAINERS UI --- */}
 
 
-        <div className=" bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Manage Requests</h2>
+        <div className="md:bg-white/60 md:backdrop-blur-md md:rounded-2xl md:shadow-sm md:border border-gray-200 md:p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 md:mb-6 px-1 md:px-0">Manage Requests</h2>
 
             {/* --- START OF NEW FILTERS UI --- */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200 md:bg-transparent md:p-0 md:rounded-none md:shadow-none md:border-0">
                 <FilterInput label="Search by Name or ID" value={filters.search} onChange={(e) => setFilters({...filters, search: e.target.value})} placeholder="e.g., John Doe or 12345">
                     <FaSearch className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
                 </FilterInput>
@@ -171,8 +171,8 @@ const OvertimeAdmin = () => {
             </div>
             {/* --- END OF NEW FILTERS UI --- */}
 
-            {/* --- TABLE (with enhanced UI) --- */}
-            <div className="overflow-x-auto">
+            {/* --- DESKTOP TABLE --- */}
+            <div className="hidden md:block overflow-x-auto rounded-xl shadow-sm border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-indigo-50">
                         <tr>
@@ -229,7 +229,7 @@ const OvertimeAdmin = () => {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={6} className="text-center py-10 text-gray-500">
+                                <td colSpan={6} className="text-center py-10 text-gray-500 bg-white">
                                     <p className="font-semibold text-lg">No Overtime Requests Found</p>
                                     <p className="text-sm">Try adjusting your filters or check back later.</p>
                                 </td>
@@ -237,6 +237,67 @@ const OvertimeAdmin = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* --- MOBILE LIST VIEW --- */}
+            <div className="md:hidden flex flex-col gap-4">
+                {filteredOvertimeList.length > 0 ? (
+                    filteredOvertimeList.map((ot) => (
+                        <div key={ot._id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col gap-3 hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                            {ot.employeeName.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 text-sm">{ot.employeeName}</h4>
+                                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{ot.employeeId}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`px-2 py-1 inline-flex text-[9px] font-bold rounded-md tracking-wider uppercase ${
+                                        ot.status === "APPROVED" ? "bg-green-50 text-green-700 border border-green-200"
+                                        : ot.status === "REJECTED" ? "bg-red-50 text-red-700 border border-red-200"
+                                        : "bg-yellow-50 text-yellow-700 border border-yellow-200"
+                                    }`}>
+                                        {ot.status}
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-row items-center gap-3 text-xs mt-1">
+                                    <div className="flex items-center gap-1.5 text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                        <FaCalendarAlt className="text-gray-400 text-[10px]" />
+                                        <span className="font-medium text-[11px]">{ot.date}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                                        <span className="font-bold text-[10px] uppercase tracking-wider">{ot.type}</span>
+                                    </div>
+                                </div>
+
+                                {ot.status === 'PENDING' && (
+                                    <div className="flex gap-2 w-full mt-2">
+                                        <button
+                                            disabled={updatingId === ot._id}
+                                            onClick={() => updateStatus(ot._id, "APPROVED")}
+                                            className="flex-1 bg-[#10B981] text-white px-3 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-[#059669] disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            disabled={updatingId === ot._id}
+                                            onClick={() => updateStatus(ot._id, "REJECTED")}
+                                            className="flex-1 bg-[#EF4444] text-white px-3 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-[#DC2626] disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-10 bg-white rounded-2xl shadow-sm border border-gray-200">
+                            <p className="font-semibold text-gray-500">No Requests Found</p>
+                        </div>
+                    )}
             </div>
         </div>
       </div>

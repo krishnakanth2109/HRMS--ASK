@@ -1305,7 +1305,7 @@ const renderMorningUpdateSection = () => {
             )}
 
             <div className="rounded-[28px] bg-white p-6 shadow-xl shadow-slate-200/60">
-              <div className="mb-5 flex items-center justify-between gap-4">
+              <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-slate-900">My Records</h2>
                   <p className="mt-1 text-sm text-slate-500">
@@ -1316,18 +1316,20 @@ const renderMorningUpdateSection = () => {
                         : "Review your submitted score, the admin-approved score, and all work submissions for the selected month."}
                   </p>
                 </div>
-                {selectedCalendarDateKey && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCalendarDateKey("")}
-                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
-                  >
-                    Clear Filter
-                  </button>
-                )}
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                  {displayedRecords.length} {displayedRecords.length === 1 ? "entry" : "entries"}
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {selectedCalendarDateKey && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCalendarDateKey("")}
+                      className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                    {displayedRecords.length} {displayedRecords.length === 1 ? "entry" : "entries"}
+                  </span>
+                </div>
               </div>
 
               {loading ? (
@@ -1446,7 +1448,7 @@ const renderMorningUpdateSection = () => {
                                 {record.daily_work_percentage || 0}%
                               </p>
                             </div>
-                            <div className="text-right text-xs font-semibold text-slate-500">
+                            <div className="text-left sm:text-right text-xs font-semibold text-slate-500">
                               <p>Mode: {record.percentage_mode || "none"}</p>
                               <p>
                                 Generated:{" "}

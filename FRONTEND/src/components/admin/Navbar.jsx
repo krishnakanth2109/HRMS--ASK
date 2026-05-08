@@ -98,11 +98,11 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
         <h1 className="text-2xl font-bold text-white tracking-wide drop-shadow"></h1>
 
         <div className="flex items-center gap-6">
-          
+
           {/* 🔥 THEME SELECTION OPTION (SIDE OF BELL) */}
           <div className="relative" ref={themeRef}>
-            <div 
-              className="cursor-pointer group p-1" 
+            <div
+              className="cursor-pointer group p-1"
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
             >
               <FaPalette className="text-xl text-white group-hover:text-yellow-300 transition" />
@@ -125,8 +125,8 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
                       onThemeChange(t.id);
                       setShowThemeDropdown(false);
                     }}
-                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition text-sm font-medium ${currentTheme === 'dark' 
-                      ? 'text-slate-300 hover:bg-white/5' 
+                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition text-sm font-medium ${currentTheme === 'dark'
+                      ? 'text-slate-300 hover:bg-white/5'
                       : 'text-gray-700 hover:bg-blue-50'}`}
                   >
                     <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ const Navbar = ({ currentTheme, onThemeChange }) => {
             <FaChevronDown className={`text-white ml-1 transition-transform duration-200 ${showMenu ? "rotate-180" : ""}`} />
 
             {showMenu && (
-              <div className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-56 z-50 text-base animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute top-12 right-0 bg-white border rounded-lg shadow-lg w-56 z-50 text-base animate-fade-in overflow-hidden " onClick={(e) => e.stopPropagation()}>
                 <div onClick={() => { navigate("/admin/profile"); setShowMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition">
                   <FaUser className="text-blue-600" /> View Profile
                 </div>

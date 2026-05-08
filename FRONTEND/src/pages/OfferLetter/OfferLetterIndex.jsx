@@ -318,7 +318,8 @@ function OfferLetterIndex() {
           </div>
         ) : (
           <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-color)', overflow: 'hidden', boxShadow: 'var(--card-shadow)' }}>
-            <div style={{ overflowX: 'auto' }}>
+            {/* Desktop Table View */}
+            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
                 <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
                   <tr>
@@ -362,6 +363,59 @@ function OfferLetterIndex() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card List View */}
+            <div className="md:hidden flex flex-col">
+              {filteredEmployees.map((emp, idx) => {
+                const uniqueId = emp._id || emp.id;
+                return (
+                  <div key={uniqueId} style={{ 
+                    padding: '1.25rem', 
+                    borderBottom: idx !== filteredEmployees.length - 1 ? '1px solid var(--border-color)' : 'none',
+                    background: selectedIds.has(uniqueId) ? selectedBg : 'transparent',
+                    transition: 'background 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }} onClick={(e) => {
+                    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'svg' && e.target.tagName !== 'path' && e.target.tagName !== 'INPUT') {
+                      const s = new Set(selectedIds); s.has(uniqueId) ? s.delete(uniqueId) : s.add(uniqueId); setSelectedIds(s);
+                    }
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input type="checkbox" checked={selectedIds.has(uniqueId)} onChange={() => { const s = new Set(selectedIds); s.has(uniqueId) ? s.delete(uniqueId) : s.add(uniqueId); setSelectedIds(s); }} style={{ cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{emp.name || "Unnamed"}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{emp.designation || "N/A"}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                          <button onClick={(e) => { e.stopPropagation(); handleViewEmployee(emp); }} style={{ padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px', border:'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Eye size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditEmployee(emp); }} style={{ padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px', border:'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Pencil size={14} /></button>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={14} /> {(emp.createdAt || emp.joining_date) ? new Date(emp.createdAt || emp.joining_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px',
+                        background: emp.status === 'Accepted' ? 'var(--success-bg)' : emp.status === 'Rejected' ? 'var(--error-bg)' : 'var(--pending-bg)',
+                        color: emp.status === 'Accepted' ? 'var(--success-text)' : emp.status === 'Rejected' ? 'var(--error-text)' : 'var(--pending-text)'
+                      }}>
+                        {emp.status || 'Pending'}
+                      </span>
+                    </div>
+
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedEmployee(emp); }} style={{ width: '100%', marginTop: '8px', background: emp.status === 'Accepted' ? 'var(--success-text)' : 'var(--accent-color)', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.15)' }}>
+                      {emp.status?.includes('Sent') ? 'VIEW OFFER' : 'MANAGE OFFER'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

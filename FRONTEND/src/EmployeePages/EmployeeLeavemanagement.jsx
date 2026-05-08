@@ -1466,7 +1466,7 @@ const EmployeeLeavemanagement = () => {
             </p>
           </div>
 
-          
+
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
@@ -1848,10 +1848,19 @@ const EmployeeLeavemanagement = () => {
 
                 {form.from && form.to && form.from === form.to && (
                   <div>
+<<<<<<< HEAD
+
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
+                    <select
+                      name="halfDaySession"
+                      value={form.halfDaySession}
+
+=======
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
                     <select
                       name="halfDaySession"
                       value={form.halfDaySession}
+>>>>>>> 043fa46c63bc89cdee4401e47ea38c30e4dcb27d
                       onChange={handleChange}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     >
@@ -1859,23 +1868,25 @@ const EmployeeLeavemanagement = () => {
                       <option value="Morning Half">Morning Half</option>
                       <option value="Afternoon Half">Afternoon Half</option>
                     </select>
-                  </div>
+                  </div >
                 )}
 
-                {/* Sandwich Warning */}
-                {sandwichWarning && sandwichWarning.length > 0 && (
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
-                    <div className="flex items-start">
-                      <span className="text-yellow-600 text-xl mr-2">⚠️</span>
-                      <div>
-                        <p className="font-semibold text-yellow-800 mb-2">Sandwich Leave Warning</p>
-                        {sandwichWarning.map((warning, index) => (
-                          <p key={index} className="text-sm text-yellow-700 mb-1">{warning.message}</p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+{/* Sandwich Warning */ }
+{
+  sandwichWarning && sandwichWarning.length > 0 && (
+    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+      <div className="flex items-start">
+        <span className="text-yellow-600 text-xl mr-2">⚠️</span>
+        <div>
+          <p className="font-semibold text-yellow-800 mb-2">Sandwich Leave Warning</p>
+          {sandwichWarning.map((warning, index) => (
+            <p key={index} className="text-sm text-yellow-700 mb-1">{warning.message}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Leave Type</label>
@@ -1912,8 +1923,8 @@ const EmployeeLeavemanagement = () => {
                     maxLength={REASON_LIMIT}
                     rows="3"
                     className={`w-full border-2 rounded-xl px-4 py-3 transition duration-200 resize-none ${isOptimized
-                        ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
-                        : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
+                      : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                       }`}
                     placeholder="Brief reason for your leave"
                   ></textarea>
@@ -1924,8 +1935,8 @@ const EmployeeLeavemanagement = () => {
                       onClick={handleOptimizeReason}
                       disabled={!form.reason.trim() || isOptimizing}
                       className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 ${!form.reason.trim()
-                          ? "bg-gray-300 cursor-not-allowed text-gray-500"
-                          : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
+                        ? "bg-gray-300 cursor-not-allowed text-gray-500"
+                        : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
                         }`}
                       style={{ fontFamily: 'Segoe UI, system-ui, sans-serif' }}
                     >
@@ -1945,184 +1956,188 @@ const EmployeeLeavemanagement = () => {
                   </div>
                 </div>
 
-                {submitError && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
-                    <p className="text-red-700 font-semibold">{submitError}</p>
-                  </div>
-                )}
-
-                {submitSuccess && (
-                  <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
-                    <p className="text-green-700 font-semibold">{submitSuccess}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
-                  >
-                    Submit Leave Request
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModalOpen(false)}
-                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Sandwich Alert Modal */}
-      <AnimatePresence>
-        {showSandwichAlert && sandwichWarning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-2xl">⚠️</span>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Sandwich Leave Detected</h3>
-              </div>
-
-              <div className="mb-6 space-y-3">
-                {sandwichWarning.map((warning, index) => (
-                  <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-                    <p className="text-sm text-gray-700">{warning.message}</p>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-gray-600 mb-6">
-                Do you want to proceed with this leave request?
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowSandwichAlert(false);
-                    // Check for LOP warning before submitting
-                    const hasLOPWarning = checkLOPWarning(form.from, form.to);
-                    if (hasLOPWarning) {
-                      setShowLOPWarning(true);
-                    } else {
-                      submitLeaveRequest();
-                    }
-                  }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
-                >
-                  Yes, Proceed
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSandwichAlert(false);
-                  }}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ✅ NEW: LOP Warning Modal */}
-      <AnimatePresence>
-        {showLOPWarning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-2xl text-red-600">💰</span>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
-              </div>
-
-              <div className="mb-6 space-y-3">
-                <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
-                  <p className="text-sm text-red-700">
-                    <strong>Warning:</strong> Your pending leave balance is completed for this month!
-                  </p>
-                </div>
-
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-700">Available Pending Leaves:</span>
-                      <span className="text-sm font-semibold">{LOPWarningDetails.pendingLeaves} day(s)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-700">Requested Leave Days:</span>
-                      <span className="text-sm font-semibold">{LOPWarningDetails.requestedDays} day(s)</span>
-                    </div>
-                    <div className="flex justify-between border-t border-yellow-200 pt-2">
-                      <span className="text-sm font-semibold text-red-600">Will be marked as LOP:</span>
-                      <span className="text-sm font-bold text-red-600">{LOPWarningDetails.willBeLOP} day(s)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-sm text-blue-700">
-                    <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-gray-600 mb-6">
-                Do you want to continue with this leave request as LOP?
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowLOPWarning(false);
-                    submitLeaveRequest();
-                  }}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
-                >
-                  Yes, Proceed as LOP
-                </button>
-                <button
-                  onClick={() => {
-                    setShowLOPWarning(false);
-                  }}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
-                >
-                  Cancel Request
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+{
+  submitError && (
+    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+      <p className="text-red-700 font-semibold">{submitError}</p>
     </div>
+  )
+}
+
+{
+  submitSuccess && (
+    <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
+      <p className="text-green-700 font-semibold">{submitSuccess}</p>
+    </div>
+  )
+}
+
+<div className="flex gap-3 pt-4">
+  <button
+    type="submit"
+    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
+  >
+    Submit Leave Request
+  </button>
+  <button
+    type="button"
+    onClick={() => setModalOpen(false)}
+    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-3 rounded-xl transition duration-200"
+  >
+    Cancel
+  </button>
+</div>
+              </form >
+            </motion.div >
+          </motion.div >
+        )}
+      </AnimatePresence >
+
+  {/* Sandwich Alert Modal */ }
+  < AnimatePresence >
+  { showSandwichAlert && sandwichWarning && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      >
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900">Sandwich Leave Detected</h3>
+        </div>
+
+        <div className="mb-6 space-y-3">
+          {sandwichWarning.map((warning, index) => (
+            <div key={index} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+              <p className="text-sm text-gray-700">{warning.message}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-gray-600 mb-6">
+          Do you want to proceed with this leave request?
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              setShowSandwichAlert(false);
+              // Check for LOP warning before submitting
+              const hasLOPWarning = checkLOPWarning(form.from, form.to);
+              if (hasLOPWarning) {
+                setShowLOPWarning(true);
+              } else {
+                submitLeaveRequest();
+              }
+            }}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+          >
+            Yes, Proceed
+          </button>
+          <button
+            onClick={() => {
+              setShowSandwichAlert(false);
+            }}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
+          >
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+      </AnimatePresence >
+
+  {/* ✅ NEW: LOP Warning Modal */ }
+  < AnimatePresence >
+  { showLOPWarning && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      >
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
+            <span className="text-2xl text-red-600">💰</span>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900">Loss of Pay (LOP) Warning</h3>
+        </div>
+
+        <div className="mb-6 space-y-3">
+          <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded">
+            <p className="text-sm text-red-700">
+              <strong>Warning:</strong> Your pending leave balance is completed for this month!
+            </p>
+          </div>
+
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-700">Available Pending Leaves:</span>
+                <span className="text-sm font-semibold">{LOPWarningDetails.pendingLeaves} day(s)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-700">Requested Leave Days:</span>
+                <span className="text-sm font-semibold">{LOPWarningDetails.requestedDays} day(s)</span>
+              </div>
+              <div className="flex justify-between border-t border-yellow-200 pt-2">
+                <span className="text-sm font-semibold text-red-600">Will be marked as LOP:</span>
+                <span className="text-sm font-bold text-red-600">{LOPWarningDetails.willBeLOP} day(s)</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-700">
+              <strong>Note:</strong> LOP (Loss of Pay) leaves will result in salary deduction. Are you sure you want to proceed?
+            </p>
+          </div>
+        </div>
+
+        <p className="text-gray-600 mb-6">
+          Do you want to continue with this leave request as LOP?
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              setShowLOPWarning(false);
+              submitLeaveRequest();
+            }}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-xl transition duration-200"
+          >
+            Yes, Proceed as LOP
+          </button>
+          <button
+            onClick={() => {
+              setShowLOPWarning(false);
+            }}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-3 rounded-xl transition duration-200"
+          >
+            Cancel Request
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+      </AnimatePresence >
+    </div >
   );
 };
 

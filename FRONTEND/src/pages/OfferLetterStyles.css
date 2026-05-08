@@ -41,7 +41,7 @@
   color: var(--text-primary);
 }
 
-.offer-letter-wrapper[data-theme='dark'] {
+.dark .offer-letter-wrapper {
   color-scheme: dark;
   --bg-primary: #020617;    /* Slate 950 */
   --bg-secondary: #0f172a;  /* Slate 900 */

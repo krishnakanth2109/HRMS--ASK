@@ -7,8 +7,8 @@ import { Outlet } from "react-router-dom";
 const LayoutEmployee = () => {
   const [theme, setTheme] = useState(sessionStorage.getItem("employeeTheme") || "bubbles");
   const [bubbles, setBubbles] = useState([]);
-  
-  const themeBgImage = "https://image2url.com/r2/default/images/1772457362735-3b1e508e-e9da-4614-8ffd-86efe3e119ba.png"; 
+
+  const themeBgImage = "https://image2url.com/r2/default/images/1772457362735-3b1e508e-e9da-4614-8ffd-86efe3e119ba.png";
 
   const toggleTheme = (selectedTheme) => {
     setTheme(selectedTheme);
@@ -42,14 +42,14 @@ const LayoutEmployee = () => {
 
   return (
     <div className={`flex h-screen w-full overflow-hidden transition-colors duration-500 ${theme === 'dark' ? 'bg-slate-950 text-slate-200' : theme === 'white' ? 'bg-white' : 'bg-[#F8FAFF]'}`}>
-      
+
       {/* SIDEBAR */}
       <div className={`z-30 transition-all duration-500 flex-shrink-0 ${theme === 'dark' ? 'bg-slate-900/50 backdrop-blur-xl border-r border-white/5' : 'bg-white/70 backdrop-blur-sm shadow-[4px_0_24px_rgba(0,0,0,0.02)]'}`}>
         <SidebarEmployee />
       </div>
 
       <div className="flex flex-col flex-1 min-w-0">
-        
+
         {/* NAVBAR */}
         <div className={`z-20 transition-all duration-500 flex-shrink-0 ${theme === 'dark' ? 'bg-slate-900/50 backdrop-blur-xl border-b border-white/5' : 'bg-white/70 backdrop-blur-sm shadow-[0_4px_24px_rgba(0,0,0,0.02)]'}`}>
           <NavbarEmployee currentTheme={theme} onThemeChange={toggleTheme} />
@@ -95,7 +95,7 @@ const LayoutEmployee = () => {
           </div>
 
           {/* CONTENT AREA */}
-          <div className="relative h-full w-full overflow-y-auto p-6 md:p-8 custom-scrollbar">
+          <div className="relative h-full w-full overflow-y-auto px-2 md:p-4 lg:p-8 ">
             <Outlet />
           </div>
         </main>

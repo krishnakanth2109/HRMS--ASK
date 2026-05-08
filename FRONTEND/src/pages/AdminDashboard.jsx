@@ -116,42 +116,42 @@ const getJoiningDate = (employee) => {
 const isTodayBirthday = (employee) => {
   const dob = employee.personalDetails?.dob;
   if (!dob) return false;
-  
+
   const today = new Date();
   const birthDate = new Date(dob);
-  
+
   // Compare month and day only
-  return today.getMonth() === birthDate.getMonth() && 
-         today.getDate() === birthDate.getDate();
+  return today.getMonth() === birthDate.getMonth() &&
+    today.getDate() === birthDate.getDate();
 };
 
 // ─── Helper function to check if today is work anniversary ─────────────────
 const isTodayWorkAnniversary = (employee) => {
   const joiningDate = getJoiningDate(employee);
   if (!joiningDate) return null;
-  
+
   const today = new Date();
   const joinDate = new Date(joiningDate);
-  
+
   // Check if today matches the month and day of joining
-  const isSameDay = today.getMonth() === joinDate.getMonth() && 
-                    today.getDate() === joinDate.getDate();
-  
+  const isSameDay = today.getMonth() === joinDate.getMonth() &&
+    today.getDate() === joinDate.getDate();
+
   if (!isSameDay) return null;
-  
+
   // Calculate years completed
   let yearsCompleted = today.getFullYear() - joinDate.getFullYear();
-  
+
   // If anniversary hasn't occurred yet this year (for future dates), subtract 1
   if (today < new Date(today.getFullYear(), joinDate.getMonth(), joinDate.getDate())) {
     yearsCompleted--;
   }
-  
+
   // Only return if at least 1 year has been completed
   if (yearsCompleted >= 1) {
     return yearsCompleted;
   }
-  
+
   return null;
 };
 
@@ -273,7 +273,7 @@ const AdminDashboard = () => {
     const announcementsList = [];
     const today = new Date();
     const todayStr = today.toLocaleDateString();
-    
+
     console.log("Checking announcements for date:", todayStr); // Debug log
 
     activeEmployees.forEach((employee) => {
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
           type: "birthday",
           name: employee.name,
           role: role,
-message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s Birthday! Wish them a wonderful day! 🎂🎈`,
+          message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s Birthday! Wish them a wonderful day! 🎂🎈`,
           icon: <FaBirthdayCake className="inline mr-2 text-pink-500" />
         });
         console.log("Found birthday for:", employee.name); // Debug log
@@ -655,9 +655,9 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
       `}</style>
 
       {/* ================= MAIN CONTENT (Internally Scrollable Area) ================= */}
-      <div className="relative z-10 w-full h-full overflow-y-auto p-6 pb-20 internal-scroll">
+      <div className="relative z-10 w-full h-full overflow-y-auto p-3 md:p-6 pb-20 internal-scroll">
 
-    
+
 
         {/* 1. TOP STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -723,7 +723,7 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
           </div>
         </div>
 
-            {/* ================= ANNOUNCEMENTS MARQUEE SECTION ================= */}
+        {/* ================= ANNOUNCEMENTS MARQUEE SECTION ================= */}
         {hasAnnouncements && (
           <div className="mb-6 bg-gradient-to-r from-purple-50 via-pink-50 to-yellow-50 rounded-xl shadow-sm border border-purple-100 overflow-hidden">
             <div className="flex items-center bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 border-b border-purple-200">
@@ -828,7 +828,7 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
                 </div>
               </div>
             </div>
-            
+
             {/* Chart Area */}
             <div className="h-[250px] w-full">
               {loadingGraph ? (
@@ -978,7 +978,7 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
 
         </div>
 
-        
+
 
         {/* 3. MAIN CONTENT GRID */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -1009,27 +1009,27 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
                   recentLeaves.map((item, idx) => (
                     <div
                       key={item._id || idx}
-                      className="flex items-center justify-between p-3 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
+                      className="flex items-center justify-between p-3 gap-2 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-10 h-10 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
+                          className={`w-10 h-10 shrink-0 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
                         >
                           {getInitials(item.name)}
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-[#2B3674]">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-[#2B3674] truncate">
                             {item.name}{" "}
-                            <span className="text-[10px] text-gray-400 font-normal">
+                            <span className="text-[10px] text-gray-400 font-normal hidden sm:inline">
                               ({item.role})
                             </span>
                           </h4>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
                             {item.dateLabel}
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-3">
+                      <div className="flex gap-2 shrink-0">
                         {item.status === "Pending" ? (
                           <>
                             <button
@@ -1086,22 +1086,22 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
                   onLeaveTodayList.map((item, idx) => (
                     <div
                       key={item.employeeId + idx}
-                      className="flex items-center justify-between p-3 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
+                      className="flex items-center justify-between p-3 gap-2 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-10 h-10 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
+                          className={`w-10 h-10 shrink-0 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
                         >
                           {getInitials(item.name)}
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-[#2B3674]">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-[#2B3674] truncate">
                             {item.name}{" "}
-                            <span className="text-[10px] text-gray-400 font-normal">
+                            <span className="text-[10px] text-gray-400 font-normal hidden sm:inline">
                               ({item.role})
                             </span>
                           </h4>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
                             {item.leaveType}, {formatLeaveDate(item.from)}
                           </p>
                         </div>
@@ -1134,22 +1134,22 @@ message: `🎉 Today is ${employee.name}${role !== "—" ? ` (${role})` : ""}'s 
                   remoteWorkers.map((item, idx) => (
                     <div
                       key={item.employeeId + idx}
-                      className="flex items-center justify-between p-3 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
+                      className="flex items-center justify-between p-3 gap-2 rounded-[14px] bg-[#F9FAFD] border border-gray-100"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-10 h-10 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
+                          className={`w-10 h-10 shrink-0 rounded-full ${pickColor(item.name)} text-white font-bold flex items-center justify-center text-xs`}
                         >
                           {getInitials(item.name)}
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-[#2B3674]">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-[#2B3674] truncate">
                             {item.name}{" "}
-                            <span className="text-[10px] text-gray-400 font-normal">
+                            <span className="text-[10px] text-gray-400 font-normal hidden sm:inline">
                               ({item.role})
                             </span>
                           </h4>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
                             Work From Home
                           </p>
                         </div>

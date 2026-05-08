@@ -111,14 +111,14 @@ const OvertimeWithModal = () => {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex  justify-between border border-gray-200 shadow-sm p-4 bg-white rounded-2xl items-center mb-8">
-        <h2 className="text-4xl font-extrabold text-indigo-900 tracking-wide">
+      <div className="flex flex-col md:flex-row justify-between border border-gray-200 shadow-sm p-4 bg-white rounded-2xl items-start md:items-center gap-4 mb-8">
+        <h2 className="text-2xl md:text-4xl font-extrabold text-indigo-900 tracking-wide">
           My Overtime Requests
         </h2>
 
         <button
           onClick={() => setApplyModalOpen(true)}
-          className="bg-gradient-to-r from-indigo-600 to-indigo-800 hover:opacity-90 text-white px-6 py-2.5 rounded-lg shadow-lg transition-all font-semibold"
+          className="bg-gradient-to-r from-indigo-600 to-indigo-800 hover:opacity-90 text-white px-6 py-2.5 rounded-lg shadow-lg transition-all font-semibold w-full md:w-auto"
         >
           + Apply Overtime
         </button>
@@ -126,68 +126,70 @@ const OvertimeWithModal = () => {
 
       {/* TABLE */}
       <div className="bg-white shadow-xl rounded-xl overflow-hidden border">
-        <table className="w-full text-sm">
-          <thead className="bg-indigo-600 text-white">
-            <tr>
-              <th className="px-6 py-3 border-r">Date</th>
-              <th className="px-6 py-3 border-r">Type</th>
-              <th className="px-6 py-3">Status / Action</th>
-            </tr>
-          </thead>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
+            <thead className="bg-indigo-600 text-white">
+              <tr>
+                <th className="px-6 py-3 border-r whitespace-nowrap">Date</th>
+                <th className="px-6 py-3 border-r whitespace-nowrap">Type</th>
+                <th className="px-6 py-3 whitespace-nowrap">Status / Action</th>
+              </tr>
+            </thead>
 
-          <tbody>
-            {overtimeList.length > 0 ? (
-              overtimeList.map((ot) => (
-                <tr
-                  key={ot._id}
-                  className="hover:bg-indigo-50 transition border-b"
-                >
-                  <td className="px-6 py-3 border-r text-center">{ot.date}</td>
-                  <td className="px-6 py-3 border-r text-center">
-                    {ot.type.replace("_", " ")}
-                  </td>
+            <tbody>
+              {overtimeList.length > 0 ? (
+                overtimeList.map((ot) => (
+                  <tr
+                    key={ot._id}
+                    className="hover:bg-indigo-50 transition border-b"
+                  >
+                    <td className="px-6 py-3 border-r text-center whitespace-nowrap">{ot.date}</td>
+                    <td className="px-6 py-3 border-r text-center whitespace-nowrap">
+                      {ot.type.replace("_", " ")}
+                    </td>
 
-                  <td className="px-6 py-3 text-center">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        ot.status === "APPROVED"
-                          ? "bg-green-100 text-green-700"
-                          : ot.status === "REJECTED"
-                          ? "bg-red-100 text-red-700"
-                          : ot.status === "CANCELLED"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {ot.status}
-                    </span>
-
-                    {ot.status === "PENDING" && (
-                      <button
-                        onClick={() => {
-                          setSelectedOT(ot._id);
-                          setConfirmCancelModal(true);
-                        }}
-                        className="ml-3 text-xs bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded-md shadow transition"
+                    <td className="px-6 py-3 text-center whitespace-nowrap">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          ot.status === "APPROVED"
+                            ? "bg-green-100 text-green-700"
+                            : ot.status === "REJECTED"
+                            ? "bg-red-100 text-red-700"
+                            : ot.status === "CANCELLED"
+                            ? "bg-gray-200 text-gray-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
                       >
-                        Cancel
-                      </button>
-                    )}
+                        {ot.status}
+                      </span>
+
+                      {ot.status === "PENDING" && (
+                        <button
+                          onClick={() => {
+                            setSelectedOT(ot._id);
+                            setConfirmCancelModal(true);
+                          }}
+                          className="ml-3 text-xs bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded-md shadow transition"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    className="p-6 text-center text-gray-600"
+                    colSpan="3"
+                  >
+                    No overtime requests found.
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  className="p-6 text-center text-gray-600"
-                  colSpan="3"
-                >
-                  No overtime requests found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ----------------------- APPLY OT MODAL ----------------------- */}
