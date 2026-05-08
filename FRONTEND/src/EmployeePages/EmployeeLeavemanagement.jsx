@@ -475,27 +475,12 @@ const EmployeeLeavemanagement = () => {
       let leavesData = [];
 
       if (typeof getLeaveRequestsForEmployee === "function") {
-        try {
-          const maybeResult = await getLeaveRequestsForEmployee(empId);
-          if (Array.isArray(maybeResult)) {
-            leavesData = maybeResult;
-          }
-        } catch (err) {
-          console.warn("Failed to fetch leaves via function, trying API directly", err);
+        const maybeResult = await getLeaveRequestsForEmployee(empId);
+        if (Array.isArray(maybeResult)) {
+          leavesData = maybeResult;
         }
-      }
-
-      // Fallback to API if function fails
-      if (!leavesData.length) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        const url = new URL(API_BASE, window.location.origin);
-        url.searchParams.set("employeeId", empId);
-
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error("Failed to fetch leave list");
-
-        const data = await res.json();
-        leavesData = data || [];
+      } else {
+        throw new Error("Fetch leaves function is not available.");
       }
 
       const normalized = leavesData.map((d) => ({
@@ -1094,27 +1079,10 @@ const EmployeeLeavemanagement = () => {
         halfDaySession: from === to ? halfDaySession || "" : "",
       };
 
-      let applied = false;
       if (typeof applyForLeave === "function") {
-        try {
-          await applyForLeave(payload);
-          applied = true;
-        } catch (err) {
-          console.error("Error applying leave via function:", err);
-        }
-      }
-
-      if (!applied) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        const res = await fetch(API_BASE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          throw new Error(txt || "Submit failed");
-        }
+        await applyForLeave(payload);
+      } else {
+        throw new Error("Leave application function is not available.");
       }
 
       playRequestSound();
@@ -1187,22 +1155,10 @@ const EmployeeLeavemanagement = () => {
     });
 
     try {
-      let canceled = false;
       if (typeof cancelLeaveRequestById === "function") {
-        try {
-          await cancelLeaveRequestById(leaveId);
-          canceled = true;
-        } catch (err) {
-          console.error("Error cancelling leave via function:", err);
-        }
-      }
-      if (!canceled) {
-        const API_BASE = "http://localhost:5000/api/leaves";
-        let res = await fetch(`${API_BASE}/${leaveId}`, { method: "DELETE" });
-        if (!res.ok) {
-          res = await fetch(`${API_BASE}/${leaveId}/cancel`, { method: "POST" });
-          if (!res.ok) throw new Error("Cancel failed");
-        }
+        await cancelLeaveRequestById(leaveId);
+      } else {
+        throw new Error("Cancel leave function is not available.");
       }
       await fetchAllData();
 
@@ -1975,23 +1931,18 @@ const EmployeeLeavemanagement = () => {
                 )}
 
                 {form.from && form.to && form.from === form.to && (
-                  <div className="w-full">
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Half Day Session</label>
-                    <div className="relative group">
-                      <select
-                        name="halfDaySession"
-                        value={form.halfDaySession}
-                        onChange={handleChange}
-                        className="w-full border-2 border-gray-100 bg-gray-50/30 rounded-2xl px-5 py-4 text-sm font-black text-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
-                      >
-                        <option value="">Full Day</option>
-                        <option value="Morning Half">Morning Half</option>
-                        <option value="Afternoon Half">Afternoon Half</option>
-                      </select>
-                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-blue-500 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
+                    <select
+                      name="halfDaySession"
+                      value={form.halfDaySession}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
+                    >
+                      <option value="">Full Day</option>
+                      <option value="Morning Half">Morning Half</option>
+                      <option value="Afternoon Half">Afternoon Half</option>
+                    </select>
                   </div >
                 )}
 

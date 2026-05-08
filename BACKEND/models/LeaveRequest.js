@@ -4,7 +4,7 @@ const perDaySchema = new mongoose.Schema(
   {
     date: { type: String, required: true },
     leavecategory: { type: String, enum: ["Paid", "UnPaid"], default: "UnPaid" },
-    leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY"], default: null },
+    leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY", "PAID", "LOP"], default: null },
     leaveDayType: { type: String, enum: ["Full Day", "Half Day"], default: null },
   },
   { _id: false }
@@ -18,7 +18,7 @@ const leaveRequestSchema = new mongoose.Schema(
     to: { type: String, required: true },
     reason: { type: String, required: true, maxlength: 200 },
 
-    leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY"], required: true },
+    leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY", "PAID", "LOP"], required: true },
     leaveDayType: { type: String, enum: ["Full Day", "Half Day"], required: true },
     halfDaySession: { type: String, default: "" },
 
