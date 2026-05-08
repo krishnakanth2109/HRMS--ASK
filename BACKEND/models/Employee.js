@@ -1,4 +1,4 @@
-﻿import mongoose from "mongoose";
+import mongoose from "mongoose";
 
 const employeeSchema = new mongoose.Schema({
   employeeId: { type: String, required: true, unique: true },
@@ -30,6 +30,7 @@ const employeeSchema = new mongoose.Schema({
 
   // Company Reference
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
+  adminId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   
   // Company Info (for quick access without population)
   companyName: { type: String },

@@ -4,77 +4,77 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
 const adminSchema = new mongoose.Schema(
-{
-  name: {
-    type: String,
-    required: [true, "Please provide a name"],
-  },
+  {
+    name: {
+      type: String,
+      required: [true, "Please provide a name"],
+    },
 
-  email: {
-    type: String,
-    required: [true, "Please provide an email"],
-    unique: true,
-    lowercase: true,
-    match: [/.+\@.+\..+/, "Please fill a valid email address"],
-  },
+    email: {
+      type: String,
+      required: [true, "Please provide an email"],
+      unique: true,
+      lowercase: true,
+      match: [/.+\@.+\..+/, "Please fill a valid email address"],
+    },
 
-  password: {
-    type: String,
-    required: [true, "Please provide a password"],
-    minlength: 6,
-    select: false,
-  },
+    password: {
+      type: String,
+      required: [true, "Please provide a password"],
+      minlength: 6,
+      select: false,
+    },
 
-  role: {
-    type: String,
-    enum: ["admin", "manager"],
-    default: "admin",
-  },
+    role: {
+      type: String,
+      enum: ["admin", "manager"],
+      default: "admin",
+    },
 
-  phone: {
-    type: String,
-  },
+    phone: {
+      type: String,
+    },
 
-  department: {
-    type: String,
-    default: "Administration",
-  },
+    department: {
+      type: String,
+      default: "Administration",
+    },
 
-  // ✅ NEW FIELDS (Add these)
-  designation: {
-    type: String,
-    default: "",
-  },
+    // ✅ NEW FIELDS (Add these)
+    designation: {
+      type: String,
+      default: "",
+    },
 
-  companyName: {
-    type: String,
-    default: "",
-  },
+    companyName: {
+      type: String,
+      default: "",
+    },
 
-  employeeId: {
-    type: String,
-    default: "",
-  },
+    employeeId: {
+      type: String,
+      default: "",
+    },
 
-  profileImage: {
-    type: String,
-    default: "",
-  },
+    profileImage: {
+      type: String,
+      default: "",
+    },
 
-  status: {
-    type: String,
-    enum: ["active", "inactive"],
-    default: "active",
-  },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
 
-  lastLogin: {
-    type: Date,
-  },
+    lastLogin: {
+      type: Date,
+    },
 
-},
-{
-  timestamps: true, // adds createdAt and updatedAt automatically
-}
+  },
+  {
+    timestamps: true, // adds createdAt and updatedAt automatically
+  }
 );
 
 // Middleware to hash password before saving

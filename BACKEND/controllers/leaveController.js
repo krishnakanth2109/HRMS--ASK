@@ -150,18 +150,18 @@ const createAdminLeaveNotificationEmail = ({
                     <td style="padding:9px 0;color:#6b7280;">From Date</td>
                     <td style="padding:9px 0;text-align:right;font-weight:600;color:#111827;">
                       ${new Date(from).toLocaleDateString("en-IN", {
-                        weekday: "short", year: "numeric",
-                        month: "short", day: "numeric",
-                      })}
+  weekday: "short", year: "numeric",
+  month: "short", day: "numeric",
+})}
                     </td>
                   </tr>
                   <tr style="border-top:1px solid #f1f5f9;">
                     <td style="padding:9px 0;color:#6b7280;">To Date</td>
                     <td style="padding:9px 0;text-align:right;font-weight:600;color:#111827;">
                       ${new Date(to).toLocaleDateString("en-IN", {
-                        weekday: "short", year: "numeric",
-                        month: "short", day: "numeric",
-                      })}
+  weekday: "short", year: "numeric",
+  month: "short", day: "numeric",
+})}
                     </td>
                   </tr>
                   <tr style="border-top:1px solid #e5e7eb;">
@@ -232,7 +232,7 @@ const createAdminLeaveNotificationEmail = ({
 const createLeaveStatusEmail = ({
   employeeName, status, from, to, leaveType, reason, approvedBy,
 }) => {
-  const statusColor    = status === "Approved" ? "#10b981" : "#ef4444";
+  const statusColor = status === "Approved" ? "#10b981" : "#ef4444";
   const headerGradient = status === "Approved"
     ? "linear-gradient(135deg,#059669,#10b981)"
     : "linear-gradient(135deg,#b91c1c,#ef4444)";
@@ -337,7 +337,7 @@ const createLeaveStatusEmail = ({
 const emailActionResultPage = (success, action, employeeName, message) => {
   // Color is based on the action taken, not just success/failure
   const isApproved = action === "Approved";
-  const isError    = !success;
+  const isError = !success;
 
   const headerGradient = isError
     ? "linear-gradient(135deg,#374151,#6b7280)"       // grey for errors
@@ -379,8 +379,8 @@ const emailActionResultPage = (success, action, employeeName, message) => {
             </p>
             <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.7;">
               ${success && employeeName
-                ? `${employeeName} will be notified via email about this decision.`
-                : "Please use the Admin Portal to manage leave requests."}
+      ? `${employeeName} will be notified via email about this decision.`
+      : "Please use the Admin Portal to manage leave requests."}
             </p>
           </td>
         </tr>
@@ -394,7 +394,8 @@ const emailActionResultPage = (success, action, employeeName, message) => {
     </td></tr>
   </table>
 </body>
-</html>`; };
+</html>`;
+};
 
 // ===================================================================================
 // ✅ EMPLOYEE CREATES LEAVE → Email with action buttons sent to scoped Admin
@@ -421,7 +422,7 @@ export const createLeave = async (req, res) => {
     }));
 
     const doc = await LeaveRequest.create({
-      employeeId:   employeeId,
+      employeeId: employeeId,
       employeeName: name,
       from,
       to,
@@ -430,9 +431,9 @@ export const createLeave = async (req, res) => {
       leaveDayType,
       halfDaySession,
       monthKey,
-      status:      "Pending",
-      approvedBy:  "-",
-      actionDate:  "-",
+      status: "Pending",
+      approvedBy: "-",
+      actionDate: "-",
       requestDate: new Date().toISOString().slice(0, 10),
       details,
     });
@@ -448,20 +449,20 @@ export const createLeave = async (req, res) => {
 
         // Generate one-click action tokens (7-day expiry)
         const approveToken = generateEmailActionToken(doc._id, "Approved", primaryAdmin._id);
-        const rejectToken  = generateEmailActionToken(doc._id, "Rejected", primaryAdmin._id);
+        const rejectToken = generateEmailActionToken(doc._id, "Rejected", primaryAdmin._id);
 
         const BASE_URL = process.env.VITE_API_URL_PRODUCTION || "https://hrms-ask-1jx6.onrender.com";
         const approveUrl = `${BASE_URL}/api/leaves/email-action?token=${approveToken}`;
-        const rejectUrl  = `${BASE_URL}/api/leaves/email-action?token=${rejectToken}`;
+        const rejectUrl = `${BASE_URL}/api/leaves/email-action?token=${rejectToken}`;
 
         await transporter.sendMail({
-          from:    `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
-          to:      adminEmails.join(","),
+          from: `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
+          to: adminEmails.join(","),
           subject: `New Leave Request from ${name} — Action Required`,
-          html:    createAdminLeaveNotificationEmail({
+          html: createAdminLeaveNotificationEmail({
             name,
             employeeId: employeeId,
-            email:      loggedUser.email,
+            email: loggedUser.email,
             leaveType,
             from,
             to,
@@ -481,11 +482,11 @@ export const createLeave = async (req, res) => {
     const notifList = [];
     for (const admin of admins) {
       const notif = await Notification.create({
-        userId:  admin._id.toString(),
-        title:   "New Leave Request",
+        userId: admin._id.toString(),
+        title: "New Leave Request",
         message: `${name} submitted a leave request (${from} → ${to})`,
-        type:    "leave",
-        isRead:  false,
+        type: "leave",
+        isRead: false,
       });
       notifList.push(notif);
     }
@@ -561,7 +562,7 @@ export const handleEmailAction = async (req, res) => {
     const updated = await LeaveRequest.findByIdAndUpdate(
       leaveId,
       {
-        status:     action,
+        status: action,
         approvedBy,
         actionDate: new Date().toISOString().slice(0, 10),
       },
@@ -576,27 +577,27 @@ export const handleEmailAction = async (req, res) => {
 
     if (employee) {
       await Notification.create({
-        userId:   employee._id,
+        userId: employee._id,
         userType: "Employee",
-        title:    "Leave Status Update",
-        message:  `Your leave request (${leave.from} → ${leave.to}) has been ${action} by ${approvedBy}.`,
-        type:     "leave-status",
-        isRead:   false,
+        title: "Leave Status Update",
+        message: `Your leave request (${leave.from} → ${leave.to}) has been ${action} by ${approvedBy}.`,
+        type: "leave-status",
+        isRead: false,
       });
 
       if (employee.email) {
         try {
           await transporter.sendMail({
-            from:    `"Leave Management" <${process.env.SMTP_USER}>`,
-            to:      employee.email,
+            from: `"Leave Management" <${process.env.SMTP_USER}>`,
+            to: employee.email,
             subject: `Leave Request ${action}: ${leave.from} to ${leave.to}`,
-            html:    createLeaveStatusEmail({
+            html: createLeaveStatusEmail({
               employeeName: employee.name || employeeName,
-              status:       action,
-              from:         leave.from,
-              to:           leave.to,
-              leaveType:    leave.leaveType,
-              reason:       leave.reason,
+              status: action,
+              from: leave.from,
+              to: leave.to,
+              leaveType: leave.leaveType,
+              reason: leave.reason,
               approvedBy,
             }),
           });
@@ -697,12 +698,12 @@ export const updateLeaveStatus = async (req, res) => {
 
     if (employee) {
       const notif = await Notification.create({
-        userId:   employee._id,
+        userId: employee._id,
         userType: "Employee",
-        title:    "Leave Status Update",
-        message:  `Your leave request (${doc.from} → ${doc.to}) has been ${status} by ${approvedBy}.`,
-        type:     "leave-status",
-        isRead:   false,
+        title: "Leave Status Update",
+        message: `Your leave request (${doc.from} → ${doc.to}) has been ${status} by ${approvedBy}.`,
+        type: "leave-status",
+        isRead: false,
       });
 
       const io = req.app.get("io");
@@ -711,16 +712,16 @@ export const updateLeaveStatus = async (req, res) => {
       if (employee.email) {
         try {
           await transporter.sendMail({
-            from:    `"Leave Management" <${process.env.SMTP_USER}>`,
-            to:      employee.email,
+            from: `"Leave Management" <${process.env.SMTP_USER}>`,
+            to: employee.email,
             subject: `Leave Request Update: ${status}`,
-            html:    createLeaveStatusEmail({
+            html: createLeaveStatusEmail({
               employeeName: employee.name,
               status,
-              from:      doc.from,
-              to:        doc.to,
+              from: doc.from,
+              to: doc.to,
               leaveType: doc.leaveType,
-              reason:    doc.reason,
+              reason: doc.reason,
               approvedBy,
             }),
           });
@@ -753,11 +754,11 @@ export const cancelLeave = async (req, res) => {
     const notifList = [];
     for (const admin of admins) {
       const notif = await Notification.create({
-        userId:  admin._id.toString(),
-        title:   "Leave Cancelled",
+        userId: admin._id.toString(),
+        title: "Leave Cancelled",
         message: `${req.user.name} cancelled a leave (${leave.from} → ${leave.to})`,
-        type:    "leave",
-        isRead:  false,
+        type: "leave",
+        isRead: false,
       });
       notifList.push(notif);
     }

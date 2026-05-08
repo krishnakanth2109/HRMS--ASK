@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
+    "dev" : "node --watch app.js",
     "test": "node --test utils/*.test.js",
     "migrate:daily-work": "node scripts/dailyWorkMigration.js"
   },
