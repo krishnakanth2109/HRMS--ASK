@@ -1510,9 +1510,9 @@ const EmployeeLeavemanagement = () => {
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-          
+          {/* <div className="overflow-x-auto">
+            <table className="w-full"> */}
+
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
@@ -1894,17 +1894,12 @@ const EmployeeLeavemanagement = () => {
 
                 {form.from && form.to && form.from === form.to && (
                   <div>
-<<<<<<< HEAD
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Half Day Session</label>
+
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
                     <select
                       name="halfDaySession"
                       value={form.halfDaySession}
-=======
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
-                    <select 
-                      name="halfDaySession" 
-                      value={form.halfDaySession} 
->>>>>>> 7b11b865092e5f608b95a421967663c5d48d7a2f
+
                       onChange={handleChange}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                     >
@@ -1965,8 +1960,8 @@ const EmployeeLeavemanagement = () => {
                     maxLength={REASON_LIMIT}
                     rows="3"
                     className={`w-full border-2 rounded-xl px-4 py-3 transition duration-200 resize-none ${isOptimized
-                        ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
-                        : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      ? "border-indigo-500 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
+                      : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                       }`}
                     placeholder="Brief reason for your leave"
                   ></textarea>
@@ -1977,8 +1972,8 @@ const EmployeeLeavemanagement = () => {
                       onClick={handleOptimizeReason}
                       disabled={!form.reason.trim() || isOptimizing}
                       className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 ${!form.reason.trim()
-                          ? "bg-gray-300 cursor-not-allowed text-gray-500"
-                          : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
+                        ? "bg-gray-300 cursor-not-allowed text-gray-500"
+                        : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-md transform hover:-translate-y-0.5"
                         }`}
                       style={{ fontFamily: 'Segoe UI, system-ui, sans-serif' }}
                     >

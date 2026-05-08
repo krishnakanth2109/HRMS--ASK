@@ -380,24 +380,26 @@ const AdminLeavePanel = () => {
       </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8 flex flex-col lg:flex-row gap-4 items-center justify-between z-20 relative">
-        <div className="flex flex-wrap gap-3 items-center w-full lg:w-auto">
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600">
+      <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100 mb-6 md:mb-8 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between z-15 relative">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
+          <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 shrink-0">
             <FaFilter className="text-indigo-500" />
             <span className="font-semibold text-sm">Filters:</span>
           </div>
-          <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
-            <option value="All">All Departments</option>
-            {allDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
-            <option value="All">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Today">On Leave Today</option>
-          </select>
+          <div className="grid grid-cols-2 sm:flex gap-3 w-full sm:w-auto">
+            <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full sm:w-auto px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+            <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="w-full sm:w-auto px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
+              <option value="All">All Depts</option>
+              {allDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="col-span-2 sm:col-span-1 w-full sm:w-auto px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
+              <option value="All">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Today">On Leave Today</option>
+            </select>
+          </div>
         </div>
 
         <div className="relative w-full lg:w-80">
@@ -420,43 +422,51 @@ const AdminLeavePanel = () => {
             pendingRequests.map(lv => {
               const profilePic = employeeImages[lv.employeeId];
               return (
-                <div key={lv._id} className="p-6 border-b border-slate-100 last:border-0 flex flex-col xl:flex-row justify-between xl:items-center gap-6 hover:bg-slate-50/80 transition duration-150">
-                  <div className="flex gap-4 items-start w-full">
-                    <div className="w-12 h-12 rounded-full shrink-0 border border-slate-200 overflow-hidden bg-white flex items-center justify-center font-bold text-slate-700">
+                <div key={lv._id} className="p-4 md:p-6 border-b border-slate-100 last:border-0 flex flex-col xl:flex-row justify-between xl:items-center gap-3 md:gap-4 hover:bg-slate-50 transition duration-150">
+                  <div className="flex gap-3 md:gap-4 items-start w-full">
+                    <div className="w-10 h-10 md:w-12 md:h-12 mt-0.5 rounded-full shrink-0 border border-slate-200 overflow-hidden bg-white flex items-center justify-center font-bold text-slate-700 text-sm md:text-base">
                       {profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : getInitials(lv.employeeName)}
                     </div>
                     <div className="flex flex-col w-full">
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="font-bold text-slate-800 text-base">{lv.employeeName}</span>
-                        <span className="text-xs text-slate-400 font-medium">{lv.department}</span>
-                        <LeaveTypeBadge type={lv.leaveType} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-8 mb-4 max-w-sm">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-400 mb-1">Start Date</span>
-                          <span className="text-sm font-semibold text-slate-700">{formatDateShort(lv.from)}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800 text-sm md:text-base">{lv.employeeName}</span>
+                          <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-300"></span>
+                          <span className="text-[10px] md:text-xs text-slate-400 font-medium">{lv.department}</span>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-400 mb-1">End Date</span>
-                          <span className="text-sm font-semibold text-slate-700">{formatDateShort(lv.to)}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-400 mb-1">Duration</span>
-                          <span className="text-sm font-semibold text-slate-700">{getDayCount(lv.from, lv.to)} Day{getDayCount(lv.from, lv.to) > 1 ? 's' : ''}</span>
+                        <div className="self-start sm:self-auto -ml-2 sm:ml-0">
+                          <LeaveTypeBadge type={lv.leaveType} />
                         </div>
                       </div>
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 mb-2 w-full xl:max-w-md">
-                        <span className="text-xs text-slate-400 block mb-1">Reason</span>
-                        <span className="text-sm text-slate-700 font-medium">{lv.reason}</span>
+
+                      {/* Info Row: Start, End, Duration */}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-2">
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                          <FaCalendarAlt className="text-slate-400 text-[10px]" />
+                          <span className="text-[11px] md:text-xs font-semibold text-slate-700">{formatDateShort(lv.from)}</span>
+                          <span className="text-slate-300 text-[10px]">-</span>
+                          <span className="text-[11px] md:text-xs font-semibold text-slate-700">{formatDateShort(lv.to)}</span>
+                        </div>
+                        <span className="text-[11px] md:text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
+                          {getDayCount(lv.from, lv.to)} Day{getDayCount(lv.from, lv.to) > 1 ? 's' : ''}
+                        </span>
                       </div>
-                      <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1">
-                        <FaClock size={10} /> Applied on {formatDateTime(lv.createdAt || lv.appliedDate)}
+
+                      <div className="text-xs text-slate-600 mb-2 leading-relaxed">
+                        <span className="font-semibold text-slate-400 mr-1.5 uppercase tracking-wider text-[10px]">Reason:</span>
+                        {lv.reason}
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1.5">
+                        <FaClock className="text-[10px] text-slate-300" /> Applied {formatDateTime(lv.createdAt || lv.appliedDate)}
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-3 shrink-0">
-                    <button onClick={() => handleAction(lv._id, 'approve')} className="flex items-center gap-2 px-5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white rounded-lg font-bold text-sm shadow-sm transition-colors"><FaCheck /> Approve</button>
-                    <button onClick={() => handleAction(lv._id, 'reject')} className="flex items-center gap-2 px-5 py-2.5 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-lg font-bold text-sm shadow-sm transition-colors"><FaTimes /> Reject</button>
+
+                  {/* Actions */}
+                  <div className="flex flex-row gap-2 w-full xl:w-auto shrink-0 mt-2 xl:mt-0 pt-3 xl:pt-0 border-t border-slate-100 xl:border-0">
+                    <button onClick={() => handleAction(lv._id, 'approve')} className="flex-1 justify-center xl:flex-none flex items-center gap-1.5 px-4 py-2 bg-[#10B981] hover:bg-[#059669] text-white rounded-lg font-bold text-xs md:text-sm shadow-sm transition-colors"><FaCheck /> Approve</button>
+                    <button onClick={() => handleAction(lv._id, 'reject')} className="flex-1 justify-center xl:flex-none flex items-center gap-1.5 px-4 py-2 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-lg font-bold text-xs md:text-sm shadow-sm transition-colors"><FaTimes /> Reject</button>
                   </div>
                 </div>
               );
@@ -497,13 +507,13 @@ const AdminLeavePanel = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 relative shrink-0">
+                  <div className="flex items-center justify-between md:justify-end gap-3 relative w-full md:w-auto shrink-0 mt-2 md:mt-0 pt-2 md:pt-0 border-t border-slate-100 md:border-0">
                     <DecisionBadge status={lv.status} />
                     <button onClick={(e) => { e.stopPropagation(); setOpenDropdownId(isDropdownOpen ? null : lv._id); }} className={`p-2 rounded-md border ${isDropdownOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400'}`}>
                       <FaChevronDown size={12} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isDropdownOpen && (
-                      <div className="absolute right-0 top-10 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-40 overflow-hidden">
+                      <div className="absolute right-0 top-12 md:top-10 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-40 overflow-hidden">
                         <div className="p-1.5 space-y-1">
                           <button onClick={() => handleAction(lv._id, "approve")} className="w-full text-left px-3 py-2 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2"><FaCheck size={12} /> Mark Approved</button>
                           <button onClick={() => handleAction(lv._id, "reject")} className="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"><FaTimes size={12} /> Mark Rejected</button>

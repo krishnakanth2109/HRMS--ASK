@@ -157,12 +157,12 @@ const fetchAllExpenses = async () => {
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="flex flex-col bg-gray-50 p-6 rounded-2xl border border-gray-200 md:flex-row justify-between items-center mb-8">
+        <div className="flex flex-col bg-gray-50 p-4 md:p-6 rounded-2xl border border-gray-200 md:flex-row justify-between items-start md:items-center mb-6 md:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <h1 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
               <FaUserTie className="text-blue-600" /> Admin Expense Approvals
             </h1>
-            <p className="text-gray-500 mt-1">Manage employee reimbursement requests.</p>
+            <p className="text-sm md:text-base text-gray-500 mt-1">Manage employee reimbursement requests.</p>
           </div>
           
           {/* Stats Summary */}
@@ -207,121 +207,180 @@ const fetchAllExpenses = async () => {
                <p className="font-medium">No {filter !== 'All' ? filter.toLowerCase() : ''} expenses found.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider font-semibold border-b border-gray-200">
-                    <th className="p-4 w-1/5">Employee</th>
-                    <th className="p-4 w-1/6">Category / Date</th>
-                    <th className="p-4 w-1/4">Description</th>
-                    <th className="p-4">Amount</th>
-                    <th className="p-4">Receipt</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Action Date</th>
-                    <th className="p-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm divide-y divide-gray-100">
-                  {filteredExpenses.map((expense) => (
-                    <tr key={expense._id} className="hover:bg-blue-50/30 transition duration-150 group">
-                      
-                      {/* Employee Info */}
-                      <td className="p-4">
-                        <div className="font-bold text-gray-800">{expense.employeeName}</div>
-                        <div className="text-xs text-gray-400 font-mono mt-0.5">{expense.employeeCustomId || expense.employeeId}</div>
-                      </td>
-
-                      {/* Category & Date */}
-                      <td className="p-4">
-                         <div className="font-semibold text-blue-600 bg-blue-50 inline-block px-2 py-0.5 rounded text-xs mb-1">{expense.category}</div>
-                         <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <FaCalendarAlt size={10} /> {new Date(expense.date).toLocaleDateString()}
-                         </div>
-                      </td>
-
-                      {/* Description */}
-                      <td className="p-4 text-gray-600">
-                        <div className="truncate max-w-[200px]" title={expense.description}>
-                            {expense.description || <span className="text-gray-300 italic">No description</span>}
-                        </div>
-                      </td>
-
-                      {/* Amount */}
-                      <td className="p-4">
-                         <div className="font-bold text-gray-800 text-lg">₹{expense.amount.toLocaleString()}</div>
-                      </td>
-
-                      {/* Receipt */}
-                      <td className="p-4">
-                        {expense.receiptUrl ? (
-                          <div className="flex flex-col gap-1">
-                            <button 
-                              onClick={() => handleViewReceipt(expense.receiptUrl)}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-white border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition"
-                            >
-                              {getFileIcon(expense.receiptUrl)}
-                              <FaPaperclip /> View Receipt
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">--</span>
-                        )}
-                      </td>
-
-                      {/* Status */}
-                      <td className="p-4">
-                        <div>
-                          {getStatusBadge(expense.status)}
-                    
-                        </div>
-                      </td>
-
-                      {/* Action Date */}
-                      <td className="p-4 text-sm text-gray-600">
-                        {expense.actionDate ? (
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1">
-                              <FaCalendarCheck className="text-gray-400" size={12} />
-                              {new Date(expense.actionDate).toLocaleDateString()}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {new Date(expense.actionDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      {/* Actions Buttons */}
-                      <td className="p-4 text-center">
-                        {expense.status === 'Pending' ? (
-                          <div className="flex justify-center gap-2 opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => handleStatusUpdate(expense._id, 'Approved')}
-                              className="p-2 bg-green-50 text-green-600 rounded-lg border border-green-200 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all shadow-sm tooltip"
-                              title="Approve Request"
-                            >
-                              <FaCheck />
-                            </button>
-                            <button 
-                              onClick={() => handleStatusUpdate(expense._id, 'Rejected')}
-                              className="p-2 bg-red-50 text-red-600 rounded-lg border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all shadow-sm tooltip"
-                              title="Reject Request"
-                            >
-                              <FaTimes />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 font-medium italic">Completed</span>
-                        )}
-                      </td>
-
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider font-semibold border-b border-gray-200">
+                      <th className="p-4 w-1/5">Employee</th>
+                      <th className="p-4 w-1/6">Category / Date</th>
+                      <th className="p-4 w-1/4">Description</th>
+                      <th className="p-4">Amount</th>
+                      <th className="p-4">Receipt</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Action Date</th>
+                      <th className="p-4 text-center">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="text-sm divide-y divide-gray-100">
+                    {filteredExpenses.map((expense) => (
+                      <tr key={expense._id} className="hover:bg-blue-50/30 transition duration-150 group">
+                        
+                        {/* Employee Info */}
+                        <td className="p-4">
+                          <div className="font-bold text-gray-800">{expense.employeeName}</div>
+                          <div className="text-xs text-gray-400 font-mono mt-0.5">{expense.employeeCustomId || expense.employeeId}</div>
+                        </td>
+
+                        {/* Category & Date */}
+                        <td className="p-4">
+                           <div className="font-semibold text-blue-600 bg-blue-50 inline-block px-2 py-0.5 rounded text-xs mb-1">{expense.category}</div>
+                           <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <FaCalendarAlt size={10} /> {new Date(expense.date).toLocaleDateString()}
+                           </div>
+                        </td>
+
+                        {/* Description */}
+                        <td className="p-4 text-gray-600">
+                          <div className="truncate max-w-[200px]" title={expense.description}>
+                              {expense.description || <span className="text-gray-300 italic">No description</span>}
+                          </div>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="p-4">
+                           <div className="font-bold text-gray-800 text-lg">₹{expense.amount.toLocaleString()}</div>
+                        </td>
+
+                        {/* Receipt */}
+                        <td className="p-4">
+                          {expense.receiptUrl ? (
+                            <div className="flex flex-col gap-1">
+                              <button 
+                                onClick={() => handleViewReceipt(expense.receiptUrl)}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-white border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition"
+                              >
+                                {getFileIcon(expense.receiptUrl)}
+                                <FaPaperclip /> View Receipt
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">--</span>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="p-4">
+                          <div>
+                            {getStatusBadge(expense.status)}
+                      
+                          </div>
+                        </td>
+
+                        {/* Action Date */}
+                        <td className="p-4 text-sm text-gray-600">
+                          {expense.actionDate ? (
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1">
+                                <FaCalendarCheck className="text-gray-400" size={12} />
+                                {new Date(expense.actionDate).toLocaleDateString()}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {new Date(expense.actionDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
+                        {/* Actions Buttons */}
+                        <td className="p-4 text-center">
+                          {expense.status === 'Pending' ? (
+                            <div className="flex justify-center gap-2 opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => handleStatusUpdate(expense._id, 'Approved')}
+                                className="p-2 bg-green-50 text-green-600 rounded-lg border border-green-200 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all shadow-sm tooltip"
+                                title="Approve Request"
+                              >
+                                <FaCheck />
+                              </button>
+                              <button 
+                                onClick={() => handleStatusUpdate(expense._id, 'Rejected')}
+                                className="p-2 bg-red-50 text-red-600 rounded-lg border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all shadow-sm tooltip"
+                                title="Reject Request"
+                              >
+                                <FaTimes />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 font-medium italic">Completed</span>
+                          )}
+                        </td>
+
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile List View (Non-card) */}
+              <div className="md:hidden flex flex-col gap-3 p-4 bg-gray-50/50">
+                {filteredExpenses.map((expense) => (
+                  <div key={`mobile-${expense._id}`} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col gap-2 hover:border-blue-300 transition-colors">
+                    {/* Top Row: Employee & Amount */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-gray-800 text-sm">{expense.employeeName}</span>
+                        <span className="text-[10px] text-gray-500">{expense.employeeCustomId || expense.employeeId}</span>
+                      </div>
+                      <div className="font-black text-gray-800 text-base text-right">
+                        ₹{expense.amount.toLocaleString()}
+                        <div className="mt-1">{getStatusBadge(expense.status)}</div>
+                      </div>
+                    </div>
+
+                    {/* Middle Row: Category, Date, Receipt */}
+                    <div className="flex justify-between items-center mt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">{expense.category}</span>
+                        <span className="text-[11px] text-gray-500 flex items-center gap-1">
+                          <FaCalendarAlt className="text-gray-400" /> {new Date(expense.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      
+                      {expense.receiptUrl && (
+                        <button 
+                          onClick={() => handleViewReceipt(expense.receiptUrl)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-white border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition"
+                        >
+                          <FaPaperclip /> Receipt
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bottom Row: Actions (if pending) */}
+                    {expense.status === 'Pending' && (
+                      <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                        <button 
+                          onClick={() => handleStatusUpdate(expense._id, 'Approved')}
+                          className="flex-1 flex justify-center items-center gap-1.5 bg-green-50 text-green-700 py-2 rounded-lg border border-green-200 hover:bg-green-600 hover:text-white transition font-bold text-xs"
+                        >
+                          <FaCheck /> Approve
+                        </button>
+                        <button 
+                          onClick={() => handleStatusUpdate(expense._id, 'Rejected')}
+                          className="flex-1 flex justify-center items-center gap-1.5 bg-red-50 text-red-700 py-2 rounded-lg border border-red-200 hover:bg-red-600 hover:text-white transition font-bold text-xs"
+                        >
+                          <FaTimes /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

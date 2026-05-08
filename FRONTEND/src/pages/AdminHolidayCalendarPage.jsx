@@ -306,20 +306,20 @@ const AdminHolidayCalendarPage = () => {
   };
 
   return (
-    <div className="min-h-screen font-sans text-slate-800">
+    <div className="min-h-screen font-sans text-slate-800 p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex bg-white rounded-2xl shadow-sm border border-gray-200 p-5 h-30 justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">Holiday Calendar</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Holiday Calendar</h1>
             <p className="text-gray-500 text-sm mt-1">Manage holidays & track birthdays</p>
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition active:scale-95"
+            className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition active:scale-95 flex items-center justify-center"
           >
-            <FaPlus className="inline mr-2" />
+            <FaPlus className="mr-2" />
             Add New Holiday
           </button>
         </div>
@@ -351,18 +351,18 @@ const AdminHolidayCalendarPage = () => {
                 {displayedHolidays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No holidays {showAllHolidays ? `in ${selectedYear}` : "this month"}</p> :
                   displayedHolidays.map(h => (
                     <div key={h._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:shadow-md transition group">
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-10 h-10 rounded-lg text-emerald-600 font-bold leading-none">
-                          <span className="text-sm">{new Date(h.startDate).getDate()}</span>
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className="flex flex-col items-center justify-center bg-white border border-emerald-100 shadow-sm w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-emerald-600 font-bold leading-none shrink-0">
+                          <span className="text-xs sm:text-sm">{new Date(h.startDate).getDate()}</span>
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-700">{h.name}</p>
-                          <p className="text-[10px] text-gray-400">{new Date(h.startDate).toLocaleDateString()}</p>
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-gray-700 truncate">{h.name}</p>
+                          <p className="text-[9px] sm:text-[10px] text-gray-400">{new Date(h.startDate).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleEdit(h)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="Edit"><FaEdit size={16} /></button>
-                        <button onClick={() => handleDelete(h._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Delete"><FaTrash size={16} /></button>
+                      <div className="flex gap-1 sm:gap-2">
+                        <button onClick={() => handleEdit(h)} className="text-blue-500 hover:bg-blue-50 p-1.5 sm:p-2 rounded-full transition-colors" title="Edit"><FaEdit size={14} /></button>
+                        <button onClick={() => handleDelete(h._id)} className="text-red-500 hover:bg-red-50 p-1.5 sm:p-2 rounded-full transition-colors" title="Delete"><FaTrash size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -388,13 +388,13 @@ const AdminHolidayCalendarPage = () => {
               <div className="p-4 space-y-3 min-h-[200px] max-h-[300px] overflow-y-auto custom-scrollbar">
                 {displayedBirthdays.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">No birthdays {showAllBirthdays ? "found" : "this month"}</p> :
                   displayedBirthdays.map((b, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg transition">
-                      <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xs font-bold">
+                    <div key={i} className="flex items-center gap-2 sm:gap-3 p-2 hover:bg-orange-50 rounded-lg transition min-w-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-[10px] sm:text-xs font-bold shrink-0">
                         {b.name.charAt(0)}
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">{b.name}</p>
-                        <p className="text-[10px] text-gray-400">{b.dob.getDate()} {b.dob.toLocaleString('default', { month: 'short' })}</p>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold text-gray-700 truncate">{b.name}</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-400">{b.dob.getDate()} {b.dob.toLocaleString('default', { month: 'short' })}</p>
                       </div>
                     </div>
                   ))}
@@ -403,21 +403,21 @@ const AdminHolidayCalendarPage = () => {
           </div>
 
           <div className="lg:col-span-6">
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 h-full relative">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-4 sm:p-8 h-full relative">
               <Calendar
                 tileClassName={tileClassName}
                 tileContent={tileContent}
-               onActiveStartDateChange={({ activeStartDate }) => {
-  setActiveDate(activeStartDate);
-  setHolidayCursor(activeStartDate);
-  setBirthdayCursor(activeStartDate);
-}}
+                onActiveStartDateChange={({ activeStartDate }) => {
+                  setActiveDate(activeStartDate);
+                  setHolidayCursor(activeStartDate);
+                  setBirthdayCursor(activeStartDate);
+                }}
                 className="best-ui-calendar"
                 next2Label={null}
                 prev2Label={null}
                 formatShortWeekday={(locale, date) => ['M', 'T', 'W', 'T', 'F', 'S', 'S'][date.getDay() === 0 ? 6 : date.getDay() - 1]}
               />
-              <div className="flex justify-center gap-8 mt-10 pt-6 border-t border-gray-50">
+              <div className="flex flex-wrap justify-center gap-4 sm:gap-8 mt-10 pt-6 border-t border-gray-50">
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-emerald-400 to-teal-500 shadow-md flex items-center gap-2">🎉 Holiday</span>
                 </div>
@@ -508,8 +508,14 @@ const AdminHolidayCalendarPage = () => {
         .dark .react-calendar__month-view__weekdays { border-bottom-color: rgba(255, 255, 255, 0.1); }
         .react-calendar__month-view__weekdays__weekday abbr { text-decoration: none; }
         .react-calendar__month-view__days { display: grid !important; grid-template-columns: repeat(7, 1fr); row-gap: 12px; }
-        .react-calendar__tile { border-radius: 10px; padding: 6px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 6px; background: transparent !important; position: relative; overflow: visible !important;}
-        .react-calendar__tile abbr { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; min-width: 32px; min-height: 32px; border-radius: 50%; font-weight: 600; font-size: 0.95rem; color: #475569; transition: all 0.2s ease;}
+        .react-calendar__tile { border-radius: 10px; padding: 6px; height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 6px; background: transparent !important; position: relative; overflow: visible !important;}
+        @media (min-width: 640px) {
+          .react-calendar__tile { height: 64px; }
+        }
+        .react-calendar__tile abbr { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 24px; min-height: 24px; border-radius: 50%; font-weight: 600; font-size: 0.8rem; color: #475569; transition: all 0.2s ease;}
+        @media (min-width: 640px) {
+          .react-calendar__tile abbr { width: 36px; height: 36px; min-width: 32px; min-height: 32px; font-size: 0.95rem; }
+        }
         .dark .react-calendar__tile abbr { color: #cbd5e1; }
         .react-calendar__tile:not(.holiday-date-circle):not(.birthday-date-circle):hover abbr { background-color: #f1f5f9; color: #0f172a;}
         .dark .react-calendar__tile:not(.holiday-date-circle):not(.birthday-date-circle):hover abbr { background-color: rgba(255, 255, 255, 0.1); color: #ffffff;}

@@ -464,8 +464,8 @@ ${companyName}`;
       Swal.fire(
         "Add Failed",
         error.response?.data?.error ||
-          error.response?.data?.message ||
-          "Failed to add employee.",
+        error.response?.data?.message ||
+        "Failed to add employee.",
         "error"
       );
     } finally {
@@ -476,7 +476,7 @@ ${companyName}`;
   const renderScheduleFields = () => {
     if (form.inductionType === "Induction Program Duration") {
       return (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <InputField
             label="Start Date"
             icon={<FaCalendarAlt />}
@@ -511,7 +511,7 @@ ${companyName}`;
 
     if (form.inductionType === "Online Module") {
       return (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <InputField
             label="Date"
             icon={<FaCalendarAlt />}
@@ -532,13 +532,14 @@ ${companyName}`;
             placeholder="Paste Google Meet / Zoom link"
             value={form.meetingLink}
             onChange={(value) => handleInputChange("meetingLink", value)}
+            className="sm:col-span-2 md:col-span-1"
           />
         </div>
       );
     }
 
     return (
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         <InputField
           label="Date"
           icon={<FaCalendarAlt />}
@@ -559,6 +560,7 @@ ${companyName}`;
           placeholder="Enter venue or platform"
           value={form.venueOrPlatform}
           onChange={(value) => handleInputChange("venueOrPlatform", value)}
+          className="sm:col-span-2 md:col-span-1"
         />
       </div>
     );
@@ -568,18 +570,18 @@ ${companyName}`;
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-         <div className="bg-blue-50 px-5 py-4 md:px-6 md:py-5">
-  <h1 className="text-xl font-semibold text-blue-800 md:text-2xl">
-    Induction Program
-  </h1>
-  <p className="mt-1 max-w-2xl text-sm leading-5 text-blue-500 md:text-sm">
-    Select employees, choose an induction activity, fill the schedule,
-    and send personalized emails automatically from HRMS.
-  </p>
-</div>
+          <div className="bg-blue-50 px-5 py-4 md:px-6 md:py-5">
+            <h1 className="text-xl font-semibold text-blue-800 md:text-2xl">
+              Induction Program
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-blue-500 md:text-sm">
+              Select employees, choose an induction activity, fill the schedule,
+              and send personalized emails automatically from HRMS.
+            </p>
+          </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+        <div className="grid gap-6 lg:grid-cols-1 xl:grid-cols-[1.2fr,0.8fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
             <div className="border-b border-slate-200 pb-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -598,15 +600,13 @@ ${companyName}`;
                     type="button"
                     onClick={() => setSelectionMode("single")}
                     disabled={form.inductionType === "One-to-One Session"}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                      selectionMode === "single"
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    } ${
-                      form.inductionType === "One-to-One Session"
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${selectionMode === "single"
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      } ${form.inductionType === "One-to-One Session"
                         ? "cursor-not-allowed opacity-60"
                         : ""
-                    }`}
+                      }`}
                   >
                     Single Select
                   </button>
@@ -614,15 +614,13 @@ ${companyName}`;
                     type="button"
                     onClick={() => setSelectionMode("multiple")}
                     disabled={form.inductionType === "One-to-One Session"}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                      selectionMode === "multiple"
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    } ${
-                      form.inductionType === "One-to-One Session"
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${selectionMode === "multiple"
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      } ${form.inductionType === "One-to-One Session"
                         ? "cursor-not-allowed opacity-60"
                         : ""
-                    }`}
+                      }`}
                   >
                     Bulk Select
                   </button>
@@ -639,11 +637,10 @@ ${companyName}`;
                 <button
                   type="button"
                   onClick={() => setShowEmployeeDropdown((prev) => !prev)}
-                  className={`flex flex-1 items-center justify-between rounded-3xl border px-5 py-4 text-left transition ${
-                    showEmployeeDropdown
-                      ? "border-sky-400 bg-white shadow-sm"
-                      : "border-slate-200 bg-slate-50 hover:border-sky-300 hover:bg-white"
-                  }`}
+                  className={`flex flex-1 items-center justify-between rounded-3xl border px-5 py-4 text-left transition ${showEmployeeDropdown
+                    ? "border-sky-400 bg-white shadow-sm"
+                    : "border-slate-200 bg-slate-50 hover:border-sky-300 hover:bg-white"
+                    }`}
                 >
                   <div className="flex min-w-0 items-center gap-4">
                     <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
@@ -653,22 +650,21 @@ ${companyName}`;
                       <p className="truncate text-base font-medium text-slate-900">
                         {selectedEmployees.length
                           ? selectedEmployees
-                              .slice(0, 2)
-                              .map((employee) => employee.name)
-                              .join(", ")
+                            .slice(0, 2)
+                            .map((employee) => employee.name)
+                            .join(", ")
                           : "Select employee"}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {selectedEmployees.length
                           ? `${selectedEmployees.length} employee(s) selected`
-                          : "Open the dropdown to choose from employee records"}
+                          : "Open dropdown to choose"}
                       </p>
                     </div>
                   </div>
                   <FaChevronDown
-                    className={`shrink-0 text-slate-500 transition ${
-                      showEmployeeDropdown ? "rotate-180" : ""
-                    }`}
+                    className={`shrink-0 text-slate-500 transition ${showEmployeeDropdown ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -676,11 +672,10 @@ ${companyName}`;
                   type="button"
                   onClick={handleSelectAllFiltered}
                   disabled={selectionMode === "single"}
-                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                    selectionMode === "single"
-                      ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                      : "bg-sky-100 text-sky-700 hover:bg-sky-200"
-                  }`}
+                  className={`rounded-2xl px-5 py-3 text-sm font-bold transition whitespace-nowrap ${selectionMode === "single"
+                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                    : "bg-sky-100 text-sky-700 hover:bg-sky-200"
+                    }`}
                 >
                   {selectionMode === "single"
                     ? "Single Mode"
@@ -689,70 +684,92 @@ ${companyName}`;
               </div>
 
               {showEmployeeDropdown && (
-                <div className="mt-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="relative">
-                    <FaSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Search employees by name, ID, email, or company"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none transition focus:border-sky-500 focus:bg-white"
-                    />
-                  </div>
+                <>
+                  {/* Mobile Backdrop/Overlay for Dropdown */}
+                  <div
+                    className="fixed inset-0 z-[110] bg-slate-950/40 backdrop-blur-sm sm:hidden"
+                    onClick={() => setShowEmployeeDropdown(false)}
+                  />
 
-                  <div className="mt-3 max-h-[280px] space-y-1.5 overflow-y-auto pr-1">
-                    {filteredEmployees.map((employee) => {
-                      const isSelected = selectedEmployeeIds.includes(employee._id);
+                  <div className="fixed inset-x-2 bottom-2 top-2 z-[120] flex flex-col rounded-[2rem] border border-slate-200 bg-white p-4 shadow-2xl animate-in slide-in-from-bottom-5 duration-300 sm:relative sm:inset-x-0 sm:bottom-0 sm:top-0 sm:z-10 sm:mt-3 sm:max-h-none sm:rounded-3xl sm:p-4 sm:shadow-sm sm:animate-none">
+                    {/* Mobile Header for Dropdown */}
+                    <div className="mb-4 flex items-center justify-between sm:hidden">
+                      <h3 className="text-lg font-bold text-slate-900">Select Employees</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeDropdown(false)}
+                        className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 active:scale-95"
+                      >
+                        Done
+                      </button>
+                    </div>
 
-                      return (
-                        <button
-                          key={employee._id}
-                          type="button"
-                          onClick={() => toggleEmployee(employee._id)}
-                          className={`flex w-full items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${
-                            isSelected
+                    <div className="relative">
+                      <FaSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Search name, ID, email..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none transition focus:border-sky-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1 sm:mt-3 sm:max-h-[280px] sm:space-y-1.5 custom-scrollbar">
+                      {filteredEmployees.map((employee) => {
+                        const isSelected = selectedEmployeeIds.includes(employee._id);
+
+                        return (
+                          <button
+                            key={employee._id}
+                            type="button"
+                            onClick={() => toggleEmployee(employee._id)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition active:scale-[0.98] sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:active:scale-100 ${isSelected
                               ? "border-sky-500 bg-sky-50 shadow-sm"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-[15px] font-semibold text-slate-900">
-                              {employee.name}
-                            </p>
-                            <p className="mt-1 text-xs font-medium text-slate-500">
-                              {employee.employeeId}
-                            </p>
-                            <p className="mt-1.5 truncate text-[13px] text-slate-600">
-                              {employee.email}
-                            </p>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                              {employee.companyName || "No company"}
-                            </p>
-                          </div>
-                          <span
-                            className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                              isSelected
-                                ? "bg-sky-600 text-white"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
+                              : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50"
+                              }`}
                           >
-                            {selectionMode === "single" ? (
-                              <FaUser className="text-[10px]" />
-                            ) : (
-                              <FaCheckSquare className="text-[10px]" />
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate text-sm font-bold text-slate-900 sm:text-[15px]">
+                                  {employee.name}
+                                </p>
+                                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {employee.employeeId}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 truncate text-xs text-slate-500">
+                                {employee.email}
+                              </p>
+                              {employee.companyName && (
+                                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                  {employee.companyName}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-transform sm:h-5 sm:w-5 ${isSelected
+                                ? "bg-sky-600 text-white scale-110"
+                                : "bg-slate-100 text-slate-300"
+                                }`}
+                            >
+                              {selectionMode === "single" ? (
+                                <FaUser />
+                              ) : (
+                                <FaCheckSquare />
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
 
-                    {!filteredEmployees.length && (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-                        No employees match the current search.
-                      </div>
-                    )}
+                      {!filteredEmployees.length && (
+                        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">
+                          No employees found.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -774,11 +791,11 @@ ${companyName}`;
                   Clear Selection
                 </button>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                 {selectedEmployees.map((employee) => (
                   <span
                     key={employee._id}
-                    className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm border border-slate-100"
                   >
                     <FaUsers className="text-[10px] text-sky-600" />
                     {employee.name}
@@ -854,11 +871,10 @@ ${companyName}`;
                 <button
                   type="submit"
                   disabled={sending}
-                  className={`flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white transition ${
-                    sending
-                      ? "cursor-not-allowed bg-slate-400"
-                      : "bg-slate-900 hover:bg-slate-800"
-                  }`}
+                  className={`flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white transition ${sending
+                    ? "cursor-not-allowed bg-slate-400"
+                    : "bg-slate-900 hover:bg-slate-800"
+                    }`}
                 >
                   <FaEnvelope />
                   {sending ? "Sending Emails..." : "Send Email"}
@@ -874,9 +890,9 @@ ${companyName}`;
                 This preview follows the exact template and updates as you fill
                 the form.
               </p>
-          <pre className="mt-4 overflow-x-auto rounded-2xl bg-white p-5 text-sm leading-7 text-black border border-gray-300 shadow-sm">
-  {previewText}
-</pre>
+              <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-2xl   p-5 text-sm leading-7 border border-gray-300 dark:border-slate-600 shadow-sm">
+                {previewText}
+              </pre>
             </section>
 
             {lastResult && (
@@ -884,7 +900,7 @@ ${companyName}`;
                 <h2 className="text-xl font-bold text-slate-900">
                   Last Send Summary
                 </h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   <SummaryCard
                     title="Total"
                     value={lastResult.summary?.total || 0}
@@ -920,11 +936,10 @@ ${companyName}`;
                           )}
                         </div>
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${
-                            item.status === "sent"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-rose-100 text-rose-700"
-                          }`}
+                          className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${item.status === "sent"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700"
+                            }`}
                         >
                           {item.status === "sent" ? "accepted" : item.status}
                         </span>
@@ -944,8 +959,8 @@ ${companyName}`;
       </div>
 
       {showAddEmployeeModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-2 sm:p-4 backdrop-blur-sm">
+          <div className="max-h-[96vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">
@@ -967,8 +982,8 @@ ${companyName}`;
               </button>
             </div>
 
-            <form onSubmit={handleAddEmployee} className="space-y-6 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleAddEmployee} className="space-y-6 p-4 sm:p-6">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
                     Company
@@ -1114,11 +1129,10 @@ ${companyName}`;
                 <button
                   type="submit"
                   disabled={addingEmployee}
-                  className={`rounded-2xl px-5 py-3 text-sm font-bold text-white transition ${
-                    addingEmployee
-                      ? "cursor-not-allowed bg-slate-400"
-                      : "bg-emerald-600 hover:bg-emerald-700"
-                  }`}
+                  className={`rounded-2xl px-5 py-3 text-sm font-bold text-white transition ${addingEmployee
+                    ? "cursor-not-allowed bg-slate-400"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                    }`}
                 >
                   {addingEmployee ? "Adding Employee..." : "Add Employee"}
                 </button>
@@ -1138,8 +1152,9 @@ const InputField = ({
   placeholder,
   value,
   onChange,
+  className = "",
 }) => (
-  <div>
+  <div className={className}>
     <label className="mb-2 block text-sm font-semibold text-slate-700">
       {label}
     </label>

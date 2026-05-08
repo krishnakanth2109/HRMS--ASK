@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import api from "../api"; 
+import api from "../api";
 import Swal from "sweetalert2";
-import { 
-  FaCheck, 
-  FaTimes, 
-  FaUserClock, 
-  FaCalendarDay, 
+import {
+  FaCheck,
+  FaTimes,
+  FaUserClock,
+  FaCalendarDay,
   FaSearch,
   FaCog,
   FaExclamationTriangle,
@@ -29,7 +29,7 @@ const AdminLateRequests = () => {
     startDate: "",
     endDate: ""
   });
-  const [requestType, setRequestType] = useState("PENDING"); 
+  const [requestType, setRequestType] = useState("PENDING");
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showBulkLimitModal, setShowBulkLimitModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -53,15 +53,15 @@ const AdminLateRequests = () => {
     try {
       // Using the confirmed admin route to get the correction requests
       const response = await api.get("/api/attendance/admin/status-correction-requests");
-      
+
       // The backend returns { success: true, data: [...] }
       const allData = response.data?.data || [];
-      
+
       // Filter for PENDING status
-      const pendingCount = allData.filter(req => 
+      const pendingCount = allData.filter(req =>
         req.status === "PENDING" || req.status === "pending"
       ).length;
-      
+
       setStatusCorrectionCount(pendingCount);
     } catch (err) {
       console.error("Error fetching status correction count:", err);
@@ -75,7 +75,7 @@ const AdminLateRequests = () => {
       const { data } = await api.get("/api/attendance/all", {
         params: { status: 'PENDING', type: 'LATE_CORRECTION' }
       });
-      
+
       const allRecords = data.data || [];
       const pendingRequests = [];
 
@@ -85,7 +85,7 @@ const AdminLateRequests = () => {
 
         for (const dayLog of empRecord.attendance) {
           if (
-            dayLog.lateCorrectionRequest?.hasRequest && 
+            dayLog.lateCorrectionRequest?.hasRequest &&
             dayLog.lateCorrectionRequest?.status === "PENDING"
           ) {
             pendingRequests.push({
@@ -123,13 +123,13 @@ const AdminLateRequests = () => {
       const allRecords = data.data || [];
       const limitData = [];
       const batchSize = 5;
-      
+
       // Process in batches for better performance
       for (let i = 0; i < allRecords.length; i += batchSize) {
         const batch = allRecords.slice(i, i + batchSize);
         const batchPromises = batch.map(async (empRecord) => {
           if (!empRecord.employeeId) return null;
-          
+
           try {
             // Use cached data if available
             const existingLimit = employeeLimits.find(emp => emp.employeeId === empRecord.employeeId);
@@ -140,7 +140,7 @@ const AdminLateRequests = () => {
             const limitResponse = await api.get(`/api/attendance/request-limit/${empRecord.employeeId}`);
             const currentMonth = new Date().toISOString().slice(0, 7);
             const monthData = limitResponse.data.monthlyRequestLimits?.[currentMonth] || { limit: 5, used: 0 };
-            
+
             return {
               employeeId: empRecord.employeeId,
               employeeName: empRecord.employeeName,
@@ -212,7 +212,7 @@ const AdminLateRequests = () => {
 
     // ✅ Background Interval: Keep the status correction badge updated
     const interval = setInterval(() => {
-        fetchStatusCorrectionCount();
+      fetchStatusCorrectionCount();
     }, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
@@ -225,7 +225,7 @@ const AdminLateRequests = () => {
     // Filter by search text
     if (filterText) {
       const lowerFilter = filterText.toLowerCase();
-      filtered = filtered.filter(r => 
+      filtered = filtered.filter(r =>
         r.employeeName.toLowerCase().includes(lowerFilter) ||
         r.employeeId.includes(lowerFilter) ||
         r.reason.toLowerCase().includes(lowerFilter)
@@ -247,7 +247,7 @@ const AdminLateRequests = () => {
   const filteredEmployeeLimits = useMemo(() => {
     if (!filterText) return employeeLimits;
     const lowerFilter = filterText.toLowerCase();
-    return employeeLimits.filter(emp => 
+    return employeeLimits.filter(emp =>
       emp.employeeName.toLowerCase().includes(lowerFilter) ||
       emp.employeeId.includes(lowerFilter)
     );
@@ -279,7 +279,7 @@ const AdminLateRequests = () => {
   const openLimitModal = async (req) => {
     // Show modal immediately with existing data
     const employeeLimit = employeeLimits.find(emp => emp.employeeId === req.employeeId);
-    
+
     if (employeeLimit) {
       setLimitSettings({
         employeeId: req.employeeId,
@@ -295,7 +295,7 @@ const AdminLateRequests = () => {
         const { data } = await api.get(`/api/attendance/request-limit/${req.employeeId}`);
         const currentMonth = new Date().toISOString().slice(0, 7);
         const monthData = data.monthlyRequestLimits?.[currentMonth] || { limit: 5, used: 0 };
-        
+
         setLimitSettings({
           employeeId: req.employeeId,
           employeeName: req.employeeName,
@@ -319,7 +319,7 @@ const AdminLateRequests = () => {
       requests: []
     });
     setShowHistoryModal(true);
-    
+
     const history = await fetchEmployeeHistory(employeeId);
     setCurrentEmployeeHistory({
       employeeId,
@@ -356,10 +356,10 @@ const AdminLateRequests = () => {
 
       Swal.fire("Success!", `Request limit updated to ${limitSettings.newLimit} for ${limitSettings.employeeName}`, "success");
       setShowLimitModal(false);
-      
+
       // Update local cache
-      setEmployeeLimits(prev => 
-        prev.map(emp => 
+      setEmployeeLimits(prev =>
+        prev.map(emp =>
           emp.employeeId === limitSettings.employeeId
             ? { ...emp, currentLimit: limitSettings.newLimit, remaining: limitSettings.newLimit - emp.currentUsed }
             : emp
@@ -371,109 +371,109 @@ const AdminLateRequests = () => {
     }
   };
 
-// ✅ UPDATED: Bulk Update Request Limits with better error handling
-const bulkUpdateRequestLimits = async () => {
-  if (selectedEmployees.length === 0) {
-    Swal.fire("No Selection", "Please select at least one employee", "warning");
-    return;
-  }
-
-  if (bulkLimitValue < 0 || bulkLimitValue > 100) {
-    Swal.fire("Invalid Value", "Limit must be between 0 and 100", "warning");
-    return;
-  }
-
-  Swal.fire({
-    title: 'Updating Limits...',
-    html: `Setting limit to ${bulkLimitValue} for ${selectedEmployees.length} employee(s)`,
-    allowOutsideClick: false,
-    didOpen: () => {
-      Swal.showLoading();
+  // ✅ UPDATED: Bulk Update Request Limits with better error handling
+  const bulkUpdateRequestLimits = async () => {
+    if (selectedEmployees.length === 0) {
+      Swal.fire("No Selection", "Please select at least one employee", "warning");
+      return;
     }
-  });
 
-  try {
-    const results = [];
-    const errors = [];
-    
-    // Process sequentially to get better error messages
-    for (const employeeId of selectedEmployees) {
-      try {
-        const employee = employeeLimits.find(emp => emp.employeeId === employeeId);
-        if (!employee) continue;
-        
-        // Check if new limit is less than used requests
-        if (bulkLimitValue < employee.currentUsed) {
-          errors.push({
+    if (bulkLimitValue < 0 || bulkLimitValue > 100) {
+      Swal.fire("Invalid Value", "Limit must be between 0 and 100", "warning");
+      return;
+    }
+
+    Swal.fire({
+      title: 'Updating Limits...',
+      html: `Setting limit to ${bulkLimitValue} for ${selectedEmployees.length} employee(s)`,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const results = [];
+      const errors = [];
+
+      // Process sequentially to get better error messages
+      for (const employeeId of selectedEmployees) {
+        try {
+          const employee = employeeLimits.find(emp => emp.employeeId === employeeId);
+          if (!employee) continue;
+
+          // Check if new limit is less than used requests
+          if (bulkLimitValue < employee.currentUsed) {
+            errors.push({
+              employeeId,
+              employeeName: employee.employeeName,
+              error: `Cannot set limit (${bulkLimitValue}) below already used requests (${employee.currentUsed})`
+            });
+            continue;
+          }
+
+          const response = await api.post("/api/attendance/set-request-limit", {
+            employeeId,
+            limit: bulkLimitValue
+          });
+
+          results.push({
             employeeId,
             employeeName: employee.employeeName,
-            error: `Cannot set limit (${bulkLimitValue}) below already used requests (${employee.currentUsed})`
+            success: true
           });
-          continue;
-        }
-        
-        const response = await api.post("/api/attendance/set-request-limit", {
-          employeeId,
-          limit: bulkLimitValue
-        });
-        
-        results.push({
-          employeeId,
-          employeeName: employee.employeeName,
-          success: true
-        });
-        
-      } catch (err) {
-        const employee = employeeLimits.find(emp => emp.employeeId === employeeId);
-        errors.push({
-          employeeId,
-          employeeName: employee?.employeeName || employeeId,
-          error: err.response?.data?.message || err.message
-        });
-      }
-    }
 
-    if (errors.length > 0) {
-      let errorMessage = `Failed to update ${errors.length} of ${selectedEmployees.length} employees:\n\n`;
-      errors.slice(0, 5).forEach((err, index) => {
-        errorMessage += `${index + 1}. ${err.employeeName} (${err.employeeId}): ${err.error}\n`;
-      });
-      
-      if (errors.length > 5) {
-        errorMessage += `\n... and ${errors.length - 5} more`;
+        } catch (err) {
+          const employee = employeeLimits.find(emp => emp.employeeId === employeeId);
+          errors.push({
+            employeeId,
+            employeeName: employee?.employeeName || employeeId,
+            error: err.response?.data?.message || err.message
+          });
+        }
       }
-      
-      Swal.fire({
-        icon: 'warning',
-        title: 'Partial Success',
-        html: `<div style="text-align: left;">
+
+      if (errors.length > 0) {
+        let errorMessage = `Failed to update ${errors.length} of ${selectedEmployees.length} employees:\n\n`;
+        errors.slice(0, 5).forEach((err, index) => {
+          errorMessage += `${index + 1}. ${err.employeeName} (${err.employeeId}): ${err.error}\n`;
+        });
+
+        if (errors.length > 5) {
+          errorMessage += `\n... and ${errors.length - 5} more`;
+        }
+
+        Swal.fire({
+          icon: 'warning',
+          title: 'Partial Success',
+          html: `<div style="text-align: left;">
                 <p><strong>Updated:</strong> ${results.length} employee(s)</p>
                 <p><strong>Failed:</strong> ${errors.length} employee(s)</p>
                 <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                   <pre style="font-size: 11px; white-space: pre-wrap;">${errorMessage}</pre>
                 </div>
               </div>`,
-        confirmButtonText: 'OK'
-      });
-    } else {
-      Swal.fire(
-        "Success!",
-        `Updated limits to ${bulkLimitValue} for ${selectedEmployees.length} employee(s)`,
-        "success"
-      );
+          confirmButtonText: 'OK'
+        });
+      } else {
+        Swal.fire(
+          "Success!",
+          `Updated limits to ${bulkLimitValue} for ${selectedEmployees.length} employee(s)`,
+          "success"
+        );
+      }
+
+      setShowBulkLimitModal(false);
+      setSelectedEmployees([]);
+      setSelectAll(false);
+
+      // Refresh limits data
+      fetchEmployeeLimits(false);
+
+    } catch (err) {
+      Swal.fire("Error", "Failed to update limits. Please check individually.", "error");
     }
-    
-    setShowBulkLimitModal(false);
-    setSelectedEmployees([]);
-    setSelectAll(false);
-    
-    // Refresh limits data
-    fetchEmployeeLimits(false);
-    
-  } catch (err) {
-    Swal.fire("Error", "Failed to update limits. Please check individually.", "error");
-  }
-};
+  };
 
   // ✅ UPDATED: Handle Approve / Reject with Loading & Optimistic Update
   const handleAction = async (reqItem, action) => {
@@ -499,26 +499,26 @@ const bulkUpdateRequestLimits = async () => {
       }
       adminComment = text;
     } else {
-        const confirm = await Swal.fire({
-            title: "Approve Time Change?",
-            html: `This will update <b>${reqItem.employeeName}'s</b> First Punch In time to <br/>
+      const confirm = await Swal.fire({
+        title: "Approve Time Change?",
+        html: `This will update <b>${reqItem.employeeName}'s</b> First Punch In time to <br/>
                    <b style="color:green; font-size:1.1em">${new Date(reqItem.requestedTime).toLocaleTimeString()}</b>.`,
-            icon: "question",
-            showCancelButton: true,
-            confirmButtonColor: "#10b981",
-            confirmButtonText: "Yes, Update Punch In"
-        });
-        if (!confirm.isConfirmed) return;
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#10b981",
+        confirmButtonText: "Yes, Update Punch In"
+      });
+      if (!confirm.isConfirmed) return;
     }
 
     // 2. SHOW LOADING
     Swal.fire({
-        title: isApprove ? 'Approving...' : 'Rejecting...',
-        html: 'Please wait while we update the attendance records.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
+      title: isApprove ? 'Approving...' : 'Rejecting...',
+      html: 'Please wait while we update the attendance records.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
     });
 
     try {
@@ -531,14 +531,14 @@ const bulkUpdateRequestLimits = async () => {
       });
 
       // 4. OPTIMISTIC UPDATE
-      setRequests(prevRequests => prevRequests.filter(r => 
-          !(r.employeeId === reqItem.employeeId && r.date === reqItem.date)
+      setRequests(prevRequests => prevRequests.filter(r =>
+        !(r.employeeId === reqItem.employeeId && r.date === reqItem.date)
       ));
 
       // 5. Update employee limits cache if rejected
       if (action === "REJECTED") {
-        setEmployeeLimits(prev => 
-          prev.map(emp => 
+        setEmployeeLimits(prev =>
+          prev.map(emp =>
             emp.employeeId === reqItem.employeeId && emp.currentUsed > 0
               ? { ...emp, currentUsed: emp.currentUsed - 1, remaining: emp.remaining + 1 }
               : emp
@@ -549,8 +549,8 @@ const bulkUpdateRequestLimits = async () => {
       // 6. SHOW SUCCESS CONFIRMATION
       Swal.fire(
         isApprove ? "Approved!" : "Rejected",
-        isApprove 
-          ? "Attendance record has been updated successfully." 
+        isApprove
+          ? "Attendance record has been updated successfully."
           : "Request has been rejected.",
         "success"
       );
@@ -563,7 +563,7 @@ const bulkUpdateRequestLimits = async () => {
 
   // ✅ Get status badge color
   const getStatusBadge = (status) => {
-    switch(status) {
+    switch (status) {
       case "PENDING": return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "APPROVED": return "bg-green-100 text-green-800 border-green-200";
       case "REJECTED": return "bg-red-100 text-red-800 border-red-200";
@@ -572,64 +572,61 @@ const bulkUpdateRequestLimits = async () => {
   };
 
   return (
-    <div className="p-6 min-h-screen font-sans">
-      <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+    <div className="p-4 sm:p-6 min-h-screen font-sans">
+      <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-               <FaUserClock className="text-orange-600" /> Employees Attendece Status Correction Requests
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-               Manage all late login requests, employee request limits and attendance status correction requests.
-            </p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <FaUserClock className="text-orange-600 shrink-0" /> <span className="truncate">Attendance Status Correction Requests</span>
+          </h2>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Manage all late login requests, employee request limits and attendance status correction requests.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button 
+        <div className="flex flex-wrap gap-2">
+          <button
             onClick={() => {
               setRequestType("PENDING");
               fetchPendingRequests();
-            }} 
-            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium ${
-              requestType === "PENDING" 
-                ? "bg-orange-600 text-white" 
+            }}
+            className={`flex-1 sm:flex-none text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg transition shadow-sm font-medium ${requestType === "PENDING"
+                ? "bg-orange-600 text-white"
                 : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
+              }`}
           >
             Late Login
           </button>
-          <button 
+          <button
             onClick={() => {
               setRequestType("LIMITS");
               fetchEmployeeLimits();
-            }} 
-            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center gap-2 ${
-              requestType === "LIMITS" 
-                ? "bg-purple-600 text-white" 
+            }}
+            className={`flex-1 sm:flex-none text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center justify-center gap-2 ${requestType === "LIMITS"
+                ? "bg-purple-600 text-white"
                 : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
+              }`}
           >
             <FaUsers /> Limits
           </button>
-          
+
           {/* ✅ BUTTON: Attendance Status Correction Button with Persistent Count Badge */}
-          <button 
+          <button
             onClick={() => {
-                setRequestType("ATTENDANCE_STATUS");
-                fetchStatusCorrectionCount();
+              setRequestType("ATTENDANCE_STATUS");
+              fetchStatusCorrectionCount();
             }}
-            className={`text-sm px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center gap-2 relative ${
-              requestType === "ATTENDANCE_STATUS" 
-                ? "bg-blue-600 text-white" 
+            className={`flex-[2] sm:flex-none text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg transition shadow-sm font-medium flex items-center justify-center gap-2 relative ${requestType === "ATTENDANCE_STATUS"
+                ? "bg-blue-600 text-white"
                 : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
+              }`}
           >
-            <FaSync /> Attendence Status Correction
+            <FaSync /> <span className="hidden sm:inline">Attendence Status Correction</span><span className="sm:hidden">Correction</span>
             {statusCorrectionCount > 0 && (
-                <span className="absolute -top-2 -right-2 flex h-6 w-6">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-6 w-6 bg-red-600 border-2 border-white text-white items-center justify-center text-[11px] font-bold">
-                        {statusCorrectionCount}
-                    </span>
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-5 w-5 bg-red-600 border-2 border-white text-white items-center justify-center text-[10px] font-bold">
+                  {statusCorrectionCount}
                 </span>
+              </span>
             )}
           </button>
         </div>
@@ -641,34 +638,34 @@ const bulkUpdateRequestLimits = async () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             {/* Search Input - Takes 5 columns */}
             <div className="md:col-span-5 relative">
-              <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              <input 
-                  type="text" 
-                  placeholder="Search by Employee Name, ID, or Reason..." 
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
+              <FaSearch className="absolute left-3 top-3.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search Name, ID, or Reason..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition text-sm"
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
               />
             </div>
-            
+
             {/* Date Range Inputs - Takes 5 columns */}
-            <div className="md:col-span-5 grid grid-cols-2 gap-3">
+            <div className="md:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
+                <FaCalendarAlt className="absolute left-3 top-3.5 text-gray-400" />
                 <input
                   type="date"
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition text-sm"
                   value={dateRange.startDate}
-                  onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
                 />
               </div>
               <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
+                <FaCalendarAlt className="absolute left-3 top-3.5 text-gray-400" />
                 <input
                   type="date"
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition text-sm"
                   value={dateRange.endDate}
-                  onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
                 />
               </div>
             </div>
@@ -678,7 +675,7 @@ const bulkUpdateRequestLimits = async () => {
               {requestType === "LIMITS" && (
                 <button
                   onClick={() => setShowBulkLimitModal(true)}
-                  className="flex-1 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm font-medium"
+                  className="flex-1 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-xs sm:text-sm font-medium"
                   disabled={selectedEmployees.length === 0}
                 >
                   <FaCog /> Bulk ({selectedEmployees.length})
@@ -689,7 +686,7 @@ const bulkUpdateRequestLimits = async () => {
                   setFilterText("");
                   setDateRange({ startDate: "", endDate: "" });
                 }}
-                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition flex items-center justify-center gap-2 text-sm"
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition flex items-center justify-center gap-2 text-xs sm:text-sm"
               >
                 <FaFilter /> Clear
               </button>
@@ -737,7 +734,7 @@ const bulkUpdateRequestLimits = async () => {
               <span className="text-sm text-gray-600">Select All</span>
             </div>
           </div>
-          
+
           {loadingLimits ? (
             <div className="p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
@@ -748,103 +745,162 @@ const bulkUpdateRequestLimits = async () => {
               No employee limits found
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Limit</th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Used</th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remaining</th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
-                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredEmployeeLimits.map((emp) => (
-                    <tr key={emp.employeeId} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-3">
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Limit</th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Used</th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Remaining</th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
+                      <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredEmployeeLimits.map((emp) => (
+                      <tr key={emp.employeeId} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedEmployees.includes(emp.employeeId)}
+                            onChange={() => handleSelectEmployee(emp.employeeId)}
+                            className="h-4 w-4 text-purple-600 rounded focus:ring-purple-500"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div>
+                            <p className="font-medium text-gray-900">{emp.employeeName}</p>
+                            <p className="text-xs text-gray-500 font-mono">{emp.employeeId}</p>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="font-bold text-purple-700">{emp.currentLimit}</span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`font-bold ${emp.currentUsed > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                            {emp.currentUsed}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`font-bold ${emp.remaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {emp.remaining}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="w-32">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${emp.currentUsed / emp.currentLimit > 0.8 ? 'bg-red-500' : emp.currentUsed / emp.currentLimit > 0.5 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min((emp.currentUsed / emp.currentLimit) * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              {Math.round((emp.currentUsed / emp.currentLimit) * 100)}% used
+                            </p>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openHistoryModal(emp.employeeId, emp.employeeName)}
+                              className="px-3 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg border border-blue-200 transition flex items-center gap-1"
+                              title="View History"
+                            >
+                              <FaHistory className="text-xs" /> History
+                            </button>
+                            <button
+                              onClick={() => openLimitModal(emp)}
+                              className="px-3 py-1 text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg border border-purple-200 transition flex items-center gap-1"
+                              title="Edit Limit"
+                            >
+                              <FaEdit className="text-xs" /> Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {filteredEmployeeLimits.map((emp) => (
+                  <div key={emp.employeeId} className="p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-3">
                         <input
                           type="checkbox"
                           checked={selectedEmployees.includes(emp.employeeId)}
                           onChange={() => handleSelectEmployee(emp.employeeId)}
-                          className="h-4 w-4 text-purple-600 rounded focus:ring-purple-500"
+                          className="h-5 w-5 mt-1 text-purple-600 rounded focus:ring-purple-500"
                         />
-                      </td>
-                      <td className="p-3">
                         <div>
-                          <p className="font-medium text-gray-900">{emp.employeeName}</p>
+                          <p className="font-bold text-gray-900">{emp.employeeName}</p>
                           <p className="text-xs text-gray-500 font-mono">{emp.employeeId}</p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <span className="font-bold text-purple-700">{emp.currentLimit}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className={`font-bold ${emp.currentUsed > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
-                          {emp.currentUsed}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className={`font-bold ${emp.remaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {emp.remaining}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <div className="w-32">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${emp.currentUsed / emp.currentLimit > 0.8 ? 'bg-red-500' : emp.currentUsed / emp.currentLimit > 0.5 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                              style={{ width: `${Math.min((emp.currentUsed / emp.currentLimit) * 100, 100)}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {Math.round((emp.currentUsed / emp.currentLimit) * 100)}% used
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openHistoryModal(emp.employeeId, emp.employeeName)}
-                            className="px-3 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg border border-blue-200 transition flex items-center gap-1"
-                            title="View History"
-                          >
-                            <FaHistory className="text-xs" /> History
-                          </button>
-                          <button
-                            onClick={() => openLimitModal(emp)}
-                            className="px-3 py-1 text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg border border-purple-200 transition flex items-center gap-1"
-                            title="Edit Limit"
-                          >
-                            <FaEdit className="text-xs" /> Edit
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openHistoryModal(emp.employeeId, emp.employeeName)}
+                          className="p-2 bg-blue-50 text-blue-700 rounded-lg border border-blue-200"
+                        >
+                          <FaHistory />
+                        </button>
+                        <button
+                          onClick={() => openLimitModal(emp)}
+                          className="p-2 bg-purple-50 text-purple-700 rounded-lg border border-purple-200"
+                        >
+                          <FaEdit />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 bg-gray-50 p-2 rounded-lg text-center">
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Limit</p>
+                        <p className="text-sm font-bold text-purple-700">{emp.currentLimit}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Used</p>
+                        <p className="text-sm font-bold text-orange-600">{emp.currentUsed}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Left</p>
+                        <p className="text-sm font-bold text-green-600">{emp.remaining}</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${emp.currentUsed / emp.currentLimit > 0.8 ? 'bg-red-500' : emp.currentUsed / emp.currentLimit > 0.5 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                        style={{ width: `${Math.min((emp.currentUsed / emp.currentLimit) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       ) : filteredRequests.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaCheck className="text-green-500 text-2xl" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-700">No pending requests found!</h3>
-            <p className="text-gray-400 mt-1">
-              All caught up! No pending late correction requests.
-            </p>
+          <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaCheck className="text-green-500 text-2xl" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-700">No pending requests found!</h3>
+          <p className="text-gray-400 mt-1">
+            All caught up! No pending late correction requests.
+          </p>
         </div>
       ) : (
         /* Pending Requests Card View */
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredRequests.map((req) => (
             <div key={`${req.employeeId}-${req.date}`} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 flex flex-col group">
-              
+
               {/* Card Header */}
               <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex justify-between items-start">
                 <div>
@@ -855,8 +911,8 @@ const bulkUpdateRequestLimits = async () => {
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                       <FaCalendarDay />
-                       {new Date(req.date).toLocaleDateString("en-GB")}
+                    <FaCalendarDay />
+                    {new Date(req.date).toLocaleDateString("en-GB")}
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -879,49 +935,49 @@ const bulkUpdateRequestLimits = async () => {
 
               {/* Card Body */}
               <div className="p-5 flex-1 space-y-4">
-                
+
                 {/* Time Comparison Block */}
                 <div className="flex items-center justify-between bg-orange-50/50 p-3 rounded-xl border border-orange-100">
-                    <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">System Recognized</p>
-                        <p className="text-red-500 font-mono font-bold text-lg line-through decoration-2 opacity-70">
-                            {req.currentPunchIn 
-                                ? new Date(req.currentPunchIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                : "--:--"
-                            }
-                        </p>
-                    </div>
-                    <div className="text-orange-300 text-xl font-light">➜</div>
-                    <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">Requested Time</p>
-                        <p className="text-green-600 font-mono font-bold text-xl bg-green-50 px-2 rounded">
-                            {new Date(req.requestedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </p>
-                    </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">System Recognized</p>
+                    <p className="text-red-500 font-mono font-bold text-lg line-through decoration-2 opacity-70">
+                      {req.currentPunchIn
+                        ? new Date(req.currentPunchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : "--:--"
+                      }
+                    </p>
+                  </div>
+                  <div className="text-orange-300 text-xl font-light">➜</div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">Requested Time</p>
+                    <p className="text-green-600 font-mono font-bold text-xl bg-green-50 px-2 rounded">
+                      {new Date(req.requestedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Reason Block */}
                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Reason provided</p>
-                    <p className="text-sm text-gray-700 italic leading-relaxed">
-                        "{req.reason}"
-                    </p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Reason provided</p>
+                  <p className="text-sm text-gray-700 italic leading-relaxed">
+                    "{req.reason}"
+                  </p>
                 </div>
               </div>
 
               {/* Actions Footer */}
               <div className="p-3 bg-gray-50/50 border-t border-gray-100 flex gap-3">
                 <button
-                    onClick={() => handleAction(req, "REJECTED")}
-                    className="flex-1 flex items-center justify-center gap-2 bg-white text-red-600 border border-red-200 hover:bg-red-50 py-2.5 rounded-lg font-bold transition text-xs shadow-sm"
+                  onClick={() => handleAction(req, "REJECTED")}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white text-red-600 border border-red-200 hover:bg-red-50 py-2.5 rounded-lg font-bold transition text-xs shadow-sm"
                 >
-                    <FaTimes /> Reject
+                  <FaTimes /> Reject
                 </button>
                 <button
-                    onClick={() => handleAction(req, "APPROVED")}
-                    className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 py-2.5 rounded-lg font-bold transition text-xs shadow-md shadow-green-200"
+                  onClick={() => handleAction(req, "APPROVED")}
+                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 py-2.5 rounded-lg font-bold transition text-xs shadow-md shadow-green-200"
                 >
-                    <FaCheck /> Approve
+                  <FaCheck /> Approve
                 </button>
               </div>
 
@@ -939,7 +995,7 @@ const bulkUpdateRequestLimits = async () => {
                 <FaEdit className="text-purple-600" />
                 Edit Request Limit
               </h3>
-              <button 
+              <button
                 onClick={() => setShowLimitModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
               >
@@ -970,7 +1026,7 @@ const bulkUpdateRequestLimits = async () => {
               </div>
               <div className="mt-3">
                 <div className="w-full bg-purple-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min((limitSettings.currentUsed / limitSettings.currentLimit) * 100, 100)}%` }}
                   ></div>
@@ -990,7 +1046,7 @@ const bulkUpdateRequestLimits = async () => {
                 min={limitSettings.currentUsed}
                 max="100"
                 value={limitSettings.newLimit}
-                onChange={(e) => setLimitSettings({...limitSettings, newLimit: parseInt(e.target.value) || 0})}
+                onChange={(e) => setLimitSettings({ ...limitSettings, newLimit: parseInt(e.target.value) || 0 })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none text-lg font-bold text-center"
               />
               <p className="text-xs text-gray-500 mt-2">
@@ -1020,15 +1076,15 @@ const bulkUpdateRequestLimits = async () => {
       {showHistoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden transform transition-all">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <FaHistory className="text-blue-600" />
-                {currentEmployeeHistory?.employeeName}'s Request History
-                <span className="text-sm font-normal text-gray-500 ml-2">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FaHistory className="text-blue-600 shrink-0" />
+                <span className="truncate">{currentEmployeeHistory?.employeeName}'s History</span>
+                <span className="hidden sm:inline text-sm font-normal text-gray-500 ml-2">
                   ID: {currentEmployeeHistory?.employeeId}
                 </span>
               </h3>
-              <button 
+              <button
                 onClick={() => setShowHistoryModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
               >
@@ -1061,25 +1117,25 @@ const bulkUpdateRequestLimits = async () => {
                           {req.status}
                         </span>
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className="text-center bg-white p-3 rounded-lg border">
-                          <p className="text-xs text-gray-400 mb-1">Original Time</p>
-                          <p className="text-red-500 font-mono font-medium line-through">
-                            {req.currentPunchIn 
-                              ? new Date(req.currentPunchIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div className="text-center bg-white p-2 sm:p-3 rounded-lg border">
+                          <p className="text-[10px] text-gray-400 mb-1">Original Time</p>
+                          <p className="text-red-500 font-mono font-medium line-through text-sm sm:text-base">
+                            {req.currentPunchIn
+                              ? new Date(req.currentPunchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                               : "--:--"
                             }
                           </p>
                         </div>
-                        <div className="text-center bg-white p-3 rounded-lg border">
-                          <p className="text-xs text-gray-400 mb-1">Requested Time</p>
-                          <p className="text-green-600 font-mono font-bold">
-                            {new Date(req.requestedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        <div className="text-center bg-white p-2 sm:p-3 rounded-lg border border-green-100">
+                          <p className="text-[10px] text-gray-400 mb-1">Requested Time</p>
+                          <p className="text-green-600 font-mono font-bold text-sm sm:text-base">
+                            {new Date(req.requestedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div>
                           <p className="text-xs text-gray-400 mb-1">Employee's Reason</p>
@@ -1123,7 +1179,7 @@ const bulkUpdateRequestLimits = async () => {
                 <FaUsers className="text-purple-600" />
                 Bulk Update Request Limits
               </h3>
-              <button 
+              <button
                 onClick={() => setShowBulkLimitModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
               >
@@ -1138,7 +1194,7 @@ const bulkUpdateRequestLimits = async () => {
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <p className="text-sm font-bold text-purple-900 mb-2">⚠️ Important Note</p>
                 <p className="text-xs text-purple-700">
-                  This will set the same limit value for all selected employees. 
+                  This will set the same limit value for all selected employees.
                   The limit cannot be set below the number of requests already used by each employee.
                 </p>
               </div>

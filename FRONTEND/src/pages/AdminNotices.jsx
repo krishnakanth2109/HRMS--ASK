@@ -39,64 +39,64 @@ const AdminNotices = () => {
 
   // ── form ──────────────────────────────────────────────────────────────────
   const initialFormState = { title: "", description: "", recipients: [], sendTo: "ALL", selectedGroupId: null };
-  const [noticeData, setNoticeData]     = useState(initialFormState);
-  const [notices, setNotices]           = useState([]);
+  const [noticeData, setNoticeData] = useState(initialFormState);
+  const [notices, setNotices] = useState([]);
   const [isLoadingNotices, setIsLoadingNotices] = useState(true);
-  const initialLoadRef                  = useRef(true);
-  const [employees, setEmployees]       = useState([]);
+  const initialLoadRef = useRef(true);
+  const [employees, setEmployees] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employeeWorkingStatus, setEmployeeWorkingStatus] = useState({});
 
   // ── UI ────────────────────────────────────────────────────────────────────
-  const [editingNoticeId, setEditingNoticeId]   = useState(null);
-  const [isModalOpen, setIsModalOpen]           = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen]     = useState(false);
-  const [searchTerm, setSearchTerm]             = useState("");
+  const [editingNoticeId, setEditingNoticeId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // ── meeting ───────────────────────────────────────────────────────────────
   const DEFAULT_MEETING_LINK = "https://meet.google.com/tsn-vrih-zvx";
-  const [isMeetingMode, setIsMeetingMode]       = useState(false);
-  const [meetingParams, setMeetingParams]       = useState({ date: "", time: "" });
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
+  const [meetingParams, setMeetingParams] = useState({ date: "", time: "" });
   const [meetingDescManual, setMeetingDescManual] = useState(false);
-  const [meetingLink, setMeetingLink]           = useState(DEFAULT_MEETING_LINK);
-  const [isLinkEditable, setIsLinkEditable]     = useState(false);
+  const [meetingLink, setMeetingLink] = useState(DEFAULT_MEETING_LINK);
+  const [isLinkEditable, setIsLinkEditable] = useState(false);
 
   // ── popups ────────────────────────────────────────────────────────────────
   const [expandedRecipientNoticeId, setExpandedRecipientNoticeId] = useState(null);
-  const [viewedByNotice, setViewedByNotice]     = useState(null);
-  const [repliesNotice, setRepliesNotice]       = useState(null);
+  const [viewedByNotice, setViewedByNotice] = useState(null);
+  const [repliesNotice, setRepliesNotice] = useState(null);
   const [selectedChatEmployeeId, setSelectedChatEmployeeId] = useState(null);
-  const [replyText, setReplyText]               = useState("");
-  const [sendingReply, setSendingReply]         = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   // ── image upload ──────────────────────────────────────────────────────────
-  const [selectedFile, setSelectedFile]         = useState(null);
-  const fileInputRef                            = useRef(null);
-  const [previewImage, setPreviewImage]         = useState(null);
-  const [employeeImages, setEmployeeImages]     = useState({});
-  const lastUploadedImageRef                    = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [employeeImages, setEmployeeImages] = useState({});
+  const lastUploadedImageRef = useRef(null);
 
   const staticQuickReplies = ["Ok", "Come To My Cabin", "Do It Fast", "Call me", "Update me when done"];
   const messagesEndRef = useRef(null);
 
   // ── read state ────────────────────────────────────────────────────────────
-  const [readState, setReadState]               = useState({});
+  const [readState, setReadState] = useState({});
   const [readStateConfigId, setReadStateConfigId] = useState(null);
 
   // ── groups ────────────────────────────────────────────────────────────────
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-  const [groups, setGroups]                     = useState([]);
-  const [groupConfigId, setGroupConfigId]       = useState(null);
-  const [groupForm, setGroupForm]               = useState({ name: "", members: [] });
-  const [editingGroupId, setEditingGroupId]     = useState(null);
-  const [groupSearchTerm, setGroupSearchTerm]   = useState("");
-  const [viewUnassigned, setViewUnassigned]     = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [groupConfigId, setGroupConfigId] = useState(null);
+  const [groupForm, setGroupForm] = useState({ name: "", members: [] });
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [viewUnassigned, setViewUnassigned] = useState(false);
 
   // ── AI title ──────────────────────────────────────────────────────────────
-  const [ghostText, setGhostText]               = useState("");
+  const [ghostText, setGhostText] = useState("");
   const [titleSuggestions, setTitleSuggestions] = useState([]);
-  const [loadingSuggest, setLoadingSuggest]     = useState(false);
-  const [aiGenerating, setAiGenerating]         = useState(false);
+  const [loadingSuggest, setLoadingSuggest] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   // Use a REF for aiPaused — state would reset the debounce effect on every keystroke,
   // causing suggestions to re-appear immediately after generation/tab-accept.
   const aiPausedRef = useRef(false);
@@ -132,11 +132,11 @@ const AdminNotices = () => {
       try {
         const [autoRes, sugRes] = await Promise.allSettled([
           api.get("/api/ai/autocomplete", { params: { q: debouncedTitle } }),
-          api.get("/api/ai/suggest",      { params: { q: debouncedTitle } }),
+          api.get("/api/ai/suggest", { params: { q: debouncedTitle } }),
         ]);
         if (cancelled) return;
         if (autoRes.status === "fulfilled") setGhostText(autoRes.value.data?.completion || "");
-        if (sugRes.status === "fulfilled")  setTitleSuggestions(sugRes.value.data?.suggestions || []);
+        if (sugRes.status === "fulfilled") setTitleSuggestions(sugRes.value.data?.suggestions || []);
       } catch {
         // silent — AI is optional, never break the form
       }
@@ -183,7 +183,7 @@ const AdminNotices = () => {
     resetGroupForm();
   };
 
-  const handleEditGroup   = (group) => { setEditingGroupId(group.id); setGroupForm({ name: group.name, members: group.members }); setViewUnassigned(false); };
+  const handleEditGroup = (group) => { setEditingGroupId(group.id); setGroupForm({ name: group.name, members: group.members }); setViewUnassigned(false); };
   const handleDeleteGroup = (groupId) => {
     if (!window.confirm("Delete this group?")) return;
     const updated = groups.filter(g => g.id !== groupId);
@@ -359,8 +359,8 @@ const AdminNotices = () => {
     if (notice) {
       setEditingNoticeId(notice._id);
       const detectedLink = (notice.description?.match(/(https?:\/\/[^\s]+)/) || [])[0];
-      const dateMatch    = notice.description?.match(/scheduled meeting\s+(\d{4}-\d{2}-\d{2})/i);
-      const timeMatch    = notice.description?.match(/at\s+(\d{2}:\d{2})/i);
+      const dateMatch = notice.description?.match(/scheduled meeting\s+(\d{4}-\d{2}-\d{2})/i);
+      const timeMatch = notice.description?.match(/at\s+(\d{2}:\d{2})/i);
       if (detectedLink && dateMatch && timeMatch) {
         setIsMeetingMode(true);
         setMeetingParams({ date: dateMatch[1], time: timeMatch[1] });
@@ -415,7 +415,7 @@ const AdminNotices = () => {
     const result = await Swal.fire({ title: "Delete Notice?", text: "This action cannot be undone.", icon: "warning", showCancelButton: true, confirmButtonColor: "#ef4444", cancelButtonColor: "#6b7280", confirmButtonText: "Yes, Delete" });
     if (!result.isConfirmed) return;
     try { await deleteNoticeById(id); Swal.fire("Deleted", "Notice removed successfully.", "success"); fetchNotices(); }
-    catch  { Swal.fire("Error", "Failed to delete.", "error"); }
+    catch { Swal.fire("Error", "Failed to delete.", "error"); }
   };
 
   const handleSubmit = async (e) => {
@@ -660,19 +660,19 @@ const AdminNotices = () => {
             <p className="text-slate-300 text-sm">Create one to notify your team.</p>
           </div>
         ) : notices.map(notice => {
-          const { date, time }         = formatDateTime(notice.date);
-          const isSpecific             = Array.isArray(notice.recipients) && notice.recipients.length > 0;
-          const recipientNames         = isSpecific ? getRecipientNamesList(notice.recipients) : [];
-          const isExpandedRecipients   = expandedRecipientNoticeId === notice._id;
-          const groupName              = isSpecific ? getGroupNameForNotice(notice.recipients) : null;
-          const viewCount              = notice.readBy?.length || 0;
-          const groupedChats           = getGroupedReplies(notice);
-          const activeChatCount        = Object.keys(groupedChats).length;
-          const unreadCount            = Object.values(groupedChats).filter(g => g.hasUnread).length;
-          const detectedLink           = (notice.description?.match(/(https?:\/\/[^\s]+)/) || [])[0];
-          const isMeeting              = detectedLink && (notice.title.toLowerCase().includes("meeting") || notice.description.toLowerCase().includes("meeting") || notice.description.includes("meet.google"));
+          const { date, time } = formatDateTime(notice.date);
+          const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
+          const recipientNames = isSpecific ? getRecipientNamesList(notice.recipients) : [];
+          const isExpandedRecipients = expandedRecipientNoticeId === notice._id;
+          const groupName = isSpecific ? getGroupNameForNotice(notice.recipients) : null;
+          const viewCount = notice.readBy?.length || 0;
+          const groupedChats = getGroupedReplies(notice);
+          const activeChatCount = Object.keys(groupedChats).length;
+          const unreadCount = Object.values(groupedChats).filter(g => g.hasUnread).length;
+          const detectedLink = (notice.description?.match(/(https?:\/\/[^\s]+)/) || [])[0];
+          const isMeeting = detectedLink && (notice.title.toLowerCase().includes("meeting") || notice.description.toLowerCase().includes("meeting") || notice.description.includes("meet.google"));
           const sideBarColor = isMeeting ? "bg-gradient-to-b from-rose-500 to-pink-500" : isSpecific ? (groupName ? "bg-gradient-to-b from-indigo-600 to-violet-600" : "bg-gradient-to-b from-amber-500 to-orange-500") : "bg-gradient-to-b from-blue-500 to-cyan-500";
-          const borderColor  = isMeeting ? "border-rose-100" : isSpecific ? (groupName ? "border-indigo-100" : "border-orange-100") : "border-slate-100";
+          const borderColor = isMeeting ? "border-rose-100" : isSpecific ? (groupName ? "border-indigo-100" : "border-orange-100") : "border-slate-100";
 
           return (
             <div key={notice._id} className={`group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border ${borderColor} overflow-visible`}>
@@ -783,10 +783,10 @@ const AdminNotices = () => {
               {!Object.keys(getGroupedReplies(repliesNotice)).length ? (
                 <div className="text-center py-10 text-slate-400"><p>No private replies yet.</p></div>
               ) : Object.entries(getGroupedReplies(repliesNotice)).map(([empId, data]) => {
-                const last    = data.messages[data.messages.length - 1];
-                const emp     = findEmployeeByEmployeeId(empId);
-                const online  = emp ? isEmployeeWorking(emp.employeeId) : false;
-                const pic     = emp?.employeeId ? employeeImages[emp.employeeId] : null;
+                const last = data.messages[data.messages.length - 1];
+                const emp = findEmployeeByEmployeeId(empId);
+                const online = emp ? isEmployeeWorking(emp.employeeId) : false;
+                const pic = emp?.employeeId ? employeeImages[emp.employeeId] : null;
                 return (
                   <div key={empId} onClick={() => handleChatSelection(empId)} className={`p-4 cursor-pointer border-b border-slate-200 flex items-center gap-3 hover:bg-white transition-colors relative ${selectedChatEmployeeId === empId ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : ""}`}>
                     <div className="relative">
@@ -867,9 +867,9 @@ const AdminNotices = () => {
                     </div>
                     {displayMessages.map((msg, i) => {
                       const isAdmin = msg.sentBy === "Admin";
-                      const msgEmp  = findEmployeeByEmployeeId(msg.employeeId?._id || msg.employeeId);
-                      let imgSrc    = msg.image;
-                      const isLast  = i === displayMessages.length - 1;
+                      const msgEmp = findEmployeeByEmployeeId(msg.employeeId?._id || msg.employeeId);
+                      let imgSrc = msg.image;
+                      const isLast = i === displayMessages.length - 1;
                       if (isAdmin && isLast && !msg.isSending && lastUploadedImageRef.current && Date.now() - lastUploadedImageRef.current.timestamp < 30000) {
                         imgSrc = lastUploadedImageRef.current.url;
                       }
@@ -1187,9 +1187,9 @@ const AdminNotices = () => {
                 <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 uppercase"><div className="w-2 h-2 rounded-full bg-violet-500" /> Audience</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { key: "ALL",      label: "All Employees", Icon: FaUsers,     color: "blue"   },
-                    { key: "GROUP",    label: "Group Sending", Icon: FaLayerGroup, color: "indigo" },
-                    { key: "SPECIFIC", label: "Specific",      Icon: FaUserTag,   color: "purple" },
+                    { key: "ALL", label: "All Employees", Icon: FaUsers, color: "blue" },
+                    { key: "GROUP", label: "Group Sending", Icon: FaLayerGroup, color: "indigo" },
+                    { key: "SPECIFIC", label: "Specific", Icon: FaUserTag, color: "purple" },
                   ].map(({ key, label, Icon, color }) => {
                     const active = noticeData.sendTo === key;
                     return (

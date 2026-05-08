@@ -425,15 +425,15 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
-        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-6 sticky top-0 z-10 flex justify-between items-center">
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 md:p-6 sticky top-0 z-10 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold tracking-wide">Payslip Detail</h2>
-            <p className="text-blue-100 text-sm">{employee.employeeName} ({employee.employeeId})</p>
+            <h2 className="text-xl md:text-2xl font-bold tracking-wide">Payslip Detail</h2>
+            <p className="text-blue-100 text-xs md:text-sm">{employee.employeeName} ({employee.employeeId})</p>
           </div>
-          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition"><span className="text-2xl">×</span></button>
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 p-1.5 md:p-2 rounded-full transition"><span className="text-xl md:text-2xl leading-none">×</span></button>
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="p-4 md:p-8 space-y-4 md:space-y-6">
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -501,7 +501,7 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
             </div>
           </div>
 
-          <div className="flex gap-8">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8">
             {/* EARNINGS */}
             <div className="flex-1">
               <h3 className="text-lg font-bold text-green-700 mb-3 border-b pb-2">Earnings</h3>
@@ -577,15 +577,15 @@ const PayrollSlipModal = ({ employee, onClose, periodStart, periodEnd }) => {
             </div>
           </div>
 
-          <div className="bg-gray-800 text-white p-4 rounded-lg flex justify-between items-center text-lg shadow-lg">
-            <span className="font-bold">NET SALARY PAYABLE</span>
-            <span className="font-extrabold text-2xl">{formatCurrency(employee.netPayableSalary)}</span>
+          <div className="bg-gray-800 text-white p-4 rounded-lg flex flex-col md:flex-row justify-between items-center md:text-lg shadow-lg gap-2 text-center">
+            <span className="font-bold text-sm md:text-lg">NET SALARY PAYABLE</span>
+            <span className="font-extrabold text-2xl text-green-400 md:text-white">{formatCurrency(employee.netPayableSalary)}</span>
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button onClick={downloadPayslip} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">🖨️ Print Payslip</button>
-            <button onClick={handleExportSingle} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">📊 Export Excel</button>
-            <button onClick={onClose} className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700">Close</button>
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4 pt-2 md:pt-4">
+            <button onClick={downloadPayslip} className="w-full md:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 md:py-3 px-6 rounded-lg shadow-lg transition text-sm md:text-base">🖨️ Print Payslip</button>
+            <button onClick={handleExportSingle} className="w-full md:flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 md:py-3 px-6 rounded-lg shadow-lg transition text-sm md:text-base">📊 Export Excel</button>
+            <button onClick={onClose} className="w-full md:w-auto px-6 py-2.5 md:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 text-sm md:text-base">Close</button>
           </div>
         </div>
       </div>
@@ -1016,7 +1016,7 @@ const PayrollManagement = () => {
       <div className="max-w-[1800px] mx-auto">
 
         {/* ✅ HEADER UI */}
-        <div className="mb-6 bg-white p-6 rounded-xl shadow-sm border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="mb-6 bg-white p-6 rounded-xl shadow-sm border-gray-100 flex flex-col lg:flex-row items-center justify-between gap-4">
 
           <div className="flex-shrink-0">
             <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
@@ -1024,7 +1024,7 @@ const PayrollManagement = () => {
             </h1>
           </div>
 
-          <div className="flex flex-1 items-center gap-3 overflow-x-auto w-full md:w-auto">
+          <div className="flex md:flex-row flex-col  flex-1 items-center gap-3 overflow-x-auto w-full md:w-auto">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
               <input
@@ -1032,33 +1032,33 @@ const PayrollManagement = () => {
                 placeholder="Search ID/Name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 w-48 transition"
+                className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 md:w-48 w-80 transition"
               />
             </div>
 
-    <div className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
-  <span className="text-gray-500 font-bold text-xs">FROM</span>
-  <input
-    type="date"
-    value={summaryStartDate}
-    onChange={e => setSummaryStartDate(e.target.value)}
-    onKeyDown={(e) => e.preventDefault()}
-    onPaste={(e) => e.preventDefault()}
-    className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
-  />
+            <div className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
+              <span className="text-gray-500 font-bold text-xs">FROM</span>
+              <input
+                type="date"
+                value={summaryStartDate}
+                onChange={e => setSummaryStartDate(e.target.value)}
+                onKeyDown={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
+              />
 
-  <span className="text-gray-300">|</span>
+              <span className="text-gray-300">|</span>
 
-  <span className="text-gray-500 font-bold text-xs">TO</span>
-  <input
-    type="date"
-    value={summaryEndDate}
-    onChange={e => setSummaryEndDate(e.target.value)}
-    onKeyDown={(e) => e.preventDefault()}
-    onPaste={(e) => e.preventDefault()}
-    className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
-  />
-</div>
+              <span className="text-gray-500 font-bold text-xs">TO</span>
+              <input
+                type="date"
+                value={summaryEndDate}
+                onChange={e => setSummaryEndDate(e.target.value)}
+                onKeyDown={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                className="bg-transparent border-none p-0 text-gray-700 font-semibold focus:ring-0 text-sm w-28 cursor-pointer"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1103,8 +1103,10 @@ const PayrollManagement = () => {
         </div>
 
         {/* TABLE */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-          <div className="overflow-x-auto">
+        <div className="bg-gray-50 md:bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+          
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-bold">
                 <tr>
@@ -1118,7 +1120,7 @@ const PayrollManagement = () => {
                   <th className="px-6 py-4 text-center">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {filteredPayroll.length === 0 ? (
                   <tr><td colSpan="8" className="text-center py-8 text-gray-500">No Full Time employees found</td></tr>
                 ) : filteredPayroll.map((emp) => (
@@ -1174,6 +1176,64 @@ const PayrollManagement = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card List View */}
+          <div className="md:hidden flex flex-col gap-3 p-3">
+            {filteredPayroll.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No Full Time employees found</div>
+            ) : filteredPayroll.map((emp) => (
+              <div key={`mobile-${emp.employeeId}`} className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col gap-3 shadow-sm hover:border-indigo-200 transition-colors">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-bold text-sm border border-indigo-100 shrink-0">
+                      {emp.employeeName.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-bold text-gray-800 text-sm">{emp.employeeName}</div>
+                      <div className="text-[10px] text-gray-500 font-mono">{emp.employeeId}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedEmployee(emp)} className="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold px-3 py-1.5 rounded-lg transition duration-200 text-[10px] shadow-sm flex items-center gap-1">
+                    📄 Slip
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Base Salary</span>
+                    <span className="font-bold text-gray-700 text-xs">{formatCurrency(emp.monthlyBreakdown.total)}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Net Pay</span>
+                    <span className="font-black text-indigo-700 text-sm">{formatCurrency(emp.netPayableSalary)}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg py-1.5 px-1 flex flex-col items-center justify-center">
+                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Worked</span>
+                     <span className="text-xs font-black text-purple-700">{emp.workedDays}</span>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg py-1.5 px-1 flex flex-col items-center justify-center">
+                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">L/A</span>
+                     <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-blue-600">{emp.totalLeavesConsumed}</span>
+                        <span className="text-[10px] font-bold text-gray-300">/</span>
+                        <span className="text-[10px] font-bold text-red-600">{emp.absentDays}</span>
+                     </div>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg py-1.5 px-1 flex flex-col items-center justify-center">
+                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">LOP</span>
+                     <span className={`text-xs font-black ${emp.lopDays > 0 ? "text-orange-600" : "text-gray-500"}`}>{emp.lopDays}</span>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg py-1.5 px-1 flex flex-col items-center justify-center">
+                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Late</span>
+                     <span className={`text-xs font-black ${emp.lateDaysCount > 0 ? "text-red-600" : "text-gray-500"}`}>{emp.lateDaysCount}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

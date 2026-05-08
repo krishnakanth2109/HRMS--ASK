@@ -234,31 +234,34 @@ const PunchOutRequests = () => {
             </div>
 
             {/* Filter UI */}
-            <div className="flex flex-wrap gap-4 items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="flex items-center gap-2 text-slate-600 font-semibold">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-start md:items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="hidden md:flex items-center gap-2 text-slate-600 font-semibold">
                     <FaFilter size={14} /> <span>Filters:</span>
                 </div>
-                <input 
-                    type="text" 
-                    placeholder="Search Name or ID..." 
-                    className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64"
-                    onChange={(e) => setFilterEmployee(e.target.value)}
-                />
-                <select 
-                    className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                >
-                    <option value="">All Statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto flex-1">
+                    <input 
+                        type="text" 
+                        placeholder="Search Name or ID..." 
+                        className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full"
+                        onChange={(e) => setFilterEmployee(e.target.value)}
+                    />
+                    <select 
+                        className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full"
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
             </div>
         </div>
         
         {/* Main Content Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden min-h-[500px]">
-          <div className="overflow-x-auto">
+        <div className="md:bg-white md:rounded-2xl md:shadow-lg md:border md:border-slate-200/80 overflow-hidden min-h-[500px]">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto bg-white rounded-2xl shadow-lg border border-slate-200/80">
              <table className="min-w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xs tracking-wider border-b border-slate-200">
                   <tr>
@@ -272,7 +275,9 @@ const PunchOutRequests = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredAndSortedRequests.map((req) => (
+                  {filteredAndSortedRequests.length === 0 ? (
+                    <tr><td colSpan="7" className="px-6 py-8 text-center text-slate-500 font-medium">No requests found.</td></tr>
+                  ) : filteredAndSortedRequests.map((req) => (
                     <tr key={req._id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-800">{req.employeeName || "Unknown"}</div>
@@ -319,6 +324,70 @@ const PunchOutRequests = () => {
                   ))}
                 </tbody>
               </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden flex flex-col gap-4">
+             {filteredAndSortedRequests.length === 0 ? (
+               <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-xl shadow-sm border border-slate-200">No requests found.</div>
+             ) : (
+               filteredAndSortedRequests.map((req) => (
+                 <div key={req._id} className="p-4 flex flex-col gap-3 bg-white border border-slate-200 shadow-sm rounded-xl hover:shadow-md transition-shadow">
+                   <div className="flex justify-between items-start">
+                     <div>
+                       <div className="font-bold text-slate-800 text-sm">{req.employeeName || "Unknown"}</div>
+                       <div className="text-xs text-slate-500 font-mono mt-0.5">{req.employeeId}</div>
+                     </div>
+                     <div>
+                       {req.status === 'Approved' ? (
+                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
+                             <FaCheckCircle /> Approved
+                         </span>
+                       ) : req.status === 'Rejected' ? (
+                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">
+                             <FaBan /> Rejected
+                         </span>
+                       ) : (
+                         <span className="inline-flex items-center px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-bold">
+                             Pending
+                         </span>
+                       )}
+                     </div>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-2 text-xs">
+                     <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                       <div className="text-slate-400 font-semibold mb-0.5 text-[10px] uppercase tracking-wider">Shift Date</div>
+                       <div className="font-bold text-slate-700">{formatDateDMY(req.originalDate)}</div>
+                     </div>
+                     <div className="bg-blue-50 p-2 rounded-lg border border-blue-100">
+                       <div className="text-blue-500 font-semibold mb-0.5 text-[10px] uppercase tracking-wider">Req. Out Time</div>
+                       <div className="font-bold text-blue-700 font-mono">{req.requestedPunchOut ? new Date(req.requestedPunchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</div>
+                     </div>
+                   </div>
+                   
+                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
+                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Reason:</span>
+                     <span className="text-xs text-slate-700 italic">"{req.reason}"</span>
+                   </div>
+                   
+                   <div className="flex items-center justify-between mt-1">
+                     <div className="text-[10px] text-slate-400 font-medium">
+                       Req. on {new Date(req.requestDate).toLocaleDateString('en-GB')} {new Date(req.requestDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                     </div>
+                     <div className="flex items-center gap-2">
+                       {req.status === 'Pending' && (
+                         <>
+                           <button onClick={() => handleRequestAction(req._id, 'Approved', req)} className="w-8 h-8 flex items-center justify-center bg-green-100 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Approve"><FaCheck size={12} /></button>
+                           <button onClick={() => handleRequestAction(req._id, 'Rejected', req)} className="w-8 h-8 flex items-center justify-center bg-red-100 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Reject"><FaBan size={12} /></button>
+                         </>
+                       )}
+                       <button onClick={() => handleDeleteRequest(req._id)} className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-600 hover:text-white transition-all shadow-sm" title="Delete"><FaTrash size={12} /></button>
+                     </div>
+                   </div>
+                 </div>
+               ))
+             )}
           </div>
         </div>
       </div>

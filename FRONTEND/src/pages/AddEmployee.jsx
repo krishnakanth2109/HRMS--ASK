@@ -7,13 +7,13 @@ import {
   FaEye, FaEyeSlash, FaPlus, FaTimes, FaTrash, FaEdit
 } from "react-icons/fa";
 // ✅ IMPORT THE CENTRALIZED API FUNCTIONS
-import { 
-  getEmployees, 
-  addEmployee, 
-  getAllCompanies, 
-  createCompany, 
-  updateCompany, 
-  getNextEmployeeId, 
+import {
+  getEmployees,
+  addEmployee,
+  getAllCompanies,
+  createCompany,
+  updateCompany,
+  getNextEmployeeId,
   deleteCompany,
   // helper for autocomplete
   getEmployeeSuggestions
@@ -77,8 +77,8 @@ const AddEmployee = () => {
   // ── Autocomplete state for Role & Department (From Code 1) ──────────────────────────────
   const [showRoleSugg, setShowRoleSugg] = useState(false);
   const [showDeptSugg, setShowDeptSugg] = useState(false);
-  const [roleSuggestions, setRoleSuggestions] = useState([]); 
-  const [deptSuggestions, setDeptSuggestions] = useState([]); 
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
+  const [deptSuggestions, setDeptSuggestions] = useState([]);
   const roleRef = useRef(null);
   const deptRef = useRef(null);
 
@@ -144,9 +144,9 @@ const AddEmployee = () => {
       try {
         const latestEmployees = await getEmployees();
         setEmployees(latestEmployees || []);
-        
+
         const idResponse = await getNextEmployeeId(companyId);
-        
+
         let nextId = idResponse?.nextEmployeeId || idResponse?.employeeId || idResponse?.data?.nextEmployeeId;
 
         if (!nextId) {
@@ -199,7 +199,7 @@ const AddEmployee = () => {
 
   // Handle Edit Click - Restored mapping for all fields from Code 2
   const handleEditClick = (e, company) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     setEditCompanyData({
       _id: company._id,
       name: company.name,
@@ -207,8 +207,8 @@ const AddEmployee = () => {
       description: company.description || "",
       email: company.email || "",
       phone: company.phone || "",
-      address: company.address || company.officeLocation?.address || "", 
-      city: company.city || "", 
+      address: company.address || company.officeLocation?.address || "",
+      city: company.city || "",
       state: company.state || "",
       zipCode: company.zipCode || "",
       country: company.country || ""
@@ -247,7 +247,7 @@ const AddEmployee = () => {
 
   // Handle Delete Company
   const handleDeleteCompany = async (e, companyId, companyName) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (window.confirm(`Permanently delete "${companyName}"?`)) {
       try {
         await deleteCompany(companyId);
@@ -324,7 +324,7 @@ const AddEmployee = () => {
       if (formData.bankDetails.accountNumber.length < 9 || formData.bankDetails.accountNumber.length > 18) return "Account Number 9-18 digits.";
     }
     if (formData.bankDetails.ifsc && formData.bankDetails.ifsc.length !== 11) return "IFSC Code must be 11 characters.";
-    
+
     // Check uniqueness (From Code 2)
     if (formData.employeeId.trim()) {
       const exists = employees.some(emp => emp.employeeId === formData.employeeId.trim());
@@ -385,12 +385,12 @@ const AddEmployee = () => {
   };
 
   return (
-    <div className="p-6 min-h-screen flex flex-col items-center justify-center">
-      <div className="p-8 rounded-2xl shadow-2xl w-full max-w-4xl">
+    <div className="p-3 md:p-6 min-h-screen flex flex-col items-center justify-center ">
+      <div className="p-5 md:p-8 rounded-2xl shadow-2xl w-full max-w-4xl bg-white ">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="mb-6 px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition shadow flex items-center gap-2"
+          onClick={() => navigate("/employees")}
+          className="mb-6 px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition shadow flex items-center gap-2 cursor-pointer"
         >
           &#8592; Back to Employees
         </button>
@@ -407,7 +407,7 @@ const AddEmployee = () => {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* COMPANY SELECTION SECTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-yellow-50/50 shadow-inner">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6 border rounded-xl  shadow-inner">
             <h3 className="md:col-span-2 text-xl font-bold text-yellow-700 border-b pb-3 mb-3">Company Information</h3>
 
             <div className="relative">
@@ -448,10 +448,10 @@ const AddEmployee = () => {
                           <span className="text-gray-700 font-medium">
                             {company.name} <span className="text-gray-400 text-sm">({company.prefix})</span>
                           </span>
-                          
+
                           <div className="flex gap-2">
-                             <button type="button" onClick={(e) => handleEditClick(e, company)} className="text-blue-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition"><FaEdit /></button>
-                             <button type="button" onClick={(e) => handleDeleteCompany(e, company._id, company.name)} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition"><FaTimes /></button>
+                            <button type="button" onClick={(e) => handleEditClick(e, company)} className="text-blue-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition"><FaEdit /></button>
+                            <button type="button" onClick={(e) => handleDeleteCompany(e, company._id, company.name)} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition"><FaTimes /></button>
                           </div>
                         </div>
                       ))
@@ -484,7 +484,7 @@ const AddEmployee = () => {
           </div>
 
           {/* PERSONAL INFO SECTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-blue-50/50 shadow-inner">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6 border rounded-xl shadow-inner">
             <h3 className="md:col-span-2 text-xl font-bold text-blue-700 border-b pb-3 mb-3">Personal Information</h3>
             <InputField icon={<FaUser />} name="name" label="Full Name" value={formData.name} onChange={handleChange} placeholder="e.g., John Doe" required />
             <InputField
@@ -499,7 +499,7 @@ const AddEmployee = () => {
           </div>
 
           {/* JOB DETAILS SECTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-green-50/50 shadow-inner">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6 border rounded-xl shadow-inner">
             <h3 className="md:col-span-2 text-xl font-bold text-green-700 border-b pb-3 mb-3">Job Details</h3>
 
             {/* Department with API Suggestions */}
@@ -586,7 +586,7 @@ const AddEmployee = () => {
           </div>
 
           {/* BANK DETAILS SECTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-purple-50/50 shadow-inner">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6 border rounded-xl  shadow-inner">
             <h3 className="md:col-span-2 text-xl font-bold text-purple-700 border-b pb-3 mb-3">Personal & Bank Details</h3>
             <InputField icon={<FaBirthdayCake />} name="personalDetails.dob" label="Date of Birth" type="date" value={formData.personalDetails.dob} onChange={handleChange} />
             <InputField icon={<FaFlag />} name="personalDetails.nationality" label="Nationality" value={formData.personalDetails.nationality} onChange={handleChange} placeholder="e.g., Indian" />
@@ -609,345 +609,345 @@ const AddEmployee = () => {
       )}
 
       {/* ADD COMPANY MODAL (Restored all missing fields from Code 2) */}
-{showAddCompanyModal && (
-  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showAddCompanyModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
 
-    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar m-4">
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
-        <h3 className="text-xl font-semibold text-white">
-          Add New Company
-        </h3>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
+              <h3 className="text-xl font-semibold text-white">
+                Add New Company
+              </h3>
 
-        <button
-          onClick={() => setShowAddCompanyModal(false)}
-          className="text-white hover:bg-white/20 p-2 rounded-full transition"
-        >
-          <FaTimes />
-        </button>
-      </div>
+              <button
+                onClick={() => setShowAddCompanyModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-full transition"
+              >
+                <FaTimes />
+              </button>
+            </div>
 
-      {/* Form */}
-      <form onSubmit={handleAddCompany} className="p-6 space-y-4">
+            {/* Form */}
+            <form onSubmit={handleAddCompany} className="p-6 space-y-4">
 
-        {/* Company Name */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Name *
-          </label>
-          <input
-            type="text"
-            placeholder="Enter company name"
-            value={newCompanyData.name}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, name: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
+              {/* Company Name */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter company name"
+                  value={newCompanyData.name}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, name: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              {/* Prefix */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Prefix *This will be used in employee IDs
+                </label>
+                <input
+                  type="text"
+                  placeholder="'e.g., ARAH, TECH, FINC'"
+                  value={newCompanyData.prefix}
+                  onChange={(e) =>
+                    setNewCompanyData({
+                      ...newCompanyData,
+                      prefix: e.target.value.toUpperCase(),
+                    })
+                  }
+                  maxLength={4}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl uppercase focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Description
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Short description about the company..."
+                  value={newCompanyData.description}
+                  onChange={(e) =>
+                    setNewCompanyData({
+                      ...newCompanyData,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter company email"
+                  value={newCompanyData.email}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, email: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Enter company phone number"
+                  value={newCompanyData.phone}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, phone: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="Street address or office location"
+                  value={newCompanyData.address}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, address: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* City State */}
+              <div className="grid grid-cols-2 gap-3">
+
+                <input
+                  type="text"
+                  placeholder="City (Example: Hyderabad)"
+                  value={newCompanyData.city}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, city: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+
+                <input
+                  type="text"
+                  placeholder="State (Example: Telangana)"
+                  value={newCompanyData.state}
+                  onChange={(e) =>
+                    setNewCompanyData({ ...newCompanyData, state: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4">
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddCompanyModal(false)}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl font-semibold hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={addingCompany}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:opacity-90 transition"
+                >
+                  {addingCompany ? "Adding..." : "Add Company"}
+                </button>
+
+              </div>
+            </form>
+          </div>
         </div>
-
-        {/* Prefix */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Prefix *This will be used in employee IDs
-          </label>
-          <input
-            type="text"
-            placeholder="'e.g., ARAH, TECH, FINC'"
-            value={newCompanyData.prefix}
-            onChange={(e) =>
-              setNewCompanyData({
-                ...newCompanyData,
-                prefix: e.target.value.toUpperCase(),
-              })
-            }
-            maxLength={4}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl uppercase focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Description
-          </label>
-          <textarea
-            rows="2"
-            placeholder="Short description about the company..."
-            value={newCompanyData.description}
-            onChange={(e) =>
-              setNewCompanyData({
-                ...newCompanyData,
-                description: e.target.value,
-              })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* Email */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Email
-          </label>
-          <input
-            type="email"
-            placeholder="Enter company email"
-            value={newCompanyData.email}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, email: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* Phone */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            placeholder="Enter company phone number"
-            value={newCompanyData.phone}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, phone: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* Address */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Address
-          </label>
-          <input
-            type="text"
-            placeholder="Street address or office location"
-            value={newCompanyData.address}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, address: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* City State */}
-        <div className="grid grid-cols-2 gap-3">
-
-          <input
-            type="text"
-            placeholder="City (Example: Hyderabad)"
-            value={newCompanyData.city}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, city: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-
-          <input
-            type="text"
-            placeholder="State (Example: Telangana)"
-            value={newCompanyData.state}
-            onChange={(e) =>
-              setNewCompanyData({ ...newCompanyData, state: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3 pt-4">
-
-          <button
-            type="button"
-            onClick={() => setShowAddCompanyModal(false)}
-            className="flex-1 py-2.5 border border-gray-300 rounded-xl font-semibold hover:bg-gray-100 transition"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={addingCompany}
-            className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:opacity-90 transition"
-          >
-            {addingCompany ? "Adding..." : "Add Company"}
-          </button>
-
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
 
       {/* EDIT COMPANY MODAL (Restored all missing fields from Code 2) */}
-   {showEditCompanyModal && (
-  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showEditCompanyModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
 
-    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar m-4">
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
-        <h3 className="text-xl font-semibold text-white">
-          Edit Company
-        </h3>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
+              <h3 className="text-xl font-semibold text-white">
+                Edit Company
+              </h3>
 
-        <button
-          onClick={() => setShowEditCompanyModal(false)}
-          className="text-white hover:bg-white/20 p-2 rounded-full transition"
-        >
-          <FaTimes />
-        </button>
-      </div>
+              <button
+                onClick={() => setShowEditCompanyModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-full transition"
+              >
+                <FaTimes />
+              </button>
+            </div>
 
-      {/* Form */}
-      <form onSubmit={handleUpdateCompany} className="p-6 space-y-4">
+            {/* Form */}
+            <form onSubmit={handleUpdateCompany} className="p-6 space-y-4">
 
-        {/* Company Name */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Name *
-          </label>
-          <input
-            type="text"
-            placeholder="Enter company name"
-            value={editCompanyData.name}
-            onChange={(e) =>
-              setEditCompanyData({ ...editCompanyData, name: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
+              {/* Company Name */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter company name"
+                  value={editCompanyData.name}
+                  onChange={(e) =>
+                    setEditCompanyData({ ...editCompanyData, name: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              {/* Prefix */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Prefix *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Example: ARAH"
+                  value={editCompanyData.prefix}
+                  onChange={(e) =>
+                    setEditCompanyData({
+                      ...editCompanyData,
+                      prefix: e.target.value.toUpperCase(),
+                    })
+                  }
+                  maxLength={4}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl uppercase focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Description
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Update company description"
+                  value={editCompanyData.description}
+                  onChange={(e) =>
+                    setEditCompanyData({
+                      ...editCompanyData,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Company Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Example: contact@company.com"
+                  value={editCompanyData.email}
+                  onChange={(e) =>
+                    setEditCompanyData({ ...editCompanyData, email: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter office address"
+                  value={editCompanyData.address}
+                  onChange={(e) =>
+                    setEditCompanyData({ ...editCompanyData, address: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* City + State */}
+              <div className="grid grid-cols-2 gap-3">
+
+                <input
+                  type="text"
+                  placeholder="City (Example: Hyderabad)"
+                  value={editCompanyData.city}
+                  onChange={(e) =>
+                    setEditCompanyData({ ...editCompanyData, city: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+
+                <input
+                  type="text"
+                  placeholder="State (Example: Telangana)"
+                  value={editCompanyData.state}
+                  onChange={(e) =>
+                    setEditCompanyData({ ...editCompanyData, state: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4">
+
+                <button
+                  type="button"
+                  onClick={() => setShowEditCompanyModal(false)}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl font-semibold hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={updatingCompany}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:opacity-90 transition"
+                >
+                  {updatingCompany ? "Updating..." : "Update Company"}
+                </button>
+
+              </div>
+
+            </form>
+          </div>
         </div>
-
-        {/* Prefix */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Prefix *
-          </label>
-          <input
-            type="text"
-            placeholder="Example: ARAH"
-            value={editCompanyData.prefix}
-            onChange={(e) =>
-              setEditCompanyData({
-                ...editCompanyData,
-                prefix: e.target.value.toUpperCase(),
-              })
-            }
-            maxLength={4}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl uppercase focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Description
-          </label>
-          <textarea
-            rows="2"
-            placeholder="Update company description"
-            value={editCompanyData.description}
-            onChange={(e) =>
-              setEditCompanyData({
-                ...editCompanyData,
-                description: e.target.value,
-              })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* Email */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Company Email
-          </label>
-          <input
-            type="email"
-            placeholder="Example: contact@company.com"
-            value={editCompanyData.email}
-            onChange={(e) =>
-              setEditCompanyData({ ...editCompanyData, email: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* Address */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 mb-1 block">
-            Address
-          </label>
-          <input
-            type="text"
-            placeholder="Enter office address"
-            value={editCompanyData.address}
-            onChange={(e) =>
-              setEditCompanyData({ ...editCompanyData, address: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        {/* City + State */}
-        <div className="grid grid-cols-2 gap-3">
-
-          <input
-            type="text"
-            placeholder="City (Example: Hyderabad)"
-            value={editCompanyData.city}
-            onChange={(e) =>
-              setEditCompanyData({ ...editCompanyData, city: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-
-          <input
-            type="text"
-            placeholder="State (Example: Telangana)"
-            value={editCompanyData.state}
-            onChange={(e) =>
-              setEditCompanyData({ ...editCompanyData, state: e.target.value })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3 pt-4">
-
-          <button
-            type="button"
-            onClick={() => setShowEditCompanyModal(false)}
-            className="flex-1 py-2.5 border border-gray-300 rounded-xl font-semibold hover:bg-gray-100 transition"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={updatingCompany}
-            className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:opacity-90 transition"
-          >
-            {updatingCompany ? "Updating..." : "Update Company"}
-          </button>
-
-        </div>
-
-      </form>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 };
