@@ -47,6 +47,42 @@ const AdminLiveTracking = () => {
     const [screenshotsLoading, setScreenshotsLoading] = useState(false);
     const [lightboxUrl, setLightboxUrl] = useState(null);
 
+    // Tracker Settings
+    const [screenshotInterval, setScreenshotInterval] = useState(5);
+    const [savingSettings, setSavingSettings] = useState(false);
+
+    useEffect(() => {
+        // Fetch tracker settings
+        const fetchSettings = async () => {
+            try {
+                const res = await api.get('/api/idletime/settings/tracker');
+                if (res.data && res.data.screenshotIntervalMinutes) {
+                    setScreenshotInterval(res.data.screenshotIntervalMinutes);
+                }
+            } catch (err) {
+                console.error("Error fetching tracker settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const handleSaveSettings = async (newInterval) => {
+        try {
+            setSavingSettings(true);
+            const val = parseInt(newInterval, 10);
+            if (val > 0) {
+                await api.put('/api/idletime/settings/tracker', { screenshotIntervalMinutes: val });
+                setScreenshotInterval(val);
+                alert(`Tracker screenshot interval updated to ${val} minutes. It will take effect the next time employees' trackers sync.`);
+            }
+        } catch (err) {
+            console.error("Error saving settings", err);
+            alert("Failed to save tracker settings.");
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
     useEffect(() => {
         // Fetch all employees to map IDs to Names once when component loads
         const loadEmployees = async () => {
@@ -541,16 +577,35 @@ const AdminLiveTracking = () => {
                     </p>
                 </div>
 
-                <button
-                    onClick={() => {
-                        setLoading(true);
-                        fetchLiveData(false);
-                    }}
-                    className="w-full md:w-auto justify-center flex items-center gap-2 px-4 py-2.5 md:py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
-                >
-                    <FaSyncAlt className={loading ? "animate-spin text-indigo-400" : "text-indigo-400"} />
-                    Auto-Refresh in {refreshCountdown}s
-                </button>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-white px-3 py-2 border border-slate-200 rounded-lg shadow-sm">
+                        <FaCamera className="text-slate-400" />
+                        <span className="text-sm font-medium text-slate-600">Screenshot Interval:</span>
+                        <select
+                            value={screenshotInterval}
+                            onChange={(e) => handleSaveSettings(e.target.value)}
+                            disabled={savingSettings}
+                            className="text-sm bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none text-indigo-700 font-medium"
+                        >
+                            <option value={1}>1 Minute</option>
+                            <option value={5}>5 Minutes</option>
+                            <option value={10}>10 Minutes</option>
+                            <option value={15}>15 Minutes</option>
+                            <option value={30}>30 Minutes</option>
+                            <option value={60}>1 Hour</option>
+                        </select>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setLoading(true);
+                            fetchLiveData(false);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin text-indigo-400" : "text-indigo-400"} />
+                        Auto-Refresh in {refreshCountdown}s
+                    </button>
+                </div>
             </div>
 
             {/* Summary Cards */}
@@ -671,6 +726,12 @@ const AdminLiveTracking = () => {
                                                 <div className="flex items-center gap-2 text-sm text-gray-500">
                                                     <FaClock className="text-gray-400 text-xs" />
                                                     {formatTime(record.lastPing)}
+                                                    {/* Active Window Badge */}
+                                                    {record.activeWindow && (
+                                                        <span className="ml-2 flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 max-w-[200px] truncate" title={record.activeWindow}>
+                                                            <FaDesktop className="text-[9px]" /> {record.activeWindow}
+                                                        </span>
+                                                    )}
                                                     {/* Live screenshot indicator for IDLE employees */}
                                                     {record.currentIdleScreenshot && statusInfo.text === 'Idle' && (
                                                         <a
@@ -813,37 +874,48 @@ const AdminLiveTracking = () => {
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
 
                         {/* Modal Header */}
-                        <div className="bg-white border-b border-slate-200 p-4 md:p-6 flex flex-col z-10 relative">
-                            {/* Close Button Absolute */}
-                            <button onClick={closeReportModal} className="absolute top-4 right-4 md:top-6 md:right-6 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2 md:p-2.5 rounded-full transition-all z-20">
-                                <FaTimes className="text-sm md:text-base" />
-                            </button>
-
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pr-10 md:pr-0">
-                                <div>
-                                    <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2 md:gap-3">
-                                        <FaChartPie className="text-indigo-500 shrink-0" />
-                                        Activity Report
-                                    </h2>
-                                    <p className="text-slate-500 mt-1 flex items-center gap-2 font-medium flex-wrap text-sm md:text-base">
-                                        <span className="text-slate-800 font-semibold">{selectedEmployee.name}</span>
-                                        <span className="text-[10px] md:text-xs px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-slate-600">{selectedEmployee.employeeId}</span>
-                                        <span className={`text-[10px] md:text-xs ml-0 md:ml-1 flex items-center gap-1 font-semibold ${selectedEmployee.statusInfo.color}`}>
-                                            <FaCircle className="text-[8px]" /> {selectedEmployee.statusInfo.text}
+                        <div className="bg-white border-b border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center z-10 gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
+                                    <FaChartPie className="text-indigo-500 shrink-0" />
+                                    Employee Activity Report
+                                </h2>
+                                <p className="text-slate-500 mt-1 flex items-center gap-2 font-medium flex-wrap">
+                                    <span className="text-slate-800">{selectedEmployee.name}</span>
+                                    <span className="text-xs px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-slate-600">{selectedEmployee.employeeId}</span>
+                                    <span className={`text-xs ml-1 flex items-center gap-1 font-semibold ${selectedEmployee.statusInfo.color}`}>
+                                        <FaCircle className="text-[8px]" /> {selectedEmployee.statusInfo.text}
+                                    </span>
+                                    {selectedEmployee.activeWindow && (
+                                        <span className="text-xs ml-2 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-full text-blue-600 font-medium flex items-center gap-1">
+                                            <FaDesktop className="text-[10px]" /> {selectedEmployee.activeWindow}
                                         </span>
-                                    </p>
-                                </div>
-
-                                <div className="w-full md:w-auto md:pr-14">
-                                    <div className="flex w-full md:w-auto items-center bg-white border border-slate-300 shadow-sm rounded-lg px-3 py-2 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
-                                        <FaCalendarAlt className="text-indigo-400 mr-2 text-sm" />
-                                        <input
-                                            type="date"
-                                            value={selectedDate}
-                                            onChange={(e) => handleDateChange(e.target.value)}
-                                            className="bg-transparent text-slate-700 outline-none text-sm font-semibold cursor-pointer w-full md:w-auto"
-                                        />
-                                    </div>
+                                    )}
+                                </p>
+                                {/* Tab Switcher */}
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        onClick={() => setActiveTab('report')}
+                                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'report'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                            }`}
+                                    >
+                                        <FaChartPie className="inline mr-1.5" /> Activity Report
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('screenshots')}
+                                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'screenshots'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                            }`}
+                                    >
+                                        <FaCamera />
+                                        Screenshots
+                                        {screenshots.length > 0 && (
+                                            <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{screenshots.length}</span>
+                                        )}
+                                    </button>
                                 </div>
                             </div>
 
@@ -1041,7 +1113,7 @@ const AdminLiveTracking = () => {
                                     <div className="flex items-center gap-3 mb-6">
                                         <FaCamera className="text-indigo-500 text-xl" />
                                         <h3 className="text-xl font-bold text-slate-800">Screenshots Log</h3>
-                                        <span className="text-xs text-slate-500">(working screenshots every 5 minutes)</span>
+                                        <span className="text-xs text-slate-500">(interval dynamically set by admin)</span>
                                     </div>
 
                                     {screenshotsLoading ? (

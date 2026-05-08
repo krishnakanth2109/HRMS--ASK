@@ -47,27 +47,58 @@ router.post("/submit", protect, async (req, res) => {
   try {
     const { employeeId, employeeName, employeeEmail, department, designation, reason, companyName } = req.body;
 
+    // ── FIXED: Resolve adminId reliably ──────────────────────────────
     let adminId = null;
+
+    // 1. If the submitter IS an admin/HR, use their own ID
     if (req.user.role && req.user.role !== "employee") {
-      adminId = req.user.adminId || req.user._id;
-    } else if (req.user.companyName) {
-      const admin = await Admin.findOne({ companyName: req.user.companyName }).select("_id");
-      if (admin) adminId = admin._id;
+      adminId = req.user._id;
     }
 
-    if (!adminId && companyName) {
-      const admin = await Admin.findOne({ companyName }).select("_id");
-      if (admin) adminId = admin._id;
-    }
-
+    // 2. Employee: find admin by companyName (prefer req.user over body)
     if (!adminId) {
-      const admin = await Admin.findOne().select("_id");
-      if (admin) {
-        adminId = admin._id;
-      } else {
-        adminId = req.user._id;
+      const nameToSearch = req.user.companyName || companyName;
+      if (nameToSearch) {
+        const admin = await Admin.findOne({ companyName: nameToSearch }).select("_id");
+        if (admin) adminId = admin._id;
       }
     }
+
+    // 3. Employee: try matching via adminId field directly on user (if stored)
+    if (!adminId && req.user.adminId) {
+      adminId = req.user.adminId;
+    }
+
+    // 4. Last resort fallback — log a warning so you know this is happening
+    if (!adminId) {
+      console.warn(`⚠️ Could not resolve adminId for employee ${employeeId} — using first admin as fallback`);
+      const admin = await Admin.findOne().select("_id");
+      adminId = admin?._id || req.user._id;
+    }
+    // try {
+    //   const { employeeId, employeeName, employeeEmail, department, designation, reason, companyName } = req.body;
+
+    //   let adminId = null;
+    //   if (req.user.role && req.user.role !== "employee") {
+    //     adminId = req.user.adminId || req.user._id;
+    //   } else if (req.user.companyName) {
+    //     const admin = await Admin.findOne({ companyName: req.user.companyName }).select("_id");
+    //     if (admin) adminId = admin._id;
+    //   }
+
+    //   if (!adminId && companyName) {
+    //     const admin = await Admin.findOne({ companyName }).select("_id");
+    //     if (admin) adminId = admin._id;
+    //   }
+
+    //   if (!adminId) {
+    //     const admin = await Admin.findOne().select("_id");
+    //     if (admin) {
+    //       adminId = admin._id;
+    //     } else {
+    //       adminId = req.user._id;
+    //     }
+    //   }
 
     const existing = await Resignation.findOne({
       employeeId,
@@ -136,8 +167,7 @@ router.get("/my/:employeeId", protect, async (req, res) => {
 // ============================================================
 router.get("/admin/all", protect, onlyAdmin, async (req, res) => {
   try {
-    const adminId = req.user._id;
-    const resignations = await Resignation.find({ adminId }).sort({ createdAt: -1 });
+    const resignations = await Resignation.find({}).sort({ createdAt: -1 });
     res.status(200).json(resignations);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -19,6 +19,7 @@ import {
   FaCalendarWeek,
   FaBriefcase,
   FaCalculator,
+  FaDownload,
 } from "react-icons/fa";
 
 import {
@@ -932,6 +933,9 @@ const renderMorningUpdateSection = () => {
                 Submit your morning plan, close the day with real outcomes, add your
                 own work score, and watch your monthly progress build up.
               </p>
+              <div className="pt-2">
+            
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 min-w-[320px]">

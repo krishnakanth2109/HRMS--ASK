@@ -126,48 +126,48 @@ const CurrentEmployeeLeaveRequestProvider = ({ children }) => {
 
   // --- UPDATED applyLeave: add aggregated leave only, remove Paid/UnPaid assignment logic
   // inside CurrentEmployeeLeaveRequestProvider.jsx
-const applyLeave = async ({ from, to, reason, leaveType, halfDaySession, leaveDayType }) => {
-  const days = eachDateInclusive(from, to);
-  const leaveDays = days.length === 1 && leaveDayType === "Half Day" ? 0.5 : days.length;
+  const applyLeave = async ({ from, to, reason, leaveType, halfDaySession, leaveDayType }) => {
+    const days = eachDateInclusive(from, to);
+    const leaveDays = days.length === 1 && leaveDayType === "Half Day" ? 0.5 : days.length;
 
-  let nextId = leaveRequests.length + 1;
+    let nextId = leaveRequests.length + 1;
 
-  const newAggregatedLeave = {
-    id: nextId,
-    employeeId: "EMP101",
-    name: "John Doe",
-    from,
-    to,
-    reason,
-    requestDate: new Date().toISOString().slice(0, 10),
-    status: "Pending",
-    leaveDayType: leaveDayType || "Full Day",
-    halfDaySession: leaveDayType === "Half Day" ? halfDaySession : null,
-    leaveType,
-    actionDate: null,
-    approvedBy: null,
-    leavecategory: null,
-    leaveDays, // <-- now includes 0.5 for half-day
-  };
+    const newAggregatedLeave = {
+      id: nextId,
+      employeeId: "EMP101",
+      name: "John Doe",
+      from,
+      to,
+      reason,
+      requestDate: new Date().toISOString().slice(0, 10),
+      status: "Pending",
+      leaveDayType: leaveDayType || "Full Day",
+      halfDaySession: leaveDayType === "Half Day" ? halfDaySession : null,
+      leaveType,
+      actionDate: null,
+      approvedBy: null,
+      leavecategory: null,
+      leaveDays, // <-- now includes 0.5 for half-day
+    };
 
-  try {
-    const response = await fetch("/api/leaves", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newAggregatedLeave),
-    });
+    try {
+      const response = await fetch("/api/leaves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAggregatedLeave),
+      });
 
-    if (response.ok) {
-      const saved = await response.json();
-      setLeaveRequests((prev) => [...prev, saved]);
-    } else {
+      if (response.ok) {
+        const saved = await response.json();
+        setLeaveRequests((prev) => [...prev, saved]);
+      } else {
+        setLeaveRequests((prev) => [...prev, newAggregatedLeave]);
+      }
+    } catch (err) {
+      console.error("Backend save failed; adding aggregated leave locally", err);
       setLeaveRequests((prev) => [...prev, newAggregatedLeave]);
     }
-  } catch (err) {
-    console.error("Backend save failed; adding aggregated leave locally", err);
-    setLeaveRequests((prev) => [...prev, newAggregatedLeave]);
-  }
-};
+  };
 
 
 

@@ -31,6 +31,7 @@ const dailyLiveSchema = new mongoose.Schema(
         currentStatus: { type: String, enum: ["WORKING", "IDLE", "OFFLINE"], default: "OFFLINE" },
         lastPing: { type: Date },
         idleSince: { type: Date, default: null },
+        activeWindow: { type: String, default: null },
         idleTimeline: { type: [idleSegmentSchema], default: [] },
         trackedWorkSeconds: { type: Number, default: 0 },
         trackedIdleSeconds: { type: Number, default: 0 },

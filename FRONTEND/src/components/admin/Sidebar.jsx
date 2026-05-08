@@ -85,7 +85,7 @@ const navLinks = [
   { to: "/admin/payrollcandidates", label: "Payroll Candidates", icon: <FaUserCheck /> },
   { to: "/admin/expense", label: "Expense Management", icon: <FaReceipt /> },
   { to: "/admin/work-reports", label: "Employee Work Reports", icon: <FaClipboardCheck /> },
-  { to: "/admin/setup-face", label: "Face & Fingerprint", icon: <FaFingerprint /> },
+  { to: "/admin/setup-face", label: "Settings", icon: <FaFingerprint /> },
 
   // 📢 COMMUNICATION
   {
