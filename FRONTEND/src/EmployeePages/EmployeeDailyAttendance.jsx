@@ -349,6 +349,14 @@ const EmployeeDailyAttendance = () => {
   }, [processedCalendarData, searchTerm, sortConfig]);
 
   // --- Calculate Yearly Stats for Graph ---
+  const joiningDate = useMemo(() => {
+    // user comes from AuthContext which stores the full employee object
+    const raw = user?.joiningDate || user?.doj || null;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d;
+  }, [user]);
+
   const yearlyStats = useMemo(() => {
     const year = selectedDate.getFullYear();
     const statsPerMonth = Array(12).fill(null).map(() => ({
@@ -366,10 +374,16 @@ const EmployeeDailyAttendance = () => {
     const adminHalfDayHours = shiftDetails?.halfDayHours || 4.5;
     const weeklyOffDays = shiftDetails?.weeklyOffDays || [0];
 
+    // Normalize joining date to midnight for comparison
+    const joiningMidnight = joiningDate ? new Date(joiningDate.getFullYear(), joiningDate.getMonth(), joiningDate.getDate()) : null;
+
     for (let m = 0; m < 12; m++) {
       const days = getDaysInMonth(year, m);
       days.forEach(dayDate => {
         if (dayDate > today) return;
+        // ✅ Skip days before joining date
+        if (joiningMidnight && dayDate < joiningMidnight) return;
+
         const currentDateISO = toISODateString(dayDate);
         const dayOfWeek = dayDate.getDay();
         const record = attendance.find(a => toISODateString(a.date) === currentDateISO);
@@ -405,7 +419,7 @@ const EmployeeDailyAttendance = () => {
       });
     }
     return statsPerMonth;
-  }, [selectedDate, attendance, shiftDetails, holidays, leaves]);
+  }, [selectedDate, attendance, shiftDetails, holidays, leaves, joiningDate]);
 
   // --- Summary Stats for the Cards & Donut ---
   const summaryStats = useMemo(() => {
@@ -461,26 +475,46 @@ const EmployeeDailyAttendance = () => {
 
   // --- Chart Data Configuration ---
   const barGraphData = useMemo(() => {
+    const allLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const selectedYear = selectedDate.getFullYear();
+
+    // Determine the start month index for this year
+    let startMonthIdx = 0;
+    if (joiningDate) {
+      const joinYear = joiningDate.getFullYear();
+      if (joinYear === selectedYear) {
+        startMonthIdx = joiningDate.getMonth(); // e.g. Feb = 1
+      } else if (joinYear > selectedYear) {
+        // Entire year is before joining — show nothing
+        startMonthIdx = 12;
+      }
+      // joinYear < selectedYear → show all months (startMonthIdx stays 0)
+    }
+
+    const labels = allLabels.slice(startMonthIdx);
+    const presentData = yearlyStats.slice(startMonthIdx).map(s => s.present);
+    const absentData = yearlyStats.slice(startMonthIdx).map(s => s.absent + s.leave);
+
     return {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+      labels,
       datasets: [
         {
           label: 'Present',
-          data: yearlyStats.map(s => s.present),
-          backgroundColor: '#10b981', // Emerald 500
+          data: presentData,
+          backgroundColor: '#10b981',
           borderRadius: 3,
           barThickness: 10,
         },
         {
           label: 'Absent',
-          data: yearlyStats.map(s => s.absent + s.leave),
-          backgroundColor: '#ef4444', // Red 500
+          data: absentData,
+          backgroundColor: '#ef4444',
           borderRadius: 3,
           barThickness: 10,
         }
       ]
     };
-  }, [yearlyStats]);
+  }, [yearlyStats, joiningDate, selectedDate]);
 
   const donutData = {
     labels: ['Present', 'Absent', 'Late', 'Holidays/Off'],
@@ -646,7 +680,17 @@ const EmployeeDailyAttendance = () => {
 
           <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50 md:bg-white p-1.5 md:p-2 rounded-xl shadow-sm border border-gray-100">
             <select value={selectedDate.getMonth()} onChange={handleMonthChange} className="flex-1 md:flex-none bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none cursor-pointer hover:text-blue-600 px-2 py-1">
-              {barGraphData.labels.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                .map((m, i) => {
+                  // Hide months before joining month (for the joining year)
+                  const selectedYear = selectedDate.getFullYear();
+                  if (joiningDate && joiningDate.getFullYear() === selectedYear && i < joiningDate.getMonth()) {
+                    return null;
+                  }
+                  return <option key={i} value={i}>{m}</option>;
+                })
+                .filter(Boolean)
+              }
             </select>
             <div className="w-px h-4 bg-gray-300"></div>
             <select value={selectedDate.getFullYear()} onChange={handleYearChange} className="flex-1 md:flex-none bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none cursor-pointer hover:text-blue-600 px-2 py-1">

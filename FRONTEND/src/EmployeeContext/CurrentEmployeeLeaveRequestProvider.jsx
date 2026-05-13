@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { CurrentEmployeeLeaveRequestContext } from "./CurrentEmployeeLeaveRequestContext";
+import { getLeaveRequestsForEmployee, applyForLeave } from "../api";
 
 const getMonthOptions = (requests) => {
   const months = requests.map((req) => (req.from ? req.from.slice(0, 7) : null)).filter(Boolean); // "YYYY-MM"
@@ -89,17 +90,28 @@ const CurrentEmployeeLeaveRequestProvider = ({ children }) => {
     // (You can add additional per-day dummy entries here for other aggregated leaves.)
   ];
 
-  // ✅ fetch aggregated leaves on mount (unchanged behavior)
+  // ✅ fetch aggregated leaves on mount using authenticated API
   useEffect(() => {
     const fetchLeaves = async () => {
+      // Read logged-in user from sessionStorage (where auth token is stored)
+      let loggedUser = null;
       try {
-        const response = await fetch("/api/leaves/EMP101"); // Replace with real API
-        if (!response.ok) throw new Error("Failed to fetch");
-        const data = await response.json();
-        setLeaveRequests(data); // backend aggregated data replaces dummy aggregated data
-      } catch (error) {
-        console.error("Backend not available, using aggregated dummy data", error);
-        // keep aggregated dummy data (leaveRequests) as fallback
+        const raw = sessionStorage.getItem("hrmsUser");
+        loggedUser = raw ? JSON.parse(raw) : null;
+      } catch {}
+
+      if (!loggedUser?._id) {
+        return; // no user logged in — keep dummy data as fallback
+      }
+
+      try {
+        // Uses the authenticated axios instance — token is attached automatically
+        const data = await getLeaveRequestsForEmployee(loggedUser._id);
+        if (Array.isArray(data) && data.length > 0) {
+          setLeaveRequests(data);
+        }
+      } catch {
+        // backend unavailable — keep aggregated dummy data as fallback
       }
     };
 
@@ -151,18 +163,16 @@ const CurrentEmployeeLeaveRequestProvider = ({ children }) => {
     };
 
     try {
-      const response = await fetch("/api/leaves", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newAggregatedLeave),
+      // Uses the authenticated axios instance — token is attached automatically
+      const saved = await applyForLeave({
+        from,
+        to,
+        reason,
+        leaveType,
+        leaveDayType: leaveDayType || "Full Day",
+        halfDaySession: leaveDayType === "Half Day" ? halfDaySession : "",
       });
-
-      if (response.ok) {
-        const saved = await response.json();
-        setLeaveRequests((prev) => [...prev, saved]);
-      } else {
-        setLeaveRequests((prev) => [...prev, newAggregatedLeave]);
-      }
+      setLeaveRequests((prev) => [...prev, saved]);
     } catch (err) {
       console.error("Backend save failed; adding aggregated leave locally", err);
       setLeaveRequests((prev) => [...prev, newAggregatedLeave]);
@@ -174,11 +184,10 @@ const CurrentEmployeeLeaveRequestProvider = ({ children }) => {
   // --- NEW: fetch per-day details for a leave (tries backend, falls back to leaveDetailsDummy)
   const fetchLeaveDetails = async (leaveId) => {
     try {
-      // try backend endpoint (adjust path to your API)
-      const res = await fetch(`/api/leaves/${leaveId}/details`);
-      if (!res.ok) throw new Error("No details from backend");
-      const data = await res.json();
-      // Expecting data to be an array of per-day objects like [{date: "2025-07-10", leavecategory: "Paid"}, ...]
+      // Uses the authenticated axios instance — token is attached automatically
+      const { getLeaveDetailsById } = await import("../api");
+      const data = await getLeaveDetailsById(leaveId);
+      // Expecting data to be an array of per-day objects
       return data;
     } catch (err) {
       console.warn(`Failed to fetch details for leaveId ${leaveId}, using dummy`, err);

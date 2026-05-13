@@ -55,6 +55,10 @@ export const NotificationProvider = ({ children }) => {
 
   // Fetch notifications from backend
   const fetchNotifications = useCallback(async () => {
+    // ✅ Skip if no auth token — user is not logged in yet
+    const token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
+    if (!token) return;
+
     try {
       const data = await getNotifications();
       setNotifications(data);
@@ -75,7 +79,7 @@ export const NotificationProvider = ({ children }) => {
       transports: ["websocket", "polling"],
     });
 
-    console.log("📡 SOCKET CONNECTED (notifications):", SOCKET_URL);
+    // console.log("📡 SOCKET CONNECTED (notifications):", SOCKET_URL);
 
     // When admin posts a notice (you already had this)
     socket.on("newNotice", (data) => {

@@ -14,7 +14,7 @@ const LeaveWithModal = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const loggedUser = JSON.parse(localStorage.getItem("hrmsUser"));
+  const loggedUser = JSON.parse(sessionStorage.getItem("hrmsUser") || "null");
   const loggedEmail = loggedUser?.email;
 
   const fetchEmployeeAndLeaves = useCallback(async () => {

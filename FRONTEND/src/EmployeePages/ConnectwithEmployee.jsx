@@ -155,9 +155,9 @@ const ConnectWithEmployee = () => {
     if (!currentUserId) return;
 
     const token =
-      localStorage.getItem("token") ||
-      localStorage.getItem("authToken") ||
-      sessionStorage.getItem("token") || "";
+      sessionStorage.getItem("token") ||
+      sessionStorage.getItem("authToken") ||
+      sessionStorage.getItem("hrms-token") || "";
 
     const socket = io(SOCKET_URL, {
       transports: ["polling", "websocket"], // ✅ polling first for Render

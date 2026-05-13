@@ -1,5 +1,6 @@
 import React, { useContext, useMemo, useState } from "react";
 import { CurrentEmployeeAttendanceContext } from "../EmployeeContext/CurrentEmployeeAttendanceContext";
+import { CurrentEmployeeContext } from "../EmployeeContext/CurrentEmployeeContext";
 
 import { Bar } from "react-chartjs-2";
 import {
@@ -66,12 +67,46 @@ const CalendarCell = ({ day, record }) => {
 // ==================================================================================
 // Main Component
 // ==================================================================================
+const OVERALL_KEY = "__overall__";
+
 const CurrentEmployeeAttendanceProfile = () => {
   const {
     attendanceRecords,
     PermissionRequests,
     overtimeRequests,
   } = useContext(CurrentEmployeeAttendanceContext);
+
+  const { job } = useContext(CurrentEmployeeContext);
+
+  // joining date: prefer profile context (job.doj), fallback to sessionStorage
+  const joiningDate = useMemo(() => {
+    if (job?.doj) return job.doj; // "YYYY-MM-DD" from CurrentEmployeeProvider
+    try {
+      const u = JSON.parse(sessionStorage.getItem("hrmsUser") || "null");
+      return u?.joiningDate?.slice(0, 10) || null;
+    } catch { return null; }
+  }, [job?.doj]);
+
+  // ── Stats derived from joining date ──────────────────────────────────────────
+  const { daysSinceJoining, workingDaysSinceJoining } = useMemo(() => {
+    if (!joiningDate) return { daysSinceJoining: null, workingDaysSinceJoining: null };
+    const start = new Date(joiningDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const totalMs = today - start;
+    if (totalMs < 0) return { daysSinceJoining: 0, workingDaysSinceJoining: 0 };
+    const totalDays = Math.floor(totalMs / (1000 * 60 * 60 * 24)) + 1; // inclusive
+
+    // Count Mon–Sat (6-day work week) between joining date and today
+    let workingDays = 0;
+    const cursor = new Date(start);
+    while (cursor <= today) {
+      const dow = cursor.getDay(); // 0=Sun
+      if (dow !== 0) workingDays++; // exclude Sunday only
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return { daysSinceJoining: totalDays, workingDaysSinceJoining: workingDays };
+  }, [joiningDate]);
 
   // ==================================================================================
   // Ensure attendance data is loaded
@@ -91,15 +126,19 @@ const CurrentEmployeeAttendanceProfile = () => {
   // ==================================================================================
   const monthOptions = getMonthOptions(attendanceRecords);
 
-  const [selectedMonth, setSelectedMonth] = useState(
-    monthOptions[monthOptions.length - 1] || ""
-  );
+  const [selectedMonth, setSelectedMonth] = useState(OVERALL_KEY); // default: overall view
 
   const monthlyRecords = useMemo(() => {
-    return attendanceRecords.filter((rec) =>
-      rec.date.startsWith(selectedMonth)
-    );
-  }, [attendanceRecords, selectedMonth]);
+    if (selectedMonth === OVERALL_KEY) {
+      // All records from joining date onward (backend already scopes to this employee)
+      if (joiningDate) {
+        const joining = joiningDate.slice(0, 10); // "YYYY-MM-DD"
+        return attendanceRecords.filter((rec) => rec.date >= joining);
+      }
+      return attendanceRecords;
+    }
+    return attendanceRecords.filter((rec) => rec.date.startsWith(selectedMonth));
+  }, [attendanceRecords, selectedMonth, joiningDate]);
 
   // ==================================================================================
   // Summary Counts
@@ -114,7 +153,10 @@ const CurrentEmployeeAttendanceProfile = () => {
     labels: ["Present", "Absent", "Leave", "Half-Day", "Completed"],
     datasets: [
       {
-        label: "Attendance Summary",
+        label:
+          selectedMonth === OVERALL_KEY
+            ? `Since ${joiningDate ? new Date(joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Joining"}`
+            : `${getMonthName(selectedMonth)} Summary`,
         data: [
           presentCount,
           absentCount,
@@ -186,12 +228,18 @@ const CurrentEmployeeAttendanceProfile = () => {
       </h1>
 
       {/* Month Selector */}
-      <div className="mb-4 flex gap-4 items-center">
+      <div className="mb-4 flex gap-4 items-center flex-wrap">
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
           className="border px-4 py-2 rounded"
         >
+          {/* Overall since joining option */}
+          <option value={OVERALL_KEY}>
+            📊 Overall (Since {joiningDate
+              ? new Date(joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+              : "Joining"})
+          </option>
           {monthOptions.map((m) => (
             <option key={m} value={m}>
               {getMonthName(m)}
@@ -209,8 +257,41 @@ const CurrentEmployeeAttendanceProfile = () => {
 
       {/* Bar Chart */}
       <div className="max-w-lg mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          {selectedMonth === OVERALL_KEY
+            ? `Showing all records since ${joiningDate ? new Date(joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "joining date"}`
+            : `Showing records for ${getMonthName(selectedMonth)}`
+          }
+        </p>
         <Bar data={chartData} />
       </div>
+
+      {/* ── Since-Joining Stats Banner (Overall view only) ────────────────────── */}
+      {selectedMonth === OVERALL_KEY && joiningDate && daysSinceJoining !== null && (
+        <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3">
+            📅 Since Joining — {new Date(joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <p className="text-2xl font-bold text-indigo-600">{daysSinceJoining}</p>
+              <p className="text-xs text-gray-500 mt-1">Total Days</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <p className="text-2xl font-bold text-purple-600">{workingDaysSinceJoining}</p>
+              <p className="text-xs text-gray-500 mt-1">Working Days (Mon–Sat)</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <p className="text-2xl font-bold text-green-600">{presentCount + completedCount}</p>
+              <p className="text-xs text-gray-500 mt-1">Days Present</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <p className="text-2xl font-bold text-red-500">{absentCount}</p>
+              <p className="text-xs text-gray-500 mt-1">Days Absent</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Boxes */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">

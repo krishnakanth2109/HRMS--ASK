@@ -6,8 +6,8 @@ import { CurrentEmployeeAttendanceContext } from "./CurrentEmployeeAttendanceCon
 const API = "http://localhost:5000";
 
 const CurrentEmployeeAttendanceProvider = ({ children }) => {
-  // ✅ Logged user
-  const loggedUser = JSON.parse(localStorage.getItem("hrmsUser"));
+  // ✅ Logged user — read from sessionStorage (where auth data is stored)
+  const loggedUser = JSON.parse(sessionStorage.getItem("hrmsUser") || localStorage.getItem("hrmsUser") || "null");
   const employeeId = loggedUser?.employeeId; // ✅ Use exact value (EMP101)
 
   // ✅ Manual (dummy) attendance for fallback
@@ -52,12 +52,9 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
   // ✅ Fetch Attendance
   const fetchAttendance = async () => {
     if (!employeeId) {
-      console.warn("⚠ No employeeId found → using dummy data");
       setAttendanceRecords(manualAttendance);
       return;
     }
-
-    console.log("✅ Fetching attendance for:", employeeId);
 
     try {
       const res = await axios.get(`${API}/attendance/${employeeId}`);
@@ -84,7 +81,6 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
 
         setAttendanceRecords(formatted);
       } else {
-        console.warn("⚠ No attendance in backend → using dummy");
         setAttendanceRecords(manualAttendance);
       }
     } catch (err) {
@@ -95,6 +91,10 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
 
   // ✅ Fetch Permission Requests
   const fetchPermissions = async () => {
+    if (!employeeId) {
+      setPermissionRequests([]);
+      return;
+    }
     try {
       const res = await axios.get(`${API}/permissions/${employeeId}`);
       setPermissionRequests(res.data.length ? res.data : []);
@@ -106,6 +106,10 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
 
   // ✅ Fetch Overtime Requests
   const fetchOvertime = async () => {
+    if (!employeeId) {
+      setOvertimeRequests([]);
+      return;
+    }
     try {
       const res = await axios.get(`${API}/overtime/${employeeId}`);
       setOvertimeRequests(res.data.length ? res.data : []);

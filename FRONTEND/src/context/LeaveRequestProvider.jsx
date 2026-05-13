@@ -38,6 +38,10 @@ export const LeaveRequestProvider = ({ children }) => {
 
   // ✅ FETCH ALL LEAVE REQUESTS FROM THE BACKEND
   const fetchLeaveRequests = useCallback(async () => {
+    // ✅ Skip if no auth token — user is not logged in yet
+    const token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
+    if (!token) return;
+
     try {
       setLoading(true);
       const data = await getLeaveRequests();

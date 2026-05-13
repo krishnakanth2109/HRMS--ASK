@@ -55,6 +55,10 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
 
   // ----- LOAD EMPLOYEE NOTIFICATIONS -----
   const loadNotifications = useCallback(async () => {
+    // ✅ Skip if no auth token — user is not logged in yet
+    const token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
+    if (!token) return;
+
     try {
       const all = await getNotifications();
 
@@ -78,6 +82,10 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
 
   // ----- LOAD NOTICES -----
   const loadNotices = useCallback(async () => {
+    // ✅ Skip if no auth token — user is not logged in yet
+    const token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
+    if (!token) return;
+
     try {
       const list = await getNotices();
       const readIds = loadReadNoticeIds();
@@ -110,18 +118,18 @@ const CurrentEmployeeNotificationProvider = ({ children }) => {
   };
 
   // ----- SOCKET DISABLED -----
-  useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ["websocket", "polling"] });
+  // useEffect(() => {
+  //   const socket = io(SOCKET_URL, { transports: ["websocket", "polling"] });
 
-    console.log("📡 Socket connected (employee notifications disabled)");
+  //   console.log("📡 Socket connected (employee notifications disabled)");
 
-    socket.off("newNotification");
-    socket.off("newNotice");
-    socket.off("notificationUpdated");
-    socket.off("notificationsAllRead");
+  //   socket.off("newNotification");
+  //   socket.off("newNotice");
+  //   socket.off("notificationUpdated");
+  //   socket.off("notificationsAllRead");
 
-    return () => socket.disconnect();
-  }, []);
+  //   return () => socket.disconnect();
+  // }, []);
 
   // ----- MARK SINGLE NOTIFICATION READ -----
   const markAsRead = async (id) => {

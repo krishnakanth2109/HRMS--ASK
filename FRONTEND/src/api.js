@@ -58,10 +58,8 @@ api.interceptors.request.use(
 ============================================================================= */
 api.interceptors.response.use(
   (response) => {
-    // Read logged user
-    const rawUser =
-      localStorage.getItem("hrmsUser") ||
-      sessionStorage.getItem("hrmsUser");
+    // Read logged user (auth is stored in sessionStorage)
+    const rawUser = sessionStorage.getItem("hrmsUser");
 
     let user = null;
     try {
@@ -218,8 +216,8 @@ export const sendReplyWithImage = async (noticeId, formData) => {
 export const getLeaveRequests = async () => (await api.get("/api/leaves")).data;
 export const getFilteredLeaveRequests = async (params) =>
   (await api.get("/api/leaves", { params })).data;
-export const getLeaveRequestsForEmployee = async (id) =>
-  (await api.get(`/api/leaves/${id}`)).data;
+export const getLeaveRequestsForEmployee = async (_id) =>
+  (await api.get("/api/leaves/my-leaves")).data;
 export const applyForLeave = async (data) =>
   (await api.post("/api/leaves/apply", data)).data;
 export const getLeaveDetailsById = async (id) =>
