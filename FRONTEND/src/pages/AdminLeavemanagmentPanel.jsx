@@ -19,7 +19,9 @@ import {
   FaUsers,
   FaClock,
   FaSearch,
-  FaChevronDown
+  FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight
 } from "react-icons/fa";
 import { useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -89,8 +91,25 @@ const AdminLeavePanel = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [recentPage, setRecentPage] = useState(1);
 
   const [employeeImages, setEmployeeImages] = useState({});
+
+  const handlePrevMonth = () => {
+    const [year, month] = filterMonth.split("-").map(Number);
+    const date = new Date(year, month - 2, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilterMonth(`${y}-${m}`);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = filterMonth.split("-").map(Number);
+    const date = new Date(year, month, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilterMonth(`${y}-${m}`);
+  };
 
   // ✅ Fetch all data (Logic aligned with AdminDashboard)
   const fetchAllData = useCallback(async () => {
@@ -386,8 +405,29 @@ const AdminLeavePanel = () => {
             <FaFilter className="text-indigo-500" />
             <span className="font-semibold text-sm">Filters:</span>
           </div>
-          <div className="grid grid-cols-2 sm:flex gap-3 w-full sm:w-auto">
-            <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full sm:w-auto px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div className="grid grid-cols-1 sm:flex gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+              <button 
+                onClick={handlePrevMonth}
+                className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+                title="Previous Month"
+              >
+                <FaChevronLeft size={12} />
+              </button>
+              <input 
+                type="month" 
+                value={filterMonth} 
+                onChange={(e) => setFilterMonth(e.target.value)} 
+                className="px-2 py-1 bg-transparent border-none text-sm outline-none font-bold text-slate-700 w-[130px]" 
+              />
+              <button 
+                onClick={handleNextMonth}
+                className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+                title="Next Month"
+              >
+                <FaChevronRight size={12} />
+              </button>
+            </div>
             <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="w-full sm:w-auto px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
               <option value="All">All Depts</option>
               {allDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -475,8 +515,7 @@ const AdminLeavePanel = () => {
         </div>
       </div>
 
-      {/* RECENT DECISIONS SECTION */}
-      <div className="border border-slate-200 rounded-2xl bg-white p-6 shadow-sm">
+      <div id="recent-decisions-header" className="border border-slate-200 rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-slate-800">Recent Decisions</h3>
           <span className="text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">{recentDecisions.length} Processed</span>
@@ -485,7 +524,7 @@ const AdminLeavePanel = () => {
           {recentDecisions.length === 0 ? (
             <div className="py-10 text-center text-slate-500 font-medium">No recent decisions found.</div>
           ) : (
-            recentDecisions.map(lv => {
+            recentDecisions.slice((recentPage - 1) * 5, recentPage * 5).map(lv => {
               const isDropdownOpen = openDropdownId === lv._id;
               return (
                 <div key={lv._id} className="py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4 hover:bg-slate-50/50 transition duration-150 px-2 rounded-lg -mx-2">
@@ -526,6 +565,46 @@ const AdminLeavePanel = () => {
             })
           )}
         </div>
+        
+        {recentDecisions.length > 5 && (
+          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2">
+            <button
+              disabled={recentPage === 1}
+              onClick={() => { setRecentPage(p => p - 1); window.scrollTo({ top: document.getElementById('recent-decisions-header')?.offsetTop - 100, behavior: 'smooth' }); }}
+              className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-all text-slate-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {[...Array(Math.ceil(recentDecisions.length / 5))].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setRecentPage(i + 1); window.scrollTo({ top: document.getElementById('recent-decisions-header')?.offsetTop - 100, behavior: 'smooth' }); }}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                    recentPage === i + 1
+                      ? "bg-indigo-600 text-white"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+
+            <button
+              disabled={recentPage === Math.ceil(recentDecisions.length / 5)}
+              onClick={() => { setRecentPage(p => p + 1); window.scrollTo({ top: document.getElementById('recent-decisions-header')?.offsetTop - 100, behavior: 'smooth' }); }}
+              className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-all text-slate-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

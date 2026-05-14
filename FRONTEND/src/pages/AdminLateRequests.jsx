@@ -15,7 +15,9 @@ import {
   FaUsers,
   FaUser,
   FaEdit,
-  FaSync
+  FaSync,
+  FaChevronLeft,
+  FaChevronRight
 } from "react-icons/fa";
 import AdminAttendanceRequests from "./AdminAttendanceRequests"; // ✅ ADD THIS IMPORT
 
@@ -25,6 +27,8 @@ const AdminLateRequests = () => {
   const [loading, setLoading] = useState(true);
   const [loadingLimits, setLoadingLimits] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [limitsCurrentPage, setLimitsCurrentPage] = useState(1);
+  const limitsItemsPerPage = 10;
   const [dateRange, setDateRange] = useState({
     startDate: "",
     endDate: ""
@@ -72,38 +76,8 @@ const AdminLateRequests = () => {
   const fetchPendingRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/api/attendance/all", {
-        params: { status: 'PENDING', type: 'LATE_CORRECTION' }
-      });
-
-      const allRecords = data.data || [];
-      const pendingRequests = [];
-
-      // Optimized loop
-      for (const empRecord of allRecords) {
-        if (!empRecord.attendance || !Array.isArray(empRecord.attendance)) continue;
-
-        for (const dayLog of empRecord.attendance) {
-          if (
-            dayLog.lateCorrectionRequest?.hasRequest &&
-            dayLog.lateCorrectionRequest?.status === "PENDING"
-          ) {
-            pendingRequests.push({
-              employeeId: empRecord.employeeId,
-              employeeName: empRecord.employeeName,
-              date: dayLog.date,
-              currentPunchIn: dayLog.punchIn,
-              requestedTime: dayLog.lateCorrectionRequest.requestedTime,
-              reason: dayLog.lateCorrectionRequest.reason,
-              status: dayLog.lateCorrectionRequest.status,
-            });
-          }
-        }
-      }
-
-      // Sort by date (Newest First)
-      pendingRequests.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setRequests(pendingRequests);
+      const { data } = await api.get("/api/attendance/admin/pending-late-corrections");
+      setRequests(data.data || []);
     } catch (err) {
       console.error("Error fetching requests:", err);
       if (err.code !== "ERR_CANCELED") {
@@ -118,53 +92,8 @@ const AdminLateRequests = () => {
   const fetchEmployeeLimits = async (showLoader = true) => {
     if (showLoader) setLoadingLimits(true);
     try {
-      // Fetch all attendance records first
-      const { data } = await api.get("/api/attendance/all");
-      const allRecords = data.data || [];
-      const limitData = [];
-      const batchSize = 5;
-
-      // Process in batches for better performance
-      for (let i = 0; i < allRecords.length; i += batchSize) {
-        const batch = allRecords.slice(i, i + batchSize);
-        const batchPromises = batch.map(async (empRecord) => {
-          if (!empRecord.employeeId) return null;
-
-          try {
-            // Use cached data if available
-            const existingLimit = employeeLimits.find(emp => emp.employeeId === empRecord.employeeId);
-            if (existingLimit && !showLoader) {
-              return existingLimit;
-            }
-
-            const limitResponse = await api.get(`/api/attendance/request-limit/${empRecord.employeeId}`);
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            const monthData = limitResponse.data.monthlyRequestLimits?.[currentMonth] || { limit: 5, used: 0 };
-
-            return {
-              employeeId: empRecord.employeeId,
-              employeeName: empRecord.employeeName,
-              currentLimit: monthData.limit,
-              currentUsed: monthData.used,
-              remaining: monthData.limit - monthData.used
-            };
-          } catch (err) {
-            console.error(`Error fetching limit for ${empRecord.employeeId}:`, err);
-            return {
-              employeeId: empRecord.employeeId,
-              employeeName: empRecord.employeeName,
-              currentLimit: 5,
-              currentUsed: 0,
-              remaining: 5
-            };
-          }
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        limitData.push(...batchResults.filter(Boolean));
-      }
-
-      setEmployeeLimits(limitData);
+      const { data } = await api.get("/api/attendance/admin/all-request-limits");
+      setEmployeeLimits(data.data || []);
     } catch (err) {
       console.error("Error fetching employee limits:", err);
       if (showLoader) {
@@ -252,6 +181,13 @@ const AdminLateRequests = () => {
       emp.employeeId.includes(lowerFilter)
     );
   }, [employeeLimits, filterText]);
+
+  // ✅ Pagination for Employee Limits
+  const totalLimitPages = Math.ceil(filteredEmployeeLimits.length / limitsItemsPerPage);
+  const paginatedEmployeeLimits = useMemo(() => {
+    const startIndex = (limitsCurrentPage - 1) * limitsItemsPerPage;
+    return filteredEmployeeLimits.slice(startIndex, startIndex + limitsItemsPerPage);
+  }, [filteredEmployeeLimits, limitsCurrentPage]);
 
   // ✅ Handle employee selection for bulk update
   const handleSelectEmployee = (employeeId) => {
@@ -644,7 +580,10 @@ const AdminLateRequests = () => {
                 placeholder="Search Name, ID, or Reason..."
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-200 outline-none transition text-sm"
                 value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
+                onChange={(e) => {
+                  setFilterText(e.target.value);
+                  setLimitsCurrentPage(1);
+                }}
               />
             </div>
 
@@ -761,7 +700,7 @@ const AdminLateRequests = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredEmployeeLimits.map((emp) => (
+                    {paginatedEmployeeLimits.map((emp) => (
                       <tr key={emp.employeeId} className="hover:bg-gray-50 transition-colors">
                         <td className="p-3">
                           <input
@@ -829,7 +768,7 @@ const AdminLateRequests = () => {
 
               {/* Mobile Card View */}
               <div className="md:hidden divide-y divide-gray-100">
-                {filteredEmployeeLimits.map((emp) => (
+                {paginatedEmployeeLimits.map((emp) => (
                   <div key={emp.employeeId} className="p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="flex gap-3">
@@ -882,6 +821,43 @@ const AdminLateRequests = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Pagination Footer for Limits */}
+              {totalLimitPages > 1 && (
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-2">
+                  <button
+                    disabled={limitsCurrentPage === 1}
+                    onClick={() => setLimitsCurrentPage(p => p - 1)}
+                    className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 transition-all text-gray-600"
+                  >
+                    <FaChevronLeft size={12} />
+                  </button>
+
+                  <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] sm:max-w-none no-scrollbar">
+                    {[...Array(totalLimitPages)].map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setLimitsCurrentPage(i + 1)}
+                        className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition-all ${
+                          limitsCurrentPage === i + 1
+                            ? "bg-purple-600 text-white shadow-md"
+                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    disabled={limitsCurrentPage === totalLimitPages}
+                    onClick={() => setLimitsCurrentPage(p => p + 1)}
+                    className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 transition-all text-gray-600"
+                  >
+                    <FaChevronRight size={12} />
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

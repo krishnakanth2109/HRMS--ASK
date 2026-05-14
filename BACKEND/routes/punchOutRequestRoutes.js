@@ -4,32 +4,12 @@ import express from "express";
 import PunchOutRequest from "../models/PunchOutRequest.js";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/employeeModel.js";
-import nodemailer from "nodemailer";
+import transporter from "../config/nodemailer.js";
 
 const router = express.Router();
 
 /* ================= EMAIL CONFIGURATION ================= */
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_PORT == 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
-// Verify connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ PunchOut Mail Server Error:", error);
-  } else {
-    console.log("✅ PunchOut Mail Server is ready");
-  }
-});
+// Using shared transporter from config/nodemailer.js
 
 /* ================= EMAIL TEMPLATE ================= */
 const createPunchOutStatusEmail = (data) => {

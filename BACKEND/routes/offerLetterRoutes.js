@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import xlsx from "xlsx";
-import nodemailer from "nodemailer";
+import transporter from "../config/nodemailer.js";
 import HTMLtoDOCX from "html-to-docx";
 import OfferLetterEmployee from "../models/OfferLetterEmployee.js";
 import GeneratedLetter from "../models/GeneratedLetter.js";
@@ -44,13 +44,7 @@ function getPublicBackendUrl(req) {
   return `${protocol}://${host}`;
 }
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_PORT == 465,
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  tls: { rejectUnauthorized: false }
-});
+// Shared transporter from config/nodemailer.js is used
 
 // The upload middleware from Cloudinary is now used directly on the route.
 

@@ -7,7 +7,7 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import LeaveRequest from "../models/LeaveRequest.js";
 import Holiday from "../models/Holiday.js";
 import Overtime from "../models/Overtime.js";
-import nodemailer from 'nodemailer';
+import transporter from '../config/nodemailer.js';
 import { getFingerprintAttendanceDecision } from "../utils/fingerprintAttendance.js";
 
 const router = express.Router();
@@ -16,27 +16,7 @@ const router = express.Router();
    1. EMAIL CONFIGURATION & TRANSPORTER
    ========================================================== */
 
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_PORT == 465,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
-
-// Verify SMTP Connection on startup
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("❌ SMTP Verification Error:", error);
-    } else {
-        console.log("✅ Mail Server is ready to send messages");
-    }
-});
+// Using shared transporter from config/nodemailer.js
 
 
 /* ==========================================================
@@ -155,12 +135,67 @@ router.use(protect);
  */
 router.get('/all', onlyAdmin, async (req, res) => {
     try {
-        const records = await Attendance.find({});
-        const sortedRecords = records.map(rec => {
-            rec.attendance.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return rec;
+        const records = await Attendance.find({}, { attendance: { $slice: -30 } }); // Only get last 30 days by default to save memory
+        res.status(200).json({ success: true, count: records.length, data: records });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/**
+ * Admin: Get All Pending Late Correction Requests (OPTIMIZED)
+ */
+router.get('/admin/pending-late-corrections', onlyAdmin, async (req, res) => {
+    try {
+        const pipeline = [
+            { $unwind: "$attendance" },
+            { 
+                $match: { 
+                    "attendance.lateCorrectionRequest.hasRequest": true, 
+                    "attendance.lateCorrectionRequest.status": "PENDING" 
+                } 
+            },
+            {
+                $project: {
+                    employeeId: 1,
+                    employeeName: 1,
+                    date: "$attendance.date",
+                    currentPunchIn: "$attendance.punchIn",
+                    requestedTime: "$attendance.lateCorrectionRequest.requestedTime",
+                    reason: "$attendance.lateCorrectionRequest.reason",
+                    status: "$attendance.lateCorrectionRequest.status"
+                }
+            },
+            { $sort: { date: -1 } }
+        ];
+
+        const requests = await Attendance.aggregate(pipeline);
+        res.json({ success: true, data: requests });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/**
+ * Admin: Get All Employee Monthly Request Limits (OPTIMIZED)
+ */
+router.get('/admin/all-request-limits', onlyAdmin, async (req, res) => {
+    try {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const records = await Attendance.find({}, {
+            employeeId: 1,
+            employeeName: 1,
+            [`monthlyRequestLimits.${currentMonth}`]: 1
         });
-        res.status(200).json({ success: true, count: sortedRecords.length, data: sortedRecords });
+
+        const data = records.map(rec => {
+            const monthData = rec.monthlyRequestLimits?.get(currentMonth) || { limit: 5, used: 0 };
+            return {
+                employeeId: rec.employeeId,
+                employeeName: rec.employeeName,
+                currentLimit: monthData.limit,
+                currentUsed: monthData.used,
+                remaining: monthData.limit - monthData.used
+            };
+        });
+
+        res.json({ success: true, data });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -498,22 +533,22 @@ router.post('/punch-in', async (req, res) => {
         const approvedLeaveToday = await LeaveRequest.findOne({
             employeeId: String(employeeId).trim(), status: "Approved", "details.date": today
         }).lean();
-        if (approvedLeaveToday) { 
-            if (approvedLeaveToday.leaveDayType === "Full Day") { return res.status(403).json({ success: false, message: "Punch-in not allowed. You are on approved leave today." }); } 
-            if (approvedLeaveToday.leaveDayType === "Half Day") { 
-                const hour = now.getHours(); 
-                if (approvedLeaveToday.halfDaySession === "Morning" && hour < 13) { return res.status(403).json({ success: false, message:"Morning half-day leave. Punch-in allowed after 1 PM." }); } 
-                if (approvedLeaveToday.halfDaySession === "Afternoon" && hour >= 13) { return res.status(403).json({ success: false, message: "Afternoon half-day leave. Punch-in not allowed after 1 PM." }); } 
-            } 
+        if (approvedLeaveToday) {
+            if (approvedLeaveToday.leaveDayType === "Full Day") { return res.status(403).json({ success: false, message: "Punch-in not allowed. You are on approved leave today." }); }
+            if (approvedLeaveToday.leaveDayType === "Half Day") {
+                const hour = now.getHours();
+                if (approvedLeaveToday.halfDaySession === "Morning" && hour < 13) { return res.status(403).json({ success: false, message: "Morning half-day leave. Punch-in allowed after 1 PM." }); }
+                if (approvedLeaveToday.halfDaySession === "Afternoon" && hour >= 13) { return res.status(403).json({ success: false, message: "Afternoon half-day leave. Punch-in not allowed after 1 PM." }); }
+            }
         }
 
         const todayDayNum = new Date(today + "T00:00:00").getDay();
         let isTodayWeekOff = false;
-        if (shift.weeklyOffDays && Array.isArray(shift.weeklyOffDays)) { isTodayWeekOff = shift.weeklyOffDays.includes(todayDayNum); } 
-        else if (shift.weekOffs && Array.isArray(shift.weekOffs)) { 
-            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]; 
+        if (shift.weeklyOffDays && Array.isArray(shift.weeklyOffDays)) { isTodayWeekOff = shift.weeklyOffDays.includes(todayDayNum); }
+        else if (shift.weekOffs && Array.isArray(shift.weekOffs)) {
+            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
             const todayDayName = daysOfWeek[todayDayNum];
-            isTodayWeekOff = shift.weekOffs.some(off => String(off).toLowerCase() === todayDayName.toLowerCase() || off === todayDayNum); 
+            isTodayWeekOff = shift.weekOffs.some(off => String(off).toLowerCase() === todayDayName.toLowerCase() || off === todayDayNum);
         } else { isTodayWeekOff = (todayDayNum === 0); }
 
         if (isTodayWeekOff) {
@@ -928,6 +963,59 @@ router.post('/approve-status-correction', onlyAdmin, async (req, res) => {
         dayRecord.statusCorrectionRequest.adminComment = adminComment || "Approved by Admin";
 
         await attendance.save(); res.json({ success: true, message: `Attendance corrected.` });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/**
+ * Admin: Reject Status Correction
+ */
+router.post('/reject-status-correction', onlyAdmin, async (req, res) => {
+    try {
+        const { employeeId, date, adminComment } = req.body;
+        const attendance = await Attendance.findOne({ employeeId });
+        const dayRecord = attendance?.attendance.find(a => a.date === date);
+
+        if (!dayRecord?.statusCorrectionRequest?.hasRequest) { return res.status(404).json({ message: "No request found" }); }
+
+        dayRecord.statusCorrectionRequest.status = "REJECTED";
+        dayRecord.statusCorrectionRequest.adminComment = adminComment || "Rejected by Admin";
+
+        await attendance.save();
+        res.json({ success: true, message: "Correction request rejected." });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/**
+ * Admin: Get All Pending Status Correction Requests
+ */
+router.get('/admin/status-correction-requests', onlyAdmin, async (req, res) => {
+    try {
+        const pipeline = [
+            { $unwind: "$attendance" },
+            {
+                $match: {
+                    "attendance.statusCorrectionRequest.hasRequest": true,
+                    "attendance.statusCorrectionRequest.status": "PENDING"
+                }
+            },
+            {
+                $project: {
+                    employeeId: 1,
+                    employeeName: 1,
+                    date: "$attendance.date",
+                    punchIn: "$attendance.punchIn",
+                    punchOut: "$attendance.punchOut",
+                    requestedPunchOut: "$attendance.statusCorrectionRequest.requestedPunchOut",
+                    reason: "$attendance.statusCorrectionRequest.reason",
+                    status: "$attendance.statusCorrectionRequest.status",
+                    createdAt: "$attendance.statusCorrectionRequest.createdAt"
+                }
+            },
+            { $sort: { date: -1 } }
+        ];
+
+        const requests = await Attendance.aggregate(pipeline);
+        res.json({ success: true, data: requests });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -17,7 +17,7 @@ console.log("🌐 API Base URL:", baseURL);
 // Create a single, consistent Axios instance
 const api = axios.create({
   baseURL,
-  timeout: 500000, 
+  timeout: 500000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -64,7 +64,7 @@ api.interceptors.response.use(
     let user = null;
     try {
       user = rawUser ? JSON.parse(rawUser) : null;
-    } catch {}
+    } catch { }
 
     const isEmployee = user?.role === "Employee";
 
@@ -89,7 +89,7 @@ export const loginUser = async (email, password) => {
   try {
     // Return full response so AuthProvider can handle status/headers
     const response = await api.post("/api/auth/login", { email, password });
-    return response; 
+    return response;
   } catch (error) {
     console.error("Login failed:", error.response?.data || error.message);
     throw error;
@@ -499,9 +499,9 @@ export const getAllEmployeesWithWorkModes = async () => {
 // Update specific employee work mode
 export const updateEmployeeWorkMode = async (employeeId, mode) => {
   try {
-    const response = await api.put("/api/admin/settings/employee-mode", { 
-      employeeId, 
-      mode 
+    const response = await api.put("/api/admin/settings/employee-mode", {
+      employeeId,
+      mode
     });
     return response.data;
   } catch (error) {
@@ -618,7 +618,7 @@ export const getPayrollRules = async () => {
   } catch (error) {
     console.error("Get payroll rules error:", error);
     // Return null so the frontend falls back to default rules
-    return null; 
+    return null;
   }
 };
 
@@ -632,7 +632,7 @@ export const savePayrollRules = async (rulesData) => {
   }
 };
 // Add this export to your api/index.js file
-export const getEmployeePayroll = (employeeId, month) => 
+export const getEmployeePayroll = (employeeId, month) =>
   api.get(`/api/payroll/record/${employeeId}?month=${month}`);
 
 /* =============================================================================
@@ -950,16 +950,16 @@ export const setRequestLimit = (employeeId, limit) => {
 
 
 // ✅ NEW: Work Status Correction APIs
-export const requestStatusCorrection = async (data) => 
+export const requestStatusCorrection = async (data) =>
   (await api.post("/api/attendance/request-status-correction", data)).data;
 
-export const getAllStatusCorrectionRequests = async () => 
+export const getAllStatusCorrectionRequests = async () =>
   (await api.get("/api/attendance/admin/status-correction-requests")).data;
 
-export const approveStatusCorrection = async (data) => 
+export const approveStatusCorrection = async (data) =>
   (await api.post("/api/attendance/approve-status-correction", data)).data;
 
-export const rejectStatusCorrection = async (data) => 
+export const rejectStatusCorrection = async (data) =>
   (await api.post("/api/attendance/reject-status-correction", data)).data;
 
 // api.js - Update the publicOnboard function
@@ -1053,7 +1053,7 @@ export const sendOnboardingLink = async (data) => {
 /* =============================================================================
    PAYROLL CANDIDATE MANAGEMENT
 ============================================================================= */
-export const getPayrollCandidates = async () => 
+export const getPayrollCandidates = async () =>
   (await api.get("/api/payroll/all")).data;
 
 export const managePayrollCandidate = async (formData, id = null) => {
@@ -1063,7 +1063,7 @@ export const managePayrollCandidate = async (formData, id = null) => {
   })).data;
 };
 
-export const deletePayrollCandidate = async (id) => 
+export const deletePayrollCandidate = async (id) =>
   (await api.delete(`/api/payroll/${id}`)).data;
 
 
@@ -1235,7 +1235,7 @@ export const sendOfferLetterEmail = async (data) => {
 
 export const downloadOfferLetterDocx = async (data) => {
   const response = await api.post("/api/offer-letters/download-docx", data, {
-      responseType: "blob"
+    responseType: "blob"
   });
   return response.data;
 };

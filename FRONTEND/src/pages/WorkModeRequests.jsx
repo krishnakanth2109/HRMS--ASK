@@ -1,6 +1,6 @@
 // --- START OF FILE WorkModeRequests.jsx ---
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 // ⚠️ CHECK THIS IMPORT PATH:
 // If this file is in 'src/pages', use '../api'
 // If this file is in 'src/components', use '../api'
@@ -15,7 +15,9 @@ import {
   FaTimes,
   FaSyncAlt,
   FaBuilding,
-  FaLaptopHouse
+  FaLaptopHouse,
+  FaChevronLeft,
+  FaChevronRight
 } from "react-icons/fa";
 
 // ==========================================
@@ -35,6 +37,27 @@ const getFormattedDays = (days) => {
 const WorkModeRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const handlePrevMonth = () => {
+    const [year, month] = filterMonth.split("-").map(Number);
+    const date = new Date(year, month - 2, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilterMonth(`${y}-${m}`);
+    setCurrentPage(1);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = filterMonth.split("-").map(Number);
+    const date = new Date(year, month, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilterMonth(`${y}-${m}`);
+    setCurrentPage(1);
+  };
 
   // Fetch Requests
   const fetchRequests = useCallback(async () => {
@@ -98,12 +121,30 @@ const WorkModeRequests = () => {
     });
   };
 
-  // Sort: Pending first, then by date (newest first)
-  const sortedRequests = [...requests].sort((a, b) => {
-    if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-    if (a.status !== 'Pending' && b.status === 'Pending') return 1;
-    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-  });
+  // Filter: Month & Sort: Pending first, then by date (newest first)
+  const filteredAndSortedRequests = useMemo(() => {
+    let filtered = [...requests];
+
+    if (filterMonth) {
+      filtered = filtered.filter(req => {
+        const date = req.createdAt || req.requestedDate;
+        return date && date.startsWith(filterMonth);
+      });
+    }
+
+    return filtered.sort((a, b) => {
+      if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+      if (a.status !== 'Pending' && b.status === 'Pending') return 1;
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }, [requests, filterMonth]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredAndSortedRequests.length / itemsPerPage);
+  const paginatedRequests = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedRequests.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAndSortedRequests, currentPage]);
 
   const pendingCount = requests.filter(r => r.status === 'Pending').length;
 
@@ -125,6 +166,28 @@ const WorkModeRequests = () => {
               <span className="text-sm font-bold text-slate-500 uppercase mr-2">Pending</span>
               <span className="text-xl font-bold text-blue-600">{pendingCount}</span>
             </div>
+
+            {/* Month Filter */}
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded transition-all"
+              >
+                <FaChevronLeft size={10} />
+              </button>
+              <input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => { setFilterMonth(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs outline-none font-bold text-slate-700 w-[110px]"
+              />
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded transition-all"
+              >
+                <FaChevronRight size={10} />
+              </button>
+            </div>
             <button
               onClick={fetchRequests}
               className="p-2 bg-white text-slate-600 rounded-lg hover:bg-slate-50 border border-slate-200 shadow-sm transition-colors"
@@ -141,13 +204,13 @@ const WorkModeRequests = () => {
             <div className="text-center py-20 text-slate-500">Loading requests...</div>
           )}
 
-          {!loading && sortedRequests.length === 0 ? (
+          {!loading && paginatedRequests.length === 0 ? (
             <div className="bg-white rounded-2xl p-16 flex flex-col items-center justify-center text-slate-400 shadow-sm border border-slate-200">
               <FaCheckCircle size={48} className="mb-4 opacity-20" />
               <p className="text-lg font-medium">No requests found.</p>
             </div>
           ) : (
-            sortedRequests.map(req => (
+            paginatedRequests.map(req => (
               <div key={req._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4 md:gap-5 items-start">
 
                 {/* Left: Employee & Request Details */}
@@ -261,6 +324,43 @@ const WorkModeRequests = () => {
             ))
           )}
         </div>
+
+        {/* Pagination Footer */}
+        {!loading && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-2 pb-8">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all text-slate-600 shadow-sm"
+            >
+              <FaChevronLeft size={12} />
+            </button>
+
+            <div className="flex items-center gap-1">
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                    currentPage === i + 1
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all text-slate-600 shadow-sm"
+            >
+              <FaChevronRight size={12} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

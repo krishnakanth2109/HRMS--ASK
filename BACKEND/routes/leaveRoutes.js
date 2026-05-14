@@ -2,13 +2,13 @@
 
 import express from "express";
 import {
-  createLeave,
-  listLeavesForEmployee,
-  adminListAllLeaves,
-  getLeaveDetails,
-  updateLeaveStatus,
-  cancelLeave,
-  handleEmailAction,          // ← NEW
+   createLeave,
+   listLeavesForEmployee,
+   adminListAllLeaves,
+   getLeaveDetails,
+   updateLeaveStatus,
+   cancelLeave,
+   handleEmailAction,          // ← NEW
 } from "../controllers/leaveController.js";
 
 import { protect } from "../controllers/authController.js";
@@ -49,13 +49,13 @@ router.get("/:id/details", getLeaveDetails);
    🟩 ADMIN → APPROVE or REJECT LEAVE (from portal UI)
 ============================================================================ */
 router.patch("/:id/approve", onlyAdmin, (req, res) => {
-  req.body.status = "Approved";
-  updateLeaveStatus(req, res);
+   req.body.status = "Approved";
+   updateLeaveStatus(req, res);
 });
 
 router.patch("/:id/reject", onlyAdmin, (req, res) => {
-  req.body.status = "Rejected";
-  updateLeaveStatus(req, res);
+   req.body.status = "Rejected";
+   updateLeaveStatus(req, res);
 });
 
 /* ============================================================================

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { FaFilter, FaSearch, FaCalendarAlt, FaCheckCircle, FaClock, FaHourglassHalf, FaTimesCircle } from 'react-icons/fa';
+import { FaFilter, FaSearch, FaCalendarAlt, FaCheckCircle, FaClock, FaHourglassHalf, FaTimesCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { getAllOvertimeRequests, updateOvertimeStatus } from "../api";
 
 // --- START OF NEW UI COMPONENTS ---
@@ -46,8 +46,28 @@ const OvertimeAdmin = () => {
   const [filters, setFilters] = useState({
     status: 'ALL', // ALL, PENDING, APPROVED, REJECTED
     search: '',
-    date: ''
+    month: new Date().toISOString().slice(0, 7)
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const handlePrevMonth = () => {
+    const [year, month] = filters.month.split("-").map(Number);
+    const date = new Date(year, month - 2, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilters(prev => ({ ...prev, month: `${y}-${m}` }));
+    setCurrentPage(1);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = filters.month.split("-").map(Number);
+    const date = new Date(year, month, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    setFilters(prev => ({ ...prev, month: `${y}-${m}` }));
+    setCurrentPage(1);
+  };
   // --- END OF NEW STATE FOR FILTERS ---
 
 
@@ -92,15 +112,23 @@ const OvertimeAdmin = () => {
         const matchesSearch = filters.search.toLowerCase() === '' || 
                               ot.employeeName.toLowerCase().includes(filters.search.toLowerCase()) ||
                               ot.employeeId.toLowerCase().includes(filters.search.toLowerCase());
-        const matchesDate = filters.date === '' || ot.date === filters.date;
+        const matchesMonth = !filters.month || ot.date.startsWith(filters.month);
         
-        return matchesStatus && matchesSearch && matchesDate;
+        return matchesStatus && matchesSearch && matchesMonth;
     });
   }, [overtimeList, filters]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredOvertimeList.length / itemsPerPage);
+  const paginatedList = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredOvertimeList.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredOvertimeList, currentPage]);
   
   const handleFilterChange = (e) => {
       const { name, value } = e.target;
       setFilters(prev => ({...prev, [name]: value}));
+      setCurrentPage(1);
   }
   // --- END OF NEW DYNAMIC FILTERING LOGIC ---
 
@@ -153,21 +181,28 @@ const OvertimeAdmin = () => {
                 </FilterInput>
 
                 <div>
-                    <label className="text-sm font-semibold text-gray-600 mb-1 block">Filter by Status</label>
-                    <div className="relative">
-                        <FaFilter className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
-                        <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="ALL">All Statuses</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="APPROVED">Approved</option>
-                            <option value="REJECTED">Rejected</option>
-                        </select>
+                    <label className="text-sm font-semibold text-gray-600 mb-1 block">Filter by Month</label>
+                    <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg p-1 shadow-sm">
+                        <button 
+                            onClick={handlePrevMonth}
+                            className="p-2 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-all"
+                        >
+                            <FaChevronLeft size={10} />
+                        </button>
+                        <input 
+                            type="month" 
+                            value={filters.month} 
+                            onChange={(e) => { setFilters({...filters, month: e.target.value}); setCurrentPage(1); }} 
+                            className="bg-transparent border-none text-xs outline-none font-bold text-gray-700 w-full" 
+                        />
+                        <button 
+                            onClick={handleNextMonth}
+                            className="p-2 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-all"
+                        >
+                            <FaChevronRight size={10} />
+                        </button>
                     </div>
                 </div>
-                
-                <FilterInput label="Filter by Date" value={filters.date} onChange={(e) => setFilters({...filters, date: e.target.value})} placeholder="YYYY-MM-DD">
-                     <FaCalendarAlt className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
-                </FilterInput>
             </div>
             {/* --- END OF NEW FILTERS UI --- */}
 
@@ -185,8 +220,8 @@ const OvertimeAdmin = () => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredOvertimeList.length > 0 ? (
-                            filteredOvertimeList.map((ot) => (
+                        {paginatedList.length > 0 ? (
+                            paginatedList.map((ot) => (
                                 <tr key={ot._id} className="hover:bg-gray-50 transition-colors duration-200">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ot.employeeId}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{ot.employeeName}</td>
@@ -241,8 +276,8 @@ const OvertimeAdmin = () => {
 
             {/* --- MOBILE LIST VIEW --- */}
             <div className="md:hidden flex flex-col gap-4">
-                {filteredOvertimeList.length > 0 ? (
-                    filteredOvertimeList.map((ot) => (
+                {paginatedList.length > 0 ? (
+                    paginatedList.map((ot) => (
                         <div key={ot._id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col gap-3 hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
@@ -301,6 +336,43 @@ const OvertimeAdmin = () => {
             </div>
         </div>
       </div>
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-2 pb-8">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => p - 1)}
+            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 transition-all text-gray-600 shadow-sm"
+          >
+            <FaChevronLeft size={12} />
+          </button>
+
+          <div className="flex items-center gap-1">
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  currentPage === i + 1
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 transition-all text-gray-600 shadow-sm"
+          >
+            <FaChevronRight size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

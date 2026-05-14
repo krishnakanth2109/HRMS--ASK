@@ -1,4 +1,4 @@
-﻿// --- START OF FILE employeeRoutes.js ---
+// --- START OF FILE employeeRoutes.js ---
 
 import express from "express";
 import Employee from "../models/employeeModel.js";
@@ -8,38 +8,16 @@ import Otp from "../models/OtpModel.js";
 import { upload, cloudinary } from "../config/cloudinary.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
-import nodemailer from "nodemailer";
 import bcrypt from "bcrypt"; 
 import multer from "multer";
+import transporter from "../config/nodemailer.js";
 
 const router = express.Router();
 
 const memoryStorage = multer.memoryStorage();
 const memoryUpload = multer({ storage: memoryStorage });
 
-// FIXED: Nodemailer transporter configuration with better error handling
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT) || 587, // Use 587 for TLS, 465 for SSL
-  secure: process.env.SMTP_SECURE === "true" || false, // false for 587, true for 465
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false // Only for development, helps with self-signed certificates
-  }
-});
-
-// Verify transporter connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Email server configuration error:", error);
-    console.log("Please check your SMTP credentials in .env file");
-  } else {
-    console.log("✅ Email server is ready to send messages");
-  }
-});
+// Shared transporter from config/nodemailer.js is used below
 
 /* ==============================================================
 ==============
@@ -332,14 +310,7 @@ router.patch("/:id/reactivate", protect, onlyAdmin, async (req, res) => {
     // ── EMAIL: notify employee their account is reactivated ──────────────────
     if (emp.email) {
       try {
-        // Use service:"gmail" — same pattern as the working OTP routes in this file
-        const reactivationTransporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
+        // Use shared transporter instead of creating a new one
 
         const reactivatedOn = new Date(date || Date.now()).toLocaleDateString("en-IN", {
           weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -505,7 +476,7 @@ router.patch("/:id/reactivate", protect, onlyAdmin, async (req, res) => {
 </body>
 </html>`;
 
-        await reactivationTransporter.sendMail({
+        await transporter.sendMail({
           from:    `"HRMS Team" <${process.env.SMTP_USER}>`,
           to:      emp.email,
           subject: `Your HRMS Account Has Been Reactivated - Welcome Back, ${emp.name}!`,

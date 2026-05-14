@@ -4,22 +4,13 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import Notification from "../models/notificationModel.js";
 import Employee from "../models/employeeModel.js";
 import Admin from "../models/adminModel.js";
-import nodemailer from "nodemailer";
+import transporter from "../config/nodemailer.js";
 import jwt from "jsonwebtoken";
 
 /* ===============================================================
    SMTP TRANSPORTER
 =============================================================== */
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_PORT == 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: { rejectUnauthorized: false },
-});
+// Using shared transporter from config/nodemailer.js
 
 // Helper: List dates
 function listDates(fromStr, toStr) {
