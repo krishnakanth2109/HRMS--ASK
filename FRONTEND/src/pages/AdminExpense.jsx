@@ -13,14 +13,37 @@ import {
   FaTimesCircle,
   FaFilePdf,
   FaFileImage,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaFilter,
+  FaChevronLeft,
+  FaChevronRight
 } from 'react-icons/fa';
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const shiftMonthValue = (monthValue, offset) => {
+  const [year, month] = monthValue.split('-').map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const formatMonthLabel = (monthValue) => {
+  const [year, month] = monthValue.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric'
+  });
+};
 
 const AdminExpenseDashboard = () => {
   const [expenses, setExpenses] = useState([]);
   const [filteredExpenses, setFilteredExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonthValue());
   const [receiptModal, setReceiptModal] = useState({
     isOpen: false,
     url: '',
@@ -31,7 +54,7 @@ const AdminExpenseDashboard = () => {
 const fetchAllExpenses = async () => {
   setLoading(true);
   try {
-    const res = await getAllExpenses(); // Use API function
+    const res = await getAllExpenses(monthFilter ? { month: monthFilter } : {}); // Use API function
     if (res.success) {
       setExpenses(res.data);
     }
@@ -45,7 +68,7 @@ const fetchAllExpenses = async () => {
 
   useEffect(() => {
     fetchAllExpenses();
-  }, []);
+  }, [monthFilter]);
 
   // --- Filter Logic ---
   useEffect(() => {
@@ -152,6 +175,10 @@ const fetchAllExpenses = async () => {
     );
   };
 
+  const handleMonthChange = (offset) => {
+    setMonthFilter((currentMonth) => shiftMonthValue(currentMonth, offset));
+  };
+
   return (
     <div className="min-h-screen  p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -179,20 +206,50 @@ const fetchAllExpenses = async () => {
         </div>
 
         {/* Filters Tabs */}
-        <div className="bg-white rounded-t-2xl shadow-sm border-b border-gray-200 p-2 flex gap-2 overflow-x-auto">
-          {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (
+        <div className="bg-white rounded-t-2xl shadow-sm border-b border-gray-200 p-2 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex gap-2 overflow-x-auto">
+            {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-6 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
+                  filter === status 
+                  ? 'bg-blue-600 text-white shadow-md transform scale-105' 
+                  : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+            <FaFilter className="text-gray-400" size={13} />
+            <label htmlFor="expenseMonth" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Month</label>
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
-                filter === status 
-                ? 'bg-blue-600 text-white shadow-md transform scale-105' 
-                : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              onClick={() => handleMonthChange(-1)}
+              className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white border border-transparent hover:border-gray-200 transition"
+              title="Previous month"
             >
-              {status}
+              <FaChevronLeft size={12} />
             </button>
-          ))}
+            <div className="min-w-[132px] text-center text-sm font-bold text-gray-700">
+              {formatMonthLabel(monthFilter)}
+            </div>
+            <input
+              id="expenseMonth"
+              type="month"
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 w-[128px]"
+            />
+            <button
+              onClick={() => handleMonthChange(1)}
+              className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white border border-transparent hover:border-gray-200 transition"
+              title="Next month"
+            >
+              <FaChevronRight size={12} />
+            </button>
+          </div>
         </div>
 
         {/* Table Content */}

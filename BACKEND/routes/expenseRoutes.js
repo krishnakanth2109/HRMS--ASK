@@ -117,7 +117,22 @@ router.get('/employee/:employeeId', async (req, res) => {
 // --- ADMIN ROUTE: Get ALL Expenses ---
 router.get('/all', async (req, res) => {
   try {
-    const expenses = await Expense.find().sort({ status: 1, date: -1 });
+    const { month } = req.query;
+    const query = {};
+
+    if (month) {
+      const [year, monthNumber] = month.split('-').map(Number);
+      if (!year || !monthNumber || monthNumber < 1 || monthNumber > 12) {
+        return res.status(400).json({ success: false, message: 'Invalid month format. Use YYYY-MM.' });
+      }
+
+      query.date = {
+        $gte: new Date(Date.UTC(year, monthNumber - 1, 1)),
+        $lt: new Date(Date.UTC(year, monthNumber, 1))
+      };
+    }
+
+    const expenses = await Expense.find(query).sort({ status: 1, date: -1 });
     const sortedExpenses = expenses.sort((a, b) => {
       if (a.status === 'Pending' && b.status !== 'Pending') return -1;
       if (a.status !== 'Pending' && b.status === 'Pending') return 1;

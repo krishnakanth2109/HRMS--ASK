@@ -767,9 +767,9 @@ export const getInbox = async () => {
 ============================================================================= */
 
 // Get all expenses (Admin)
-export const getAllExpenses = async () => {
+export const getAllExpenses = async (params = {}) => {
   try {
-    const response = await api.get("/api/expenses/all");
+    const response = await api.get("/api/expenses/all", { params });
     return response.data;
   } catch (error) {
     console.error("Get all expenses error:", error);

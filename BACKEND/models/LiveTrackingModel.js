@@ -8,6 +8,8 @@ const idleSegmentSchema = new mongoose.Schema(
         startTime: { type: Date, required: true },
         endTime: { type: Date, required: true },
         idleDurationSeconds: { type: Number, required: false },
+        screenshotUrl: { type: String, default: null },
+        screenshotExpiresAt: { type: Date, default: null },
     },
     { _id: false }
 );
@@ -18,7 +20,8 @@ const idleSegmentSchema = new mongoose.Schema(
 const workingScreenshotSchema = new mongoose.Schema(
     {
         screenshotUrl: { type: String, required: true },
-        capturedAt: { type: Date, required: true }
+        capturedAt: { type: Date, required: true },
+        expiresAt: { type: Date, default: null }
     },
     { _id: false }
 );

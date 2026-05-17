@@ -140,6 +140,9 @@ const EmployeeLeavemanagement = () => {
     willBeLOP: 0
   });
 
+  // ✅ ADDED: State for past present/punched-in blocked dates
+  const [blockedPastDates, setBlockedPastDates] = useState([]);
+
   // Use ref to track if data has been loaded
   const dataLoadedRef = useRef({
     leaves: false,
@@ -149,22 +152,12 @@ const EmployeeLeavemanagement = () => {
     shift: false
   });
 
-  // --- UPDATED DATE LOGIC: Allow past dates (Present Month or 7 days ago) ---
+  // --- UPDATED DATE LOGIC: Restrict to Current Month onwards ---
   const minSelectionDate = useMemo(() => {
     const now = new Date();
-
-    // 1. Calculate 7 days ago
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(now.getDate() - 7);
-
-    // 2. Calculate Start of Current Month
+    // Start of Current Month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    // 3. Take the earlier of the two to be permissible
-    const earliestAllowed = sevenDaysAgo < startOfMonth ? sevenDaysAgo : startOfMonth;
-
-    // Format to YYYY-MM-DD
-    return formatDate(earliestAllowed);
+    return formatDate(startOfMonth);
   }, []);
 
   const todayStr = new Date().toISOString().split("T")[0];
@@ -677,6 +670,58 @@ const EmployeeLeavemanagement = () => {
   }, [filteredLeaveList, holidays, selectedMonth, shiftDetails, calculateSandwichLeaves]);
 
   // Check Overlaps with Colleagues
+  // ✅ NEW: Check if employee was present or punched in on a given date string
+  const isPresentOrPunchedIn = useCallback((dateStr) => {
+    if (!attendanceData || !Array.isArray(attendanceData)) return false;
+    const record = attendanceData.find(a => {
+      const recordDate = a.date ? new Date(a.date) : null;
+      return recordDate && toISODateString(recordDate) === dateStr;
+    });
+
+    if (!record) return false;
+
+    // Check if punched in
+    if (record.punchIn) return true;
+
+    // Check if status represents presence
+    const status = (record.status || "").toUpperCase();
+    const workedStatus = (record.workedStatus || "").toUpperCase();
+    const presentStatuses = ["PRESENT", "FULL DAY", "HALF DAY", "LATE", "ON_TIME", "WORKING"];
+
+    if (presentStatuses.includes(status) || presentStatuses.includes(workedStatus)) {
+      return true;
+    }
+
+    return false;
+  }, [attendanceData]);
+
+  // ✅ NEW: Check and set blocked past dates in range
+  const checkBlockedPastDates = useCallback((fromDate, toDate) => {
+    if (!fromDate || !toDate) {
+      setBlockedPastDates([]);
+      return;
+    }
+
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    const todayStr = formatDate(new Date());
+    const blocked = [];
+
+    let current = new Date(start);
+    while (current <= end) {
+      const dateStr = formatDate(current);
+      if (dateStr < todayStr) {
+        if (isPresentOrPunchedIn(dateStr)) {
+          blocked.push(dateStr);
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    setBlockedPastDates(blocked);
+  }, [isPresentOrPunchedIn]);
+
+  // Check Overlaps with Colleagues
   const checkColleagueOverlaps = useCallback((fromDate, toDate) => {
     if (!fromDate || !toDate) {
       setOverlappingColleagues([]);
@@ -819,10 +864,13 @@ const EmployeeLeavemanagement = () => {
         if (hasLOPWarning) {
           // Don't show LOP warning yet, wait for submit
         }
+        // Check for present/punched-in past days
+        checkBlockedPastDates(fromDate, toDate);
       } else {
         setSandwichWarning(null);
         setOverlappingColleagues([]);
         setShowLOPWarning(false);
+        setBlockedPastDates([]);
       }
 
       return updated;
@@ -1035,6 +1083,46 @@ const EmployeeLeavemanagement = () => {
       return;
     }
 
+    // Prevent selecting/applying past dates beyond allowed minSelectionDate (previous months)
+    const startOfCurrentMonthStr = minSelectionDate;
+    if (from < startOfCurrentMonthStr || to < startOfCurrentMonthStr) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Restricted Action',
+        text: 'Applying leaves for previous months is restricted.',
+        confirmButtonColor: '#3085d6'
+      });
+      setSubmitError("Applying leaves for previous months is restricted.");
+      return;
+    }
+
+    // Check for present/punched-in past days
+    const todayStr = formatDate(new Date());
+    const blocked = [];
+    let current = new Date(from);
+    const end = new Date(to);
+    while (current <= end) {
+      const dateStr = formatDate(current);
+      if (dateStr < todayStr) {
+        if (isPresentOrPunchedIn(dateStr)) {
+          blocked.push(dateStr);
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (blocked.length > 0) {
+      const formattedDates = blocked.map(d => formatDisplayDate(d)).join(", ");
+      Swal.fire({
+        icon: 'error',
+        title: 'Submission Blocked',
+        text: `You cannot apply for leave on days you were present or punched in: ${formattedDates}`,
+        confirmButtonColor: '#3085d6'
+      });
+      setSubmitError(`Cannot apply for leave on present/punched-in days: ${formattedDates}`);
+      return;
+    }
+
     // First check for sandwich warning
     if (sandwichWarning && sandwichWarning.length > 0) {
       setShowSandwichAlert(true);
@@ -1108,6 +1196,7 @@ const EmployeeLeavemanagement = () => {
       setOverlappingColleagues([]);
       setShowSandwichAlert(false);
       setShowLOPWarning(false);
+      setBlockedPastDates([]);
       setModalOpen(false);
 
       // Refresh data
@@ -1944,6 +2033,29 @@ const EmployeeLeavemanagement = () => {
                       <option value="Afternoon Half">Afternoon Half</option>
                     </select>
                   </div >
+                )}
+
+                {/* Blocked Present/Punched-in Days Warning */}
+                {blockedPastDates.length > 0 && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                    <div className="flex items-start">
+                      <span className="text-red-500 text-xl mr-2">❌</span>
+                      <div>
+                        <p className="font-semibold text-red-800 mb-1">Cannot Apply for Leave</p>
+                        <p className="text-sm text-red-700">
+                          You were present or punched in on the following past {blockedPastDates.length === 1 ? "day" : "days"}:
+                        </p>
+                        <ul className="list-disc list-inside text-xs text-red-700 font-semibold mt-1">
+                          {blockedPastDates.map((d, index) => (
+                            <li key={index}>{formatDisplayDate(d)}</li>
+                          ))}
+                        </ul>
+                        <p className="text-[11px] text-red-600 mt-2 font-medium">
+                          Leaves can only be applied for days you were absent or didn't punch in.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Sandwich Warning */}

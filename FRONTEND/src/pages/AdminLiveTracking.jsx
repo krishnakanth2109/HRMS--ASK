@@ -12,12 +12,15 @@ import {
     FaSearch,
     FaCamera,
     FaExternalLinkAlt,
-    FaCalendarAlt
+    FaCalendarAlt,
+    FaTrash,
+    FaChevronLeft,
+    FaChevronRight
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement } from "chart.js";
-import { Doughnut, Line, Bar } from "react-chartjs-2";
+import { Doughnut, Pie, Line, Bar } from "react-chartjs-2";
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement);
 
@@ -34,6 +37,7 @@ const AdminLiveTracking = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [reportData, setReportData] = useState(null);
     const [yesterdayIdle, setYesterdayIdle] = useState(0);
+    const [dailyChartData, setDailyChartData] = useState(null);
     const [reportLoading, setReportLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('report'); // 'report' | 'screenshots'
 
@@ -41,6 +45,7 @@ const AdminLiveTracking = () => {
     const [weeklyOffset, setWeeklyOffset] = useState(0);
     const [weeklyChartData, setWeeklyChartData] = useState(null);
     const [weeklyDataLoading, setWeeklyDataLoading] = useState(false);
+    const [weeklyTotals, setWeeklyTotals] = useState({ worked: 0, idle: 0 });
 
     // Screenshots State
     const [screenshots, setScreenshots] = useState([]);
@@ -48,7 +53,7 @@ const AdminLiveTracking = () => {
     const [lightboxUrl, setLightboxUrl] = useState(null);
 
     // Tracker Settings
-    const [screenshotInterval, setScreenshotInterval] = useState(5);
+    const [screenshotInterval, setScreenshotInterval] = useState(1);
     const [savingSettings, setSavingSettings] = useState(false);
 
     useEffect(() => {
@@ -111,7 +116,7 @@ const AdminLiveTracking = () => {
             setLiveData(data);
             setError(null);
             setLastUpdated(new Date());
-            setRefreshCountdown(10);
+            setRefreshCountdown(120);
         } catch (err) {
             console.error("Error fetching live tracking data:", err);
             if (!isBackground) setError("Failed to fetch live tracking data");
@@ -125,16 +130,34 @@ const AdminLiveTracking = () => {
         fetchLiveData(false);
         const interval = setInterval(() => {
             fetchLiveData(true);
-        }, 10000);
+        }, 100000);
         return () => clearInterval(interval);
     }, []);
 
     // Countdown visual timer interval (1 second)
+    // useEffect(() => {
+    //     const timer = setInterval(() => {
+    //         setRefreshCountdown((prev) => (prev <= 1 ? 120 : prev - 1));
+    //     }, 120000);
+    //     return () => clearInterval(timer);
+    // }, []);
+
+    // Countdown every second
     useEffect(() => {
         const timer = setInterval(() => {
             setRefreshCountdown((prev) => (prev <= 1 ? 10 : prev - 1));
         }, 1000);
+
         return () => clearInterval(timer);
+    }, []);
+
+    // Actual refresh every 2 mins
+    useEffect(() => {
+        const refreshTimer = setInterval(() => {
+            fetchData();
+        }, 120000);
+
+        return () => clearInterval(refreshTimer);
     }, []);
 
     const getStatusInfo = (record) => {
@@ -266,10 +289,11 @@ const AdminLiveTracking = () => {
     // Keep base API data for live ticking
     const [rawReportData, setRawReportData] = useState({ idle: null, attendance: null });
 
-    const fetchReportData = async (record, targetDateStr) => {
+    const fetchReportData = async (empId, targetDateStr, liveRecord) => {
         setReportLoading(true);
-        const empId = String(record.employeeId || "").trim();
-        const employeeName = employeesMap[empId] || record.name || "Unknown Employee";
+        const cleanEmpId = String(empId || "").trim();
+        const employeeName = employeesMap[cleanEmpId] || (liveRecord && liveRecord.name) || "Unknown Employee";
+        const todayStr = new Date().toISOString().split('T')[0];
 
         try {
             const target = new Date(targetDateStr);
@@ -279,8 +303,8 @@ const AdminLiveTracking = () => {
 
             // Fetch target date, yesterday's idle time, and attendance in parallel
             const [idleRes, yesterdayIdleRes, attRes] = await Promise.all([
-                getIdleTimeForEmployeeByDate(empId, targetDateStr),
-                getIdleTimeForEmployeeByDate(empId, yesterdayStr),
+                getIdleTimeForEmployeeByDate(cleanEmpId, targetDateStr),
+                getIdleTimeForEmployeeByDate(cleanEmpId, yesterdayStr),
                 getAttendanceByDateRange(targetDateStr, targetDateStr)
             ]);
 
@@ -294,29 +318,113 @@ const AdminLiveTracking = () => {
 
             // Find matching attendance
             const attData = attRes?.length > 0 ? attRes.find(a =>
-                String(a.employeeId || "").trim() === empId ||
+                String(a.employeeId || "").trim() === cleanEmpId ||
                 String(a.employeeName || "").toLowerCase().includes(employeeName.toLowerCase())
             ) : null;
 
             // Store raw results
             setRawReportData({ idle: idleRes, attendance: attData });
 
+            // Build the correct record to pass to calculateReportStats.
+            // For historical dates, use the data from the DB (idleRes) instead of the stale live record.
+            const isToday = targetDateStr === todayStr;
+            const record = isToday && liveRecord
+                ? liveRecord  // Use live record for real-time ticking today
+                : {
+                    // For historical dates, reconstruct from the DB idle record
+                    date: targetDateStr,
+                    employeeId: cleanEmpId,
+                    currentStatus: "OFFLINE",
+                    idleSince: null,
+                    lastPing: idleRes?.lastPing || null,
+                    trackedWorkSeconds: idleRes?.trackedWorkSeconds || 0,
+                    trackedIdleSeconds: idleRes?.trackedIdleSeconds || 0,
+                    idleTimeline: idleRes?.idleTimeline || []
+                };
+
             // Initial calculation
             const stats = calculateReportStats(record, idleRes, attData);
             setReportData(stats);
 
+            // setup hourly chart data
+            if (stats && stats.idleTimeline) {
+                const hourlyBuckets = Array(24).fill(0).map((_, i) => ({ hour: i, working: 0, idle: 0 }));
+
+                // Process idle segments
+                stats.idleTimeline.forEach(seg => {
+                    const start = new Date(seg.idleStart);
+                    const end = new Date(seg.idleEnd);
+                    let curr = new Date(start);
+
+                    while (curr < end) {
+                        const h = curr.getHours();
+                        const nextH = new Date(curr);
+                        nextH.setHours(h + 1, 0, 0, 0);
+                        const endOfSegment = end < nextH ? end : nextH;
+                        const durationMins = (endOfSegment - curr) / 60000;
+                        if (h >= 0 && h < 24) hourlyBuckets[h].idle += durationMins;
+                        curr = endOfSegment;
+                    }
+                });
+
+                // Estimate working hours from punch-in to last-ping
+                if (attData && attData.punchIn) {
+                    const start = new Date(attData.punchIn);
+                    const end = record.lastPing
+                        ? new Date(record.lastPing)
+                        : (isToday ? new Date() : new Date(targetDateStr + 'T23:59:59'));
+                    let curr = new Date(start);
+
+                    while (curr < end) {
+                        const h = curr.getHours();
+                        const nextH = new Date(curr);
+                        nextH.setHours(h + 1, 0, 0, 0);
+                        const endOfSegment = end < nextH ? end : nextH;
+                        const totalMins = (endOfSegment - curr) / 60000;
+                        if (h >= 0 && h < 24) {
+                            const idleMins = hourlyBuckets[h].idle;
+                            hourlyBuckets[h].working = Math.max(0, totalMins - idleMins);
+                        }
+                        curr = endOfSegment;
+                    }
+                }
+
+                // Filter to only show hours with activity
+                const activeHours = hourlyBuckets.filter(b => b.working > 0 || b.idle > 0);
+
+                setDailyChartData({
+                    labels: activeHours.map(b => `${b.hour}:00`),
+                    datasets: [
+                        {
+                            label: 'Working (mins)',
+                            data: activeHours.map(b => parseFloat(b.working.toFixed(1))),
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'Idle (mins)',
+                            data: activeHours.map(b => parseFloat(b.idle.toFixed(1))),
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        }
+                    ]
+                });
+            } else {
+                setDailyChartData(null);
+            }
+
         } catch (err) {
             console.error("Error fetching report data:", err);
-            // Fallback
-            if (!reportData) {
-                setReportData({
-                    idleSeconds: 0,
-                    workedSeconds: 0,
-                    totalElapsedSeconds: 0,
-                    idleTimeline: [],
-                    punchIn: "N/A"
-                });
-            }
+            setReportData({ idleSeconds: 0, workedSeconds: 0, totalElapsedSeconds: 0, idleTimeline: [], punchIn: "N/A" });
+            setDailyChartData(null);
         } finally {
             setReportLoading(false);
         }
@@ -402,6 +510,10 @@ const AdminLiveTracking = () => {
                     }
                 ]
             });
+
+            const totalWorked = workedData.reduce((acc, val) => acc + val, 0);
+            const totalIdle = idleData.reduce((acc, val) => acc + val, 0);
+            setWeeklyTotals({ worked: totalWorked, idle: totalIdle });
         } catch (err) {
             console.error("Error fetching weekly data:", err);
             setWeeklyChartData(null);
@@ -415,6 +527,31 @@ const AdminLiveTracking = () => {
             fetchWeeklyData(selectedEmployee.employeeId, selectedEmployee.name, weeklyOffset);
         }
     }, [weeklyOffset, selectedEmployee]);
+
+    // Re-fetch report and screenshots when selectedDate changes
+    useEffect(() => {
+        if (selectedEmployee) {
+            const empId = selectedEmployee.employeeId;
+            // For live view of today, pass the live tracker record;
+            // for historical dates, pass null so fetchReportData rebuilds from DB
+            const todayStr = new Date().toISOString().split('T')[0];
+            const liveRecord = selectedDate === todayStr
+                ? (liveData.find(r => String(r.employeeId).trim() === String(empId).trim()) || selectedEmployee)
+                : null;
+            fetchReportData(empId, selectedDate, liveRecord);
+            fetchScreenshots(empId, selectedDate);
+        }
+    }, [selectedDate]);
+
+    // When employee is first selected, also trigger the initial fetch
+    useEffect(() => {
+        if (selectedEmployee) {
+            const empId = selectedEmployee.employeeId;
+            const liveRecord = liveData.find(r => String(r.employeeId).trim() === String(empId).trim()) || selectedEmployee;
+            fetchReportData(empId, selectedDate, liveRecord);
+            fetchScreenshots(empId, selectedDate);
+        }
+    }, [selectedEmployee]);
 
     // "Live Ticker" Effect: Recalculate modal stats every second while modal is open
     useEffect(() => {
@@ -452,6 +589,21 @@ const AdminLiveTracking = () => {
         }
     };
 
+    const handleDeleteScreenshot = async (ss) => {
+        if (!window.confirm('Delete this screenshot? This action cannot be undone.')) return;
+        try {
+            const empId = selectedEmployee.employeeId;
+            await api.delete(`/api/idletime/screenshots/${empId}`, {
+                data: { screenshotUrl: ss.screenshotUrl, date: ss.date, type: ss.type }
+            });
+            // Optimistically remove from UI
+            setScreenshots(prev => prev.filter(s => s.screenshotUrl !== ss.screenshotUrl));
+        } catch (err) {
+            console.error('Error deleting screenshot:', err);
+            alert('Failed to delete screenshot. Please try again.');
+        }
+    };
+
     const handleViewReport = (record) => {
         const empId = String(record.employeeId || "").trim();
         const latestRecord = liveData.find(r => String(r.employeeId).trim() === empId) || record;
@@ -468,15 +620,23 @@ const AdminLiveTracking = () => {
         setActiveTab('report');
         setScreenshots([]);
         setSelectedDate(targetDate);
-        fetchReportData(latestRecord, targetDate);
+        // Pass the live record only for today; null for historical dates
+        const liveRecord = targetDate === todayStr ? latestRecord : null;
+        fetchReportData(empId, targetDate, liveRecord);
         fetchScreenshots(empId, targetDate);
     };
 
     const handleDateChange = (newDate) => {
         setSelectedDate(newDate);
-        if (selectedEmployee) {
-            fetchReportData(selectedEmployee, newDate);
-            fetchScreenshots(selectedEmployee.employeeId, newDate);
+    };
+
+    const shiftDate = (days) => {
+        const date = new Date(selectedDate);
+        date.setDate(date.getDate() + days);
+        const newDateStr = date.toISOString().split('T')[0];
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (newDateStr <= todayStr) {
+            setSelectedDate(newDateStr);
         }
     };
 
@@ -487,7 +647,11 @@ const AdminLiveTracking = () => {
             if (currentRecord) {
                 const employeeName = employeesMap[String(currentRecord.employeeId).trim()] || selectedEmployee.name;
                 setSelectedEmployee({ ...currentRecord, name: employeeName, statusInfo: getStatusInfo(currentRecord) });
-                fetchReportData(currentRecord, selectedDate);
+                // Only auto-refresh report if viewing today (live data changes are irrelevant for past dates)
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (selectedDate === todayStr) {
+                    fetchReportData(currentRecord.employeeId, selectedDate, currentRecord);
+                }
             }
         }
     }, [liveData]);
@@ -499,6 +663,21 @@ const AdminLiveTracking = () => {
         setLightboxUrl(null);
         setActiveTab('report');
     };
+
+    // Close modal on Esc key press
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                closeReportModal();
+            }
+        };
+        if (selectedEmployee) {
+            window.addEventListener('keydown', handleKeyDown);
+        }
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedEmployee]);
 
     const getRowIdleTime = (record) => {
         let total = record.trackedIdleSeconds || 0;
@@ -603,7 +782,7 @@ const AdminLiveTracking = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 rounded-lg shadow-sm transition-all font-medium"
                     >
                         <FaSyncAlt className={loading ? "animate-spin text-indigo-400" : "text-indigo-400"} />
-                        Auto-Refresh in {refreshCountdown}s
+                        Auto-Refresh
                     </button>
                 </div>
             </div>
@@ -870,11 +1049,24 @@ const AdminLiveTracking = () => {
 
             {/* Modal for Details & Report */}
             {selectedEmployee && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+                    onClick={closeReportModal}
+                >
+                    <div
+                        className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
 
                         {/* Modal Header */}
-                        <div className="bg-white border-b border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center z-10 gap-4">
+                        <div className="bg-white border-b border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center z-10 gap-4 relative">
+                            <button
+                                onClick={closeReportModal}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-all"
+                                title="Close"
+                            >
+                                <FaTimes className="text-xl" />
+                            </button>
                             <div>
                                 <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
                                     <FaChartPie className="text-indigo-500 shrink-0" />
@@ -893,34 +1085,65 @@ const AdminLiveTracking = () => {
                                     )}
                                 </p>
                                 {/* Tab Switcher */}
-                                <div className="flex gap-2 mt-3">
-                                    <button
-                                        onClick={() => setActiveTab('report')}
-                                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'report'
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
-                                            }`}
-                                    >
-                                        <FaChartPie className="inline mr-1.5" /> Activity Report
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('screenshots')}
-                                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'screenshots'
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
-                                            }`}
-                                    >
-                                        <FaCamera />
-                                        Screenshots
-                                        {screenshots.length > 0 && (
-                                            <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{screenshots.length}</span>
-                                        )}
-                                    </button>
+                                <div className="flex flex-wrap items-center gap-3 mt-3">
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setActiveTab('report')}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'report'
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                                }`}
+                                        >
+                                            <FaChartPie className="inline mr-1.5" /> Activity Report
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveTab('screenshots')}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'screenshots'
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                                }`}
+                                        >
+                                            <FaCamera />
+                                            Screenshots
+                                            {screenshots.length > 0 && (
+                                                <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{screenshots.length}</span>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Date Picker */}
+                                    <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-lg shadow-sm hover:border-indigo-300 transition-all overflow-hidden">
+                                        <button
+                                            onClick={() => shiftDate(-1)}
+                                            className="p-2 hover:bg-slate-200 text-slate-500 transition-colors border-r border-slate-200"
+                                            title="Previous Day"
+                                        >
+                                            <FaChevronLeft className="text-[10px]" />
+                                        </button>
+                                        <div className="flex items-center gap-2 px-3 py-1.5">
+                                            <FaCalendarAlt className="text-indigo-500 text-xs" />
+                                            <input
+                                                type="date"
+                                                value={selectedDate}
+                                                onChange={(e) => handleDateChange(e.target.value)}
+                                                className="text-xs font-bold text-slate-600 outline-none border-none bg-transparent cursor-pointer"
+                                                max={new Date().toISOString().split('T')[0]}
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => shiftDate(1)}
+                                            disabled={selectedDate === new Date().toISOString().split('T')[0]}
+                                            className="p-2 hover:bg-slate-200 text-slate-500 transition-colors border-l border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title="Next Day"
+                                        >
+                                            <FaChevronRight className="text-[10px]" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Tab Switcher */}
-                            <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
+                            {/* <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
                                 <button
                                     onClick={() => setActiveTab('report')}
                                     className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'report'
@@ -943,7 +1166,7 @@ const AdminLiveTracking = () => {
                                         <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-[10px] rounded-full">{screenshots.length}</span>
                                     )}
                                 </button>
-                            </div>
+                            </div> */}
                         </div>
 
                         {/* Modal Body */}
@@ -983,124 +1206,327 @@ const AdminLiveTracking = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4">
-                                                {/* Doughnut Chart */}
-                                                <div className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
-                                                    <h3 className="text-lg font-bold text-slate-800 mb-4 self-start">Activity Ratio (Today)</h3>
-                                                    <div className="w-48 h-48">
-                                                        {reportData.workedSeconds === 0 && reportData.idleSeconds === 0 ? (
-                                                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-full">No Data</div>
-                                                        ) : (
-                                                            <Doughnut
-                                                                data={{
-                                                                    labels: ['Working', 'Idle'],
-                                                                    datasets: [{
-                                                                        data: [reportData.workedSeconds, reportData.idleSeconds],
-                                                                        backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)'],
-                                                                        borderColor: ['rgba(16, 185, 129, 1)', 'rgba(245, 158, 11, 1)'],
-                                                                        borderWidth: 1,
-                                                                        cutout: '70%'
-                                                                    }]
-                                                                }}
+                                            {/* Daily Performance Section */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                                                {/* Daily Activity Trend (Line) */}
+                                                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                                        <FaRegClock className="text-indigo-500" />
+                                                        Day Activity Trend (Hourly)
+                                                    </h3>
+                                                    <div className="w-full h-56 relative">
+                                                        {dailyChartData ? (
+                                                            <Line
+                                                                data={dailyChartData}
                                                                 options={{
+                                                                    responsive: true,
+                                                                    maintainAspectRatio: false,
                                                                     plugins: {
-                                                                        legend: { position: 'bottom', labels: { color: '#64748b' } }
+                                                                        legend: {
+                                                                            position: 'top',
+                                                                            align: 'end',
+                                                                            labels: { boxWidth: 8, usePointStyle: true, pointStyle: 'circle', font: { size: 10 } }
+                                                                        },
+                                                                        tooltip: {
+                                                                            mode: 'index',
+                                                                            intersect: false,
+                                                                            callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} mins` }
+                                                                        }
                                                                     },
-                                                                    maintainAspectRatio: false
+                                                                    scales: {
+                                                                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+                                                                        y: {
+                                                                            beginAtZero: true,
+                                                                            ticks: { font: { size: 9 } },
+                                                                            title: { display: true, text: 'Mins / Hour', font: { size: 10, weight: '600' } }
+                                                                        }
+                                                                    }
                                                                 }}
                                                             />
+                                                        ) : (
+                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
+                                                                No trend data for this date
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                {/* Timeline Table */}
-                                                <div className="bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden max-h-72 shadow-sm">
-                                                    <h3 className="text-base md:text-lg font-bold text-slate-800 p-4 border-b border-slate-200 sticky top-0 bg-white">Idle Intervals Log</h3>
-                                                    <div className="overflow-y-auto">
-                                                        {reportData.idleTimeline && reportData.idleTimeline.length > 0 ? (
-                                                            <div className="flex flex-col divide-y divide-slate-100">
-                                                                {/* Desktop Table Header */}
-                                                                <div className="hidden md:grid grid-cols-3 bg-slate-50 px-4 py-2 sticky top-0 font-bold text-slate-600 text-sm">
-                                                                    <div>Idle Start</div>
-                                                                    <div>Idle End</div>
-                                                                    <div>Duration</div>
-                                                                </div>
-                                                                {reportData.idleTimeline.map((item, idx) => (
-                                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-3 p-3 md:p-4 md:py-2 hover:bg-slate-50 gap-1 md:gap-4 text-xs md:text-sm">
-                                                                        <div className="flex justify-between md:block">
-                                                                            <span className="md:hidden text-slate-500 font-medium">Start:</span>
-                                                                            <span className="text-slate-700 font-semibold md:font-normal">{new Date(item.idleStart).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between md:block">
-                                                                            <span className="md:hidden text-slate-500 font-medium">End:</span>
-                                                                            <span className="text-slate-700 font-semibold md:font-normal">{new Date(item.idleEnd).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between md:block mt-1 md:mt-0 pt-1 md:pt-0 border-t border-slate-100 md:border-0">
-                                                                            <span className="md:hidden text-slate-500 font-medium">Duration:</span>
-                                                                            <span className="text-amber-600 font-mono font-bold">{formatDuration(item.idleDurationSeconds)}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
+                                                {/* Activity Ratio (Doughnut) */}
+                                                <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm relative group overflow-hidden">
+                                                    <div className="w-full flex justify-between items-center mb-6">
+                                                        <h3 className="text-lg font-extrabold text-slate-800">Ratio</h3>
+                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">LIVE</span>
+                                                    </div>
+
+                                                    <div className="w-full h-52 relative">
+                                                        {reportData.workedSeconds === 0 && reportData.idleSeconds === 0 ? (
+                                                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-full">No Data</div>
                                                         ) : (
-                                                            <div className="p-8 text-center text-slate-500 text-sm">
-                                                                <FaClock className="text-3xl md:text-4xl mx-auto mb-2 opacity-20" />
-                                                                No idle sessions recorded for this user today.
-                                                            </div>
+                                                            <>
+                                                                <Pie
+                                                                    data={{
+                                                                        labels: ['Working Time', 'Idle Time'],
+                                                                        datasets: [{
+                                                                            data: [
+                                                                                (reportData.workedSeconds / 3600).toFixed(2),
+                                                                                (reportData.idleSeconds / 3600).toFixed(2)
+                                                                            ],
+                                                                            backgroundColor: [
+                                                                                'rgba(16, 185, 129, 0.9)',
+                                                                                'rgba(245, 158, 11, 0.9)'
+                                                                            ],
+                                                                            hoverBackgroundColor: [
+                                                                                'rgba(16, 185, 129, 1)',
+                                                                                'rgba(245, 158, 11, 1)'
+                                                                            ],
+                                                                            borderColor: '#fff',
+                                                                            borderWidth: 1,
+                                                                            hoverOffset: 20
+                                                                        }]
+                                                                    }}
+                                                                    plugins={[{
+                                                                        id: 'datalabels',
+                                                                        afterDatasetsDraw(chart) {
+                                                                            const { ctx, data } = chart;
+                                                                            ctx.save();
+                                                                            const meta = chart.getDatasetMeta(0);
+                                                                            meta.data.forEach((element, i) => {
+                                                                                const value = data.datasets[0].data[i];
+                                                                                if (value > 0.2) { // Only show if segment is large enough
+                                                                                    const { x, y } = element.tooltipPosition();
+                                                                                    ctx.fillStyle = 'white';
+                                                                                    ctx.font = 'bold 12px Inter, sans-serif';
+                                                                                    ctx.textAlign = 'center';
+                                                                                    ctx.textBaseline = 'middle';
+                                                                                    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                                                                                    ctx.shadowBlur = 4;
+                                                                                    ctx.fillText(`${value}h`, x, y);
+                                                                                }
+                                                                            });
+                                                                            ctx.restore();
+                                                                        }
+                                                                    }]}
+                                                                    options={{
+                                                                        plugins: {
+                                                                            legend: {
+                                                                                display: true,
+                                                                                position: 'bottom',
+                                                                                labels: {
+                                                                                    boxWidth: 8,
+                                                                                    usePointStyle: true,
+                                                                                    pointStyle: 'circle',
+                                                                                    font: { size: 11, weight: '600' },
+                                                                                    padding: 15,
+                                                                                    color: '#64748b'
+                                                                                }
+                                                                            },
+                                                                            tooltip: {
+                                                                                backgroundColor: '#1e293b',
+                                                                                padding: 12,
+                                                                                cornerRadius: 10,
+                                                                                callbacks: {
+                                                                                    label: (ctx) => ` ${ctx.label}: ${ctx.raw} hrs`
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        maintainAspectRatio: false,
+                                                                        animation: { animateScale: true, animateRotate: true }
+                                                                    }}
+                                                                />
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Weekly Chart View */}
-                                            <div className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col mt-4 shadow-sm">
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <h3 className="text-lg font-bold text-slate-800">Weekly Summary (Past 7 Days)</h3>
-                                                    <select
-                                                        className="bg-white text-slate-700 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 text-sm"
-                                                        value={weeklyOffset}
-                                                        onChange={(e) => setWeeklyOffset(Number(e.target.value))}
-                                                    >
-                                                        <option value={0}>Current Week</option>
-                                                        <option value={1}>1 Week Ago</option>
-                                                        <option value={2}>2 Weeks Ago</option>
-                                                        <option value={3}>3 Weeks Ago</option>
-                                                        <option value={4}>4 Weeks Ago</option>
-                                                    </select>
+                                            {/* Intervals and Weekly Summary Grid */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                                {/* Timeline Table */}
+                                                <div className="bg-white rounded-2xl border border-slate-200 flex flex-col overflow-hidden shadow-sm">
+                                                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                                        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                                            <FaClock className="text-amber-500" />
+                                                            Idle Intervals Log
+                                                        </h3>
+                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">Today</span>
+                                                    </div>
+                                                    <div className="overflow-y-auto max-h-64">
+                                                        {reportData.idleTimeline && reportData.idleTimeline.length > 0 ? (
+                                                            <div className="flex flex-col divide-y divide-slate-100">
+                                                                {reportData.idleTimeline.map((item, idx) => (
+                                                                    <div key={idx} className="grid grid-cols-3 p-3 hover:bg-slate-50 gap-4 text-xs">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-slate-400 text-[9px] uppercase font-bold">Start</span>
+                                                                            <span className="text-slate-700 font-semibold">{new Date(item.idleStart).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-slate-400 text-[9px] uppercase font-bold">End</span>
+                                                                            <span className="text-slate-700 font-semibold">{new Date(item.idleEnd).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span className="text-slate-400 text-[9px] uppercase font-bold">Duration</span>
+                                                                            <span className="text-amber-600 font-bold">{formatDuration(item.idleDurationSeconds)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="p-12 text-center text-slate-400 text-xs italic">
+                                                                No idle sessions recorded.
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
 
-                                                <div className="w-full h-64 relative">
-                                                    {weeklyDataLoading ? (
-                                                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 gap-2">
-                                                            <FaSyncAlt className="animate-spin text-xl" /> Fetching history...
+                                                {/* Week Summary Stats Mini-Card (Quick Peek) */}
+                                                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg flex flex-col justify-center relative overflow-hidden">
+                                                    <div className="relative z-10">
+                                                        <h3 className="text-lg font-bold mb-1 opacity-90">Weekly Overview</h3>
+                                                        <p className="text-xs opacity-70 mb-6">Aggregate performance for the last 7 days</p>
+
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
+                                                                <div className="text-[10px] uppercase font-bold opacity-60 mb-1">Total Worked</div>
+                                                                <div className="text-xl font-black">{weeklyTotals.worked.toFixed(1)}h</div>
+                                                            </div>
+                                                            <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
+                                                                <div className="text-[10px] uppercase font-bold opacity-60 mb-1">Total Idle</div>
+                                                                <div className="text-xl font-black">{weeklyTotals.idle.toFixed(1)}h</div>
+                                                            </div>
                                                         </div>
-                                                    ) : weeklyChartData ? (
-                                                        <Line
-                                                            data={weeklyChartData}
-                                                            options={{
-                                                                responsive: true,
-                                                                maintainAspectRatio: false,
-                                                                plugins: {
-                                                                    legend: { labels: { color: '#64748b' } },
-                                                                    tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} hrs` } }
-                                                                },
-                                                                scales: {
-                                                                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(226, 232, 240, 0.5)' } },
-                                                                    y: {
-                                                                        beginAtZero: true,
-                                                                        ticks: { color: '#94a3b8' },
-                                                                        grid: { color: 'rgba(226, 232, 240, 0.5)' },
-                                                                        title: { display: true, text: 'Hours', color: '#64748b' }
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                                                            Data could not be loaded
+
+                                                        <div className="mt-6 flex items-center gap-2 text-xs">
+                                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                                            <span className="font-medium">Tracker syncing active</span>
                                                         </div>
-                                                    )}
+                                                    </div>
+                                                    {/* Decorative background icon */}
+                                                    <FaChartPie className="absolute -bottom-6 -right-6 text-white/5 text-9xl transform rotate-12" />
                                                 </div>
+                                            </div>
+
+                                            {/* Weekly Summary Grid */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                                                {/* Left Column: Stats Summary */}
+                                                {/* <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                                    <div className="flex justify-between items-center mb-6">
+                                                        <h3 className="text-lg font-bold text-slate-800">Week Stats</h3>
+                                                        <FaChartPie className="text-indigo-400" />
+                                                    </div>
+
+                                                    <div className="space-y-4 flex-grow">
+                                                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                                                            <div className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Worked</div>
+                                                            <div className="text-2xl font-black text-emerald-700">{weeklyTotals.worked.toFixed(1)} <span className="text-sm font-medium opacity-70">hrs</span></div>
+                                                            <div className="text-[10px] text-emerald-600/70 mt-1">Avg: {(weeklyTotals.worked / 7).toFixed(1)} hrs / day</div>
+                                                        </div>
+
+                                                        <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                                                            <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Total Idle</div>
+                                                            <div className="text-2xl font-black text-amber-700">{weeklyTotals.idle.toFixed(1)} <span className="text-sm font-medium opacity-70">hrs</span></div>
+                                                            <div className="text-[10px] text-amber-600/70 mt-1">Avg: {(weeklyTotals.idle / 7).toFixed(1)} hrs / day</div>
+                                                        </div>
+
+                                                        <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                                            <div className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">Efficiency</div>
+                                                            <div className="text-2xl font-black text-indigo-700">
+                                                                {weeklyTotals.worked + weeklyTotals.idle > 0
+                                                                    ? ((weeklyTotals.worked / (weeklyTotals.worked + weeklyTotals.idle)) * 100).toFixed(0)
+                                                                    : 0}%
+                                                            </div>
+                                                            <div className="w-full bg-indigo-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                                                                <div
+                                                                    className="bg-indigo-600 h-full rounded-full transition-all duration-1000"
+                                                                    style={{
+                                                                        width: `${weeklyTotals.worked + weeklyTotals.idle > 0
+                                                                            ? (weeklyTotals.worked / (weeklyTotals.worked + weeklyTotals.idle)) * 100
+                                                                            : 0}%`
+                                                                    }}
+                                                                ></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-6 pt-4 border-t border-slate-100">
+                                                        <p className="text-[10px] text-slate-400 italic">Values based on past 7 days tracking data.</p>
+                                                    </div>
+                                                </div> */}
+
+                                                {/* Right Column: Line Chart */}
+                                                {/* <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                                    <div className="flex justify-between items-center mb-6">
+                                                        <h3 className="text-lg font-bold text-slate-800">Activity Trend</h3>
+                                                        <select
+                                                            className="bg-slate-50 text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm font-medium transition-all"
+                                                            value={weeklyOffset}
+                                                            onChange={(e) => setWeeklyOffset(Number(e.target.value))}
+                                                        >
+                                                            <option value={0}>Current Week</option>
+                                                            <option value={1}>1 Week Ago</option>
+                                                            <option value={2}>2 Weeks Ago</option>
+                                                            <option value={3}>3 Weeks Ago</option>
+                                                            <option value={4}>4 Weeks Ago</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="w-full h-64 relative">
+                                                        {weeklyDataLoading ? (
+                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 gap-2 bg-white/50 backdrop-blur-[1px] z-10 rounded-xl">
+                                                                <FaSyncAlt className="animate-spin text-2xl text-indigo-500" />
+                                                                <span className="font-medium">Updating Trend...</span>
+                                                            </div>
+                                                        ) : weeklyChartData ? (
+                                                            <Line
+                                                                data={weeklyChartData}
+                                                                options={{
+                                                                    responsive: true,
+                                                                    maintainAspectRatio: false,
+                                                                    interaction: {
+                                                                        mode: 'index',
+                                                                        intersect: false,
+                                                                    },
+                                                                    plugins: {
+                                                                        legend: {
+                                                                            position: 'top',
+                                                                            align: 'end',
+                                                                            labels: {
+                                                                                usePointStyle: true,
+                                                                                pointStyle: 'circle',
+                                                                                padding: 20,
+                                                                                font: { family: 'Inter, sans-serif', size: 11, weight: '600' },
+                                                                                color: '#64748b'
+                                                                            }
+                                                                        },
+                                                                        tooltip: {
+                                                                            backgroundColor: '#1e293b',
+                                                                            padding: 12,
+                                                                            titleFont: { size: 13, weight: 'bold' },
+                                                                            bodyFont: { size: 12 },
+                                                                            cornerRadius: 8,
+                                                                            callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} hrs` }
+                                                                        }
+                                                                    },
+                                                                    scales: {
+                                                                        x: {
+                                                                            ticks: { color: '#94a3b8', font: { size: 10 } },
+                                                                            grid: { display: false }
+                                                                        },
+                                                                        y: {
+                                                                            beginAtZero: true,
+                                                                            ticks: { color: '#94a3b8', font: { size: 10 }, stepSize: 2 },
+                                                                            grid: { color: 'rgba(226, 232, 240, 0.4)', strokeDashArray: [4, 4] },
+                                                                            title: { display: true, text: 'Hours Captured', color: '#64748b', font: { size: 11, weight: '600' } }
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-500 border-2 border-dashed border-slate-100 rounded-xl">
+                                                                Data could not be loaded
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div> */}
                                             </div>
                                         </>
                                     )
@@ -1170,15 +1596,25 @@ const AdminLiveTracking = () => {
                                                                     </>
                                                                 )}
                                                             </div>
-                                                            <a
-                                                                href={ss.screenshotUrl}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="text-slate-400 hover:text-indigo-500 transition-colors"
-                                                                title="Open full size"
-                                                            >
-                                                                <FaExternalLinkAlt className="text-sm" />
-                                                            </a>
+                                                            <div className="flex items-center gap-2">
+                                                                <a
+                                                                    href={ss.screenshotUrl}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="text-slate-400 hover:text-indigo-500 transition-colors"
+                                                                    title="Open full size"
+                                                                    onClick={e => e.stopPropagation()}
+                                                                >
+                                                                    <FaExternalLinkAlt className="text-sm" />
+                                                                </a>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteScreenshot(ss); }}
+                                                                    className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                                                                    title="Delete screenshot"
+                                                                >
+                                                                    <FaTrash className="text-xs" />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         {ss.type !== 'WORKING' && (
                                                             <p className="text-xs text-slate-400 mt-1">

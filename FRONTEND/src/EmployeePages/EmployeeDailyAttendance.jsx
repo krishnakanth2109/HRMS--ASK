@@ -159,6 +159,13 @@ const EmployeeDailyAttendance = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'descending' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
+
+  // Reset pagination when date or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDate, searchTerm]);
 
   // Request Modals
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -347,6 +354,13 @@ const EmployeeDailyAttendance = () => {
 
     return data;
   }, [processedCalendarData, searchTerm, sortConfig]);
+
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   // --- Calculate Yearly Stats for Graph ---
   const joiningDate = useMemo(() => {
@@ -919,9 +933,7 @@ const EmployeeDailyAttendance = () => {
             {/* --- DESKTOP TABLE --- */}
             <div
               ref={tableContainerRef}
-              onScroll={handleScroll}
-              className="max-h-[400px] overflow-auto hidden md:block"
-              style={{ scrollbarWidth: 'thin' }}
+              className="hidden md:block"
             >
               <table className="w-full text-sm text-left min-w-[900px]">
                 <thead className="text-xs text-gray-400 uppercase font-bold sticky top-0 z-10">
@@ -936,8 +948,8 @@ const EmployeeDailyAttendance = () => {
                 <tbody className="divide-y divide-gray-50">
                   {loading ? (
                     Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} />)
-                  ) : filteredData.length > 0 ? (
-                    filteredData.map((row) => {
+                  ) : paginatedData.length > 0 ? (
+                    paginatedData.map((row) => {
                       const isWeekend = row.workedStatus === 'Week Off';
                       const isAbsent = row.workedStatus === 'Absent';
                       const isPending = row.statusCorrectionRequest?.hasRequest && row.statusCorrectionRequest?.status === 'PENDING';
@@ -1021,8 +1033,8 @@ const EmployeeDailyAttendance = () => {
                             <div className="h-3 bg-gray-200 rounded w-1/4"></div>
                         </div>
                     ))
-                ) : filteredData.length > 0 ? (
-                    filteredData.map((row) => {
+                ) : paginatedData.length > 0 ? (
+                    paginatedData.map((row) => {
                       const isWeekend = row.workedStatus === 'Week Off';
                       const isAbsent = row.workedStatus === 'Absent';
                       const isPending = row.statusCorrectionRequest?.hasRequest && row.statusCorrectionRequest?.status === 'PENDING';
@@ -1093,13 +1105,53 @@ const EmployeeDailyAttendance = () => {
                     )}
             </div>
 
-            {/* Scroll Indicator */}
-            {showScrollArrow && (
-              <div className="hidden md:flex absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur shadow-lg border border-gray-100 rounded-full p-2 text-blue-600 animate-bounce cursor-pointer z-10" onClick={() => tableContainerRef.current.scrollBy({ top: 100, behavior: 'smooth' })}>
-                <FaChevronDown />
-              </div>
-            )}
+
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="p-4 md:p-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/30">
+              <p className="text-xs md:text-sm text-gray-500 font-medium">
+                Showing <span className="text-gray-900 font-bold">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-gray-900 font-bold">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> of <span className="text-gray-900 font-bold">{filteredData.length}</span> records
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-bold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                >
+                  Prev
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    // Only show 5 pages at a time if there are many pages
+                    if (totalPages > 7) {
+                      if (i + 1 !== 1 && i + 1 !== totalPages && (i + 1 < currentPage - 1 || i + 1 > currentPage + 1)) {
+                        if (i + 1 === currentPage - 2 || i + 1 === currentPage + 2) return <span key={i} className="px-1 text-gray-400">...</span>;
+                        return null;
+                      }
+                    }
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${currentPage === i + 1 ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-bold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* --- MODALS (IMPROVED UI & DATA MAPPING) --- */}

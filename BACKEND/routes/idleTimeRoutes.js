@@ -1,10 +1,80 @@
 import express from "express";
-import LiveTracking from "../models/LiveTrackingModel.js"; 
+import LiveTracking from "../models/LiveTrackingModel.js";
 import { cloudinary } from "../config/cloudinary.js";
 import Employee from "../models/employeeModel.js";
 
 const router = express.Router();
 import OfficeSettings from "../models/OfficeSettings.js";
+
+const SCREENSHOT_EXPIRY_DAYS = 3;
+
+const getScreenshotExpiryDate = (capturedAt = new Date()) => {
+  const expiry = new Date(capturedAt);
+  expiry.setDate(expiry.getDate() + SCREENSHOT_EXPIRY_DAYS);
+  return expiry;
+};
+
+const isExpiredScreenshot = (date) => {
+  if (!date) return false;
+  return new Date(date) <= new Date();
+};
+
+const deleteFromCloudinary = async (url) => {
+  try {
+    if (!url || !url.includes("cloudinary.com")) return;
+    const parts = url.split("/");
+    const filename = parts.pop(); // e.g. "abcd.png"
+    const folder = parts.pop();   // e.g. "idle_screenshots"
+    // Handle cases where there might be a version number (v1234567)
+    const folderName = folder.startsWith('v') ? parts.pop() : folder;
+    const publicId = `${folderName}/${filename.split(".")[0]}`;
+    await cloudinary.uploader.destroy(publicId);
+    console.log(`✅ [Cloudinary] Deleted: ${publicId}`);
+  } catch (err) {
+    console.error("❌ [Cloudinary] Delete Error:", err);
+  }
+};
+
+const cleanupExpiredScreenshots = async (doc) => {
+  if (!doc?.dates) return false;
+
+  let changed = false;
+  for (const [dateStr, dailyData] of doc.dates.entries()) {
+    const workingScreenshots = dailyData.workingScreenshots || [];
+    const expiredWorking = workingScreenshots.filter((shot) => {
+      const expiresAt = shot.expiresAt || getScreenshotExpiryDate(shot.capturedAt);
+      return isExpiredScreenshot(expiresAt);
+    });
+
+    if (expiredWorking.length > 0) {
+      for (const shot of expiredWorking) {
+        await deleteFromCloudinary(shot.screenshotUrl);
+      }
+      dailyData.workingScreenshots = workingScreenshots.filter(s => !expiredWorking.includes(s));
+      changed = true;
+    }
+
+    const timeline = dailyData.idleTimeline || [];
+    for (let i = 0; i < timeline.length; i++) {
+      const seg = timeline[i];
+      if (!seg.screenshotUrl) continue;
+
+      const expiresAt = seg.screenshotExpiresAt || getScreenshotExpiryDate(seg.startTime);
+      if (isExpiredScreenshot(expiresAt)) {
+        await deleteFromCloudinary(seg.screenshotUrl);
+        const plainSeg = seg.toObject ? seg.toObject() : seg;
+        timeline[i] = { ...plainSeg, screenshotUrl: null, screenshotExpiresAt: null };
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      doc.dates.set(dateStr, dailyData);
+    }
+  }
+
+  return changed;
+};
 
 // ------------------------------------------
 // GET /settings/tracker
@@ -15,9 +85,9 @@ router.get("/settings/tracker", async (req, res) => {
     let settings = await OfficeSettings.findOne({ type: "Global" });
     if (!settings) {
       // Return default if not initialized
-      return res.json({ screenshotIntervalMinutes: 5 });
+      return res.json({ screenshotIntervalMinutes: 90 });
     }
-    return res.json({ screenshotIntervalMinutes: settings.screenshotIntervalMinutes || 5 });
+    return res.json({ screenshotIntervalMinutes: settings.screenshotIntervalMinutes || 90 });
   } catch (err) {
     console.error("Fetch tracker settings error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -35,7 +105,7 @@ router.put("/settings/tracker", async (req, res) => {
     if (!settings) {
       settings = new OfficeSettings({ type: "Global", officeLocation: { latitude: 0, longitude: 0 } });
     }
-    settings.screenshotIntervalMinutes = Number(screenshotIntervalMinutes) || 5;
+    settings.screenshotIntervalMinutes = Number(screenshotIntervalMinutes) || 90;
     await settings.save();
     return res.json({ message: "Settings updated successfully", screenshotIntervalMinutes: settings.screenshotIntervalMinutes });
   } catch (err) {
@@ -66,10 +136,10 @@ router.post('/live-status', async (req, res) => {
   try {
     const { employeeId, status, timestamp, total_work_seconds, total_idle_seconds } = req.body;
     // Idle screenshots removed — only working screenshots are captured
-    
+
     // Ensure date is consistent (YYYY-MM-DD)
     const date = new Date().toISOString().split('T')[0];
-    
+
     // Python sends timestamp in seconds, JS needs milliseconds
     const pingTime = new Date(timestamp * 1000);
     const idleSinceTime = req.body.idle_since ? new Date(req.body.idle_since * 1000) : null;
@@ -99,7 +169,7 @@ router.post('/live-status', async (req, res) => {
       todayData.lastPing = pingTime;
       todayData.idleSince = idleSinceTime;
       todayData.activeWindow = req.body.activeWindow || null;
-      
+
       if (total_work_seconds !== undefined) todayData.trackedWorkSeconds = total_work_seconds;
       if (total_idle_seconds !== undefined) todayData.trackedIdleSeconds = total_idle_seconds;
 
@@ -108,7 +178,15 @@ router.post('/live-status', async (req, res) => {
     }
 
     await doc.save();
-    res.status(200).json({ message: "Live Telemetry Updated" });
+
+    // Fetch current settings to send back to tracker for dynamic sync
+    const settings = await OfficeSettings.findOne({ type: "Global" });
+    const currentInterval = settings ? (settings.screenshotIntervalMinutes || 5) : 90;
+
+    res.status(200).json({
+      message: "Live Telemetry Updated",
+      screenshotIntervalMinutes: currentInterval
+    });
   } catch (error) {
     console.error("Live Status Error:", error);
     res.status(500).json({ error: "Server Error" });
@@ -180,17 +258,17 @@ router.post('/live-screenshot', async (req, res) => {
     }
 
     if (!doc.dates.has(date)) {
-      const newDateData = { 
-        idleTimeline: [], 
-        workingScreenshots: [{ screenshotUrl, capturedAt: capturedDate }],
-        currentIdleScreenshot: null, 
-        screenshotCapturedAt: null 
+      const newDateData = {
+        idleTimeline: [],
+        workingScreenshots: [{ screenshotUrl, capturedAt: capturedDate, expiresAt: getScreenshotExpiryDate(capturedDate) }],
+        currentIdleScreenshot: null,
+        screenshotCapturedAt: null
       };
       doc.dates.set(date, newDateData);
     } else {
       const todayData = doc.dates.get(date);
       if (!todayData.workingScreenshots) todayData.workingScreenshots = [];
-      todayData.workingScreenshots.push({ screenshotUrl, capturedAt: capturedDate });
+      todayData.workingScreenshots.push({ screenshotUrl, capturedAt: capturedDate, expiresAt: getScreenshotExpiryDate(capturedDate) });
       doc.dates.set(date, todayData);
     }
 
@@ -219,6 +297,10 @@ router.get("/screenshots/:employeeId", async (req, res) => {
       return res.json([]);
     }
 
+    if (await cleanupExpiredScreenshots(doc)) {
+      await doc.save();
+    }
+
     const screenshots = [];
     for (const [dateStr, dailyData] of doc.dates.entries()) {
       // If a date filter is provided, skip non-matching dates
@@ -227,6 +309,7 @@ router.get("/screenshots/:employeeId", async (req, res) => {
       const timeline = dailyData.idleTimeline || [];
       timeline.forEach((seg) => {
         if (seg.screenshotUrl) {
+          const expiresAt = seg.screenshotExpiresAt || getScreenshotExpiryDate(seg.startTime);
           screenshots.push({
             date: dateStr,
             type: 'IDLE',
@@ -234,7 +317,8 @@ router.get("/screenshots/:employeeId", async (req, res) => {
             idleEnd: seg.endTime,
             idleDurationSeconds: seg.idleDurationSeconds,
             screenshotUrl: seg.screenshotUrl,
-            capturedAt: seg.startTime
+            capturedAt: seg.startTime,
+            expiresAt
           });
         }
       });
@@ -242,11 +326,13 @@ router.get("/screenshots/:employeeId", async (req, res) => {
       const working = dailyData.workingScreenshots || [];
       working.forEach((seg) => {
         if (seg.screenshotUrl) {
+          const expiresAt = seg.expiresAt || getScreenshotExpiryDate(seg.capturedAt);
           screenshots.push({
             date: dateStr,
             type: 'WORKING',
             screenshotUrl: seg.screenshotUrl,
-            capturedAt: seg.capturedAt
+            capturedAt: seg.capturedAt,
+            expiresAt
           });
         }
       });
@@ -258,6 +344,71 @@ router.get("/screenshots/:employeeId", async (req, res) => {
   } catch (err) {
     console.error("❌ Get screenshots error:", err);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ------------------------------------------
+// DELETE /screenshots/:employeeId
+// Deletes a specific screenshot by URL and date for an employee
+// Body: { screenshotUrl, date, type } (type = 'IDLE' | 'WORKING')
+// ------------------------------------------
+router.delete("/screenshots/:employeeId", async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { screenshotUrl, date, type } = req.body;
+
+    if (!screenshotUrl || !date) {
+      return res.status(400).json({ message: "screenshotUrl and date are required" });
+    }
+
+    const doc = await LiveTracking.findOne({
+      employeeId: { $regex: new RegExp(`^${employeeId}$`, "i") }
+    });
+
+    if (!doc || !doc.dates || !doc.dates.has(date)) {
+      return res.status(404).json({ message: "No tracking data found for that date" });
+    }
+
+    const dayData = doc.dates.get(date);
+
+    if (type === 'WORKING') {
+      // Remove from workingScreenshots array
+      const before = (dayData.workingScreenshots || []).length;
+      dayData.workingScreenshots = (dayData.workingScreenshots || []).filter(
+        s => s.screenshotUrl !== screenshotUrl
+      );
+      const after = dayData.workingScreenshots.length;
+      if (before === after) {
+        return res.status(404).json({ message: "Screenshot not found in working screenshots" });
+      }
+    } else {
+      // Remove screenshotUrl from the matching idle timeline segment
+      const before = (dayData.idleTimeline || []).filter(s => s.screenshotUrl === screenshotUrl).length;
+      dayData.idleTimeline = (dayData.idleTimeline || []).map(seg => {
+        if (seg.screenshotUrl === screenshotUrl) {
+          return { ...seg.toObject ? seg.toObject() : seg, screenshotUrl: null };
+        }
+        return seg;
+      });
+      const after = (dayData.idleTimeline || []).filter(s => s.screenshotUrl === screenshotUrl).length;
+      if (before === 0) {
+        return res.status(404).json({ message: "Screenshot not found in idle timeline" });
+      }
+    }
+
+    doc.dates.set(date, dayData);
+    await doc.save();
+
+    // Also delete from Cloudinary
+    if (screenshotUrl) {
+      await deleteFromCloudinary(screenshotUrl);
+    }
+
+    console.log(`🗑️ Deleted screenshot for ${employeeId} on ${date} [${type}]`);
+    return res.json({ message: "Screenshot deleted successfully" });
+  } catch (err) {
+    console.error("❌ Delete screenshot error:", err);
+    return res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -301,19 +452,21 @@ router.post("/", async (req, res) => {
     }
 
     const todayData = doc.dates.get(date);
-    
+    const startTime = new Date(idleStart);
+
     // Create new segment (Python sends milliseconds, which `new Date()` accepts perfectly)
     const newSegment = {
-      startTime: new Date(idleStart),
+      startTime,
       endTime: new Date(idleEnd),
       idleDurationSeconds: Number(idleDurationSeconds),
-      screenshotUrl: screenshotUrl
+      screenshotUrl: screenshotUrl,
+      screenshotExpiresAt: screenshotUrl ? getScreenshotExpiryDate(startTime) : null
     };
 
     // Prevent duplicate entries (if python script retries due to poor network)
     const isDuplicate = todayData.idleTimeline.some(
       (seg) => seg.startTime.getTime() === newSegment.startTime.getTime() &&
-               seg.endTime.getTime() === newSegment.endTime.getTime()
+        seg.endTime.getTime() === newSegment.endTime.getTime()
     );
 
     if (!isDuplicate) {

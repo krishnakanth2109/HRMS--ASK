@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef, useCallback } from "react";
+import React, { useEffect, useState, useContext, useRef, useCallback, useMemo } from "react";
 import { AuthContext } from "../context/AuthContext"; 
 import api, { sendReplyWithImage, getEmployees, addNotice } from "../api"; 
 import { 
@@ -6,8 +6,27 @@ import {
   FaPen, FaPaperclip, FaVideo, FaClock, FaPlus, FaBullhorn, 
   FaCheck, FaSearch, FaUserTag, FaChevronDown, FaUserFriends,
   FaLayerGroup, FaUsers, FaEye, FaChevronUp, FaCommentDots, FaPhone, FaEllipsisH, FaEllipsisV,
-  FaCheckDouble
+  FaCheckDouble, FaChevronLeft, FaChevronRight
 } from "react-icons/fa";
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const shiftMonthValue = (monthValue, offset) => {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const formatMonthLabel = (monthValue) => {
+  const [year, month] = monthValue.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric"
+  });
+};
 
 const NoticeList = () => {
   // --- EXISTING NOTICE STATES ---
@@ -19,6 +38,7 @@ const NoticeList = () => {
   const [previewGroup, setPreviewGroup] = useState(null); 
   const [expandedNoticeId, setExpandedNoticeId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonthValue());
 
   const { user } = useContext(AuthContext);
   const currentUserId = user?._id || user?.id;
@@ -360,6 +380,19 @@ const NoticeList = () => {
     return { date: d.toLocaleDateString(), time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
   };
 
+  const filteredNotices = useMemo(() => {
+    return notices.filter((notice) => {
+      if (!notice.date) return false;
+      const noticeDate = new Date(notice.date);
+      const noticeMonth = `${noticeDate.getFullYear()}-${String(noticeDate.getMonth() + 1).padStart(2, "0")}`;
+      return noticeMonth === monthFilter;
+    });
+  }, [notices, monthFilter]);
+
+  const handleMonthChange = (offset) => {
+    setMonthFilter((currentMonth) => shiftMonthValue(currentMonth, offset));
+  };
+
   const getMeetingDateTimeComponents = (description) => {
     if (!description) return null;
     const match = description.match(/scheduled meeting\s+(.+?)\s+at\s+(.+?)\s+as per/i);
@@ -396,7 +429,33 @@ const NoticeList = () => {
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3 justify-end">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
+              <button
+                onClick={() => handleMonthChange(-1)}
+                className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition"
+                title="Previous month"
+              >
+                <FaChevronLeft size={12} />
+              </button>
+              <div className="min-w-[130px] text-center">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Month</div>
+                <div className="text-sm font-bold text-gray-700">{formatMonthLabel(monthFilter)}</div>
+              </div>
+              <input
+                type="month"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="hidden sm:block bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 w-[128px]"
+              />
+              <button
+                onClick={() => handleMonthChange(1)}
+                className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition"
+                title="Next month"
+              >
+                <FaChevronRight size={12} />
+              </button>
+            </div>
             <button 
                 onClick={() => { setIsEditing(false); setPostData(initialPostState); setIsPostModalOpen(true); }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95"
@@ -408,7 +467,12 @@ const NoticeList = () => {
 
         {/* --- EXISTING NOTICES LIST RENDERING --- */}
         <div className="space-y-5">
-          {notices.map((notice) => {
+          {filteredNotices.length === 0 ? (
+            <div className="text-center py-16 bg-white/90 rounded-2xl border border-dashed border-gray-200 text-gray-400">
+              <FaBullhorn className="text-4xl mx-auto mb-3 opacity-30" />
+              <p className="font-bold text-gray-500">No announcements for {formatMonthLabel(monthFilter)}.</p>
+            </div>
+          ) : filteredNotices.map((notice) => {
             const { date, time } = formatDateTime(notice.date);
             const isRead = notice.readBy?.some(record => (record.employeeId?._id || record.employeeId) === currentUserId);
             const isOwner = (notice.createdBy?._id || notice.createdBy) === currentUserId;

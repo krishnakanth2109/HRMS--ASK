@@ -3,7 +3,7 @@
 //    AI routed through your existing `api` instance, ghost text fixed,
 //    chat UX polished, loading/error states hardened.
 
-import React, { useState, useEffect, useCallback, useRef, useContext } from "react";
+import React, { useState, useEffect, useCallback, useRef, useContext, useMemo } from "react";
 import { getAllNoticesForAdmin, addNotice, getEmployees, deleteNoticeById, updateNotice, sendAdminReplyWithImage } from "../api";
 import api from "../api";
 import { AuthContext } from "../context/AuthContext";
@@ -13,9 +13,29 @@ import {
   FaChevronDown, FaChevronUp, FaUserTag, FaEye, FaReply, FaPaperPlane,
   FaBullhorn, FaUserFriends, FaUsers, FaLayerGroup, FaUsersCog,
   FaSave, FaExclamationCircle, FaCommentDots, FaArrowLeft, FaRobot,
-  FaPaperclip, FaVideo, FaCalendarAlt, FaClock, FaLink, FaExternalLinkAlt
+  FaPaperclip, FaVideo, FaCalendarAlt, FaClock, FaLink, FaExternalLinkAlt,
+  FaChevronLeft, FaChevronRight
 } from 'react-icons/fa';
 import { getAttendanceByDateRange } from "../api";
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const shiftMonthValue = (monthValue, offset) => {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const formatMonthLabel = (monthValue) => {
+  const [year, month] = monthValue.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric"
+  });
+};
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const getSecureUrl = (url) => {
@@ -42,6 +62,8 @@ const AdminNotices = () => {
   const [noticeData, setNoticeData] = useState(initialFormState);
   const [notices, setNotices] = useState([]);
   const [isLoadingNotices, setIsLoadingNotices] = useState(true);
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonthValue());
+  const monthInputRef = useRef(null);
   const initialLoadRef = useRef(true);
   const [employees, setEmployees] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,6 +74,8 @@ const AdminNotices = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [announcementSearch, setAnnouncementSearch] = useState("");
+  const [expandedAnnouncementId, setExpandedAnnouncementId] = useState(null);
 
   // ── meeting ───────────────────────────────────────────────────────────────
   const DEFAULT_MEETING_LINK = "https://meet.google.com/tsn-vrih-zvx";
@@ -617,13 +641,47 @@ const AdminNotices = () => {
   };
 
   // ─── render ────────────────────────────────────────────────────────────────
+  const filteredNotices = useMemo(() => {
+    const query = announcementSearch.trim().toLowerCase();
+    const selectedYear = Number(monthFilter.split("-")[0]);
+
+    return notices.filter((notice) => {
+      if (!notice.date) return false;
+      const noticeDate = new Date(notice.date);
+      const noticeMonth = `${noticeDate.getFullYear()}-${String(noticeDate.getMonth() + 1).padStart(2, "0")}`;
+      if (!query) return noticeMonth === monthFilter;
+      if (noticeDate.getFullYear() !== selectedYear) return false;
+      return [notice.title, notice.description, notice.createdBy?.name, notice.createdBy?.employeeId]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [notices, monthFilter, announcementSearch]);
+
+  const handleMonthChange = (offset) => {
+    setMonthFilter((currentMonth) => {
+      const nextMonth = shiftMonthValue(currentMonth, offset);
+      if (offset > 0 && nextMonth > getCurrentMonthValue()) {
+        return currentMonth;
+      }
+      return nextMonth;
+    });
+  };
+
+  const openMonthPicker = () => {
+    if (monthInputRef.current?.showPicker) {
+      monthInputRef.current.showPicker();
+    } else {
+      monthInputRef.current?.click();
+    }
+  };
+
   return (
     <div className="min-h-screen font-sans pb-24">
 
       {/* ── HEADER ── */}
-      <div className="relative bg-white rounded-3xl border-emerald-100 z-10 max-w-4xl mx-auto px-4 mt-8 space-y-6">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-5 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 mt-8">
+        <div className="bg-white rounded-3xl border border-emerald-100 px-5 md:px-6 py-5 flex flex-col gap-4 shadow-sm">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="relative">
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-400 rounded-xl flex items-center justify-center shadow-sm shadow-emerald-100">
                 <FaBullhorn className="text-white text-xl" />
@@ -635,16 +693,69 @@ const AdminNotices = () => {
               <p className="text-sm text-gray-600 font-medium mt-1">Share important updates and keep everyone informed</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setIsGroupModalOpen(true)} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-lg font-semibold shadow-sm transition-all duration-200 border border-indigo-200">
-              <FaUsersCog className="text-lg" /><span className="hidden sm:inline">Manage Groups</span>
+          <div className="flex gap-2 flex-wrap items-center justify-start w-full">
+            <button type="button" onClick={() => setIsGroupModalOpen(true)} className="h-10 shrink-0 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 rounded-lg text-sm font-semibold shadow-sm transition-all duration-200 border border-indigo-200">
+              <FaUsersCog className="text-base" /><span>Groups</span>
             </button>
-            <button onClick={openMeetingModal} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:shadow transition-all duration-200 border border-indigo-700/20">
-              <FaVideo className="text-sm" /><span className="hidden sm:inline">Create Meeting</span>
+            <button onClick={openMeetingModal} className="h-10 shrink-0 flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-lg text-sm font-semibold shadow-sm hover:shadow transition-all duration-200 border border-indigo-700/20">
+              <FaVideo className="text-xs" /><span>Meeting</span>
             </button>
-            <button onClick={() => openModal()} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:shadow transition-all duration-200 border border-emerald-600/20">
-              <FaPlus className="text-sm" /><span className="hidden sm:inline">Create Announcement</span>
+            <button onClick={() => openModal()} className="h-10 shrink-0 flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-3 rounded-lg text-sm font-semibold shadow-sm hover:shadow transition-all duration-200 border border-emerald-600/20">
+              <FaPlus className="text-xs" /><span>Announcement</span>
             </button>
+            <div className="h-10 shrink-0 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-1.5 shadow-sm">
+              <button onClick={() => handleMonthChange(-1)} className="h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition" title="Previous month">
+                <FaChevronLeft size={12} />
+              </button>
+              <div className="min-w-[82px] px-1 text-center">
+                <div className="text-xs font-bold text-slate-700 leading-4">
+                  {new Date(`${monthFilter}-01`).toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
+                </div>
+              </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={openMonthPicker}
+                  className="h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition border border-transparent hover:border-emerald-100"
+                  title="Choose month"
+                >
+                  <FaCalendarAlt size={14} />
+                </button>
+                <input
+                  ref={monthInputRef}
+                  type="month"
+                  value={monthFilter}
+                  max={getCurrentMonthValue()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val <= getCurrentMonthValue()) {
+                      setMonthFilter(val);
+                    }
+                  }}
+                  className="absolute right-0 top-full h-0 w-0 opacity-0 pointer-events-none"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+              </div>
+              <button 
+                onClick={() => handleMonthChange(1)} 
+                disabled={monthFilter >= getCurrentMonthValue()}
+                className={`h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition ${monthFilter >= getCurrentMonthValue() ? 'opacity-30 cursor-not-allowed' : ''}`} 
+                title="Next month"
+              >
+                <FaChevronRight size={12} />
+              </button>
+            </div>
+            <div className="h-10 flex-1 min-w-[180px] sm:max-w-[240px] relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+              <input
+                type="text"
+                value={announcementSearch}
+                onChange={(e) => setAnnouncementSearch(e.target.value)}
+                placeholder="Search announcements"
+                className="w-full h-full pl-9 pr-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 shadow-sm"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -659,7 +770,12 @@ const AdminNotices = () => {
             <p className="text-slate-400 text-lg font-medium">No active notices.</p>
             <p className="text-slate-300 text-sm">Create one to notify your team.</p>
           </div>
-        ) : notices.map(notice => {
+        ) : filteredNotices.length === 0 ? (
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-300 mx-4">
+            <FaBullhorn className="text-5xl mb-4 mx-auto text-slate-300" />
+            <p className="text-slate-400 text-lg font-medium">No announcements for {formatMonthLabel(monthFilter)}.</p>
+          </div>
+        ) : filteredNotices.map(notice => {
           const { date, time } = formatDateTime(notice.date);
           const isSpecific = Array.isArray(notice.recipients) && notice.recipients.length > 0;
           const recipientNames = isSpecific ? getRecipientNamesList(notice.recipients) : [];
@@ -673,11 +789,12 @@ const AdminNotices = () => {
           const isMeeting = detectedLink && (notice.title.toLowerCase().includes("meeting") || notice.description.toLowerCase().includes("meeting") || notice.description.includes("meet.google"));
           const sideBarColor = isMeeting ? "bg-gradient-to-b from-rose-500 to-pink-500" : isSpecific ? (groupName ? "bg-gradient-to-b from-indigo-600 to-violet-600" : "bg-gradient-to-b from-amber-500 to-orange-500") : "bg-gradient-to-b from-blue-500 to-cyan-500";
           const borderColor = isMeeting ? "border-rose-100" : isSpecific ? (groupName ? "border-indigo-100" : "border-orange-100") : "border-slate-100";
+          const isAnnouncementExpanded = expandedAnnouncementId === notice._id;
 
           return (
-            <div key={notice._id} className={`group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border ${borderColor} overflow-visible`}>
+            <div key={notice._id} className={`group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border ${borderColor} overflow-hidden`}>
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${sideBarColor}`} />
-              <div className="p-6 pl-8">
+              <div className="p-6 pl-8 pb-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -708,20 +825,34 @@ const AdminNotices = () => {
                     <span>{date}</span><span className="h-3 w-px bg-slate-300" /><span>{time}</span>
                   </div>
                 </div>
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-blue-700 transition-colors">{notice.title}</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{notice.description}</p>
-                  {isMeeting && detectedLink && (
-                    <div className="mt-4">
-                      <a href={detectedLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all">
-                        <FaVideo /> Join Now
-                      </a>
-                    </div>
-                  )}
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{notice.title}</h3>
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isAnnouncementExpanded ? "max-h-[500px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{notice.description}</p>
+                    {isMeeting && detectedLink && (
+                      <div className="mt-4">
+                        <a href={detectedLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all">
+                          <FaVideo /> Join Now
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="pt-4 border-t border-slate-50 flex justify-end gap-2 opacity-100 sm:opacity-0 sm:translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                  <button onClick={() => openModal(notice)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors shadow-sm"><FaEdit /> Edit</button>
-                  <button onClick={() => handleDelete(notice._id)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm"><FaTrash /> Delete</button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isAnnouncementExpanded ? "max-h-24 opacity-100 pt-4" : "max-h-0 opacity-0"}`}>
+                  <div className="border-t border-slate-50 flex justify-end gap-2">
+                    <button onClick={() => openModal(notice)} className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors shadow-sm"><FaEdit /> Edit</button>
+                    <button onClick={() => handleDelete(notice._id)} className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm"><FaTrash /> Delete</button>
+                  </div>
+                </div>
+                <div className="pt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedAnnouncementId(isAnnouncementExpanded ? null : notice._id)}
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-slate-50 text-slate-500 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm"
+                    title={isAnnouncementExpanded ? "Collapse announcement" : "Expand announcement"}
+                  >
+                    {isAnnouncementExpanded ? <FaChevronUp size={13} /> : <FaChevronDown size={13} />}
+                  </button>
                 </div>
               </div>
             </div>

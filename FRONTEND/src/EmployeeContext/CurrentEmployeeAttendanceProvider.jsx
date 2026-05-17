@@ -1,9 +1,9 @@
 // ✅ CurrentEmployeeAttendanceProvider.jsx (FINAL CLEAN VERSION)
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api"; // ✅ Use the shared axios instance
 import { CurrentEmployeeAttendanceContext } from "./CurrentEmployeeAttendanceContext";
 
-const API = "http://localhost:5000";
+const API_PREFIX = "/api";
 
 const CurrentEmployeeAttendanceProvider = ({ children }) => {
   // ✅ Logged user — read from sessionStorage (where auth data is stored)
@@ -11,9 +11,7 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
   const employeeId = loggedUser?.employeeId; // ✅ Use exact value (EMP101)
 
   // ✅ Manual (dummy) attendance for fallback
-  const manualAttendance = [
-    // ✅ paste your full 30-day attendance list here
-  ];
+  const manualAttendance = [];
 
   // ✅ States
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -57,10 +55,10 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
     }
 
     try {
-      const res = await axios.get(`${API}/attendance/${employeeId}`);
+      const res = await api.get(`${API_PREFIX}/attendance/${employeeId}`);
 
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        const formatted = res.data.map((rec, index) => ({
+      if (res.data && Array.isArray(res.data.data)) {
+        const formatted = res.data.data.map((rec, index) => ({
           id: rec._id || index + 1,
           employeeId: rec.employeeId,
           name: rec.name || "Employee",
@@ -84,7 +82,7 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
         setAttendanceRecords(manualAttendance);
       }
     } catch (err) {
-      console.error("❌ Attendance fetch failed:", err);
+      console.warn("ℹ️ Attendance fetch failed (likely no records yet or API mismatch):", err.message);
       setAttendanceRecords(manualAttendance);
     }
   };
@@ -96,10 +94,15 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
       return;
     }
     try {
-      const res = await axios.get(`${API}/permissions/${employeeId}`);
-      setPermissionRequests(res.data.length ? res.data : []);
+      const res = await api.get(`${API_PREFIX}/permissions/${employeeId}`);
+      setPermissionRequests(res.data?.length ? res.data : []);
     } catch (err) {
-      console.error("❌ Permission fetch failed:", err);
+      // Gracefully handle 404 since this route might not be implemented in backend yet
+      if (err.response?.status === 404) {
+        console.info("ℹ️ Permissions route not yet available in backend.");
+      } else {
+        console.error("❌ Permission fetch failed:", err.message);
+      }
       setPermissionRequests([]);
     }
   };
@@ -111,19 +114,21 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
       return;
     }
     try {
-      const res = await axios.get(`${API}/overtime/${employeeId}`);
-      setOvertimeRequests(res.data.length ? res.data : []);
+      const res = await api.get(`${API_PREFIX}/overtime/${employeeId}`);
+      setOvertimeRequests(res.data?.length ? res.data : []);
     } catch (err) {
-      console.error("❌ Overtime fetch failed:", err);
+      console.warn("ℹ️ Overtime fetch failed:", err.message);
       setOvertimeRequests([]);
     }
   };
 
   // ✅ On Employee Login Change → Load All Data
   useEffect(() => {
-    fetchAttendance();
-    fetchPermissions();
-    fetchOvertime();
+    if (employeeId) {
+      fetchAttendance();
+      fetchPermissions();
+      fetchOvertime();
+    }
   }, [employeeId]);
 
   return (
@@ -131,9 +136,7 @@ const CurrentEmployeeAttendanceProvider = ({ children }) => {
       value={{
         attendanceRecords,
         updateAttendanceRecord,
-
         PermissionRequests,
-
         overtimeRequests,
       }}
     >

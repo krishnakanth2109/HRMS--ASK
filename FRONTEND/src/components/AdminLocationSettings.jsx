@@ -5,7 +5,7 @@ import {
   FaLaptopHouse, FaBuilding, FaSearch, FaLayerGroup,
   FaUndo, FaCheckSquare, FaPlus, FaTrash, FaTimes,
   FaUserMinus, FaListAlt, FaUserPlus, FaCheck, FaCalendarAlt, FaClock, FaEdit,
-  FaLocationArrow
+  FaLocationArrow, FaChevronLeft, FaChevronRight
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -393,6 +393,8 @@ const AdminLocationSettings = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const employeesPerPage = 10;
 
   // Modals
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -530,9 +532,22 @@ const AdminLocationSettings = () => {
   const handleDeleteCategory = async () => { if (activeCategory === "All" || activeCategory === "Uncategorized") return; Swal.fire({ title: `Delete '${activeCategory}'?`, text: "Employees will be moved to 'Uncategorized'.", icon: "warning", showCancelButton: true, confirmButtonColor: "#d33", confirmButtonText: "Yes, delete it!" }).then(async (result) => { if (result.isConfirmed) { try { await api.delete(`/api/admin/settings/categories/${activeCategory}`); Swal.fire("Deleted!", "Category removed.", "success"); setActiveCategory("All"); fetchEmployees(); } catch (err) { Swal.fire("Error", "Delete failed", "error"); } } }); };
   const handleRemoveFromCategory = async (employee) => { try { await api.put("/api/admin/settings/categories/remove-employee", { categoryName: employee.category, employeeId: employee.employeeId }); Swal.fire("Removed", `${employee.name} moved to Uncategorized.`, "success"); fetchEmployees(); } catch (err) { Swal.fire("Error", "Failed to remove employee", "error"); } };
 
-  const searchFiltered = employees.filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.employeeId.includes(searchTerm));
+  const searchFiltered = useMemo(() => employees.filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.employeeId.includes(searchTerm)), [employees, searchTerm]);
   const displayEmployees = useMemo(() => { if (activeCategory === "All") return searchFiltered; if (activeCategory === "Uncategorized") return searchFiltered.filter(e => e.category === "Uncategorized"); return searchFiltered.filter(e => e.category === activeCategory); }, [searchFiltered, activeCategory]);
+  const totalPages = Math.max(1, Math.ceil(displayEmployees.length / employeesPerPage));
+  const paginatedEmployees = useMemo(() => displayEmployees.slice((currentPage - 1) * employeesPerPage, currentPage * employeesPerPage), [displayEmployees, currentPage]);
+  const pageStart = displayEmployees.length === 0 ? 0 : (currentPage - 1) * employeesPerPage + 1;
+  const pageEnd = Math.min(currentPage * employeesPerPage, displayEmployees.length);
   const getCategoryCount = (catName) => { if (catName === "All") return employees.length; return employees.filter(e => e.category === catName).length; };
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedEmployees([]);
+  }, [activeCategory, searchTerm]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   return (
     // Clean outer container without hardcoded backgrounds, letting themes shine
@@ -759,8 +774,8 @@ const AdminLocationSettings = () => {
                         <th className="px-6 py-4 w-12 text-center">
                           <input
                             type="checkbox"
-                            checked={displayEmployees.length > 0 && displayEmployees.every(e => selectedEmployees.includes(e.employeeId))}
-                            onChange={() => toggleSelectAll(displayEmployees)}
+                          checked={paginatedEmployees.length > 0 && paginatedEmployees.every(e => selectedEmployees.includes(e.employeeId))}
+                            onChange={() => toggleSelectAll(paginatedEmployees)}
                             className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer border-gray-300"
                           />
                         </th>
@@ -772,7 +787,7 @@ const AdminLocationSettings = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {displayEmployees.map(employee => {
+                      {paginatedEmployees.map(employee => {
                         const isActiveWFO = employee.currentEffectiveMode === "WFO";
                         const modeClass = isActiveWFO ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-green-50 text-green-700 border-green-100";
 
@@ -842,20 +857,20 @@ const AdminLocationSettings = () => {
                 {/* Mobile Card View */}
                 <div className="md:hidden flex flex-col gap-3 p-3">
                   {/* Select All Checkbox for Mobile */}
-                  {displayEmployees.length > 0 && (
+                  {paginatedEmployees.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
                       <input
                         type="checkbox"
-                        checked={displayEmployees.length > 0 && displayEmployees.every(e => selectedEmployees.includes(e.employeeId))}
-                        onChange={() => toggleSelectAll(displayEmployees)}
+                        checked={paginatedEmployees.length > 0 && paginatedEmployees.every(e => selectedEmployees.includes(e.employeeId))}
+                        onChange={() => toggleSelectAll(paginatedEmployees)}
                         className="w-5 h-5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer border-gray-300"
                         id="mobileSelectAll"
                       />
-                      <label htmlFor="mobileSelectAll" className="text-sm font-bold text-gray-700">Select All ({displayEmployees.length})</label>
+                      <label htmlFor="mobileSelectAll" className="text-sm font-bold text-gray-700">Select Page ({paginatedEmployees.length})</label>
                     </div>
                   )}
 
-                  {displayEmployees.map(employee => {
+                  {paginatedEmployees.map(employee => {
                     const isActiveWFO = employee.currentEffectiveMode === "WFO";
                     const modeClass = isActiveWFO ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-green-50 text-green-700 border-green-100";
 
@@ -922,6 +937,30 @@ const AdminLocationSettings = () => {
                       </div>
                     )
                   })}
+                </div>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 bg-white border-t border-gray-200">
+                  <div className="text-xs font-semibold text-gray-500">
+                    Showing {pageStart}-{pageEnd} of {displayEmployees.length} employees
+                  </div>
+                  <div className="flex items-center justify-between md:justify-end gap-2">
+                    <button
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={currentPage === 1}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      <FaChevronLeft size={10} /> Prev
+                    </button>
+                    <span className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Next <FaChevronRight size={10} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
