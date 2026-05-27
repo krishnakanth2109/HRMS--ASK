@@ -760,3 +760,71 @@ export const cancelLeave = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// ===================================================================================
+// EMPLOYEE REVOKE LEAVE FOR TODAY/SPECIFIC DAY
+// ===================================================================================
+export const revokeLeaveForDay = async (req, res) => {
+  try {
+    const { employeeId, name } = req.user;
+    const date = req.body.date || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+    // Find an approved leave request that spans this date
+    const leave = await LeaveRequest.findOne({
+      employeeId: employeeId,
+      status: "Approved",
+      "details.date": date,
+    });
+
+    if (!leave) {
+      return res.status(404).json({ message: "No approved leave found for this date." });
+    }
+
+    // Find the specific day in details
+    const dayDetail = leave.details.find((d) => d.date === date);
+    if (!dayDetail) {
+      return res.status(404).json({ message: "Leave day details not found." });
+    }
+
+    if (dayDetail.status === "Rejected") {
+      return res.status(400).json({ message: "Leave for this date is already revoked." });
+    }
+
+    // Set this specific day's status to Rejected
+    dayDetail.status = "Rejected";
+
+    // Check if there are any remaining Approved days
+    const hasApprovedDays = leave.details.some((d) => d.status !== "Rejected");
+    if (!hasApprovedDays) {
+      // If no days are left, set the parent status to Rejected
+      leave.status = "Rejected";
+    }
+
+    await leave.save();
+
+    // Notify admins about this activity
+    const admins = await Admin.find().lean();
+    const notifList = [];
+    for (const admin of admins) {
+      const notif = await Notification.create({
+        userId: admin._id.toString(),
+        title: "Leave Revoked",
+        message: `${name || "Employee"} revoked their leave for ${date}.`,
+        type: "leave",
+        isRead: false,
+      });
+      notifList.push(notif);
+    }
+    const io = req.app.get("io");
+    if (io) notifList.forEach((n) => io.emit("newNotification", n));
+
+    return res.json({
+      success: true,
+      message: `Leave for ${date} has been revoked successfully.`,
+      data: leave,
+    });
+  } catch (err) {
+    console.error("revokeLeaveForDay error:", err);
+    res.status(500).json({ message: "Failed to revoke leave." });
+  }
+};

@@ -6,6 +6,7 @@ const perDaySchema = new mongoose.Schema(
     leavecategory: { type: String, enum: ["Paid", "UnPaid"], default: "UnPaid" },
     leaveType: { type: String, enum: ["CASUAL", "SICK", "EMERGENCY", "PAID", "LOP"], default: null },
     leaveDayType: { type: String, enum: ["Full Day", "Half Day"], default: null },
+    status: { type: String, enum: ["Approved", "Rejected"], default: "Approved" },
   },
   { _id: false }
 );

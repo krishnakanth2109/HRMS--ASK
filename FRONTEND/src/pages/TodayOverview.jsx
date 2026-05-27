@@ -14,6 +14,7 @@ import {
   FaCheckCircle,
   FaUserSlash,
   FaCalendarAlt,
+  FaUmbrellaBeach,
   FaSearch,
   FaCalendarDay,
   FaTimes,
@@ -697,7 +698,14 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500">Status</span>
-            <StatusBadge status={category} />
+            <div className="flex items-center gap-1.5">
+              {employee.isLeaveRevokedToday && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  Revoked Leave
+                </span>
+              )}
+              <StatusBadge status={category} />
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -737,6 +745,13 @@ const EmployeeCard = ({ employee, onImageClick, category, onCallClick, onMessage
             <div className="bg-purple-50 rounded-md p-2.5 border border-purple-100">
               <div className="text-xs font-medium text-purple-800">{employee.leaveType}</div>
               <div className="text-xs text-purple-700 mt-0.5 line-clamp-1">"{employee.reason}"</div>
+            </div>
+          )}
+
+          {employee.isLeaveRevokedToday && (
+            <div className="bg-amber-50 rounded-md p-2.5 border border-amber-100 flex items-center gap-1.5">
+              <FaUmbrellaBeach className="text-amber-600 text-xs flex-shrink-0" />
+              <div className="text-xs font-bold text-amber-800">Leave Revoked Today</div>
             </div>
           )}
         </div>
@@ -869,6 +884,11 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClic
                   <div className="flex flex-col gap-1 items-start">
                     <StatusBadge status={employee.category} />
                     <LoginStatusBadge status={employee.loginStatus?.status || "--"} />
+                    {employee.isLeaveRevokedToday && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Revoked Leave
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -894,6 +914,12 @@ const TableView = ({ data, onImageClick, onCallClick, onMessageClick, onNameClic
                     <div className="text-xs">
                       <span className="font-medium text-purple-700 block">{employee.leaveType}</span>
                       <span className="text-slate-500 truncate max-w-[150px] block" title={employee.reason}>"{employee.reason}"</span>
+                    </div>
+                  ) : employee.isLeaveRevokedToday ? (
+                    <div className="text-xs">
+                      <span className="font-bold text-amber-700 block flex items-center gap-1">
+                        <FaUmbrellaBeach className="text-xs" /> Leave Revoked Today
+                      </span>
                     </div>
                   ) : (
                     <span className="text-sm text-slate-400">--</span>
@@ -1040,6 +1066,14 @@ const type = queryParams.get("type");
       return acc;
     }, {});
 
+    // Find all employee IDs who revoked their leave for today
+    const revokedLeaveTodayIds = new Set(
+      leaveData.filter(leave => {
+        const todayDetail = leave.details?.find(d => d.date === today);
+        return todayDetail && todayDetail.status === 'Rejected';
+      }).map(leave => leave.employeeId)
+    );
+
     const attendanceWithDetails = attendanceData.map(item => {
       const shift = shiftsMap[item.employeeId];
       const realName = empNameMap[item.employeeId] || item.employeeName || item.employeeId;
@@ -1053,6 +1087,7 @@ const type = queryParams.get("type");
         department,
         category: !item.punchIn ? 'NOT_LOGGED_IN' : (item.punchIn && !item.punchOut ? 'WORKING' : 'COMPLETED'),
         isOnLeave: false,
+        isLeaveRevokedToday: revokedLeaveTodayIds.has(item.employeeId),
         loginStatus,
         profilePic: employeeImages[item.employeeId],
         phoneNumber
@@ -1063,6 +1098,8 @@ const type = queryParams.get("type");
 
     const onLeaveToday = leaveData.filter(leave => {
       if (leave.status !== 'Approved') return false;
+      const todayDetail = leave.details?.find(d => d.date === today);
+      if (todayDetail && todayDetail.status === 'Rejected') return false;
       return today >= leave.from && today <= leave.to;
     }).map(leave => {
       const emp = allEmployees.find(e => e.employeeId === leave.employeeId);
@@ -1073,6 +1110,7 @@ const type = queryParams.get("type");
         employeeName: empNameMap[leave.employeeId] || leave.employeeName || leave.employeeId,
         category: 'ON_LEAVE',
         isOnLeave: true,
+        isLeaveRevokedToday: false,
         leaveType: leave.leaveType,
         reason: leave.reason,
         department: emp?.experienceDetails?.[0]?.department || 'Unassigned',
@@ -1099,6 +1137,7 @@ const type = queryParams.get("type");
           employeeName: empNameMap[id] || id,
           category: 'NOT_LOGGED_IN',
           isOnLeave: false,
+          isLeaveRevokedToday: revokedLeaveTodayIds.has(id),
           department: emp?.experienceDetails?.[0]?.department || 'Unassigned',
           punchIn: null,
           punchOut: null,

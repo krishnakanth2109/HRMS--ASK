@@ -324,7 +324,7 @@ const EmployeeRow = ({ emp, idx, navigate, onDeactivateClick, onOverviewClick, p
             <svg className={`w-3 h-3 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
           </button>
           {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-20 border ring-1 ring-black ring-opacity-5 overflow-hidden origin-top-right">
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-[9999] border ring-1 ring-black ring-opacity-5 overflow-hidden origin-top-right">
               <div className="py-1">
                 <button onClick={() => { navigate(`/employee/${emp.employeeId}/profile`); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors"><FaUser className="text-blue-500" /> Profile</button>
                 <button onClick={() => { onOverviewClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 flex items-center gap-3 transition-colors"><FaClipboardList className="text-teal-500" /> Overview</button>
@@ -419,7 +419,7 @@ const InactiveEmployeeRow = ({ emp, navigate, onReactivateClick, onViewDetailsCl
             <svg className={`w-3 h-3 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
           </button>
           {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-20 border">
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-[9999] border">
               <div className="py-1">
                 <button onClick={() => { navigate(`/employee/${emp.employeeId}/profile`); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3"><FaUser /> Profile</button>
                 <button onClick={() => { onOverviewClick(emp); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 flex items-center gap-3"><FaClipboardList /> Overview</button>
@@ -1747,18 +1747,19 @@ const EmployeeManagement = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10 overflow-hidden">
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
+        <div className="w-full overflow-x-auto pb-32 -mb-32">
+          <div className="rounded-2xl shadow-lg border border-gray-100 relative z-10 overflow-visible inline-block min-w-full align-middle">
+            {/* Desktop Table View */}
+          <div className="hidden md:block overflow-visible relative z-20">
             <table className="min-w-full">
               <thead className="bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-600">
                 <tr className="text-white uppercase text-sm font-semibold tracking-wide">
-                  <th className="p-4 text-left pl-6">ID</th>
+                  <th className="p-4 text-left pl-6 rounded-tl-2xl">ID</th>
                   <th className="p-4 text-left">Name</th>
                   <th className="p-4 text-left">Role</th>
                   <th className="p-4 text-left">Department</th>
                   <th className="p-4 text-left">Email</th>
-                  <th className="p-4 text-center">Actions</th>
+                  <th className="p-4 text-center rounded-tr-2xl">Actions</th>
                 </tr>
               </thead>
 
@@ -1802,7 +1803,7 @@ const EmployeeManagement = () => {
           </div>
 
           {/* Mobile Card View */}
-          <div className="md:hidden p-2 space-y-1 bg-slate-50/50">
+          <div className="md:hidden p-2 space-y-1 bg-slate-50/50 relative z-20">
             {loading ? (
               <div className="p-8 text-center text-gray-500 font-medium">
                 Loading employees data...
@@ -1900,6 +1901,7 @@ const EmployeeManagement = () => {
               </div>
             </div>
           )}
+        </div>
         </div>
 
         <DeactivateModal open={deactivateModalOpen} employee={selectedEmployee} onClose={() => setDeactivateModalOpen(false)} onSubmit={handleDeactivateSubmit} />
