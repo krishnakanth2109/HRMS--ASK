@@ -442,7 +442,7 @@ export const createLeave = async (req, res) => {
         const approveToken = generateEmailActionToken(doc._id, "Approved", primaryAdmin._id);
         const rejectToken = generateEmailActionToken(doc._id, "Rejected", primaryAdmin._id);
 
-        const BASE_URL = process.env.VITE_API_URL_PRODUCTION || "https://hrms-ask-1jx6.onrender.com";
+        const BASE_URL = process.env.VITE_API_URL_PRODUCTION;
         const approveUrl = `${BASE_URL}/api/leaves/email-action?token=${approveToken}`;
         const rejectUrl = `${BASE_URL}/api/leaves/email-action?token=${rejectToken}`;
 

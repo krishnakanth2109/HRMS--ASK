@@ -8,7 +8,7 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import Holiday from "../models/Holiday.js";
 import Overtime from "../models/Overtime.js";
 import transporter from '../config/nodemailer.js';
-import { getFingerprintAttendanceDecision } from "../utils/fingerprintAttendance.js";
+// import { getFingerprintAttendanceDecision } from "../utils/fingerprintAttendance.js";
 
 const router = express.Router();
 
@@ -878,11 +878,11 @@ router.get("/fingerprint-auto-action", async (req, res) => {
         const todayAttendance =
             attendanceRecord?.attendance?.find((entry) => entry.date === today) || null;
 
-        const decision = getFingerprintAttendanceDecision({
-            loginMethod: req.auth?.loginMethod,
-            now: new Date(),
-            todayAttendance,
-        });
+        // const decision = getFingerprintAttendanceDecision({
+        //     loginMethod: req.auth?.loginMethod,
+        //     now: new Date(),
+        //     todayAttendance,
+        // });
 
         return res.json({ success: true, data: decision });
     } catch (err) {
