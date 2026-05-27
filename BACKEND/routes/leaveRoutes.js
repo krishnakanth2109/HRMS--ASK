@@ -9,6 +9,7 @@ import {
    updateLeaveStatus,
    cancelLeave,
    handleEmailAction,          // ← NEW
+   revokeLeaveForDay,
 } from "../controllers/leaveController.js";
 
 import { protect } from "../controllers/authController.js";
@@ -61,6 +62,8 @@ router.patch("/:id/reject", onlyAdmin, (req, res) => {
 /* ============================================================================
    ❌ EMPLOYEE/MANAGER → CANCEL THEIR OWN LEAVE (if pending)
 ============================================================================ */
+router.post("/revoke-today", revokeLeaveForDay);
+
 router.delete("/cancel/:id", cancelLeave);
 
 /* ============================================================================

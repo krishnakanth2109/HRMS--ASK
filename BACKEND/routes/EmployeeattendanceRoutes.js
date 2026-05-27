@@ -516,10 +516,15 @@ router.post('/punch-in', async (req, res) => {
                         } catch { return false; }
                     });
 
-                    const approvedLeaveYesterday = await LeaveRequest.findOne({
+                                        const approvedLeaveYesterday = await LeaveRequest.findOne({
                         employeeId: String(employeeId).trim(),
                         status: "Approved",
-                        "details.date": yesterday
+                        details: {
+                            $elemMatch: {
+                                date: yesterday,
+                                status: { $ne: "Rejected" }
+                            }
+                        }
                     });
 
                     if (!isWeekOff && !isHoliday && !approvedLeaveYesterday && req.user && req.user.email) {
@@ -531,7 +536,14 @@ router.post('/punch-in', async (req, res) => {
 
         // --- Today's Leave / WeekOff Logic ---
         const approvedLeaveToday = await LeaveRequest.findOne({
-            employeeId: String(employeeId).trim(), status: "Approved", "details.date": today
+            employeeId: String(employeeId).trim(),
+            status: "Approved",
+            details: {
+                $elemMatch: {
+                    date: today,
+                    status: { $ne: "Rejected" }
+                }
+            }
         }).lean();
         if (approvedLeaveToday) {
             if (approvedLeaveToday.leaveDayType === "Full Day") { return res.status(403).json({ success: false, message: "Punch-in not allowed. You are on approved leave today." }); }

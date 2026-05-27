@@ -228,6 +228,8 @@ export const rejectLeaveRequestById = async (id) =>
   (await api.patch(`/api/leaves/${id}/reject`)).data;
 export const cancelLeaveRequestById = async (id) =>
   (await api.delete(`/api/leaves/cancel/${id}`)).data;
+export const revokeTodayLeave = async (data = {}) =>
+  (await api.post("/api/leaves/revoke-today", data)).data;
 
 /* =============================================================================
    NOTIFICATIONS

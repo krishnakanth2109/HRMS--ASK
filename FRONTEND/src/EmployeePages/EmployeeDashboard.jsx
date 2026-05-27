@@ -60,6 +60,7 @@ import api, {
   getHolidays,
   getLeaveRequestsForEmployee,
   getEmployeeById,
+  revokeTodayLeave,
 } from "../api";
 import { useNavigate, Link } from "react-router-dom";
 import ImageCropModal from "./ImageCropModal";
@@ -342,10 +343,21 @@ const EmployeeDashboard = () => {
       let totalDaysTaken = 0;
       myLeaves.forEach(leave => {
         if (leave.status === 'Approved') {
-          const lFrom = new Date(leave.from);
-          if (lFrom >= new Date(today.getFullYear(), today.getMonth(), 1)) {
-            const diffDays = Math.ceil(Math.abs(new Date(leave.to) - lFrom) / 86400000) + 1;
-            totalDaysTaken += (leave.halfDaySession && leave.from === leave.to) ? 0.5 : diffDays;
+          if (leave.details && leave.details.length > 0) {
+            leave.details.forEach(d => {
+              if (d.status !== 'Rejected') {
+                const dDate = new Date(d.date);
+                if (dDate >= new Date(today.getFullYear(), today.getMonth(), 1)) {
+                  totalDaysTaken += d.leaveDayType === 'Half Day' ? 0.5 : 1;
+                }
+              }
+            });
+          } else {
+            const lFrom = new Date(leave.from);
+            if (lFrom >= new Date(today.getFullYear(), today.getMonth(), 1)) {
+              const diffDays = Math.ceil(Math.abs(new Date(leave.to) - lFrom) / 86400000) + 1;
+              totalDaysTaken += (leave.halfDaySession && leave.from === leave.to) ? 0.5 : diffDays;
+            }
           }
         }
       });
@@ -879,6 +891,59 @@ const EmployeeDashboard = () => {
     missedPunchLog,
   ]);
 
+  const hasApprovedLeaveToday = useMemo(() => {
+    if (!leaves || leaves.length === 0) return null;
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    return leaves.find(leave => 
+      leave.status === "Approved" && 
+      leave.details?.some(d => d.date === todayStr && d.status !== "Rejected")
+    );
+  }, [leaves]);
+
+  const handleRevokeTodayLeave = async (leaveId) => {
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    Swal.fire({
+      title: "Revoke Today's Leave?",
+      text: "Are you sure you want to revoke your approved leave for today? You will be able to punch in and work normally.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, revoke it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          setLoading(true);
+          await revokeTodayLeave({ date: todayStr });
+          Swal.fire({
+            title: "Leave Revoked!",
+            text: "Today's leave has been revoked successfully. You can now punch in.",
+            icon: "success",
+            confirmButtonColor: "#3b82f6",
+          });
+          // Refresh all data
+          if (user && user.employeeId) {
+            await Promise.all([
+              loadAttendance(user.employeeId),
+              loadHolidaysAndLeaves(user.employeeId),
+              fetchOptimizedTeamData(),
+            ]);
+          }
+        } catch (err) {
+          console.error("Revoke leave error:", err);
+          Swal.fire({
+            title: "Revoke Failed",
+            text: err.response?.data?.message || "Failed to revoke leave. Please try again.",
+            icon: "error",
+            confirmButtonColor: "#ef4444",
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
   const handlePunch = async (action) => {
     if (!user) return;
     if (action === "IN") {
@@ -1343,6 +1408,29 @@ const EmployeeDashboard = () => {
   return (
     // ✨ FIX: Removed hardcoded background so theme shows through
     <div className="p-4 md:p-8 min-h-screen relative font-sans text-gray-800">
+
+      {hasApprovedLeaveToday && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 p-5 mb-6 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-4 animate-fade-in relative z-20">
+          <div className="flex items-center gap-3.5">
+            <div className="bg-amber-100 p-2.5 rounded-xl text-amber-600">
+              <FaUmbrellaBeach className="text-2xl" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-950">You are on Approved Leave Today</h4>
+              <p className="text-sm text-amber-800/90 font-medium">
+                Are you back in the office to work? Revoking your leave for today allows you to punch in and work normally.
+                <span className="block text-xs text-amber-700/80 mt-0.5">Note: This will reject your leave only for today ({formatDateDDMMYYYY(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }))}). Other leave days will remain active.</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleRevokeTodayLeave(hasApprovedLeaveToday._id)}
+            className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap text-sm"
+          >
+            <FaTimes /> Revoke Today's Leave
+          </button>
+        </div>
+      )}
 
       {missedPunchLog && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 animate-pulse-slow">
