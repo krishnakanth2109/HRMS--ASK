@@ -181,7 +181,7 @@ router.post('/live-status', async (req, res) => {
 
     // Fetch current settings to send back to tracker for dynamic sync
     const settings = await OfficeSettings.findOne({ type: "Global" });
-    const currentInterval = settings ? (settings.screenshotIntervalMinutes || 5) : 90;
+    const currentInterval = settings ? (settings.screenshotIntervalMinutes || 60) : 90;
 
     res.status(200).json({
       message: "Live Telemetry Updated",
