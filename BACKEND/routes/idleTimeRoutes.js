@@ -85,9 +85,9 @@ router.get("/settings/tracker", async (req, res) => {
     let settings = await OfficeSettings.findOne({ type: "Global" });
     if (!settings) {
       // Return default if not initialized
-      return res.json({ screenshotIntervalMinutes: 90 });
+      return res.json({ screenshotIntervalMinutes: 30 });
     }
-    return res.json({ screenshotIntervalMinutes: settings.screenshotIntervalMinutes || 90 });
+    return res.json({ screenshotIntervalMinutes: settings.screenshotIntervalMinutes || 30 });
   } catch (err) {
     console.error("Fetch tracker settings error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -105,7 +105,7 @@ router.put("/settings/tracker", async (req, res) => {
     if (!settings) {
       settings = new OfficeSettings({ type: "Global", officeLocation: { latitude: 0, longitude: 0 } });
     }
-    settings.screenshotIntervalMinutes = Number(screenshotIntervalMinutes) || 90;
+    settings.screenshotIntervalMinutes = Number(screenshotIntervalMinutes) || 30;
     await settings.save();
     return res.json({ message: "Settings updated successfully", screenshotIntervalMinutes: settings.screenshotIntervalMinutes });
   } catch (err) {
@@ -181,7 +181,7 @@ router.post('/live-status', async (req, res) => {
 
     // Fetch current settings to send back to tracker for dynamic sync
     const settings = await OfficeSettings.findOne({ type: "Global" });
-    const currentInterval = settings ? (settings.screenshotIntervalMinutes || 60) : 90;
+    const currentInterval = settings ? (settings.screenshotIntervalMinutes || 30) : 30;
 
     res.status(200).json({
       message: "Live Telemetry Updated",
@@ -485,37 +485,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ------------------------------------------
-// GET /:employeeId/:date
-// (Fetch specific employee's timeline for a specific date)
-// ------------------------------------------
-router.get("/:employeeId/:date", async (req, res) => {
-  const { employeeId, date } = req.params;
-
-  try {
-    const doc = await LiveTracking.findOne({ employeeId: { $regex: new RegExp(`^${employeeId}$`, "i") } });
-
-    if (doc && doc.dates && doc.dates.has(date)) {
-      const todayData = doc.dates.get(date);
-      const record = {
-        employeeId: doc.employeeId,
-        date: date,
-        currentStatus: todayData.currentStatus,
-        lastPing: todayData.lastPing,
-        idleSince: todayData.idleSince,
-        idleTimeline: todayData.idleTimeline || [],
-        trackedWorkSeconds: todayData.trackedWorkSeconds || 0,
-        trackedIdleSeconds: todayData.trackedIdleSeconds || 0
-      };
-      return res.json(record);
-    }
-
-    return res.json({ employeeId, date, idleTimeline: [] });
-  } catch (err) {
-    console.error("❌ Get idle time error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
 
 // ------------------------------------------
 // GET /employee/:employeeId
@@ -610,6 +579,38 @@ router.get("/admin/stats", async (req, res) => {
   } catch (error) {
     console.error("❌ Admin stats error:", error);
     res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// ------------------------------------------
+// GET /:employeeId/:date
+// (Fetch specific employee's timeline for a specific date)
+// ------------------------------------------
+router.get("/:employeeId/:date", async (req, res) => {
+  const { employeeId, date } = req.params;
+
+  try {
+    const doc = await LiveTracking.findOne({ employeeId: { $regex: new RegExp(`^${employeeId}$`, "i") } });
+
+    if (doc && doc.dates && doc.dates.has(date)) {
+      const todayData = doc.dates.get(date);
+      const record = {
+        employeeId: doc.employeeId,
+        date: date,
+        currentStatus: todayData.currentStatus,
+        lastPing: todayData.lastPing,
+        idleSince: todayData.idleSince,
+        idleTimeline: todayData.idleTimeline || [],
+        trackedWorkSeconds: todayData.trackedWorkSeconds || 0,
+        trackedIdleSeconds: todayData.trackedIdleSeconds || 0
+      };
+      return res.json(record);
+    }
+
+    return res.json({ employeeId, date, idleTimeline: [] });
+  } catch (err) {
+    console.error("❌ Get idle time error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
