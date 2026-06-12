@@ -12,6 +12,8 @@ import cors from "cors";
 import mongoose from "mongoose";
 import http from "http";
 import { Server } from "socket.io";
+import cookieParser from "cookie-parser";
+import { connectRedis } from "./config/redis.js";
 
 // -------------------- ROUTES --------------------
 import employeeRoutes from "./routes/employeeRoutes.js";
@@ -229,6 +231,7 @@ io.on("connection", (socket) => {
 });
 
 // -------------------- MIDDLEWARE --------------------
+app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -264,6 +267,13 @@ mongoose
   })
   .then(async () => {
     console.log("✅ MongoDB Connected");
+
+    try {
+      await connectRedis();
+      console.log("✅ Redis Connected");
+    } catch (redisErr) {
+      console.error("❌ Redis Connection Error:", redisErr.message);
+    }
 
     try {
       const db = mongoose.connection.db;

@@ -1,9 +1,11 @@
 // --- controllers/faceAuthController.js ---
 
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import Admin from "../models/adminModel.js";
 import Employee from "../models/employeeModel.js";
 import FaceDescriptor from "../models/FaceDescriptor.js";
+import { sessionStore } from "../config/redis.js";
 
 // Create JWT (same as authController)
 const signToken = (id, role, loginMethod = "face") => {
@@ -167,10 +169,27 @@ export const loginWithFace = async (req, res) => {
       });
     }
 
-    // Create token
+    // Create token and session
     const loginMethod = "face";
     const token = signToken(user._id, role, loginMethod);
     user.password = undefined;
+
+    // Create session
+    const sessionId = crypto.randomUUID();
+    const sessionData = {
+      id: user._id.toString(),
+      role: role,
+      loginMethod,
+    };
+    await sessionStore.set(`session:${sessionId}`, JSON.stringify(sessionData), 30 * 24 * 60 * 60);
+
+    // Set HTTP-Only Cookie
+    res.cookie("sessionId", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
 
     return res.status(200).json({
       status: "success",

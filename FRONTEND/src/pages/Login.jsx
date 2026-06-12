@@ -87,17 +87,8 @@ const Login = () => {
     try {
       const res = await login(email, password);
 
-      // Save token
-      if (res?.data?.token) {
-        sessionStorage.setItem("hrms-token", res.data.token);
-      }
-
-      // Save user
-      if (res?.data?.user) {
-        sessionStorage.setItem("hrmsUser", JSON.stringify(res.data.user));
-      }
-
-      const role = res?.data?.user?.role;
+      const userObj = res?.data?.data || res?.data?.user;
+      const role = userObj?.role;
 
       // Redirect based on role
       if (role === "admin" || role === "manager") {
@@ -193,12 +184,9 @@ const Login = () => {
       // 5. Verify with server
       const result = await verifyWebAuthnLogin(credentialData, options.challenge);
 
-      if (result.status === "success" && result.token) {
-        // Store auth data (same as normal login)
-        sessionStorage.setItem("token", result.token);
-        sessionStorage.setItem("hrms-token", result.token);
-        const userWithToken = { ...result.data, token: result.token };
-        sessionStorage.setItem("hrmsUser", JSON.stringify(userWithToken));
+      if (result.status === "success") {
+        // Cache user info (without sensitive token) in sessionStorage
+        sessionStorage.setItem("hrmsUser", JSON.stringify(result.data));
 
         // Update AuthContext
         // We need to reload because login() in AuthProvider sets state
@@ -232,11 +220,9 @@ const Login = () => {
     try {
       const result = await loginWithFaceApi(descriptor);
 
-      if (result.status === "success" && result.token) {
-        sessionStorage.setItem("token", result.token);
-        sessionStorage.setItem("hrms-token", result.token);
-        const userWithToken = { ...result.data, token: result.token };
-        sessionStorage.setItem("hrmsUser", JSON.stringify(userWithToken));
+      if (result.status === "success") {
+        // Cache user info (without sensitive token) in sessionStorage
+        sessionStorage.setItem("hrmsUser", JSON.stringify(result.data));
         setShowFaceLogin(false);
 
         window.location.href =

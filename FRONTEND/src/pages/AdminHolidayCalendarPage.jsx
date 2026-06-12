@@ -74,7 +74,7 @@ const AdminHolidayCalendarPage = () => {
       const allEmployees = await getEmployees();
 
       // ✅ LOG DATA: Open browser console (F12) to see if 'status' and 'dob' exist correctly
-      console.log("Fetched Employees:", allEmployees);
+      // console.log("Fetched Employees:", allEmployees);
 
       const result = allEmployees
         .filter((emp) => {

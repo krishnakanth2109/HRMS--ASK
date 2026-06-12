@@ -40,6 +40,6 @@ pnpm-lock.yaml
 .err
 .log
 
-
-
-
+# Custom Database Scripts & Backups
+BACKEND/scripts/copy_mongo_to_local.js
+BACKEND/local_mongo_backup/

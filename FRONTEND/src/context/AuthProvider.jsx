@@ -2,35 +2,45 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AuthContext } from "./AuthContext";
-import { loginUser } from "../api";
+import { loginUser, logoutUser, getMe } from "../api";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Retrieve data from storage
+    // 1. Load cached user from sessionStorage for instant display (optimistic UI)
     const savedUser = sessionStorage.getItem("hrmsUser");
-    const token = sessionStorage.getItem("token") || sessionStorage.getItem("hrms-token");
-
     if (savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser);
-        
-        // 2. Validate: Must have a user object AND a token (either in storage or inside the object)
-        if (token || parsedUser.token) {
-          setUser(parsedUser);
-        } else {
-          // Found user data but no token? invalid state.
-          console.warn("Found user data but no token. Clearing session.");
-          sessionStorage.clear();
-        }
+        setUser(JSON.parse(savedUser));
       } catch (e) {
-        console.error("Error parsing auth data:", e);
-        sessionStorage.clear();
+        console.error("Error parsing cached auth data:", e);
       }
     }
-    setLoading(false);
+
+    // 2. Query the server to check if session cookie is valid and fetch fresh user details
+    const fetchUser = async () => {
+      try {
+        const response = await getMe();
+        if (response?.status === "success" && response.data) {
+          const freshUser = response.data;
+          setUser(freshUser);
+          sessionStorage.setItem("hrmsUser", JSON.stringify(freshUser));
+        } else {
+          sessionStorage.removeItem("hrmsUser");
+          setUser(null);
+        }
+      } catch (error) {
+        console.warn("Invalid session cookie or expired session. Clearing user state.");
+        sessionStorage.removeItem("hrmsUser");
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
   }, []);
 
   const login = async (email, password) => {
@@ -39,57 +49,43 @@ export const AuthProvider = ({ children }) => {
 
       console.log("LOGIN RAW RESPONSE:", response.data);
 
-      const token = response.data.token;
       const userData = response.data.data;
 
       // Validation
-      if (!token || !userData) {
+      if (!userData) {
         console.error("⚠ INVALID LOGIN RESPONSE STRUCTURE", response.data);
         throw new Error("Invalid login response");
       }
 
-      // --- CRITICAL FIX: STORE TOKEN IN ALL EXPECTED LOCATIONS ---
-      
-      // 1. Standard key (used by CurrentEmployeeProfile)
-      sessionStorage.setItem("token", token);
-      
-      // 2. Legacy key (used by api.js)
-      sessionStorage.setItem("hrms-token", token);
+      // Cache user info (without sensitive token) in sessionStorage
+      sessionStorage.setItem("hrmsUser", JSON.stringify(userData));
+      setUser(userData);
 
-      // 3. Inside User Object (Best practice for Profile page access)
-      const userWithToken = { ...userData, token };
-      sessionStorage.setItem("hrmsUser", JSON.stringify(userWithToken));
-
-      setUser(userWithToken);
-
-      // Return FULL RESPONSE so Login.jsx can redirect using role
       return response;
-
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
     }
   };
 
-  const logout = () => {
-    // Clear all possible keys
-    sessionStorage.removeItem("hrmsUser");
-    sessionStorage.removeItem("hrms-token");
-    sessionStorage.removeItem("token");
-    sessionStorage.clear(); // Safety clear
-    setUser(null);
+  const logout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Backend logout failed:", error);
+    } finally {
+      // Clear local storage and state regardless of API success
+      sessionStorage.removeItem("hrmsUser");
+      sessionStorage.removeItem("hrms-token");
+      sessionStorage.removeItem("token");
+      sessionStorage.clear(); // Safety clear
+      setUser(null);
+    }
   };
 
   const updateUser = useCallback((newUserData) => {
     setUser(prevUser => {
-      // Merge new data with previous user data
       const updatedUser = { ...prevUser, ...newUserData };
-      
-      // Ensure we don't accidentally lose the token during an update
-      if (prevUser?.token && !updatedUser.token) {
-          updatedUser.token = prevUser.token;
-      }
-
       sessionStorage.setItem("hrmsUser", JSON.stringify(updatedUser));
       return updatedUser;
     });

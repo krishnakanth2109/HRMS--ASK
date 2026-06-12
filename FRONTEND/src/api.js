@@ -19,6 +19,7 @@ const api = axios.create({
   baseURL,
   timeout: 500000,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 /* =============================================================================
@@ -92,6 +93,26 @@ export const loginUser = async (email, password) => {
     return response;
   } catch (error) {
     console.error("Login failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const logoutUser = async () => {
+  try {
+    const response = await api.post("/api/auth/logout");
+    return response.data;
+  } catch (error) {
+    console.error("Logout failed:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getMe = async () => {
+  try {
+    const response = await api.get("/api/auth/me");
+    return response.data;
+  } catch (error) {
+    console.error("Fetch profile failed:", error.response?.data || error.message);
     throw error;
   }
 };
