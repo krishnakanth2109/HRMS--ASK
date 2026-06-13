@@ -2,7 +2,8 @@
 
 import express from "express";
 import multer from "multer";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 import { protect } from "../controllers/authController.js"; // Assuming you want this protected
 import Employee from "../models/employeeModel.js";
 import InductionDispatch from "../models/InductionDispatch.js";
@@ -114,7 +115,8 @@ router.post("/send-onboarding", protect, async (req, res) => {
     // 3. Send Emails
     // We use Promise.all to send them in parallel, or you can loop sequentially
     const emailPromises = recipients.map((toEmail) => {
-      return transporter.sendMail({
+      // return transporter.sendMail({
+      return sendEmail({
         from: `"HR Team" <${process.env.SMTP_USER}>`, // Sender address
         to: toEmail,
         subject: emailSubject || "Complete Your Onboarding",
@@ -252,7 +254,15 @@ router.post("/send", protect, upload.single("attachment"), async (req, res) => {
       });
 
       try {
-        const info = await transporter.sendMail({
+        // const info = await transporter.sendMail({
+        //   from: `"${companyName}" <${process.env.SMTP_USER}>`,
+        //   to: employee.email,
+        //   subject: `${inductionType} - ${companyName}`,
+        //   text: preview.text,
+        //   html: preview.html,
+        //   attachments: attachment,
+        // });
+        const info = await sendEmail({
           from: `"${companyName}" <${process.env.SMTP_USER}>`,
           to: employee.email,
           subject: `${inductionType} - ${companyName}`,
@@ -267,7 +277,7 @@ router.post("/send", protect, upload.single("attachment"), async (req, res) => {
           employeeName,
           email: employee.email,
           status: "sent",
-          provider: "nodemailer",
+          provider: "brevo",
           providerMessageId: info?.messageId || "",
         });
       } catch (error) {
@@ -277,7 +287,7 @@ router.post("/send", protect, upload.single("attachment"), async (req, res) => {
           employeeName,
           email: employee.email,
           status: "failed",
-          provider: "nodemailer",
+          provider: "brevo",
           error: error.message,
         });
       }

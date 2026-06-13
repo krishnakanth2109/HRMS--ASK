@@ -5,7 +5,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import xlsx from "xlsx";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 import HTMLtoDOCX from "html-to-docx";
 import OfferLetterEmployee from "../models/OfferLetterEmployee.js";
 import GeneratedLetter from "../models/GeneratedLetter.js";
@@ -889,8 +890,8 @@ router.post("/send-email", protect, onlyAdmin, async (req, res) => {
     }
 
     // Send the email
-    console.log("📧 Sending full offer email to:", emp.email);
-    await transporter.sendMail(mailOptions);
+    // await transporter.sendMail(mailOptions);
+    await sendEmail(mailOptions);
     console.log("✅ Full offer email sent successfully!");
 
     res.status(200).json({

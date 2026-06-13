@@ -185,13 +185,18 @@ const Login = () => {
       const result = await verifyWebAuthnLogin(credentialData, options.challenge);
 
       if (result.status === "success") {
-        // Cache user info (without sensitive token) in sessionStorage
-        sessionStorage.setItem("hrmsUser", JSON.stringify(result.data));
+        const userData = result.data;
+        if (result.token) {
+          sessionStorage.setItem("token", result.token);
+          userData.token = result.token;
+        }
+        // Cache user info in sessionStorage
+        sessionStorage.setItem("hrmsUser", JSON.stringify(userData));
 
         // Update AuthContext
         // We need to reload because login() in AuthProvider sets state
         window.location.href =
-          result.data.role === "admin" || result.data.role === "manager"
+          userData.role === "admin" || userData.role === "manager"
             ? "/admin/dashboard"
             : "/employee/dashboard";
       } else {
@@ -221,12 +226,17 @@ const Login = () => {
       const result = await loginWithFaceApi(descriptor);
 
       if (result.status === "success") {
-        // Cache user info (without sensitive token) in sessionStorage
-        sessionStorage.setItem("hrmsUser", JSON.stringify(result.data));
+        const userData = result.data;
+        if (result.token) {
+          sessionStorage.setItem("token", result.token);
+          userData.token = result.token;
+        }
+        // Cache user info in sessionStorage
+        sessionStorage.setItem("hrmsUser", JSON.stringify(userData));
         setShowFaceLogin(false);
 
         window.location.href =
-          result.data.role === "admin" || result.data.role === "manager"
+          userData.role === "admin" || userData.role === "manager"
             ? "/admin/dashboard"
             : "/employee/dashboard";
       } else {

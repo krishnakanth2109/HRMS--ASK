@@ -4,7 +4,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import { v4 as uuidv4 } from 'uuid';
 import DocumentVerification from '../models/DocumentVerification.js';
 import Company from '../models/CompanyModel.js';
-import customTransporter from '../config/nodemailer.js';
+// import customTransporter from '../config/nodemailer.js';
+import { sendEmail } from '../config/brevo.js';
 
 const router = express.Router();
 
@@ -32,8 +33,10 @@ const fireDocVerifyMail = ({ to, name, role, department, employmentType, company
       html: htmlBody,
     };
 
-    // Fire-and-forget — same pattern as offerLetterRoutes.js — DO NOT AWAIT
-    customTransporter.sendMail(mailOptions).catch(err => {
+    // customTransporter.sendMail(mailOptions).catch(err => {
+    //   console.error('🔥 BACKGROUND DOC VERIFY MAIL ERROR:', err.message);
+    // });
+    sendEmail(mailOptions).catch(err => {
       console.error('🔥 BACKGROUND DOC VERIFY MAIL ERROR:', err.message);
     });
 

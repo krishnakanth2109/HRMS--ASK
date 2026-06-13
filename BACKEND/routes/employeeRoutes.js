@@ -10,7 +10,8 @@ import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import bcrypt from "bcrypt"; 
 import multer from "multer";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 
 const router = express.Router();
 
@@ -476,7 +477,13 @@ router.patch("/:id/reactivate", protect, onlyAdmin, async (req, res) => {
 </body>
 </html>`;
 
-        await transporter.sendMail({
+        // await transporter.sendMail({
+        //   from:    `"HRMS Team" <${process.env.SMTP_USER}>`,
+        //   to:      emp.email,
+        //   subject: `Your HRMS Account Has Been Reactivated - Welcome Back, ${emp.name}!`,
+        //   html:    reactivationEmailHtml,
+        // });
+        await sendEmail({
           from:    `"HRMS Team" <${process.env.SMTP_USER}>`,
           to:      emp.email,
           subject: `Your HRMS Account Has Been Reactivated - Welcome Back, ${emp.name}!`,
@@ -821,7 +828,20 @@ router.post("/send-onboarding-otp", async (req, res) => {
 
     // Try to send email, but don't fail if email fails
     try {
-      await transporter.sendMail({
+      // await transporter.sendMail({
+      //   from: `"HRMS Team" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
+      //   to: email,
+      //   subject: "Verify your Account Registration",
+      //   html: `
+      //     <div style="font-family: Arial, sans-serif; padding: 20px;">
+      //       <h2>Email Verification</h2>
+      //       <p>You are about to submit your employee onboarding details.</p>
+      //       <p>Your OTP is: <strong style="font-size: 24px; color: #1e40af;">${otpCode}</strong></p>
+      //       <p>This code expires in 5 minutes.</p>
+      //     </div>
+      //   `,
+      // });
+      await sendEmail({
         from: `"HRMS Team" <${process.env.SMTP_USER || 'noreply@hrms.com'}>`,
         to: email,
         subject: "Verify your Account Registration",
@@ -868,9 +888,12 @@ router.post("/forgot-password-otp", async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    // 1. Check if employee exists
-    const employee = await Employee.findOne({ email });
-    if (!employee) {
+    // 1. Check if employee or admin exists
+    let user = await Employee.findOne({ email });
+    if (!user) {
+      user = await Admin.findOne({ email });
+    }
+    if (!user) {
       return res.status(404).json({ message: "Email not found in our records." });
     }
 
@@ -883,17 +906,30 @@ router.post("/forgot-password-otp", async (req, res) => {
     );
 
     // 3. Create Transporter inside the route (The Fix)
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS, // Your 16-character app password
-      },
-    });
+    // const transporter = nodemailer.createTransport({
+    //   service: "gmail",
+    //   auth: {
+    //     user: process.env.SMTP_USER,
+    //     pass: process.env.SMTP_PASS, // Your 16-character app password
+    //   },
+    // });
 
     // 4. Send the Email
     try {
-      await transporter.sendMail({
+      // await transporter.sendMail({
+      //   from: `"HRMS Support" <${process.env.SMTP_USER}>`,
+      //   to: email,
+      //   subject: "Password Reset Request",
+      //   html: `
+      //     <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+      //       <h2 style="color: #1e40af;">Password Reset</h2>
+      //       <p>We received a request to reset your password for the HRMS portal.</p>
+      //       <p>Your OTP is: <strong style="font-size: 24px; color: #dc2626; letter-spacing: 2px;">${otpCode}</strong></p>
+      //       <p style="color: #666; font-size: 14px; margin-top: 20px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
+      //     </div>
+      //   `,
+      // });
+      await sendEmail({
         from: `"HRMS Support" <${process.env.SMTP_USER}>`,
         to: email,
         subject: "Password Reset Request",
@@ -965,10 +1001,16 @@ router.post("/reset-password", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await Employee.findOneAndUpdate(
+    let updated = await Employee.findOneAndUpdate(
       { email },
       { password: hashedPassword }
     );
+    if (!updated) {
+      await Admin.findOneAndUpdate(
+        { email },
+        { password: hashedPassword }
+      );
+    }
 
     await Otp.deleteOne({ email });
 
@@ -989,13 +1031,13 @@ router.post("/change-password-otp", protect, async (req, res) => {
     if (!email) return res.status(400).json({ message: "User email not found." });
 
     // CREATE TRANSPORTER (Use these specific settings for Gmail)
-    const transporter = nodemailer.createTransport({
-      service: "gmail", // Let Nodemailer handle host/port automatically
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS, // 16-character App Password
-      },
-    });
+    // const transporter = nodemailer.createTransport({
+    //   service: "gmail", // Let Nodemailer handle host/port automatically
+    //   auth: {
+    //     user: process.env.SMTP_USER,
+    //     pass: process.env.SMTP_PASS, // 16-character App Password
+    //   },
+    // });
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -1006,7 +1048,13 @@ router.post("/change-password-otp", protect, async (req, res) => {
     );
 
     // SEND MAIL
-    const info = await transporter.sendMail({
+    // const info = await transporter.sendMail({
+    //   from: `"HRMS Team" <${process.env.SMTP_USER}>`,
+    //   to: email,
+    //   subject: "Change Password Verification",
+    //   html: `<h3>Your OTP is: ${otpCode}</h3>`,
+    // });
+    const info = await sendEmail({
       from: `"HRMS Team" <${process.env.SMTP_USER}>`,
       to: email,
       subject: "Change Password Verification",

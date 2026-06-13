@@ -4,7 +4,8 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import Notification from "../models/notificationModel.js";
 import Employee from "../models/employeeModel.js";
 import Admin from "../models/adminModel.js";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 import jwt from "jsonwebtoken";
 
 /* ===============================================================
@@ -446,7 +447,23 @@ export const createLeave = async (req, res) => {
         const approveUrl = `${BASE_URL}/api/leaves/email-action?token=${approveToken}`;
         const rejectUrl = `${BASE_URL}/api/leaves/email-action?token=${rejectToken}`;
 
-        await transporter.sendMail({
+        // await transporter.sendMail({
+        //   from: `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
+        //   to: adminEmails.join(","),
+        //   subject: `New Leave Request from ${name} — Action Required`,
+        //   html: createAdminLeaveNotificationEmail({
+        //     name,
+        //     employeeId: employeeId,
+        //     email: loggedUser.email,
+        //     leaveType,
+        //     from,
+        //     to,
+        //     reason,
+        //     approveUrl,
+        //     rejectUrl,
+        //   }),
+        // });
+        await sendEmail({
           from: `"HRMS Leave Request Notification" <${process.env.SMTP_USER}>`,
           to: adminEmails.join(","),
           subject: `New Leave Request from ${name} — Action Required`,
@@ -578,7 +595,21 @@ export const handleEmailAction = async (req, res) => {
 
       if (employee.email) {
         try {
-          await transporter.sendMail({
+          // await transporter.sendMail({
+          //   from: `"Leave Management" <${process.env.SMTP_USER}>`,
+          //   to: employee.email,
+          //   subject: `Leave Request ${action}: ${leave.from} to ${leave.to}`,
+          //   html: createLeaveStatusEmail({
+          //     employeeName: employee.name || employeeName,
+          //     status: action,
+          //     from: leave.from,
+          //     to: leave.to,
+          //     leaveType: leave.leaveType,
+          //     reason: leave.reason,
+          //     approvedBy,
+          //   }),
+          // });
+          await sendEmail({
             from: `"Leave Management" <${process.env.SMTP_USER}>`,
             to: employee.email,
             subject: `Leave Request ${action}: ${leave.from} to ${leave.to}`,
@@ -702,7 +733,21 @@ export const updateLeaveStatus = async (req, res) => {
 
       if (employee.email) {
         try {
-          await transporter.sendMail({
+          // await transporter.sendMail({
+          //   from: `"Leave Management" <${process.env.SMTP_USER}>`,
+          //   to: employee.email,
+          //   subject: `Leave Request Update: ${status}`,
+          //   html: createLeaveStatusEmail({
+          //     employeeName: employee.name,
+          //     status,
+          //     from: doc.from,
+          //     to: doc.to,
+          //     leaveType: doc.leaveType,
+          //     reason: doc.reason,
+          //     approvedBy,
+          //   }),
+          // });
+          await sendEmail({
             from: `"Leave Management" <${process.env.SMTP_USER}>`,
             to: employee.email,
             subject: `Leave Request Update: ${status}`,

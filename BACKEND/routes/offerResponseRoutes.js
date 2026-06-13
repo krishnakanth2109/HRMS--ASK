@@ -2,7 +2,7 @@ import express from "express";
 import OfferLetterEmployee from "../models/OfferLetterEmployee.js";
 import InvitedEmployee from "../models/Invitedemployee.js";
 import Company from "../models/CompanyModel.js";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
 
 const router = express.Router();
 

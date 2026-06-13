@@ -29,11 +29,15 @@ export const AuthProvider = ({ children }) => {
           sessionStorage.setItem("hrmsUser", JSON.stringify(freshUser));
         } else {
           sessionStorage.removeItem("hrmsUser");
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("hrms-token");
           setUser(null);
         }
       } catch (error) {
         console.warn("Invalid session cookie or expired session. Clearing user state.");
         sessionStorage.removeItem("hrmsUser");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("hrms-token");
         setUser(null);
       } finally {
         setLoading(false);
@@ -50,6 +54,7 @@ export const AuthProvider = ({ children }) => {
       console.log("LOGIN RAW RESPONSE:", response.data);
 
       const userData = response.data.data;
+      const token = response.data.token;
 
       // Validation
       if (!userData) {
@@ -57,7 +62,11 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Invalid login response");
       }
 
-      // Cache user info (without sensitive token) in sessionStorage
+      // Cache token and user info in sessionStorage
+      if (token) {
+        sessionStorage.setItem("token", token);
+        userData.token = token;
+      }
       sessionStorage.setItem("hrmsUser", JSON.stringify(userData));
       setUser(userData);
 

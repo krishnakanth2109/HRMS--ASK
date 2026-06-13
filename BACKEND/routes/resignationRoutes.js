@@ -5,7 +5,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import Resignation from "../models/Resignation.js";
 import WelcomeKit from "../models/WelcomeKit.js";
 import Admin from "../models/adminModel.js";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 import { protect } from "../controllers/authController.js";
 import { onlyAdmin } from "../middleware/roleMiddleware.js";
 
@@ -28,7 +29,13 @@ const uploadToCloudinary = (buffer, filename) =>
 // ─── Helper: send email ────────────────────────────────────────────────────────
 const sendMail = async (to, subject, html) => {
   try {
-    await transporter.sendMail({
+    // await transporter.sendMail({
+    //   from: `"HRMS System" <${process.env.SMTP_USER}>`,
+    //   to,
+    //   subject,
+    //   html,
+    // });
+    await sendEmail({
       from: `"HRMS System" <${process.env.SMTP_USER}>`,
       to,
       subject,

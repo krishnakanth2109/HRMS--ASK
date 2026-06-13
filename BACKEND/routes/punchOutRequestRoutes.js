@@ -4,7 +4,8 @@ import express from "express";
 import PunchOutRequest from "../models/PunchOutRequest.js";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/employeeModel.js";
-import transporter from "../config/nodemailer.js";
+// import transporter from "../config/nodemailer.js";
+import { sendEmail } from "../config/brevo.js";
 
 const router = express.Router();
 
@@ -176,7 +177,8 @@ router.post("/action", async (req, res) => {
           adminComment: adminComment
         }),
       };
-      await transporter.sendMail(mailOptions).catch(err => console.error('Email failed:', err));
+      // await transporter.sendMail(mailOptions).catch(err => console.error('Email failed:', err));
+      await sendEmail(mailOptions).catch(err => console.error('Email failed:', err));
     }
 
     res.json({ success: true, message: `Request ${status} Successfully` });

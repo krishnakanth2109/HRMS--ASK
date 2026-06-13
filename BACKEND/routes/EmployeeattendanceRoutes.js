@@ -7,7 +7,8 @@ import { onlyAdmin } from "../middleware/roleMiddleware.js";
 import LeaveRequest from "../models/LeaveRequest.js";
 import Holiday from "../models/Holiday.js";
 import Overtime from "../models/Overtime.js";
-import transporter from '../config/nodemailer.js';
+// import transporter from '../config/nodemailer.js';
+import { sendEmail } from '../config/brevo.js';
 // import { getFingerprintAttendanceDecision } from "../utils/fingerprintAttendance.js";
 
 const router = express.Router();
@@ -91,7 +92,13 @@ const createUninformedAbsenceEmail = (employeeName, absentDate) => {
 
 const sendInsufficientHoursEmail = async (employeeEmail, employeeData) => {
     try {
-        await transporter.sendMail({
+        // await transporter.sendMail({
+        //     from: `<${process.env.SMTP_USER}>`,
+        //     to: employeeEmail,
+        //     subject: `Shortage of Work Hours - ${employeeData.date}`,
+        //     html: createInsufficientHoursEmail(employeeData)
+        // });
+        await sendEmail({
             from: `<${process.env.SMTP_USER}>`,
             to: employeeEmail,
             subject: `Shortage of Work Hours - ${employeeData.date}`,
@@ -102,7 +109,13 @@ const sendInsufficientHoursEmail = async (employeeEmail, employeeData) => {
 
 const sendMissingAttendanceEmail = async (employeeEmail, employeeData) => {
     try {
-        await transporter.sendMail({
+        // await transporter.sendMail({
+        //     from: `<${process.env.SMTP_USER}>`,
+        //     to: employeeEmail,
+        //     subject: `Leave Deducted - ${employeeData.date}`,
+        //     html: createMissingAttendanceEmail(employeeData)
+        // });
+        await sendEmail({
             from: `<${process.env.SMTP_USER}>`,
             to: employeeEmail,
             subject: `Leave Deducted - ${employeeData.date}`,
@@ -113,7 +126,13 @@ const sendMissingAttendanceEmail = async (employeeEmail, employeeData) => {
 
 const sendUninformedAbsenceEmail = async (employeeEmail, employeeName, absentDate) => {
     try {
-        await transporter.sendMail({
+        // await transporter.sendMail({
+        //     from: `<${process.env.SMTP_USER}>`,
+        //     to: employeeEmail,
+        //     subject: `⚠ No Attendance Recorded - ${absentDate}`,
+        //     html: createUninformedAbsenceEmail(employeeName, absentDate)
+        // });
+        await sendEmail({
             from: `<${process.env.SMTP_USER}>`,
             to: employeeEmail,
             subject: `⚠ No Attendance Recorded - ${absentDate}`,

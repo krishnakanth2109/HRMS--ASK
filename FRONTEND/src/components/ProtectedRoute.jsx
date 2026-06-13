@@ -46,7 +46,7 @@ const styles = {
   }
 };
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, role }) => {
   const { user, loading, error } = useContext(AuthContext);
   
   // Local state to enforce a 2-second minimum loading time
@@ -126,6 +126,16 @@ const ProtectedRoute = ({ children }) => {
   // ---------------------------------------------
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Enforce role restriction if provided
+  if (role) {
+    if (role === "admin" && user.role !== "admin" && user.role !== "manager") {
+      return <Navigate to="/employee/dashboard" replace />;
+    }
+    if (role === "employee" && user.role !== "employee") {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
   }
 
   // ⭐ 4. RENDER CHILDREN IF SUCCESSFUL
