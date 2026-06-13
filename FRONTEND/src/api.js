@@ -46,7 +46,10 @@ api.interceptors.request.use(
 
     // 3. Attach token if found
     if (token) {
+      console.log(`📡 [API Interceptor] Attaching token to: ${config.method.toUpperCase()} ${config.url}`, token.substring(0, 15) + "...");
       config.headers["Authorization"] = `Bearer ${token}`;
+    } else {
+      console.warn(`📡 [API Interceptor] No token found in sessionStorage for: ${config.method.toUpperCase()} ${config.url}`);
     }
 
     return config;

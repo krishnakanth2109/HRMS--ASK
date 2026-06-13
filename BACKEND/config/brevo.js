@@ -85,7 +85,7 @@ export const sendEmail = async (options) => {
       }
     });
 
-    console.log("📩 [Brevo Diagnostics] Response data:", JSON.stringify(response.data, null, 2));
+    // console.log("📩 [Brevo Diagnostics] Response data:", JSON.stringify(response.data, null, 2));
 
     return {
       messageId: response.data.messageId,

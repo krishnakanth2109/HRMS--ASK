@@ -51,21 +51,24 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await loginUser(email, password);
 
-      console.log("LOGIN RAW RESPONSE:", response.data);
+      console.log("💾 [Auth Diagnostics] Login Raw Response:", response.data);
 
       const userData = response.data.data;
       const token = response.data.token;
 
       // Validation
       if (!userData) {
-        console.error("⚠ INVALID LOGIN RESPONSE STRUCTURE", response.data);
+        console.error("⚠ [Auth Diagnostics] Invalid login response structure", response.data);
         throw new Error("Invalid login response");
       }
 
       // Cache token and user info in sessionStorage
       if (token) {
+        console.log("💾 [Auth Diagnostics] Storing JWT token:", token.substring(0, 15) + "...");
         sessionStorage.setItem("token", token);
         userData.token = token;
+      } else {
+        console.warn("⚠ [Auth Diagnostics] No token returned in login response!");
       }
       sessionStorage.setItem("hrmsUser", JSON.stringify(userData));
       setUser(userData);
